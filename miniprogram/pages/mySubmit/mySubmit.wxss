@@ -1,0 +1,60 @@
+.filter-bar {
+  display: flex;
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 8rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 4rpx 12rpx rgba(6, 182, 212, 0.06);
+}
+.filter {
+  flex: 1;
+  text-align: center;
+  padding: 14rpx 0;
+  font-size: 26rpx;
+  color: #64748b;
+  border-radius: 10rpx;
+  transition: all 0.2s;
+}
+.filter.active {
+  background: linear-gradient(135deg, #06b6d4, #3b82f6);
+  color: #fff;
+  font-weight: 500;
+  box-shadow: 0 4rpx 10rpx rgba(6, 182, 212, 0.3);
+}
+.submit-item .submit-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+.submit-item .reject {
+  margin-top: 12rpx;
+  padding: 12rpx 16rpx;
+  background: #fef2f2;
+  border-radius: 8rpx;
+  font-size: 24rpx;
+  color: #b91c1c;
+  border-left: 4rpx solid #ef4444;
+}
+.ellipsis-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.actions {
+  margin-top: 16rpx;
+  text-align: right;
+}
+.action {
+  display: inline-block;
+  padding: 8rpx 24rpx;
+  border-radius: 6rpx;
+  font-size: 24rpx;
+  margin-left: 12rpx;
+}
+.action.cancel {
+  color: #ef4444;
+  border: 1rpx solid #ef4444;
+  background: #fff;
+}

@@ -1,0 +1,7 @@
+.content {
+  margin-top: 24rpx;
+  font-size: 30rpx;
+  line-height: 1.8;
+  color: #333;
+  white-space: pre-wrap;
+}

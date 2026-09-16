@@ -1,0 +1,44 @@
+# 校园广播站后端 - Nginx 反向代理示例
+# 放到 /etc/nginx/conf.d/radio.conf 后执行 nginx -t && nginx -s reload
+
+upstream radio_backend {
+    # 如启用 PM2 cluster，多实例可写多行
+    server 127.0.0.1:3000;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    server_name api.your-school-domain.com;
+
+    # 后端直接 HTTP，交给 PM2
+    location / {
+        proxy_pass         http://radio_backend;
+        proxy_http_version 1.1;
+        proxy_set_header   Connection          "";
+        proxy_set_header   Host                $host;
+        proxy_set_header   X-Real-IP           $remote_addr;
+        proxy_set_header   X-Forwarded-For     $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto   $scheme;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout    30s;
+        proxy_send_timeout    30s;
+
+        # 限流（简单防刷）
+        limit_req zone=radio burst=20 nodelay;
+    }
+
+    # Swagger UI 子路径单独放行（流量小）
+    location /api-docs {
+        proxy_pass http://radio_backend;
+    }
+
+    # 健康检查不走日志
+    location = /health {
+        access_log off;
+        proxy_pass http://radio_backend;
+    }
+}
+
+# 限流共享内存（放在 http {} 块内）：
+# limit_req_zone $binary_remote_addr zone=radio:10m rate=30r/s;

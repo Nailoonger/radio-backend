@@ -1,0 +1,42 @@
+.content {
+  margin-top: 16rpx;
+  font-size: 28rpx;
+  line-height: 1.8;
+  color: #444;
+  white-space: pre-wrap;
+}
+.msg {
+  display: flex;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+.msg:last-child {
+  border-bottom: none;
+}
+.avatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  margin-right: 16rpx;
+  background: #eee;
+}
+.msg-body {
+  flex: 1;
+  min-width: 0;
+}
+.msg-name {
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 6rpx;
+}
+.msg-content {
+  font-size: 28rpx;
+  color: #333;
+  line-height: 1.6;
+  word-break: break-all;
+}
+.msg-time {
+  font-size: 22rpx;
+  color: #aaa;
+  margin-top: 8rpx;
+}

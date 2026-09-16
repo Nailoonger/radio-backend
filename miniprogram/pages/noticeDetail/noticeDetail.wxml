@@ -1,0 +1,8 @@
+<view class="container" wx:if="{{notice}}">
+  <view class="card">
+    <view class="title">{{notice.title}}</view>
+    <view class="subtitle">{{notice.publishTimeFmt}}</view>
+    <view class="content">{{notice.content}}</view>
+  </view>
+</view>
+<view class="empty" wx:elif="{{!loading}}">公告不存在或已被删除</view>

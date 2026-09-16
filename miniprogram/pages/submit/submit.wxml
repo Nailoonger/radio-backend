@@ -1,0 +1,61 @@
+<view class="container">
+  <!-- 切换 -->
+  <view class="type-tabs">
+    <view
+      class="tab {{type === 1 ? 'active' : ''}} {{switches.submit_song === 'off' ? 'disabled' : ''}}"
+      data-type="1"
+      bindtap="switchType"
+    >🎵 点歌<text wx:if="{{switches.submit_song === 'off'}}" class="closed-tag">（已关闭）</text></view>
+    <view
+      class="tab {{type === 2 ? 'active' : ''}} {{switches.submit_article === 'off' ? 'disabled' : ''}}"
+      data-type="2"
+      bindtap="switchType"
+    >📝 文稿投稿<text wx:if="{{switches.submit_article === 'off'}}" class="closed-tag">（已关闭）</text></view>
+  </view>
+
+  <!-- 点歌表单 -->
+  <block wx:if="{{type === 1}}">
+    <view class="card">
+      <view class="form-row">
+        <view class="label">歌曲名<text class="required">*</text></view>
+        <input class="input" placeholder="请输入歌曲名" value="{{songName}}" bindinput="inputSongName" />
+      </view>
+      <view class="form-row">
+        <view class="label">歌手<text class="required">*</text></view>
+        <input class="input" placeholder="请输入歌手" value="{{singer}}" bindinput="inputSinger" />
+      </view>
+      <view class="form-row">
+        <view class="label">祝福语（选填）</view>
+        <textarea class="textarea" placeholder="想说点什么…" maxlength="500" value="{{wishContent}}" bindinput="inputWish"></textarea>
+      </view>
+    </view>
+  </block>
+
+  <!-- 文稿表单 -->
+  <block wx:if="{{type === 2}}">
+    <view class="card">
+      <view class="form-row">
+        <view class="label">标题<text class="required">*</text></view>
+        <input class="input" placeholder="文稿标题" value="{{articleTitle}}" bindinput="inputArticleTitle" />
+      </view>
+      <view class="form-row">
+        <view class="label">正文<text class="required">*</text></view>
+        <textarea class="textarea large" placeholder="尽情创作吧" maxlength="5000" value="{{articleContent}}" bindinput="inputArticleContent"></textarea>
+      </view>
+    </view>
+  </block>
+
+  <!-- 通用：希望播出时间 -->
+  <view class="card">
+    <view class="form-row">
+      <view class="label">希望播出时间（选填）</view>
+      <input class="input" placeholder="例如 2026-09-15 午间" value="{{wantBroadcastTime}}" bindinput="inputTime" />
+    </view>
+  </view>
+
+  <button class="btn-primary" bindtap="doSubmit" disabled="{{submitting}}">
+    {{submitting ? '提交中...' : '提交投稿'}}
+  </button>
+
+  <view class="tips" wx:if="{{!loggedIn}}">首次提交将自动登录（仅获取微信昵称/头像，不收集手机号）</view>
+</view>

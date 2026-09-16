@@ -1,0 +1,49 @@
+<view class="container">
+  <!-- 未登录提示 -->
+  <view class="empty" wx:if="{{!loggedIn}}">
+    <view>登录后查看你的投稿记录</view>
+    <button class="btn-primary" style="margin: 24rpx auto; width: 240rpx;" bindtap="doLogin">微信登录</button>
+  </view>
+
+  <block wx:if="{{loggedIn}}">
+    <!-- 筛选 -->
+    <view class="filter-bar">
+      <view class="filter {{statusFilter === '' ? 'active' : ''}}" data-status="" bindtap="switchFilter">全部</view>
+      <view class="filter {{statusFilter === '0' ? 'active' : ''}}" data-status="0" bindtap="switchFilter">待审核</view>
+      <view class="filter {{statusFilter === '1' ? 'active' : ''}}" data-status="1" bindtap="switchFilter">已通过</view>
+      <view class="filter {{statusFilter === '2' ? 'active' : ''}}" data-status="2" bindtap="switchFilter">已驳回</view>
+    </view>
+
+    <view class="empty" wx:if="{{!list.length && !loading}}">暂无记录</view>
+
+    <view class="card submit-item" wx:for="{{list}}" wx:key="id">
+      <view class="submit-head">
+        <text class="tag {{item.status === 0 ? 'tag-pending' : item.status === 1 ? 'tag-pass' : 'tag-reject'}}">
+          {{item.status === 0 ? '待审核' : item.status === 1 ? '已通过' : '已驳回'}}
+        </text>
+        <text class="subtitle">{{item.createTime}}</text>
+      </view>
+
+      <view wx:if="{{item.type === 1}}">
+        <view class="title">🎵 {{item.songName}} - {{item.singer}}</view>
+        <view class="subtitle" wx:if="{{item.wishContent}}">{{item.wishContent}}</view>
+      </view>
+
+      <view wx:if="{{item.type === 2}}">
+        <view class="title">📝 {{item.articleTitle}}</view>
+        <view class="subtitle ellipsis-2">{{item.articleContent}}</view>
+      </view>
+
+      <view class="reject" wx:if="{{item.rejectReason}}">
+        驳回原因：{{item.rejectReason}}
+      </view>
+
+      <view class="actions" wx:if="{{item.status === 0}}">
+        <view class="action cancel" data-id="{{item.id}}" bindtap="cancel">撤销</view>
+      </view>
+    </view>
+
+    <view class="empty" wx:if="{{list.length < total}}">加载中...</view>
+    <view class="empty" wx:elif="{{finished && list.length}}">— 没有更多了 —</view>
+  </block>
+</view>

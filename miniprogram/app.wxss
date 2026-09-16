@@ -1,0 +1,80 @@
+/* app.wxss - 全局样式（青蓝主题） */
+page {
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: linear-gradient(180deg, #ecfeff 0%, #f0f9ff 100%);
+  color: #0f172a;
+  font-size: 28rpx;
+  line-height: 1.6;
+}
+
+.container {
+  padding: 24rpx;
+}
+
+.card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 4rpx 16rpx rgba(6, 182, 212, 0.06);
+}
+
+.title {
+  font-size: 32rpx;
+  font-weight: bold;
+  margin-bottom: 12rpx;
+  color: #0f172a;
+}
+
+.subtitle {
+  font-size: 26rpx;
+  color: #64748b;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #6366f1 100%);
+  color: #fff;
+  border-radius: 12rpx;
+  font-size: 30rpx;
+  padding: 22rpx 0;
+  text-align: center;
+  border: none;
+  box-shadow: 0 6rpx 16rpx rgba(6, 182, 212, 0.3);
+  font-weight: 500;
+}
+
+.btn-primary[disabled] {
+  background: linear-gradient(135deg, #bae6fd, #c7d2fe);
+  color: #fff;
+  box-shadow: none;
+}
+
+.btn-secondary {
+  background: #fff;
+  color: #0891b2;
+  border: 2rpx solid #06b6d4;
+  border-radius: 12rpx;
+  font-size: 30rpx;
+  padding: 20rpx 0;
+  text-align: center;
+}
+
+.tag {
+  display: inline-block;
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+  font-size: 22rpx;
+  margin-right: 8rpx;
+  font-weight: 500;
+}
+
+.tag-pending { background: #fef3c7; color: #b45309; }
+.tag-pass { background: linear-gradient(135deg, #cffafe, #dbeafe); color: #0e7490; }
+.tag-reject { background: #fee2e2; color: #b91c1c; }
+
+.empty {
+  padding: 80rpx 0;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 26rpx;
+}

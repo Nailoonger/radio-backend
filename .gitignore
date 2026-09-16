@@ -1,0 +1,77 @@
+# ============== 依赖 ==============
+node_modules/
+
+# =============== 环境变量 ===============
+.env
+.env.local
+.env.*.local
+
+# =============== 日志 ===============
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =============== 运行时数据 ===============
+data/mysql/         # Docker MySQL 数据卷（含 .sock / .pid / binlog 等）
+data/uploads/       # Docker uploads 持久化（用户头像）
+data/radio.db*      # 旧 SQLite（已切 MySQL，不再用）
+uploads/            # 本地 uploads 目录（兼容旧代码）
+*.sqlite
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sock
+*.pid
+
+# =============== 构建产物 ===============
+dist/
+admin-web/dist/
+*.tsbuildinfo
+
+# =============== Docker / 证书 ===============
+deploy/certs/        # 自签证书（不入 git）
+
+# =============== 测试覆盖 ===============
+coverage/
+.nyc_output/
+
+# =============== IDE / 系统 ===============
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# =============== 调试 / 临时 ===============
+_*.txt
+_*.jpg
+_*.png
+_*.json
+.workbuddy/
+
+# =============== Python（脚本）==============
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# =============== Node ===============
+npm-debug.log*
+node_modules/
+jspm_packages/
+
+# =============== Misc ===============
+.pnpm-store/
+*.log
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

@@ -1,0 +1,109 @@
+# =================================================================
+#  菁悠广播站 - 一键部署（Docker Desktop 本地学习用）
+#  使用: docker compose up -d --build
+# =================================================================
+
+services:
+  # ---------- 1. MySQL 数据库 ----------
+  mysql:
+    image: mysql:8.0
+    container_name: radio-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root123}
+      MYSQL_DATABASE: ${DB_NAME:-radio_station}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_PASSWORD:-root123}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - radionet
+
+  # ---------- 2. 后端服务 ----------
+  radio-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: radio-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_DIALECT: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-radio_station}
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-root123}
+      JWT_SECRET: ${JWT_SECRET:-please-change-me-in-production}
+      JWT_EXPIRES_IN: 7d
+      CORS_ORIGIN: "*"
+      WECHAT_APPID: ${WECHAT_APPID:-}
+      WECHAT_SECRET: ${WECHAT_SECRET:-}
+      INIT_ADMIN_USERNAME: ${INIT_ADMIN_USERNAME:-teacher}
+      INIT_ADMIN_PASSWORD: ${INIT_ADMIN_PASSWORD:-admin123456}
+      INIT_ADMIN_NICKNAME: ${INIT_ADMIN_NICKNAME:-指导老师}
+    volumes:
+      - ./data/uploads:/app/uploads
+      # 如需日志持久化：
+      # - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - radionet
+
+  # ---------- 3. 管理后台（Vue 静态资源）----------
+  admin-web:
+    build:
+      context: ./admin-web
+      dockerfile: Dockerfile
+    container_name: radio-admin-web
+    restart: unless-stopped
+    depends_on:
+      - radio-backend
+    networks:
+      - radionet
+
+  # ---------- 4. 统一入口 nginx（暴露 80 + 443）----------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: radio-nginx
+    restart: unless-stopped
+    depends_on:
+      - admin-web
+      - radio-backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/certs:/etc/nginx/certs:ro
+    networks:
+      - radionet
+
+# ---------- 网络 ----------
+networks:
+  radionet:
+    driver: bridge
+
+# ---------- 卷声明（外部挂载也可见）----------
+volumes:
+  mysql_data:
+  uploads_data:

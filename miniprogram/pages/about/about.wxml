@@ -1,0 +1,22 @@
+<view class="container">
+  <view class="brand-hero">
+    <image src="/assets/station-logo.jpg" class="brand-hero-img" mode="aspectFit" />
+    <view class="brand-hero-name">菁悠广播站</view>
+    <view class="brand-hero-slogan">JING YOU GUANG BO ZHAN</view>
+  </view>
+
+  <view class="card">
+    <view class="title">📻 关于我们</view>
+    <view class="content">{{intro}}</view>
+  </view>
+
+  <view class="card">
+    <view class="title">🕐 开播时间</view>
+    <view class="content">{{schedule}}</view>
+  </view>
+
+  <view class="card">
+    <view class="title">📮 联系方式</view>
+    <view class="content">{{contact}}</view>
+  </view>
+</view>

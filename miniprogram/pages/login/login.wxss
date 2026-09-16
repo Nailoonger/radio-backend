@@ -1,0 +1,22 @@
+.logo {
+  font-size: 120rpx;
+  text-align: center;
+  margin: 80rpx 0 24rpx;
+}
+.brand {
+  text-align: center;
+  font-size: 40rpx;
+  font-weight: bold;
+  margin-bottom: 16rpx;
+}
+.intro {
+  text-align: center;
+  color: #888;
+  margin-bottom: 80rpx;
+}
+.tips {
+  margin-top: 24rpx;
+  text-align: center;
+  font-size: 22rpx;
+  color: #aaa;
+}

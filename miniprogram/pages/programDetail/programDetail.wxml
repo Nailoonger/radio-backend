@@ -1,0 +1,22 @@
+<view class="container" wx:if="{{program}}">
+  <view class="card">
+    <view class="title">{{program.title}}</view>
+    <view class="subtitle">主持人：{{program.host || '未知'}}</view>
+    <view class="subtitle">播出时间：{{program.broadcastTime}}</view>
+    <view class="content" wx:if="{{program.desc}}">{{program.desc}}</view>
+  </view>
+
+  <view class="card">
+    <view class="title">💬 节目留言（{{messages.length}}）</view>
+    <view class="msg" wx:for="{{messages}}" wx:key="id">
+      <image class="avatar" src="{{item.avatar || '/assets/default-avatar.png'}}" mode="aspectFill"></image>
+      <view class="msg-body">
+        <view class="msg-name">{{item.nickname}}</view>
+        <view class="msg-content">{{item.content}}</view>
+        <view class="msg-time">{{item.createTimeFmt}}</view>
+      </view>
+    </view>
+    <view class="empty" wx:if="{{!messages.length}}">暂无留言，快来抢沙发</view>
+  </view>
+</view>
+<view class="empty" wx:elif="{{!loading}}">节目不存在或已下线</view>

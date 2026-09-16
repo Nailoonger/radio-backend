@@ -1,0 +1,45 @@
+{
+  "name": "radio-backend",
+  "version": "1.0.0",
+  "description": "菁悠广播站微信小程序后端 - 投稿/点歌/节目/公告/留言 全栈API",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "seed": "node src/utils/seed.js",
+    "db:init": "node src/utils/init-db.js"
+  },
+  "keywords": [
+    "wechat",
+    "miniprogram",
+    "school",
+    "radio"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.7",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dayjs": "^1.11.13",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "express-rate-limit": "^7.4.1",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^2.4.0",
+    "mysql2": "^3.24.4",
+    "sequelize": "^6.37.5",
+    "sqlite3": "^5.1.7",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "jest": "^30.5.1",
+    "nodemon": "^3.1.7",
+    "supertest": "^7.2.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

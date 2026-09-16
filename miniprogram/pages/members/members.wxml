@@ -1,0 +1,76 @@
+<view class="container">
+  <!-- 顶部站徽横条 -->
+  <view class="hero">
+    <view class="hero-title">风采展示</view>
+    <view class="hero-sub">认识广播站里的每一位伙伴</view>
+  </view>
+
+  <!-- 职务 tab -->
+  <scroll-view scroll-x class="role-bar" enable-flex>
+    <view
+      class="role-tab {{activeRole === '' ? 'active' : ''}}"
+      data-role=""
+      bindtap="switchRole"
+    >全部</view>
+    <view
+      wx:for="{{roles}}"
+      wx:key="*this"
+      class="role-tab {{activeRole === item ? 'active' : ''}}"
+      data-role="{{item}}"
+      bindtap="switchRole"
+    >{{item}}</view>
+  </scroll-view>
+
+  <!-- 成员卡片 -->
+  <view wx:if="{{loading}}" class="loading">加载中...</view>
+
+  <block wx:elif="{{groups.length === 0}}">
+    <view class="empty">暂无展示成员</view>
+  </block>
+
+  <block wx:else>
+    <!-- 当选了具体职务 -->
+    <block wx:if="{{activeRole !== ''}}">
+      <view class="group-title">{{activeRole}}</view>
+      <view class="grid">
+        <view
+          class="card member-card"
+          wx:for="{{groups}}"
+          wx:for-item="g"
+          wx:key="role"
+          wx:if="{{g.role === activeRole}}"
+        >
+          <block wx:for="{{g.list}}" wx:for-item="m" wx:key="id">
+            <view class="member-cell" data-id="{{m.id}}" bindtap="goDetail">
+              <image class="avatar" src="{{m.avatar}}" mode="aspectFill" />
+              <view class="name">{{m.name}}</view>
+              <view class="role">{{m.role}}</view>
+              <view class="grade">{{m.grade}}</view>
+            </view>
+          </block>
+        </view>
+      </view>
+    </block>
+
+    <!-- 全部模式：按职务分组展示 -->
+    <block wx:else>
+      <block wx:for="{{groups}}" wx:for-item="g" wx:key="role">
+        <view class="group-title">{{g.role}}</view>
+        <view class="grid">
+          <view
+            class="member-cell"
+            wx:for="{{g.list}}"
+            wx:for-item="m"
+            wx:key="id"
+            data-id="{{m.id}}"
+            bindtap="goDetail"
+          >
+            <image class="avatar" src="{{m.avatar}}" mode="aspectFill" />
+            <view class="name">{{m.name}}</view>
+            <view class="grade">{{m.grade}}</view>
+          </view>
+        </view>
+      </block>
+    </block>
+  </block>
+</view>

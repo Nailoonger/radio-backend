@@ -1,0 +1,146 @@
+/* ============================================================
+   全局主题：青蓝渐变 + 玻璃拟态
+   ============================================================ */
+:root {
+  /* Element Plus 主色 */
+  --el-color-primary: #06b6d4;
+  --el-color-primary-light-3: #5dd5e6;
+  --el-color-primary-light-5: #89e0ed;
+  --el-color-primary-light-7: #b6ebf4;
+  --el-color-primary-light-8: #cceff7;
+  --el-color-primary-light-9: #e6f7fb;
+  --el-color-primary-dark-2: #0490a8;
+
+  --el-color-success: #10b981;
+  --el-color-warning: #f59e0b;
+  --el-color-danger:  #ef4444;
+  --el-color-info:    #64748b;
+
+  --brand-gradient: linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #6366f1 100%);
+  --brand-gradient-soft: linear-gradient(135deg, #ecfeff 0%, #eff6ff 50%, #eef2ff 100%);
+  --brand-gradient-dark: linear-gradient(135deg, #0891b2 0%, #2563eb 50%, #4f46e5 100%);
+}
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+/* ============================================================
+   全局背景：青蓝渐变 + 三个柔光斑（无水印）
+   ============================================================ */
+body {
+  background:
+    radial-gradient(at 20% 20%, rgba(6, 182, 212, 0.25) 0px, transparent 45%),
+    radial-gradient(at 80% 10%, rgba(99, 102, 241, 0.22) 0px, transparent 45%),
+    radial-gradient(at 60% 90%, rgba(59, 130, 246, 0.22) 0px, transparent 45%),
+    linear-gradient(135deg, #f0f9ff 0%, #eff6ff 50%, #eef2ff 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.5); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.8); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ============================================================
+   玻璃拟态工具类
+   ============================================================ */
+.glass {
+  background: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.06) !important;
+}
+.glass-strong {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08) !important;
+}
+
+/* ============================================================
+   Element Plus 覆盖：玻璃拟态
+   ============================================================ */
+.el-card {
+  background: rgba(255, 255, 255, 0.78) !important;
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.05) !important;
+  border-radius: 14px !important;
+  transition: transform 0.2s, box-shadow 0.2s !important;
+}
+.el-card:hover {
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08) !important;
+}
+.el-card__header {
+  font-weight: 600;
+  color: #1e293b;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6) !important;
+}
+
+.el-table { background: transparent !important; }
+.el-table tr { background: rgba(255, 255, 255, 0.5) !important; }
+.el-table th.el-table__cell {
+  background-color: rgba(248, 250, 252, 0.85) !important;
+  color: #475569;
+  font-weight: 600;
+}
+
+/* 弹窗毛玻璃 */
+.el-dialog__wrapper {
+  background: rgba(15, 23, 42, 0.35) !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.el-dialog__body {
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 12px;
+}
+
+/* 表单输入框半透明 */
+.el-input__wrapper, .el-textarea__inner {
+  background: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(8px);
+}
+
+/* 主按钮渐变 */
+.el-button--primary {
+  background: var(--brand-gradient) !important;
+  border: none !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.25);
+  transition: transform 0.15s, box-shadow 0.15s !important;
+}
+.el-button--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(6, 182, 212, 0.35) !important;
+}
+.el-button--primary:active {
+  transform: translateY(0);
+}
+.el-button--primary.is-link,
+.el-button--primary.is-link:hover {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--el-color-primary) !important;
+}
+
+/* 表单焦点 */
+.el-input__wrapper.is-focus,
+.el-textarea__inner:focus,
+.el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px var(--el-color-primary) inset !important;
+}
+
+/* 分页激活 */
+.el-pagination.is-background .el-pager li.is-active {
+  background: var(--brand-gradient) !important;
+  color: #fff !important;
+}

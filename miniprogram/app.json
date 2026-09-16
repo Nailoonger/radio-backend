@@ -1,0 +1,53 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/submit/submit",
+    "pages/members/members",
+    "pages/mySubmit/mySubmit",
+    "pages/about/about",
+    "pages/login/login",
+    "pages/noticeDetail/noticeDetail",
+    "pages/programDetail/programDetail",
+    "pages/memberDetail/memberDetail"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#0891b2",
+    "navigationBarTitleText": "菁悠广播站",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f0f9ff"
+  },
+  "tabBar": {
+    "color": "#94a3b8",
+    "selectedColor": "#0891b2",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "assets/home.png",
+        "selectedIconPath": "assets/home-active.png"
+      },
+      {
+        "pagePath": "pages/submit/submit",
+        "text": "投稿",
+        "iconPath": "assets/edit.png",
+        "selectedIconPath": "assets/edit-active.png"
+      },
+      {
+        "pagePath": "pages/members/members",
+        "text": "风采",
+        "iconPath": "assets/member.png",
+        "selectedIconPath": "assets/member-active.png"
+      },
+      {
+        "pagePath": "pages/mySubmit/mySubmit",
+        "text": "我的",
+        "iconPath": "assets/user.png",
+        "selectedIconPath": "assets/user-active.png"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

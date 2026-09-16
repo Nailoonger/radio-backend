@@ -1,0 +1,9 @@
+<view class="container">
+  <view class="logo">📻</view>
+  <view class="brand">菁悠广播站</view>
+  <view class="intro">点击下方按钮使用微信登录</view>
+  <button class="btn-primary" bindtap="doLogin" disabled="{{loading}}">
+    {{loading ? '登录中...' : '微信一键登录'}}
+  </button>
+  <view class="tips">仅获取微信昵称/头像，不收集手机号</view>
+</view>

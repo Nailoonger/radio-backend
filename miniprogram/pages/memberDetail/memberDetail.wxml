@@ -1,0 +1,27 @@
+<view class="container" wx:if="{{member}}">
+  <view class="hero">
+    <image class="hero-avatar" src="{{member.avatar}}" mode="aspectFill" />
+    <view class="hero-name">{{member.name}}</view>
+    <view class="hero-role">{{member.role}}</view>
+  </view>
+
+  <view class="card">
+    <view class="row">
+      <view class="label">年级班级</view>
+      <view class="value">{{member.grade || '未填写'}}</view>
+    </view>
+    <view class="row" wx:if="{{programList.length}}">
+      <view class="label">负责栏目</view>
+      <view class="value">
+        <text class="program-tag" wx:for="{{programList}}" wx:key="*this">{{item}}</text>
+      </view>
+    </view>
+    <view class="row" wx:if="{{member.motto}}">
+      <view class="label">个人寄语</view>
+      <view class="value motto">{{member.motto}}</view>
+    </view>
+  </view>
+</view>
+
+<view wx:elif="{{!loading}}" class="empty">成员不存在或已下架</view>
+<view wx:else class="loading">加载中...</view>
