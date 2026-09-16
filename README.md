@@ -528,6 +528,145 @@ UPDATE admin SET password='\$2a\$10\$Kx9GZSF3FFxgJ9uKViIne.jndmwowJaWkNecq.Uwv5C
 
 ---
 
+## 十六、开发工作流
+
+### Git 提交规范
+
+本项目使用 Conventional Commits。每次提交按下面格式：
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**type 类型：**
+
+| 类型 | 含义 |
+|---|---|
+| `feat` | 新功能 |
+| `fix` | 修 bug |
+| `refactor` | 重构（不改功能） |
+| `style` | 代码格式 / UI 调整 |
+| `docs` | 仅文档改动 |
+| `test` | 仅测试 |
+| `chore` | 构建 / 脚本 / 配置 |
+| `perf` | 性能优化 |
+
+**scope 范围**（可选）：`backend` / `admin-web` / `miniprogram` / `docker` / `docs` / `deps`
+
+**subject 要求：**
+- 中文，≤ 30 字
+- 动词开头（"添加"、"修复"、"调整"、"重构"……）
+- 不加句号
+
+**示例：**
+
+```bash
+git commit -m "feat(backend): 添加超管自保护逻辑"
+git commit -m "fix(miniprogram): 修复首页公告 404"
+git commit -m "style(admin-web): 优化 Dashboard 顶部 8 卡分组布局"
+git commit -m "docs: 补充 Docker 部署章节"
+```
+
+### 本地开发循环
+
+```bash
+# 1. 拉代码
+git pull
+
+# 2. 启动 Docker 全栈（如果还没起）
+powershell -File deploy/start.ps1
+
+# 3. 改代码（后端 / 前端 / 小程序）
+
+# 4. 跑测试
+npx jest                                    # 全量
+npx jest tests/submit.test.js               # 单文件
+npx jest --watch                            # watch 模式
+
+# 5. 提交
+git add -A
+git status                                  # 检查改动
+git commit -m "feat(xxx): 描述改动"
+
+# 6. 推到远程（如果有 origin）
+git push origin master
+```
+
+### Docker 容器工作流
+
+| 操作 | 命令 |
+|---|---|
+| 启动全栈 | `powershell -File deploy/start.ps1` |
+| 查看状态 | `docker ps --format "table {{.Names}}\t{{.Status}}"` |
+| 实时日志 | `powershell -File deploy/logs.ps1` |
+| 单容器日志 | `docker logs radio-backend --tail=50 -f` |
+| 进容器 shell | `docker exec -it radio-backend sh` |
+| MySQL CLI | `docker exec -it radio-mysql mysql -uroot -proot123 radio_station` |
+| 停止（保留数据）| `powershell -File deploy/stop.ps1` |
+| 清空所有数据 | `powershell -File deploy/clean.ps1` ⚠️ 不可恢复 |
+
+### 代码改动 → 部署
+
+**改了后端（`src/`、`Dockerfile`、`sql/`）：**
+```bash
+docker compose build radio-backend
+docker compose up -d radio-backend
+```
+
+**改了管理后台（`admin-web/src/`、`admin-web/public/`）：**
+```bash
+# 本地 build
+cd admin-web && npm run build
+# 重 build 镜像并重启
+cd ..
+docker compose build admin-web
+docker compose up -d admin-web
+```
+> ⚠️ admin-web 镜像构建**需要本地先 build**（因为容器内 native 模块构建失败）。
+
+**改了小程序（`miniprogram/`）：**
+小程序不走 Docker。直接用微信开发者工具打开 `miniprogram/` 编译预览。
+
+**改了 nginx 反代（`deploy/nginx.conf`）：**
+```bash
+docker exec radio-nginx nginx -s reload   # 热加载，不用重启
+```
+
+**改了 docker-compose.yml：**
+```bash
+docker compose up -d                      # 自动检测变更
+```
+
+### 调试技巧
+
+| 问题 | 调试命令 |
+|---|---|
+| 后端报错 | `docker logs radio-backend --tail=100` |
+| 后端 SQL 慢查询 | 临时改 `.env` 加 `DB_LOGGER=debug` 看 SQL |
+| admin-web 404 | 看 nginx 转发日志：`docker logs radio-nginx --tail=50` |
+| 端口冲突 | `netstat -ano \| grep :3000` |
+| 容器反复重启 | `docker inspect radio-backend` 看 ExitCode + Logs |
+| 数据库损坏 | `powershell -File deploy/clean.ps1` 后重建 |
+| 自签证书过期 | `powershell -File deploy/gen-selfsigned.ps1` |
+
+### 提交前 checklist
+
+每次提交前**强制**走一遍：
+
+- [ ] `npx jest` — 56 个测试全绿
+- [ ] 后端改动 → `sql/schema.sql` 同步了吗
+- [ ] 路由改动 → `@swagger` 注解加了吗
+- [ ] 前端改动 → `npm run build` 成功吗
+- [ ] 控制台无新的报错
+- [ ] commit message 用了 conventional format
+- [ ] 没提交 `.env` / `node_modules` / `dist` / `data/mysql` / `uploads`（看 `.gitignore`）
+
+---
+
 **项目版本**：v1.0.0
 **站名**：菁悠广播站
 **站口号**：菁菁校园情，悠悠广播声
