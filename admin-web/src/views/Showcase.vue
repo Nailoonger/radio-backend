@@ -97,8 +97,8 @@
         <div class="sec-head"><span class="sec-title">合并规则</span></div>
         <div class="card tight">
           <div class="kv"><span class="k">数据来源</span><span>仍是两张表：<span class="mono">cadre</span> 与 <span class="mono">staff</span></span></div>
-          <div class="kv"><span class="k">社干字段</span><span>姓名 · 职务 · 头像 · 显示开关（无部门）</span></div>
-          <div class="kv"><span class="k">部员字段</span><span>姓名 · 部门 · 负责栏目 · 头像 · 显示开关</span></div>
+          <div class="kv"><span class="k">社干字段</span><span>姓名 · 职务 · 照片（可选，留空用首字头像） · 显示开关（无部门）</span></div>
+          <div class="kv"><span class="k">部员字段</span><span>姓名 · 部门 · 负责栏目 · 照片（可选） · 显示开关</span></div>
           <div class="kv"><span class="k">合并方式</span><span>模块合并，<b>不是合表</b>（合表会打断小程序风采页）</span></div>
           <div class="kv"><span class="k">小程序端</span><span>保持不变：<span class="mono">/user/showcase</span> 仍返回两层结构</span></div>
         </div>
@@ -175,13 +175,13 @@
         <el-radio value="staff">部员</el-radio>
       </el-radio-group>
       <div class="micro fmt">
-        每行一位，逗号分隔。<br />
-        <b>社干</b>：<span class="mono">姓名, 职务, 头像URL [, 年级班级]</span><br />
-        <b>部员</b>：<span class="mono">姓名, 部门, 负责栏目, 头像URL [, 岗位]</span>
+        每行一位，逗号分隔。<b>照片 URL 可选</b>，留空用姓名首字头像。<br />
+        <b>社干</b>：<span class="mono">姓名, 职务 [, 照片URL] [, 年级班级]</span><br />
+        <b>部员</b>：<span class="mono">姓名, 部门, 负责栏目 [, 照片URL] [, 岗位]</span>
       </div>
       <el-input
         v-model="importText" type="textarea" :rows="7"
-        :placeholder="importType === 'cadre' ? '林晓,站长,/uploads/avatars/lin.png' : '陈默,播音部,晚风信箱,/uploads/avatars/chen.png'"
+        :placeholder="importType === 'cadre' ? '林晓,站长\n苏晚,副站长,/uploads/avatars/su.png' : '陈默,播音部,晚风信箱\n周予安,主持部,校园晨线,/uploads/avatars/zhou.png'"
       />
       <template #footer>
         <el-button @click="importVisible = false">取消</el-button>
@@ -397,16 +397,22 @@ async function doImport() {
     for (let i = 0; i < lines.length; i += 1) {
       const c = lines[i].split(/[,，]/).map((s) => s.trim());
       const no = i + 1;
+      // 照片列改成可选后无法按位置死认 —— 用「长得像 URL」来识别（含 / 或图片后缀）
+      const looksLikeUrl = (s) => !!s && (s.includes('/') || /\.(png|jpe?g|webp|gif)$/i.test(s));
       try {
         if (importType.value === 'cadre') {
-          const [name, role, avatar, grade] = c;
-          if (!name || !role || !avatar) { fails.push(`第 ${no} 行：应为「姓名, 职务, 头像URL」`); continue; }
-          await http.post('/admin/cadre/create', { name, role, avatar, grade: grade || '', isShow: 1 });
+          const [name, role, ...rest] = c;
+          if (!name || !role) { fails.push(`第 ${no} 行：应为「姓名, 职务 [, 照片URL] [, 年级班级]」`); continue; }
+          const avatar = looksLikeUrl(rest[0]) ? rest[0] : '';
+          const grade = (looksLikeUrl(rest[0]) ? rest[1] : rest[0]) || '';
+          await http.post('/admin/cadre/create', { name, role, avatar, grade, isShow: 1 });
         } else {
-          const [name, department, programs, avatar, role] = c;
-          if (!name || !department || !avatar) { fails.push(`第 ${no} 行：应为「姓名, 部门, 负责栏目, 头像URL」`); continue; }
+          const [name, department, programs, ...rest] = c;
+          if (!name || !department) { fails.push(`第 ${no} 行：应为「姓名, 部门, 负责栏目 [, 照片URL] [, 岗位]」`); continue; }
+          const avatar = looksLikeUrl(rest[0]) ? rest[0] : '';
+          const role = (looksLikeUrl(rest[0]) ? rest[1] : rest[0]) || '部员';
           await http.post('/admin/staff/create', {
-            name, department, programs: programs || '', avatar, role: role || '部员', isShow: 1,
+            name, department, programs: programs || '', avatar, role, isShow: 1,
           });
         }
         ok += 1;

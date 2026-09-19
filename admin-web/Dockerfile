@@ -1,15 +1,25 @@
 # =================================================================
-#  菁悠广播站管理后台 - 生产镜像
-#  ⚠️ 必须先在主机上跑 `npm run build` 生成 dist/
-#  镜像只 COPY dist + public 资源，不再容器内 build
+#  菁悠广播站管理后台 - 生产镜像（多阶段构建）
+#  第一阶段：容器内 npm ci + vite build 生成 dist（不再依赖主机预构建）
+#  第二阶段：nginx 只装构建产物
 # =================================================================
+
+# ---------- build stage ----------
+FROM node:20-alpine AS build
+WORKDIR /build
+
+# 先拷依赖清单装依赖（利用层缓存），再拷源码
+COPY package*.json ./
+RUN npm ci --registry=https://mirrors.cloud.tencent.com/npm/
+COPY . .
+RUN npm run build
 
 # ---------- runtime ----------
 FROM nginx:1.27-alpine
 WORKDIR /usr/share/nginx/html
 
-# 拷贝构建产物（含 Vue assets + public 资源）
-COPY dist ./
+# 从构建阶段拷贝产物（含 Vue assets）
+COPY --from=build /build/dist ./
 
 # 显式拷所有 public/ 资源（防止 dist 漏）
 COPY public/station-badge.png     /usr/share/nginx/html/station-badge.png
