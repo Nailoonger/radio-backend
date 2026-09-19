@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>学生登录 v2 · 沿用管理端登录视觉</title>
+<style>
+  :root {
+    --accent: #0066cc;
+    --accent-btn: #2f6be8;
+    --ink: #141519;
+    --muted: #6b7280;
+    --soft: #9aa3ae;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f5f5f7;
+    color: var(--ink);
+    padding: 34px 30px 50px;
+  }
+
+  /* ══════════ 页头说明 ══════════ */
+  .head { max-width: 1060px; margin: 0 auto 26px; }
+  .head h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+  .head p { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.8; }
+  .head b { color: var(--ink); }
+
+  .stage { display: flex; gap: 34px; justify-content: center; flex-wrap: wrap; }
+
+  /* ══════════ 手机框 ══════════ */
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .phone {
+    width: 340px; height: 700px;
+    border-radius: 44px;
+    background: #0b0b0f;
+    padding: 10px;
+    box-shadow: 0 30px 60px -22px rgba(15, 28, 46, 0.35);
+    flex: none;
+  }
+  .screen {
+    position: relative; width: 100%; height: 100%;
+    border-radius: 35px; overflow: hidden;
+    /* 管理端同款对角淡渐变 */
+    background: linear-gradient(135deg, #e1ecf8 0%, #fbfdfe 100%);
+    display: flex; flex-direction: column;
+  }
+  .cap { font-size: 12.5px; color: var(--muted); }
+  .cap b { color: var(--ink); }
+
+  /* 状态栏 + 顶部栏（管理端同款：徽章 + 站名） */
+  .statusbar { height: 34px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font-size: 11.5px; font-weight: 600; color: var(--ink); flex: none; }
+  .statusbar .sig { display: flex; gap: 4px; align-items: center; }
+  .sig i { display: block; background: var(--ink); border-radius: 1px; }
+  .topbar { height: 44px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; flex: none; }
+  .topbar-brand { display: flex; align-items: center; gap: 7px; }
+  .badge {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 32%, #2f6be8 0%, #0f3f95 100%);
+    color: #fff; font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    letter-spacing: 0.5px;
+  }
+  .topbar-name { font-size: 13px; font-weight: 600; letter-spacing: -0.1px; }
+  .back {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.66);
+    box-shadow: 0 1px 4px rgba(15, 28, 46, 0.08);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .back::before { content: ''; width: 8px; height: 8px; border-left: 1.6px solid #4b5563; border-bottom: 1.6px solid #4b5563; transform: rotate(45deg); margin-left: 3px; }
+
+  /* ══════════ 内容区 ══════════ */
+  .body { flex: 1; padding: 6px 22px 0; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* 品牌插画（管理端同款收音机线条 SVG，等比缩小） */
+  .brand { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 4px 0 14px; }
+  .brand svg { width: 168px; height: 122px; display: block; }
+  .tagline { font-size: 12px; color: #6b7280; letter-spacing: 0.2px; }
+
+  /* ══════════ 玻璃卡（管理端同款配方） ══════════ */
+  .glass {
+    position: relative;
+    border-radius: 22px;
+    padding: 24px 22px 20px;
+    background: rgba(255, 255, 255, 0.68);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    box-shadow:
+      inset 0 1px 2px rgba(255, 255, 255, 0.55),
+      0 4px 10px -4px rgba(15, 28, 46, 0.045),
+      0 12px 28px -8px rgba(15, 28, 46, 0.04),
+      0 24px 56px -12px rgba(15, 28, 46, 0.03);
+  }
+  .glass::before {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.06) 100%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    pointer-events: none;
+  }
+  .card-title { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .card-sub { font-size: 12px; color: #6e7178; margin-top: 5px; line-height: 1.5; }
+
+  .field { margin-top: 14px; }
+  .field-label { display: block; font-size: 11px; font-weight: 500; color: var(--muted); margin-bottom: 6px; }
+  .input {
+    display: flex; align-items: center; gap: 9px;
+    background: #fff; border-radius: 10px;
+    padding: 11px 13px;
+    box-shadow: inset 0 0 0 1px rgba(10, 26, 46, 0.08);
+    font-size: 13.5px; color: var(--ink);
+  }
+  .input .ph { color: #b3bac2; }
+  .input svg { flex: none; }
+  .input .val { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .submit {
+    width: 100%; height: 44px; margin-top: 20px;
+    border: none; border-radius: 12px; cursor: pointer;
+    background: var(--accent-btn);
+    color: #fff; font-size: 14.5px; font-weight: 600; letter-spacing: 5px;
+    font-family: inherit;
+    box-shadow: 0 8px 18px -6px rgba(47, 107, 232, 0.45);
+  }
+  .submit.disabled { opacity: 0.55; box-shadow: none; }
+
+  /* 「或」分隔 + 微信一键登录（玻璃卡内的次级按钮） */
+  .or-row { display: flex; align-items: center; gap: 10px; margin: 16px 0 12px; }
+  .or-line { flex: 1; height: 1px; background: rgba(10, 26, 46, 0.09); }
+  .or-txt { font-size: 11px; color: var(--soft); }
+  .ghost-btn {
+    width: 100%; height: 42px;
+    border-radius: 12px; cursor: pointer; font-family: inherit;
+    background: transparent; border: 1px solid rgba(10, 26, 46, 0.16);
+    color: var(--ink); font-size: 13.5px; font-weight: 500;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+  }
+  .wx { width: 17px; height: 17px; border-radius: 50%; background: #2aae67; position: relative; flex: none; }
+  .wx::before, .wx::after { content: ''; position: absolute; background: #fff; border-radius: 50%; width: 4px; height: 4px; top: 5px; }
+  .wx::before { left: 4px; } .wx::after { right: 4px; }
+
+  /* 卡片底注（管理端「记住账号/帮助」一栏的位置，换成隐私口径） */
+  .card-divider { height: 1px; margin: 16px 0 12px; background: rgba(10, 26, 46, 0.09); }
+  .card-foot { display: flex; align-items: center; justify-content: space-between; }
+  .foot-txt { font-size: 11px; color: #8a9199; }
+
+  /* ══════════ 激活屏专属 ══════════ */
+  .hello-row { display: flex; align-items: center; gap: 10px; }
+  .avatar {
+    width: 40px; height: 40px; border-radius: 50%; flex: none;
+    background: var(--ink); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 600;
+  }
+  .pwd-rule { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+  .rule {
+    font-size: 10.5px; padding: 3px 9px; border-radius: 999px;
+    background: rgba(0, 102, 204, 0.08); color: var(--accent);
+  }
+  .rule.off { background: rgba(10,26,46,0.05); color: #9aa3ae; }
+  .skip { text-align: center; margin-top: 14px; font-size: 12px; color: var(--soft); text-decoration: underline; text-underline-offset: 3px; }
+
+  /* ══════════ 底部设计说明 ══════════ */
+  .notes { max-width: 1060px; margin: 30px auto 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .note { background: #fff; border: 1px solid #e8e8ec; border-radius: 14px; padding: 14px 18px; }
+  .note .n-t { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .note .n-b { font-size: 12px; color: var(--muted); line-height: 1.8; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>学生登录 · v2 预览（沿用管理端登录视觉）</h1>
+  <p>
+    设计逻辑完全照搬管理端登录页：<b>淡蓝对角渐变底 → 收音机线条插画 → 玻璃卡（同款配方：68% 白 + 40px 模糊 + 渐变描边）→ 灰标签白输入框 → 整宽实心蓝按钮</b>。
+    手机上把管理端的左右分栏改为<b>上下堆叠</b>：插画缩到卡片上方，玻璃卡承担全部表单。
+    功能两步式保持不变：<b>学号密码登录 → 首次登录强制改密激活</b>（含微信一键登录兜底、暂时跳过）。
+    <b>确认这版之前不动小程序代码。</b>
+  </p>
+</div>
+
+<div class="stage">
+  <!-- ══════════ 屏 1：登录 ══════════ -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="screen">
+        <div class="statusbar">
+          <span>9:41</span>
+          <span class="sig"><i style="width:14px;height:8px"></i><i style="width:16px;height:8px;opacity:.4"></i></span>
+        </div>
+        <div class="topbar">
+          <div class="back"></div>
+          <div class="topbar-brand">
+            <span class="badge">菁</span>
+            <span class="topbar-name">菁悠广播站</span>
+          </div>
+          <span style="width:30px"></span>
+        </div>
+
+        <div class="body">
+          <div class="brand">
+            <!-- 管理端同款收音机线条插画（等比缩小） -->
+            <svg viewBox="0 0 330 240" fill="none" aria-hidden="true">
+              <path d="M150.6 90.5 A42 42 0 0 1 179.4 90.5" stroke="#0066CC" stroke-width="2.6" stroke-linecap="round" stroke-opacity="0.9"/>
+              <path d="M138 72 A64 64 0 0 1 192.1 72" stroke="#0066CC" stroke-width="2.6" stroke-linecap="round" stroke-opacity="0.55"/>
+              <path d="M124.6 54.1 A86 86 0 0 1 205.4 54.1" stroke="#0066CC" stroke-width="2.6" stroke-linecap="round" stroke-opacity="0.3"/>
+              <rect x="75" y="130" width="180" height="76" rx="10" stroke="#0066CC" stroke-width="2.6"/>
+              <circle cx="122" cy="168" r="26" stroke="#0066CC" stroke-width="2.6"/>
+              <circle cx="122" cy="168" r="15" stroke="#0066CC" stroke-width="2.4" stroke-opacity="0.55"/>
+              <circle cx="122" cy="168" r="4.5" fill="#0066CC"/>
+              <circle cx="200" cy="168" r="9" stroke="#0066CC" stroke-width="2.4"/>
+              <path d="M200 161v4" stroke="#0066CC" stroke-width="2.4" stroke-linecap="round"/>
+              <circle cx="232" cy="168" r="9" stroke="#0066CC" stroke-width="2.4"/>
+              <path d="M232 161v4" stroke="#0066CC" stroke-width="2.4" stroke-linecap="round"/>
+            </svg>
+            <span class="tagline">让每一个声音，都被听见</span>
+          </div>
+
+          <div class="glass">
+            <div class="card-title">学生登录</div>
+            <div class="card-sub">使用学校分发的学号进入广播站</div>
+
+            <div class="field">
+              <label class="field-label">学号</label>
+              <div class="input">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M13.3 14v-1.4a2.8 2.8 0 0 0-2.8-2.8H5.5A2.8 2.8 0 0 0 2.7 12.6V14" stroke="#9AA3AE" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="5" r="2.6" stroke="#9AA3AE" stroke-width="1.4"/></svg>
+                <span class="val">20240101</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="field-label">密码</label>
+              <div class="input">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.6" stroke="#9AA3AE" stroke-width="1.4"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="#9AA3AE" stroke-width="1.4" stroke-linecap="round"/></svg>
+                <span class="val" style="letter-spacing:2px">•••••••••••••</span>
+                <span style="font-size:10.5px;color:#b3bac2">显示</span>
+              </div>
+            </div>
+
+            <button class="submit">登 录</button>
+
+            <div class="or-row"><span class="or-line"></span><span class="or-txt">或</span><span class="or-line"></span></div>
+            <button class="ghost-btn"><span class="wx"></span>微信一键登录</button>
+
+            <div class="card-divider"></div>
+            <div class="card-foot">
+              <span class="foot-txt">不收集头像与手机号</span>
+              <span class="foot-txt">头像由姓名生成</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>屏 1 · 登录</b>（学号 + 密码，微信一键登录兜底）</div>
+  </div>
+
+  <!-- ══════════ 屏 2：首登激活 ══════════ -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="screen">
+        <div class="statusbar">
+          <span>9:42</span>
+          <span class="sig"><i style="width:14px;height:8px"></i><i style="width:16px;height:8px;opacity:.4"></i></span>
+        </div>
+        <div class="topbar">
+          <div class="back"></div>
+          <div class="topbar-brand">
+            <span class="badge">菁</span>
+            <span class="topbar-name">设置新密码</span>
+          </div>
+          <span style="width:30px"></span>
+        </div>
+
+        <div class="body">
+          <div class="brand">
+            <svg viewBox="0 0 330 240" fill="none" aria-hidden="true">
+              <path d="M150.6 90.5 A42 42 0 0 1 179.4 90.5" stroke="#0066CC" stroke-width="2.6" stroke-linecap="round" stroke-opacity="0.9"/>
+              <path d="M138 72 A64 64 0 0 1 192.1 72" stroke="#0066CC" stroke-width="2.6" stroke-linecap="round" stroke-opacity="0.55"/>
+              <path d="M124.6 54.1 A86 86 0 0 1 205.4 54.1" stroke="#0066CC" stroke-width="2.6" stroke-linecap="round" stroke-opacity="0.3"/>
+              <rect x="75" y="130" width="180" height="76" rx="10" stroke="#0066CC" stroke-width="2.6"/>
+              <circle cx="122" cy="168" r="26" stroke="#0066CC" stroke-width="2.6"/>
+              <circle cx="122" cy="168" r="15" stroke="#0066CC" stroke-width="2.4" stroke-opacity="0.55"/>
+              <circle cx="122" cy="168" r="4.5" fill="#0066CC"/>
+              <circle cx="200" cy="168" r="9" stroke="#0066CC" stroke-width="2.4"/>
+              <path d="M200 161v4" stroke="#0066CC" stroke-width="2.4" stroke-linecap="round"/>
+              <circle cx="232" cy="168" r="9" stroke="#0066CC" stroke-width="2.4"/>
+              <path d="M232 161v4" stroke="#0066CC" stroke-width="2.4" stroke-linecap="round"/>
+            </svg>
+            <span class="tagline">首次登录 · 激活你的账号</span>
+          </div>
+
+          <div class="glass">
+            <div class="hello-row">
+              <span class="avatar">冯</span>
+              <div>
+                <div class="card-title">你好，冯雨</div>
+                <div class="card-sub">2023 级 1 班 · 请设置你的新密码</div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="field-label">新密码</label>
+              <div class="input">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.6" stroke="#9AA3AE" stroke-width="1.4"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="#9AA3AE" stroke-width="1.4" stroke-linecap="round"/></svg>
+                <span class="val" style="letter-spacing:2px">••••••••••</span>
+                <span style="font-size:10.5px;color:#b3bac2">显示</span>
+              </div>
+              <div class="pwd-rule">
+                <span class="rule">至少 8 位</span>
+                <span class="rule">含字母</span>
+                <span class="rule off">含数字</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="field-label">再输一遍</label>
+              <div class="input">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.6" stroke="#9AA3AE" stroke-width="1.4"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="#9AA3AE" stroke-width="1.4" stroke-linecap="round"/></svg>
+                <span class="val" style="letter-spacing:2px;color:#b3bac2">两次输入需一致</span>
+              </div>
+            </div>
+
+            <button class="submit">激活账号</button>
+            <div class="skip">暂时跳过，下次登录再改</div>
+
+            <div class="card-divider"></div>
+            <div class="card-foot">
+              <span class="foot-txt">初始密码 = user + 学号</span>
+              <span class="foot-txt">改完即激活</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>屏 2 · 首登激活</b>（isDefaultPwd 强制改密，姓名首字头像）</div>
+  </div>
+
+  <!-- ══════════ 屏 3：错误态 ══════════ -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="screen">
+        <div class="statusbar">
+          <span>9:43</span>
+          <span class="sig"><i style="width:14px;height:8px"></i><i style="width:16px;height:8px;opacity:.4"></i></span>
+        </div>
+        <div class="topbar">
+          <div class="back"></div>
+          <div class="topbar-brand">
+            <span class="badge">菁</span>
+            <span class="topbar-name">菁悠广播站</span>
+          </div>
+          <span style="width:30px"></span>
+        </div>
+
+        <div class="body">
+          <div class="brand">
+            <svg viewBox="0 0 330 240" fill="none" aria-hidden="true">
+              <path d="M150.6 90.5 A42 42 0 0 1 179.4 90.5" stroke="#0066CC" stroke-width="2.6" stroke-linecap="round" stroke-opacity="0.9"/>
+              <path d="M138 72 A64 64 0 0 1 192.1 72" stroke="#0066CC" stroke-width="2.6" stroke-linecap="round" stroke-opacity="0.55"/>
+              <path d="M124.6 54.1 A86 86 0 0 1 205.4 54.1" stroke="#0066CC" stroke-width="2.6" stroke-linecap="round" stroke-opacity="0.3"/>
+              <rect x="75" y="130" width="180" height="76" rx="10" stroke="#0066CC" stroke-width="2.6"/>
+              <circle cx="122" cy="168" r="26" stroke="#0066CC" stroke-width="2.6"/>
+              <circle cx="122" cy="168" r="15" stroke="#0066CC" stroke-width="2.4" stroke-opacity="0.55"/>
+              <circle cx="122" cy="168" r="4.5" fill="#0066CC"/>
+              <circle cx="200" cy="168" r="9" stroke="#0066CC" stroke-width="2.4"/>
+              <path d="M200 161v4" stroke="#0066CC" stroke-width="2.4" stroke-linecap="round"/>
+              <circle cx="232" cy="168" r="9" stroke="#0066CC" stroke-width="2.4"/>
+              <path d="M232 161v4" stroke="#0066CC" stroke-width="2.4" stroke-linecap="round"/>
+            </svg>
+            <span class="tagline">让每一个声音，都被听见</span>
+          </div>
+
+          <div class="glass">
+            <div class="card-title">学生登录</div>
+            <div class="card-sub">使用学校分发的学号进入广播站</div>
+
+            <div class="field">
+              <label class="field-label">学号</label>
+              <div class="input" style="box-shadow: inset 0 0 0 1.4px #d64541;">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M13.3 14v-1.4a2.8 2.8 0 0 0-2.8-2.8H5.5A2.8 2.8 0 0 0 2.7 12.6V14" stroke="#9AA3AE" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="5" r="2.6" stroke="#9AA3AE" stroke-width="1.4"/></svg>
+                <span class="val">20240199</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="field-label">密码</label>
+              <div class="input" style="box-shadow: inset 0 0 0 1.4px #d64541;">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.6" stroke="#9AA3AE" stroke-width="1.4"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="#9AA3AE" stroke-width="1.4" stroke-linecap="round"/></svg>
+                <span class="val" style="letter-spacing:2px">•••</span>
+              </div>
+            </div>
+
+            <!-- 错误条：贴在按钮上方，红底浅红 -->
+            <div style="margin-top:16px;background:#fdecea;color:#c0392b;font-size:11.5px;line-height:1.6;border-radius:10px;padding:9px 12px;">
+              学号或密码不对。初始密码是 <b>user + 学号</b>（如 user20240199），不对就找广播站重置。
+            </div>
+
+            <button class="submit">登 录</button>
+
+            <div class="or-row"><span class="or-line"></span><span class="or-txt">或</span><span class="or-line"></span></div>
+            <button class="ghost-btn"><span class="wx"></span>微信一键登录</button>
+
+            <div class="card-divider"></div>
+            <div class="card-foot">
+              <span class="foot-txt">不收集头像与手机号</span>
+              <span class="foot-txt">头像由姓名生成</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>屏 3 · 错误态</b>（输错时输入框红描边 + 按钮上方错误条）</div>
+  </div>
+</div>
+
+<div class="notes">
+  <div class="note">
+    <div class="n-t">从管理端登录页沿用了什么</div>
+    <div class="n-b">① 淡蓝对角渐变底（#e1ecf8 → #fbfdfe）② 收音机线条插画 + 「让每一个声音，都被听见」③ 玻璃卡配方（68% 白 + blur 40 + 渐变描边 + 22px 圆角）④ 灰标签 + 白底 10px 圆角输入框 + 线性小图标 ⑤ 整宽实心蓝按钮（#2f6be8、12px 圆角、字距 5px、蓝投影）。管理端的「记住账号 / 帮助」一栏，在学生端换成隐私口径「不收集头像与手机号 · 头像由姓名生成」。</div>
+  </div>
+  <div class="note">
+    <div class="n-t">手机端怎么适配分栏</div>
+    <div class="n-b">管理端是「左插画 + 右玻璃卡」的左右分栏，手机屏放不下就改成<b>上下堆叠</b>：插画等比缩到 168×122 放在玻璃卡上方当品牌区，玻璃卡占满表单。顶部栏保留管理端的「徽章 + 站名」，左侧加小程序必备的返回键。</div>
+  </div>
+  <div class="note">
+    <div class="n-t">功能两步式不变</div>
+    <div class="n-b">屏 1 学号 + 密码登录（初始密码 user+学号）；命中初始密码 → 屏 2 强制改密激活（≥8 位含字母数字、两遍一致、实时规则提示、可暂时跳过）；普通密码错误 → 屏 3 错误态（红描边 + 按钮上方错误条，文案带「怎么找回」）。微信一键登录保留为兜底入口。</div>
+  </div>
+  <div class="note">
+    <div class="n-t">确认后我做什么</div>
+    <div class="n-b">把 miniprogram/pages/login 的 wxml/wxss 按这三屏重排（js 逻辑不动，两步式接口调用原样保留）；微信开发者工具里跑通三条链路：正确初始密码 → 激活；错误密码 → 错误态；微信一键登录。</div>
+  </div>
+</div>
+
+</body>
+</html>

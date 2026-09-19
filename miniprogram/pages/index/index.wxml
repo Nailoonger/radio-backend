@@ -1,66 +1,110 @@
-<view class="container">
-  <!-- 站徽头部 -->
-  <view class="brand-header">
-    <image src="/assets/station-logo.jpg" class="brand-logo" mode="aspectFit" />
-    <view class="brand-info">
-      <view class="brand-name">菁悠广播站</view>
-      <view class="brand-slogan">菁菁校园情，悠悠广播声</view>
-    </view>
-  </view>
+<!-- pages/index/index.wxml -->
+<launch-mask id="launch" />
 
-  <!-- 正在直播 -->
-  <view class="card live-card" wx:if="{{currentProgram}}">
-    <view class="live-badge">● 正在直播</view>
-    <view class="title">{{currentProgram.title}}</view>
-    <view class="subtitle">主持人：{{currentProgram.host || '未知'}}</view>
-    <view class="subtitle">播出时间：{{currentProgram.broadcastTime}}</view>
-    <view class="program-desc" wx:if="{{currentProgram.desc}}">{{currentProgram.desc}}</view>
-    <button class="btn-primary" bindtap="goSubmit" style="margin-top: 24rpx;">我要投稿</button>
-  </view>
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navreserve" style="height: {{navBarHeight}}px"></view>
 
-  <view class="card live-card-empty" wx:elif="{{!loading}}">
-    <view class="title">暂无直播</view>
-    <view class="subtitle">点歌或投稿，一旦被选中即可在节目中播出</view>
-    <button class="btn-primary" bindtap="goSubmit" style="margin-top: 24rpx;">立即投稿</button>
-  </view>
+  <view class="body">
 
-  <!-- 公告 -->
-  <view class="card" wx:if="{{notices.length}}">
-    <view class="title">📢 公告</view>
-    <view
-      class="notice-item"
-      wx:for="{{notices}}"
-      wx:key="id"
-      data-id="{{item.id}}"
-      bindtap="goNoticeDetail"
-    >
-      <view class="notice-title">
-        <text wx:if="{{item.isTop === 1}}" class="tag tag-pass">置顶</text>
-        {{item.title}}
+    <!-- 品牌头部 -->
+    <view class="between">
+      <view class="brand-head">
+        <image class="brand-logo" src="/assets/station-badge.png" mode="aspectFit" />
+        <view class="stack">
+          <view class="brand-name">菁悠广播站</view>
+          <view class="brand-slogan">菁菁校园情，悠悠广播声</view>
+        </view>
+      </view>
+      <view class="icon-btn" hover-class="pressed" bindtap="goAbout" aria-label="关于广播站">
+        <view class="stack" style="align-items: center; gap: 6rpx;">
+          <view class="i-dot"></view>
+          <view class="i-stem"></view>
+        </view>
       </view>
     </view>
-  </view>
 
-  <!-- 本周节目单 -->
-  <view class="card">
-    <view class="title">📻 本周节目单</view>
-    <view class="empty" wx:if="{{!weekly.length}}">暂无节目</view>
-    <view
-      class="program-item"
-      wx:for="{{weekly}}"
-      wx:key="id"
-      data-id="{{item.id}}"
-      bindtap="goProgramDetail"
-    >
-      <view class="program-time">{{item.broadcastTime}}</view>
-      <view class="program-title">{{item.title}}</view>
-      <view class="subtitle">{{item.host || '主持人未定'}}</view>
+    <!-- 正在直播 -->
+    <view class="tile" wx:if="{{currentProgram}}">
+      <view class="tile-status">
+        <view class="dot-live"></view>
+        <text>正在直播·{{currentProgram.broadcastTime}}</text>
+      </view>
+      <view class="tile-title">{{currentProgram.title}}</view>
+      <view class="tile-meta" wx:if="{{currentProgram.host}}">主持人 {{currentProgram.host}}</view>
+      <view class="tile-desc" wx:if="{{currentProgram.desc}}">{{currentProgram.desc}}</view>
+      <view class="tile-actions">
+        <button class="btn btn-on-tile" hover-class="pressed" bindtap="goSubmit">我要投稿</button>
+        <button class="btn btn-ghost" hover-class="pressed" bindtap="goCurrent">查看节目</button>
+      </view>
     </view>
+
+    <view class="tile" wx:elif="{{!loading}}">
+      <view class="tile-status">
+        <view class="dot-live" style="background: #8E8E93;"></view>
+        <text>暂无直播</text>
+      </view>
+      <view class="tile-title">点歌或投稿，被选中即可播出</view>
+      <view class="tile-actions">
+        <button class="btn btn-on-tile" hover-class="pressed" bindtap="goSubmit">立即投稿</button>
+      </view>
+    </view>
+
+    <!-- 本周节目单 -->
+    <view class="section">
+      <view class="section-head">
+        <text class="t-section">本周节目单</text>
+        <text class="t-link" hover-class="pressed" bindtap="goPrograms">查看全部</text>
+      </view>
+      <view class="card-flush" wx:if="{{weekly.length}}">
+        <view
+          class="card-row"
+          wx:for="{{weekly}}"
+          wx:key="id"
+          hover-class="row-hover"
+          data-id="{{item.id}}"
+          bindtap="goProgramDetail"
+        >
+          <text class="row-time">{{item.broadcastTime}}</text>
+          <view class="stack grow">
+            <text class="t-strong">{{item.title}}</text>
+            <text class="t-cap">{{item.host || '主持人未定'}}</text>
+          </view>
+          <view class="chev-r"></view>
+        </view>
+      </view>
+      <view class="card-flush" wx:else>
+        <view class="empty" style="padding: 48rpx 40rpx;">本周暂无节目</view>
+      </view>
+    </view>
+
+    <!-- 校园公告 -->
+    <view class="section">
+      <view class="section-head">
+        <text class="t-section">校园公告</text>
+        <text class="t-link" hover-class="pressed" bindtap="goNotices">全部公告</text>
+      </view>
+      <view class="card-flush" wx:if="{{notices.length}}">
+        <view
+          class="card-row"
+          wx:for="{{notices}}"
+          wx:key="id"
+          hover-class="row-hover"
+          data-id="{{item.id}}"
+          bindtap="goNoticeDetail"
+        >
+          <view class="tag tag-top" wx:if="{{item.isTop === 1}}">置顶</view>
+          <text class="grow notice-txt">{{item.title}}</text>
+          <view class="chev-r"></view>
+        </view>
+      </view>
+      <view class="card-flush" wx:else>
+        <view class="empty" style="padding: 48rpx 40rpx;">暂无公告</view>
+      </view>
+    </view>
+
   </view>
 
-  <!-- 介绍入口 -->
-  <view class="card about-entry" bindtap="goAbout">
-    <view class="title">📖 关于菁悠广播站</view>
-    <view class="subtitle">了解我们的开播时间和团队</view>
-  </view>
+  <!-- 给固定 tabBar 留位 -->
+  <view class="pb-tabbar"></view>
 </view>

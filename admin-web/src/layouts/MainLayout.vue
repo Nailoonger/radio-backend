@@ -1,6 +1,6 @@
 <template>
   <el-container class="layout">
-    <el-aside width="212px" class="aside">
+    <el-aside width="232px" class="aside">
       <!-- 品牌 -->
       <div class="logo">
         <img src="/station-logo.jpg" class="logo-img" alt="菁悠广播站" />
@@ -35,7 +35,7 @@
               v-for="item in group.items"
               :key="item.path"
               class="nav-item"
-              :class="{ on: route.path === item.path }"
+              :class="{ on: route.path === item.path || route.path.startsWith(item.path + '/') }"
               @click="go(item.path)"
             >
               <component :is="item.icon" :size="18" />
@@ -74,9 +74,56 @@
 
     <el-container class="right">
       <el-header class="header">
-        <div class="header-title">
-          <span class="brand-bar"></span>
-          {{ route.meta.title || '管理后台' }}
+        <div class="header-left">
+          <div class="header-title">
+            {{ pageHeader.title || route.meta.title || '管理后台' }}
+          </div>
+          <div class="header-sub" v-if="pageHeader.subtitle">{{ pageHeader.subtitle }}</div>
+        </div>
+
+        <div class="header-right">
+          <!-- 全局搜索：投稿 / 公告 / 学生账号（v8 顶栏那颗搜索框） -->
+          <div class="gsearch" :class="{ on: searchOpen }">
+            <IconSearch :size="15" />
+            <input
+              v-model="searchKey"
+              placeholder="搜索投稿 / 公告 / 用户"
+              @input="onSearchInput"
+              @focus="searchOpen = true"
+              @blur="closeSearchSoon"
+              @keyup.enter="runSearch"
+            />
+            <span class="kbd">Enter</span>
+
+            <div class="gsearch-pop" v-if="searchOpen && searchKey.trim()">
+              <div class="gs-group" v-if="results.submit.length">
+                <div class="gs-t">投稿</div>
+                <div class="gs-item" v-for="r in results.submit" :key="'s' + r.id" @mousedown.prevent="goSubmit(r)">
+                  <span class="gs-strong">{{ r.type === 1 ? r.songName : r.articleTitle }}</span>
+                  <span class="micro">{{ r.nickname || '' }}</span>
+                </div>
+              </div>
+              <div class="gs-group" v-if="results.notice.length">
+                <div class="gs-t">公告</div>
+                <div class="gs-item" v-for="r in results.notice" :key="'n' + r.id" @mousedown.prevent="goNotice(r)">
+                  <span class="gs-strong">{{ r.title }}</span>
+                </div>
+              </div>
+              <div class="gs-group" v-if="results.student.length">
+                <div class="gs-t">学生账号</div>
+                <div class="gs-item" v-for="r in results.student" :key="'u' + r.id" @mousedown.prevent="goStudent(r)">
+                  <span class="gs-strong">{{ r.nickname || r.username }}</span>
+                  <span class="micro mono">{{ r.username }}</span>
+                </div>
+              </div>
+              <div class="gs-empty" v-if="searching">搜索中…</div>
+              <div class="gs-empty" v-else-if="!hasSearchResult">没有匹配的结果</div>
+            </div>
+          </div>
+
+          <button class="icon-btn" title="刷新当前页" @click="doRefresh">
+            <IconRefresh :size="16" />
+          </button>
         </div>
       </el-header>
 
@@ -103,20 +150,68 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
+import { computed, ref, reactive, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import http from '@/utils/http';
 import {
   IconTrend, IconArticle, IconCalendar, IconMegaphone, IconChat,
-  IconStar, IconSwitch, IconUsers, IconSettings,
-  IconSearch, IconClose, IconChevronDown,
+  IconStar, IconSwitch, IconUsers, IconSettings, IconMusic, IconUserPlus,
+  IconSearch, IconClose, IconChevronDown, IconRefresh,
 } from '@/components/icons';
+import { pageHeader, triggerRefresh } from '@/utils/pageHeader';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+
+/* ---------------- 顶栏：副标题 / 全局搜索 / 刷新 ---------------- */
+const searchOpen = ref(false);
+const searchKey = ref('');
+const searching = ref(false);
+const results = reactive({ submit: [], notice: [], student: [] });
+let searchTimer = null;
+
+const hasSearchResult = computed(() => results.submit.length + results.notice.length + results.student.length > 0);
+
+function closeSearchSoon() { setTimeout(() => { searchOpen.value = false; }, 160); }
+
+/** 输入即搜（300ms 防抖），命中三类数据各取前 4 条 */
+function onSearchInput() {
+  clearTimeout(searchTimer);
+  const kw = searchKey.value.trim();
+  if (!kw) {
+    results.submit = []; results.notice = []; results.student = [];
+    return;
+  }
+  searching.value = true;
+  searchTimer = setTimeout(async () => {
+    try {
+      const [s, n, u] = await Promise.all([
+        http.get('/admin/submit/list', { params: { page: 1, pageSize: 4, keyword: kw } }).catch(() => ({ list: [] })),
+        http.get('/admin/notice/list', { params: { page: 1, pageSize: 4, keyword: kw } }).catch(() => ({ list: [] })),
+        http.get('/admin/student/list', { params: { page: 1, pageSize: 4, keyword: kw } }).catch(() => ({ list: [] })),
+      ]);
+      results.submit = s.list || [];
+      results.notice = n.list || [];
+      results.student = u.list || [];
+    } finally { searching.value = false; }
+  }, 300);
+}
+
+function runSearch() {
+  const kw = searchKey.value.trim();
+  if (!kw) return;
+  searchOpen.value = false;
+  router.push({ path: '/submit', query: { keyword: kw } });
+}
+
+function goSubmit(r) { searchOpen.value = false; router.push({ path: '/submit', query: { keyword: r.type === 1 ? r.songName : r.articleTitle } }); }
+function goNotice(r) { searchOpen.value = false; router.push({ path: '/notice', query: { keyword: r.title } }); }
+function goStudent(r) { searchOpen.value = false; router.push({ path: '/student', query: { keyword: r.username } }); }
+
+function doRefresh() { triggerRefresh(); }
 
 const avatar = computed(() => (auth.admin?.nickname || auth.admin?.username || '管').charAt(0).toUpperCase());
 
@@ -126,7 +221,7 @@ const NAV_GROUPS = [
     title: '内容运营',
     items: [
       { path: '/dashboard', title: '数据概览', icon: IconTrend },
-      { path: '/submit', title: '投稿审核', icon: IconArticle, badgeKey: 'submitPending' },
+      { path: '/submit', title: '投稿 & 点歌审核', icon: IconArticle, badgeKey: 'submitPending' },
       { path: '/program', title: '栏目管理', icon: IconCalendar },
       { path: '/notice', title: '公告管理', icon: IconMegaphone },
       { path: '/message', title: '留言审核', icon: IconChat, badgeKey: 'messagePending' },
@@ -135,7 +230,9 @@ const NAV_GROUPS = [
   {
     title: '系统管理',
     items: [
-      { path: '/member', title: '风采展示', icon: IconStar, superAdmin: true },
+      { path: '/student', title: '学生账号', icon: IconUserPlus, superAdmin: true },
+      // v8：社干 + 部员合成一个「风采展示」，页内用分段切换（不再并排两个菜单）
+      { path: '/showcase', title: '风采展示', icon: IconStar, superAdmin: true },
       { path: '/switch', title: '模块开关', icon: IconSwitch, superAdmin: true },
       { path: '/account', title: '账号管理', icon: IconUsers, superAdmin: true },
       { path: '/setting', title: '系统设置', icon: IconSettings, superAdmin: true },
@@ -249,146 +346,127 @@ onBeforeUnmount(() => {
 <style scoped>
 .layout { height: 100vh; }
 
-/* ══════════ 侧栏：浅色磨砂（方案 A） ══════════ */
+/* ══════════ 侧栏（v8 .rail：232px 白底，选中＝墨黑胶囊，无渐变无柔光） ══════════ */
 .aside {
-  position: relative;
-  background: #fff;
-  border-right: 1px solid #e8edf3;
+  background: var(--canvas);
+  border-right: 1px solid var(--hairline);
   display: flex;
   flex-direction: column;
-  box-shadow: 1px 0 12px rgba(15, 23, 42, 0.03);
+  padding: 18px 14px 14px;
 }
-/* 青蓝柔光层：品牌色以「光」的形式存在，而非底色 */
-.aside::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(at 12% 8%, rgba(6, 182, 212, 0.13) 0px, transparent 52%),
-    radial-gradient(at 88% 92%, rgba(99, 102, 241, 0.11) 0px, transparent 52%),
-    linear-gradient(168deg, #fbfdff 0%, #f5f8fd 55%, #f3f5fc 100%);
-}
-.aside > * { position: relative; z-index: 1; }
 
 .logo {
   display: flex; align-items: center; gap: 11px;
-  padding: 19px 18px 17px;
+  padding: 0 6px 16px;
   flex-shrink: 0;
 }
 .logo-img {
-  width: 38px; height: 38px;
-  border-radius: 11px;
+  width: 36px; height: 36px;
+  border-radius: 10px;
   object-fit: cover;
   flex-shrink: 0;
-  box-shadow: 0 3px 10px rgba(6, 182, 212, 0.24), 0 0 0 1px rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 1px var(--hairline);
 }
-.brand { font-size: 14.5px; font-weight: 600; color: #0f172a; letter-spacing: -0.1px; }
-.brand-sub { font-size: 10.5px; color: #94a3b8; margin-top: 2px; letter-spacing: 0.4px; }
+.brand { font-size: var(--fs-md); font-weight: 600; color: var(--ink); letter-spacing: -0.2px; }
+.brand-sub { font-size: var(--fs-2xs); color: var(--muted); margin-top: 1px; letter-spacing: var(--ls-wide-sm); }
 
 /* 菜单搜索 */
 .menu-search {
-  margin: 0 14px 14px;
   display: flex; align-items: center; gap: 8px;
-  height: 35px; padding: 0 11px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #e8edf3;
-  border-radius: 9px;
-  color: #94a3b8;
+  height: 34px; padding: 0 11px;
+  background: var(--parchment);
+  border: none; border-radius: 10px;
+  color: var(--soft);
   flex-shrink: 0;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  margin-bottom: 16px;
+  transition: background 0.16s, box-shadow 0.16s;
 }
 .menu-search:focus-within {
-  border-color: #a5f3fc;
-  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
+  background: var(--canvas);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 0 4px rgba(0, 102, 204, 0.1);
 }
 .menu-search-input {
   flex: 1; min-width: 0;
   border: none; outline: none; background: transparent;
-  font-size: 12.5px; font-family: inherit; color: #334155;
+  font-size: var(--fs-sm); font-family: inherit; color: var(--ink);
 }
-.menu-search-input::placeholder { color: #94a3b8; }
+.menu-search-input::placeholder { color: var(--soft); }
 .menu-search kbd {
-  font-size: 10px; font-family: inherit;
-  padding: 2px 5px; border-radius: 4px;
-  background: #f1f5f9; color: #94a3b8; border: 1px solid #e8edf3;
+  font-size: var(--fs-2xs); font-family: inherit;
+  padding: 1px 5px; border-radius: 5px;
+  background: var(--canvas); color: var(--muted); border: 1px solid var(--hairline);
   white-space: nowrap;
 }
 .menu-search-clear {
   border: none; background: transparent; cursor: pointer;
-  color: #94a3b8; padding: 2px; display: flex; border-radius: 4px;
+  color: var(--muted); padding: 2px; display: flex; border-radius: 4px;
 }
-.menu-search-clear:hover { color: #475569; background: #f1f5f9; }
+.menu-search-clear:hover { color: var(--ink); }
 
 /* 导航 */
-.nav { flex: 1; overflow-y: auto; padding: 0 10px 10px; }
-.nav-group { margin-bottom: 6px; }
+.nav { flex: 1; min-height: 0; overflow-y: auto; padding: 0 2px 10px; }
+.nav-group { margin-bottom: 2px; }
 .nav-group-title {
-  font-size: 10.5px; font-weight: 600; color: #94a3b8;
-  letter-spacing: 0.7px; padding: 9px 10px 6px;
+  font-size: var(--fs-2xs); font-weight: 600; color: var(--soft);
+  letter-spacing: 0.9px; padding: 12px 8px 7px;
 }
 .nav-item {
-  display: flex; align-items: center; gap: 10px;
-  height: 39px; padding: 0 10px; margin-bottom: 2px;
-  border-radius: 9px;
-  color: #475569; font-size: 13.5px;
+  display: flex; align-items: center; gap: 8px;
+  height: 38px; padding: 0 11px; margin-bottom: 2px;
+  border-radius: 11px;
+  color: var(--ink-2); font-size: var(--fs-md);
   cursor: pointer; user-select: none;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.16s, color 0.16s;
 }
-.nav-item :deep(svg) { color: #94a3b8; transition: color 0.15s; }
-.nav-item:hover { background: rgba(6, 182, 212, 0.07); color: #0e7490; }
-.nav-item:hover :deep(svg) { color: #0891b2; }
-.nav-item.on {
-  background: linear-gradient(135deg, rgba(6, 182, 212, 0.13), rgba(99, 102, 241, 0.12));
-  color: #0e7490; font-weight: 600;
-  box-shadow: inset 0 0 0 1px rgba(6, 182, 212, 0.2);
-}
-.nav-item.on :deep(svg) { color: #0891b2; }
+.nav-item :deep(svg) { color: var(--muted); transition: color 0.16s; flex-shrink: 0; }
+.nav-item:hover { background: var(--parchment); color: var(--ink); }
+.nav-item:hover :deep(svg) { color: var(--ink); }
+.nav-item.on { background: var(--ink); color: #fff; font-weight: 600; }
+.nav-item.on :deep(svg) { color: #fff; }
 .nav-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-badge {
   font-style: normal;
-  font-size: 10.5px; font-weight: 600;
+  font-size: var(--fs-2xs); font-weight: 600;
   min-width: 19px; height: 19px; padding: 0 5px;
-  border-radius: 9.5px;
-  background: #ef4444; color: #fff;
+  border-radius: var(--r-pill);
+  background: var(--ink); color: #fff;
   display: inline-flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
+.nav-item.on .nav-badge { background: #fff; color: var(--ink); }
 .nav-empty {
   display: flex; flex-direction: column; align-items: center; gap: 8px;
-  padding: 32px 10px; color: #94a3b8; font-size: 12px;
+  padding: 32px 10px; color: var(--soft); font-size: var(--fs-sm);
 }
 
-/* 底部账号 */
+/* 底部账号（v8 .rail-account：羊皮纸圆角块，头像＝墨底姓圆） */
 .account {
-  margin: 10px; padding: 11px;
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #e8edf3;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px;
+  border-radius: 13px;
+  background: var(--parchment);
+  border: none;
+  display: flex; align-items: center; gap: 8px;
   flex-shrink: 0;
 }
 .account-avatar {
-  width: 31px; height: 31px; border-radius: 9px;
-  background: linear-gradient(135deg, #06b6d4, #6366f1);
-  color: #fff; font-size: 13px; font-weight: 600;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--ink); color: #fff; font-size: var(--fs-sm); font-weight: 600;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
 .account-info { flex: 1; min-width: 0; }
 .account-name {
-  font-size: 12.5px; font-weight: 600; color: #0f172a;
+  font-size: var(--fs-sm); font-weight: 600; color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.account-role { font-size: 10.5px; color: #94a3b8; margin-top: 1px; }
+.account-role { font-size: var(--fs-2xs); color: var(--muted); margin-top: 1px; }
 .account-more {
   border: none; background: transparent; cursor: pointer;
-  color: #94a3b8; padding: 3px; border-radius: 6px;
+  color: var(--soft); padding: 3px; border-radius: 6px;
   display: flex; flex-shrink: 0; transition: 0.15s;
   align-items: center;
 }
-.account-more:hover { color: #475569; background: #f1f5f9; }
+.account-more:hover { color: var(--ink); }
 
 /* ══════════ 右侧 ══════════ */
 .right { min-width: 0; }
@@ -427,4 +505,76 @@ onBeforeUnmount(() => {
 /* 滚动条 */
 .nav::-webkit-scrollbar { width: 5px; }
 .nav::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.35); border-radius: 3px; }
+
+/* ══════════════════════════════════════════════════════════
+   顶栏（v8：白底 + 细分隔线，标题/副标题在左，搜索/刷新在右）
+   ══════════════════════════════════════════════════════════ */
+.header {
+  background: var(--canvas);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 1px solid var(--hairline);
+  box-shadow: none;
+}
+/* v8 顶栏：标题 + 副标题 在左，全局搜索 + 刷新 在右 */
+.header-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.header-sub { font-size: var(--fs-sm); color: var(--muted); letter-spacing: var(--ls-wide); }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+.gsearch {
+  position: relative;
+  display: flex; align-items: center; gap: 8px;
+  height: 36px; width: 258px; padding: 0 12px;
+  background: var(--parchment);
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  color: var(--soft);
+}
+.gsearch.on { background: var(--canvas); border-color: var(--accent); }
+.gsearch input {
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+  font-family: inherit; font-size: var(--fs-sm); color: var(--ink);
+}
+.gsearch input::placeholder { color: var(--soft); }
+.gsearch .kbd {
+  font-size: var(--fs-2xs); color: var(--muted);
+  background: var(--canvas); border: 1px solid var(--hairline);
+  border-radius: 6px; padding: 1px 6px;
+}
+.gsearch-pop {
+  position: absolute; top: 42px; left: 0; right: 0; z-index: 30;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  box-shadow: 0 18px 44px -20px rgba(0, 0, 0, 0.32);
+  padding: 8px;
+  max-height: 60vh; overflow: auto;
+}
+.gs-group + .gs-group { border-top: 1px solid var(--divider); margin-top: 6px; padding-top: 6px; }
+.gs-t { font-size: var(--fs-xs); color: var(--muted-2); padding: 4px 8px; letter-spacing: var(--ls-wide-sm); }
+.gs-item {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 7px 8px; border-radius: 8px; cursor: pointer;
+}
+.gs-item:hover { background: var(--parchment); }
+.gs-strong {
+  font-size: var(--fs-md); color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px;
+}
+.gs-empty { font-size: var(--fs-sm); color: var(--muted); padding: 10px 8px; text-align: center; }
+.mono { font-family: var(--mono); }
+
+.icon-btn {
+  width: 36px; height: 36px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--hairline); background: var(--canvas);
+  border-radius: var(--r-pill); cursor: pointer; color: var(--ink-2);
+  transition: border-color 0.16s var(--ease), background 0.16s var(--ease);
+}
+.icon-btn:hover { border-color: var(--soft); background: var(--parchment); }
+.header-title { color: var(--ink); font-size: var(--fs-xl); letter-spacing: var(--ls-tight-sm); }
+.brand-bar { background: var(--ink); }
+/* v8：内容区底色是 --canvas（纯白 #ffffff），不是羊皮纸灰；
+   羊皮纸（--parchment）只用于卡片内部的次级块，两者混用会让白色胶囊/卡片糊进背景。 */
+.main { background: var(--canvas); }
 </style>

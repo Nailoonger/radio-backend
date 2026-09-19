@@ -1,8 +1,27 @@
-<view class="container" wx:if="{{notice}}">
-  <view class="card">
-    <view class="title">{{notice.title}}</view>
-    <view class="subtitle">{{notice.publishTimeFmt}}</view>
-    <view class="content">{{notice.content}}</view>
+<!-- pages/noticeDetail/noticeDetail.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
+    </view>
+    <view class="navbar-title">公告详情</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+
+    <block wx:if="{{notice}}">
+      <view class="stack" style="gap: 14rpx;">
+        <view class="t-title">{{notice.title}}</view>
+        <view class="t-cap">{{notice.publishTimeFmt}}</view>
+      </view>
+      <view class="content">{{notice.content}}</view>
+    </block>
+
+    <view class="empty" wx:elif="{{!loading}}">公告不存在或已被删除</view>
+    <view class="loading" wx:else>加载中……</view>
+
   </view>
 </view>
-<view class="empty" wx:elif="{{!loading}}">公告不存在或已被删除</view>

@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>学生账号登录方案 v1 · 小程序端静态预览</title>
+<style>
+/* ============================================================
+   菁悠广播站 · 学生账号登录方案 v1（小程序端静态预览）
+   token 全部来自 miniprogram/app.wxss，三条硬规则：
+     ① 只有一个强调色 #0066CC；② 不用装饰性渐变/彩色投影；
+     ③ 深色卡 #272729 是主角，其余退到羊皮纸 #F5F5F7
+   ⚠️ 本页只是预览，未改动任何小程序代码
+   ============================================================ */
+:root{
+  --ink:#1d1d1f; --ink-2:#333; --muted:#7a7a7a; --muted-2:#6e6e73; --soft:#c7c7cc;
+  --hairline:#e0e0e0; --divider:#f0f0f0; --parchment:#f5f5f7;
+  --dark:#272729; --dark-2:#3a3a3c;
+  --accent:#0066cc; --accent-dark:#2997ff; --live:#ff453a;
+  --amber-bg:#fef3c7; --amber-fg:#8a6100;
+  --green-bg:#e7f5ec; --green-fg:#1e7a46;
+  --red-bg:#fde8e8;  --red-fg:#b42318;
+  --r-card:18px; --r-input:12px; --r-pill:9999px;
+  --font:-apple-system,BlinkMacSystemFont,"HarmonyOS Sans SC","MiSans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:#fafafc;color:var(--ink);font-size:14px;line-height:1.5;
+     -webkit-font-smoothing:antialiased;padding:40px 36px 72px}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;font-size:inherit;border:none;background:none;cursor:pointer;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- 页面头 ---------- */
+.head{max-width:1440px;margin:0 auto 30px}
+.eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.9px;color:var(--accent);text-transform:uppercase}
+.head h1{font-size:34px;font-weight:600;letter-spacing:-.9px;margin:9px 0 10px}
+.head p{font-size:14.5px;color:var(--ink-2);max-width:900px;line-height:1.6}
+.head code{font-family:var(--mono);font-size:12px;background:var(--parchment);border-radius:5px;padding:1px 5px}
+.spec{display:flex;gap:18px;margin-top:22px;flex-wrap:wrap}
+.spec>div{flex:1;min-width:300px;background:#fff;border:1px solid var(--hairline);border-radius:var(--r-card);padding:18px 20px}
+.spec h2{font-size:14px;font-weight:600;margin-bottom:10px}
+.spec ul{list-style:disc;padding-left:19px;display:flex;flex-direction:column;gap:7px;font-size:13px;color:var(--ink-2);line-height:1.65}
+.spec b{color:var(--ink)}
+.spec .tagline{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:var(--r-pill);
+  font-size:10.5px;font-weight:600;background:var(--green-bg);color:var(--green-fg);vertical-align:1px}
+.spec .tagline.warn{background:var(--amber-bg);color:var(--amber-fg)}
+
+/* 决策表 */
+.dtable{width:100%;border-collapse:collapse;margin-top:22px;background:#fff;
+  border:1px solid var(--hairline);border-radius:var(--r-card);overflow:hidden;font-size:13px}
+.dtable th,.dtable td{border-bottom:1px solid var(--divider);padding:10px 14px;text-align:left;vertical-align:top}
+.dtable th{background:#fbfbfd;font-weight:600;color:var(--muted);font-size:12px;white-space:nowrap}
+.dtable tr:last-child td{border-bottom:none}
+.dtable td b{color:var(--ink)}
+.dtable .pick{display:inline-flex;align-items:center;height:21px;padding:0 9px;border-radius:var(--r-pill);
+  font-size:11px;font-weight:600;background:var(--accent);color:#fff}
+
+/* ---------- 手机框 ---------- */
+.board{display:flex;gap:30px;max-width:1440px;margin:0 auto;flex-wrap:wrap;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:12px}
+.cap{font-size:13px;color:var(--muted);padding-left:4px;max-width:390px;line-height:1.6}
+.cap b{color:var(--ink);font-weight:600}
+.phone{width:390px;height:844px;background:#fff;border:1px solid var(--hairline);border-radius:22px;
+  overflow:hidden;display:flex;flex-direction:column;box-shadow:0 18px 48px rgba(0,0,0,.07);position:relative}
+.status{height:56px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 26px;
+  font-size:14px;font-weight:600}
+.navbar{height:50px;flex:none;display:flex;align-items:center;padding:0 20px;gap:12px}
+.navbar .back{width:26px;height:26px;display:flex;align-items:center;justify-content:center}
+.navbar .t{font-size:17px;font-weight:600;letter-spacing:-.37px}
+.navbar .spacer{width:26px;flex:none}
+.body{flex:1;min-height:0;overflow:hidden;padding:4px 20px 0;display:flex;flex-direction:column;gap:13px}
+.body.pad{padding-bottom:20px}
+
+/* ---------- 通用件 ---------- */
+.t-page{font-size:28px;font-weight:600;letter-spacing:-.5px;line-height:1.25}
+.t-sub{font-size:13px;color:var(--muted);line-height:1.5}
+.t-section{font-size:17px;font-weight:600;letter-spacing:-.37px}
+.card{background:var(--parchment);border-radius:var(--r-card);padding:16px;display:flex;flex-direction:column;gap:13px}
+.card-white{background:#fff;border:1px solid var(--hairline);border-radius:var(--r-card);padding:16px}
+.tile{background:var(--dark);border-radius:19px;padding:16px;display:flex;flex-direction:column;gap:10px;color:#fff}
+.tile .title{font-size:25px;font-weight:600;letter-spacing:-.4px}
+.tile .meta{font-size:12.5px;color:#ccc;letter-spacing:.25px}
+.row{display:flex;align-items:center;gap:10px}
+.between{display:flex;align-items:center;justify-content:space-between}
+.stack{display:flex;flex-direction:column;gap:13px}
+.grow{flex:1;min-width:0}
+.el{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.micro{font-size:11px;color:var(--muted-2);letter-spacing:.3px;line-height:1.5}
+.sub{font-size:13px;color:var(--muted);letter-spacing:.3px}
+.divider{height:1px;background:var(--divider)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:46px;padding:0 22px;
+  border-radius:var(--r-pill);font-size:15px;font-weight:600;line-height:1}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-off{background:#b9d2ee;color:#fff;font-weight:600}
+.btn-block{width:100%}
+.btn-ghost{border:1.5px solid var(--accent-dark);color:var(--accent-dark);background:transparent}
+.btn-tile{background:#fff;color:var(--accent)}
+.tag{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:var(--r-pill);
+  font-size:11px;font-weight:500}
+.tag-amber{background:var(--amber-bg);color:var(--amber-fg)}
+.tag-green{background:var(--green-bg);color:var(--green-fg)}
+.tag-red{background:var(--red-bg);color:var(--red-fg)}
+.tag-mute{background:#ebebee;color:var(--muted)}
+.field{display:flex;flex-direction:column;gap:7px}
+.field-label{font-size:12.5px;color:var(--muted);letter-spacing:.3px}
+.input{height:44px;border-radius:var(--r-input);background:#fff;border:1px solid var(--hairline);
+  padding:0 13px;display:flex;align-items:center;font-size:14px;color:var(--ink)}
+.input.placeholder{color:var(--soft)}
+.input.err{border-color:var(--red-fg);background:#fffafa}
+.input .eyes{width:18px;height:18px;flex:none;opacity:.45}
+.form{background:var(--parchment);border-radius:var(--r-card);padding:17px;display:flex;flex-direction:column;gap:17px}
+.errline{display:flex;align-items:flex-start;gap:7px;font-size:12.5px;color:var(--red-fg);line-height:1.5}
+.errline .dot{width:14px;height:14px;border-radius:50%;background:var(--red-fg);color:#fff;flex:none;
+  font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.okline{font-size:12.5px;color:var(--green-fg);display:flex;align-items:center;gap:7px}
+.strength{display:flex;gap:5px;margin-top:3px}
+.strength i{height:4px;flex:1;border-radius:var(--r-pill);background:var(--divider)}
+.strength i.on{background:var(--accent)}
+.cta{flex:none;padding:12px 20px calc(22px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:9px}
+.cta .hint{text-align:center;font-size:11px;color:var(--muted-2)}
+.chev{width:8px;height:8px;border-right:1.6px solid var(--soft);border-bottom:1.6px solid var(--soft);
+  transform:rotate(45deg);flex:none}
+.chev-l{width:9px;height:9px;border-left:1.6px solid var(--ink);border-bottom:1.6px solid var(--ink);
+  transform:rotate(45deg)}
+
+/* 登录页专属 */
+.login-hero{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:26px 40px 22px}
+.login-hero img{width:100px;height:100px;margin-bottom:6px}
+.login-hero .name{font-size:21px;font-weight:600;letter-spacing:-.3px}
+.login-hero .slogan{font-size:12.5px;color:var(--muted);letter-spacing:1px}
+.login-body{flex:1;display:flex;flex-direction:column;padding:0 26px}
+.tip-card{background:var(--parchment);border-radius:var(--r-card);padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.tip-row{display:flex;gap:9px;font-size:12.5px;color:var(--ink-2);line-height:1.55}
+.tip-row .k{width:16px;height:16px;border-radius:50%;background:#fff;color:var(--accent);flex:none;
+  font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px}
+
+/* 遮罩 / 弹层 */
+.mask{position:absolute;inset:0;background:rgba(0,0,0,.34);z-index:6;display:flex;align-items:center;justify-content:center;padding:0 34px}
+.dialog{background:#fff;border-radius:20px;padding:24px 22px 18px;width:100%;display:flex;flex-direction:column;gap:14px;text-align:center}
+.dialog .ic{width:52px;height:52px;border-radius:50%;background:var(--parchment);margin:0 auto;
+  display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--accent)}
+.dialog h3{font-size:17px;font-weight:600;letter-spacing:-.3px}
+.dialog p{font-size:13px;color:var(--muted);line-height:1.6}
+.dialog .acts{display:flex;flex-direction:column;gap:9px;margin-top:2px}
+.dialog .later{font-size:13px;color:var(--muted);padding:9px 0}
+.banner{margin:0 20px;background:var(--amber-bg);border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start}
+.banner .tx{font-size:12.5px;color:var(--amber-fg);line-height:1.55}
+.banner .tx b{font-weight:600}
+
+/* 我的页用户卡 */
+.me-card{background:var(--dark);border-radius:19px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.me-top{display:flex;align-items:center;gap:13px}
+.me-avatar{width:46px;height:46px;border-radius:50%;background:var(--dark-2);color:#fff;flex:none;
+  display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600}
+.me-name{font-size:17px;font-weight:600;color:#fff;letter-spacing:-.3px}
+.me-sub{font-size:12px;color:#ccc;letter-spacing:.3px;margin-top:2px}
+.me-stats{display:flex;gap:22px;padding-top:11px;border-top:1px solid #3a3a3c}
+.me-stats div{display:flex;flex-direction:column;gap:2px}
+.me-stats b{font-size:19px;font-weight:600;color:#fff}
+.me-stats span{font-size:11px;color:#ccc}
+.list-card{background:var(--parchment);border-radius:var(--r-card);padding:5px 0}
+.list-row{display:flex;align-items:center;gap:12px;padding:13px 16px}
+.list-row .ic{width:26px;height:26px;border-radius:8px;background:#fff;flex:none;
+  display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--accent)}
+.list-row .lb{font-size:14px}
+.list-row .rt{font-size:12.5px;color:var(--muted)}
+.gate{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:0 40px;text-align:center}
+.gate .ic{width:64px;height:64px;border-radius:50%;background:var(--parchment);display:flex;
+  align-items:center;justify-content:center;font-size:26px;color:var(--soft)}
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div class="eyebrow">学生账号体系 · 小程序端</div>
+  <h1>登录 / 改密 / 门禁　方案 v1</h1>
+  <p>
+    账号 = 入学年级 + 班级 + 序号（如 <code>20240101</code>），初始密码 <code>usr123456</code>。
+    本次按你选的 <b>B 方案</b> 做门禁：<b>只拦「投稿 / 点歌、留言、我的」</b>，
+    首页、节目单、公告、风采照旧免登录可看。后端已按这 5 条决策实现完毕（124 项断言全通过），
+    本页只是界面预览，<b>小程序代码尚未改动</b>。
+  </p>
+
+  <table class="dtable">
+    <tr><th style="width:52px">#</th><th style="width:260px">问题</th><th>你的选择</th><th style="width:330px">对实现的影响</th></tr>
+    <tr>
+      <td>1</td><td>门禁范围</td>
+      <td><span class="pick">B</span> 只拦投稿 / 点歌 / 留言 / 我的</td>
+      <td>不做冷启动拦截；被拦时用弹层引导去登录，回来后回到原页。<b>后端零改动</b>（这些接口本来就是登录保护的）</td>
+    </tr>
+    <tr>
+      <td>2</td><td>首次登录是否强制改密</td>
+      <td><span class="pick">A</span> 只提示，可跳过</td>
+      <td>登录成功返回 <code>isDefaultPwd=true</code> 时弹一次引导，「暂不修改」直接放行</td>
+    </tr>
+    <tr>
+      <td>3</td><td>序号缺失 / 重复</td>
+      <td><span class="pick">A</span> 报错不导入，回去改表</td>
+      <td>已实现：异常行标红并给真实行号 + 原因，不写库</td>
+    </tr>
+    <tr>
+      <td>4</td><td>已激活账号被再次导入</td>
+      <td><span class="pick">A</span> 跳过保护，要覆盖得显式勾选</td>
+      <td>已实现：默认 <code>force=false</code> 跳过；勾选后才覆盖，且<b>不碰密码</b></td>
+    </tr>
+    <tr>
+      <td>5</td><td>微信一键登录</td>
+      <td><span class="pick">A</span> 保留接口但默认关闭</td>
+      <td>已实现：开关 <code>account_login_required</code> 默认开，关掉即可回退</td>
+    </tr>
+  </table>
+
+  <div class="spec">
+    <div>
+      <h2>B 方案门禁范围（这一版的核心）</h2>
+      <ul>
+        <li><b>免登录</b>：首页 / 节目单 / 公告 / 风采 / 介绍</li>
+        <li><b>需登录</b>：投稿（含点歌）、节目留言、我的（我的投稿）</li>
+        <li>被拦时不跳空白页 —— 当前页面上盖一层弹层，说清「为什么」+ 给一个「去登录」，取消就留在原地</li>
+        <li>登录成功后<b>回到刚才那一页</b>，不用自己再点一遍</li>
+      </ul>
+    </div>
+    <div>
+      <h2>要改的小程序文件（确认后动）</h2>
+      <ul>
+        <li><code>pages/login</code> 三个文件：改为账号 + 密码表单</li>
+        <li><code>pages/changePassword/</code>：新增 4 个文件（含 app.json 注册）</li>
+        <li><code>app.js</code>：新增 <code>loginByAccount()</code> / <code>guardLogin()</code></li>
+        <li><code>utils/request.js</code>：401 时清 token 并跳登录</li>
+        <li><code>pages/mySubmit</code>：用户卡显示账号班级 + 改密入口</li>
+        <li>投稿 / 留言 / 我的三处入口接上 <code>guardLogin()</code></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="board">
+
+  <!-- 01 登录页 -->
+  <div class="col">
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>•••&nbsp;&nbsp;📶&nbsp;🔋</span></div>
+      <div class="navbar">
+        <div class="back"><div class="chev-l"></div></div>
+        <div class="t">登录</div>
+        <div class="spacer"></div>
+      </div>
+      <div class="login-hero">
+        <img src="../../miniprogram/assets/station-badge.png" alt="站徽">
+        <div class="name">菁悠广播站</div>
+        <div class="slogan">菁菁校园情，悠悠广播声</div>
+      </div>
+      <div class="login-body stack">
+        <div class="form">
+          <div class="field">
+            <div class="field-label">账号</div>
+            <div class="input num">20240101</div>
+          </div>
+          <div class="field">
+            <div class="field-label">密码</div>
+            <div class="input row" style="justify-content:space-between">
+              <span class="num" style="letter-spacing:2px">••••••••</span>
+              <span class="eyes">👁</span>
+            </div>
+          </div>
+        </div>
+        <div class="tip-card">
+          <div class="tip-row"><span class="k">1</span><span>账号是学校分发的 8 位学号，例如 <b>20240101</b></span></div>
+          <div class="tip-row"><span class="k">2</span><span>初始密码统一为 <b>usr123456</b>，首次登录后请及时修改</span></div>
+          <div class="tip-row"><span class="k">3</span><span>忘记密码请联系广播站，由管理员重置</span></div>
+        </div>
+      </div>
+      <div class="cta">
+        <button class="btn btn-primary btn-block">登 录</button>
+        <div class="hint">账号由广播站统一分发，不支持自助注册</div>
+      </div>
+    </div>
+    <div class="cap"><b>01 登录页（默认态）</b><br>账号输入框聚焦时拉起数字键盘；密码框可切换明文。下方三行说明直接把「账号是什么、初始密码是什么、忘了怎么办」讲完，减少来回问。</div>
+  </div>
+
+  <!-- 02 登录页 错误态 -->
+  <div class="col">
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>•••&nbsp;&nbsp;📶&nbsp;🔋</span></div>
+      <div class="navbar">
+        <div class="back"><div class="chev-l"></div></div>
+        <div class="t">登录</div>
+        <div class="spacer"></div>
+      </div>
+      <div class="login-hero">
+        <img src="../../miniprogram/assets/station-badge.png" alt="站徽">
+        <div class="name">菁悠广播站</div>
+        <div class="slogan">菁菁校园情，悠悠广播声</div>
+      </div>
+      <div class="login-body stack">
+        <div class="form">
+          <div class="field">
+            <div class="field-label">账号</div>
+            <div class="input num err">20240101</div>
+          </div>
+          <div class="field">
+            <div class="field-label">密码</div>
+            <div class="input row err" style="justify-content:space-between">
+              <span class="num" style="letter-spacing:2px">••••••</span>
+              <span class="eyes">👁</span>
+            </div>
+          </div>
+        </div>
+        <div class="errline"><span class="dot">!</span><span>账号或密码错误，请检查后重试</span></div>
+        <div class="tip-card">
+          <div class="tip-row"><span class="k">1</span><span>账号是 8 位学号，别把班级序号当成账号</span></div>
+          <div class="tip-row"><span class="k">2</span><span>初始密码是 <b>usr123456</b>（全小写）</span></div>
+          <div class="tip-row"><span class="k">3</span><span>改过密码后又忘了 → 找管理员重置</span></div>
+        </div>
+      </div>
+      <div class="cta">
+        <button class="btn btn-primary btn-block">登 录</button>
+        <div class="hint">连续 5 次错误会锁定 10 分钟</div>
+      </div>
+    </div>
+    <div class="cap"><b>02 登录页（错误态）</b><br>「账号不存在」和「密码错误」刻意用<b>同一句文案</b>，避免被拿来一个个试出有效学号。输入框描边变红，提示行在表单正下方，视线不用跑。</div>
+  </div>
+
+  <!-- 03 未登录被拦（投稿） -->
+  <div class="col">
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>•••&nbsp;&nbsp;📶&nbsp;🔋</span></div>
+      <div class="navbar">
+        <div class="back"><div class="chev-l"></div></div>
+        <div class="t">投稿</div>
+        <div class="spacer"></div>
+      </div>
+      <div class="body">
+        <div class="card" style="gap:14px">
+          <div class="t-section">想把话放进广播里</div>
+          <div class="sub">点一首歌，或者投一篇文稿，我们会挑合适的在节目里读出来。</div>
+        </div>
+        <div class="card-white stack" style="gap:11px">
+          <div class="sub" style="color:var(--soft)">歌曲名</div>
+          <div class="divider"></div>
+          <div class="sub" style="color:var(--soft)">歌手</div>
+          <div class="divider"></div>
+          <div class="sub" style="color:var(--soft)">想说的话</div>
+        </div>
+      </div>
+      <div class="cta">
+        <button class="btn btn-off btn-block">提交投稿</button>
+      </div>
+      <div class="mask">
+        <div class="dialog">
+          <div class="ic">🔒</div>
+          <h3>投稿需要先登录</h3>
+          <p>用学校分发的账号登录后就能投稿、点歌和留言了。<br>账号是 8 位学号，初始密码 usr123456。</p>
+          <div class="acts">
+            <button class="btn btn-primary btn-block">去登录</button>
+            <div class="later">暂不登录</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>03 未登录点「投稿」被拦</b><br>不空白跳页。弹层点破「为什么拦你」+ 账号怎么来；「暂不登录」直接关掉留在原地，表单已经填的内容不丢。你选了 B 方案，所以只有投稿 / 留言 / 我的三处会弹这个。</div>
+  </div>
+
+  <!-- 04 首页仍免登录 -->
+  <div class="col">
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>•••&nbsp;&nbsp;📶&nbsp;🔋</span></div>
+      <div class="body pad" style="padding-top:14px">
+        <div class="row" style="gap:13px">
+          <img src="../../miniprogram/assets/station-badge.png" style="width:44px;height:44px" alt="站徽">
+          <div class="grow">
+            <div style="font-size:21px;font-weight:600;letter-spacing:-.3px">菁悠广播站</div>
+            <div class="slogan" style="font-size:12.5px;color:var(--muted);letter-spacing:1px">菁菁校园情，悠悠广播声</div>
+          </div>
+        </div>
+        <div class="tile">
+          <div class="row" style="gap:7px;font-size:11.5px;font-weight:500;color:#ccc">
+            <span style="width:7px;height:7px;border-radius:50%;background:var(--live)"></span>正在直播
+          </div>
+          <div class="title">午间音乐汇</div>
+          <div class="meta">周一至周五 12:30 - 13:00 · 主播 小李</div>
+          <div class="row" style="gap:10px;margin-top:2px">
+            <button class="btn btn-tile" style="height:36px;font-size:13px">进入节目</button>
+            <button class="btn btn-ghost" style="height:36px;font-size:13px">点歌</button>
+          </div>
+        </div>
+        <div class="between"><span class="t-section">本周节目单</span><span class="sub">查看全部 ›</span></div>
+        <div class="card" style="gap:0;padding:6px 0">
+          <div class="list-row between"><span class="lb">校园新闻速递</span><span class="tag tag-mute">周一 17:00</span></div>
+          <div style="height:1px;background:var(--divider);margin:0 16px"></div>
+          <div class="list-row between"><span class="lb">晚安故事</span><span class="tag tag-mute">周五 21:30</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>04 首页：照旧免登录</b><br>这一屏什么都没变 —— 你选了 B 方案，首页 / 节目单 / 公告 / 风采这些「看」的部分不需要账号。深色卡里的「点歌」按钮点下去才会弹 03 那个登录引导。</div>
+  </div>
+
+  <!-- 05 我的页 已登录 -->
+  <div class="col">
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>•••&nbsp;&nbsp;📶&nbsp;🔋</span></div>
+      <div class="body pad" style="padding-top:14px">
+        <div class="me-card">
+          <div class="me-top">
+            <div class="me-avatar">张</div>
+            <div class="grow">
+              <div class="me-name">张三</div>
+              <div class="me-sub num">2024 级 1 班 · 01 号&nbsp;&nbsp;|&nbsp;&nbsp;20240101</div>
+            </div>
+          </div>
+          <div class="me-stats">
+            <div><b class="num">3</b><span>我的投稿</span></div>
+            <div><b class="num">1</b><span>已通过</span></div>
+            <div><b class="num">2</b><span>待审核</span></div>
+          </div>
+        </div>
+        <div class="list-card">
+          <div class="list-row">
+            <span class="ic">密</span>
+            <span class="lb grow">修改密码</span>
+            <span class="chev"></span>
+          </div>
+          <div style="height:1px;background:var(--divider);margin:0 16px"></div>
+          <div class="list-row">
+            <span class="ic">播</span>
+            <span class="lb grow">我的投稿</span>
+            <span class="chev"></span>
+          </div>
+          <div style="height:1px;background:var(--divider);margin:0 16px"></div>
+          <div class="list-row">
+            <span class="ic">关</span>
+            <span class="lb grow">关于广播站</span>
+            <span class="chev"></span>
+          </div>
+        </div>
+        <div class="list-card">
+          <div class="list-row"><span class="lb" style="color:var(--red-fg)">退出登录</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>05 「我的」页（已登录）</b><br>用户卡从「微信昵称」换成<b>账号身份</b>：姓名（有的话）+ 班级 + 账号。深色卡仍是视觉主角，统计数字用等宽数字对齐。「修改密码」是新加的入口。</div>
+  </div>
+
+  <!-- 06 修改密码 -->
+  <div class="col">
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>•••&nbsp;&nbsp;📶&nbsp;🔋</span></div>
+      <div class="navbar">
+        <div class="back"><div class="chev-l"></div></div>
+        <div class="t">修改密码</div>
+        <div class="spacer"></div>
+      </div>
+      <div class="body">
+        <div class="form">
+          <div class="field">
+            <div class="field-label">原密码</div>
+            <div class="input num" style="letter-spacing:2px">••••••••</div>
+          </div>
+          <div class="field">
+            <div class="field-label">新密码</div>
+            <div class="input row" style="justify-content:space-between">
+              <span class="num" style="letter-spacing:2px">abc123456</span>
+              <span class="eyes">👁</span>
+            </div>
+            <div class="strength"><i class="on"></i><i class="on"></i><i></i></div>
+            <div class="micro">至少 8 位，需同时包含字母和数字</div>
+          </div>
+          <div class="field">
+            <div class="field-label">确认新密码</div>
+            <div class="input num" style="letter-spacing:2px">•••••••••</div>
+          </div>
+        </div>
+        <div class="okline">✓ 两次输入一致</div>
+      </div>
+      <div class="cta">
+        <button class="btn btn-primary btn-block">确认修改</button>
+        <div class="hint">修改成功后原登录状态会失效，需要用新密码重新登录</div>
+      </div>
+    </div>
+    <div class="cap"><b>06 修改密码</b><br>三格表单 + 强度条。提示写明「改完要用新密码重登」—— 这是真的，后端会把旧 token 作废（防止别人拿着老 token 继续用）。</div>
+  </div>
+
+  <!-- 07 首次登录引导 -->
+  <div class="col">
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>•••&nbsp;&nbsp;📶&nbsp;🔋</span></div>
+      <div class="body pad" style="padding-top:14px">
+        <div class="banner">
+          <span style="font-size:14px">⚠️</span>
+          <span class="tx">你还在用初始密码。<b>建议现在改掉</b>，别人拿到你的账号就进不来了。</span>
+        </div>
+        <div class="me-card">
+          <div class="me-top">
+            <div class="me-avatar">张</div>
+            <div class="grow">
+              <div class="me-name">张三</div>
+              <div class="me-sub num">2024 级 1 班 · 01 号&nbsp;&nbsp;|&nbsp;&nbsp;20240101</div>
+            </div>
+          </div>
+          <div class="me-stats">
+            <div><b class="num">0</b><span>我的投稿</span></div>
+            <div><b class="num">0</b><span>已通过</span></div>
+            <div><b class="num">0</b><span>待审核</span></div>
+          </div>
+        </div>
+        <div class="list-card">
+          <div class="list-row">
+            <span class="ic">密</span>
+            <span class="lb grow">修改密码</span>
+            <span class="tag tag-amber">待修改</span>
+          </div>
+        </div>
+      </div>
+      <div class="mask">
+        <div class="dialog">
+          <div class="ic">✓</div>
+          <h3>登录成功</h3>
+          <p>你的账号是 <b class="num">20240101</b>，现在用的还是初始密码。<br>建议改成只有自己知道的密码。</p>
+          <div class="acts">
+            <button class="btn btn-primary btn-block">立即修改密码</button>
+            <div class="later">暂不修改</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>07 首次登录引导（可跳过）</b><br>你选了 A：<b>只提示，不硬拦</b>。点「暂不修改」直接进「我的」页，但页面顶部留一条黄色提醒，改密入口带「待修改」标签 —— 不打扰，也不让它悄悄消失。</div>
+  </div>
+
+</div>
+
+</body>
+</html>

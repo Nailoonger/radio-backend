@@ -1,0 +1,130 @@
+=== 通过 107 项 ===
+  ok   周 key 形如 YYYY-Www  [2026-W38]
+  ok   上限写入并读出  [{"daily":3,"weekly":5}]
+  ok   初始快照 daily 0/3  [{"limit":3,"used":0,"remaining":3,"exhausted":false,"periodKey":"2026-09-19"}]
+  ok   前 3 次占位成功
+  ok   第 4 次被拒（日名额已满）  [{"ok":false,"scope":"daily","limit":3,"used":3}]
+  ok   日计数器 used=3  [3]
+  ok   周计数器 used=3（同步计入）  [3]
+  ok   自动驳回命中 7 条  [swept=7]
+  ok   重复 sweep 幂等（第二次 0 条）
+  ok   已被系统驳回 7 条  [auto=7]
+  ok   驳回理由含「名额已满」  [今日点歌名额已满，系统自动驳回]
+  ok   文稿完全不受影响
+  ok   删除已通过的点歌后名额归还（3→2）
+  ok   并发下不超发（成功 ≤ 2）  [success=2]
+  ok   并发下无未预期异常  [err=0]
+  ok   计数器不超上限  [2]
+  ok   weekly=0 时不建行、不占用
+  ok   未配置内容时不弹窗、不拦人
+  ok   未配置时 assertAcked 通过
+  ok   保存后版本号变 1  [v=1]
+  ok   用户需要确认
+  ok   assertAcked 拦住
+  ok   确认后 needAck=false  [{"ackedVersion":1,"version":1}]
+  ok   确认后 assertAcked 放行
+  ok   重复确认幂等  [rows=1]
+  ok   内容没变 → 版本号不动（不打扰用户）  [v=1]
+  ok   内容没变 → 用户仍不需重新确认
+  ok   内容改了 → 版本号 +1  [v=2]
+  ok   内容改了 → 老确认失效，需重新确认
+  ok   后台能读到版本与已确认人数  [{"v":2,"acked":0}]
+  ok   重新确认后 ackedCount=1
+  ok   清空内容 = 停用（用户端不弹也不拦）  [v=3]
+  ok   5 天 × 3 时段 = 15 个可选  [n=15]
+  ok   日期都在下一周的周一到周五  [周一/周二/周三/周四/周五]
+  ok   第一天 = 下一周的周一  [2026-09-21]
+  ok   slot.value 格式规范  [2026-09-21 早间 07:20]
+  ok   每天时段顺序为早/午/晚
+  ok   合法值通过校验  [2026-09-23 午间 12:20]
+  ok   超出下周范围的日期被拒
+  ok   同周但周末被拒（若是周六）
+  ok   自由文本被拒
+  ok   空值被拒
+  ok   设置解析不出时退回默认 3 个时段  [07:20/12:20/17:30]
+  ok   后台一次拿到两份  [song,article]
+  ok   文稿注意事项保存成功且版本独立（v1）  [v=1]
+  ok   保存文稿不影响点歌那份的版本  [song v=3]
+  ok   文稿 needAck=true
+  ok   点歌那份不受牵连
+  ok   确认文稿后文稿放行
+  ok   两份确认记录各自一行  [rows=2]
+  ok   assertAcked 默认走点歌
+  ok   默认每人每周 2 次、同曲去重开  [{"weeklyUserLimit":2,"dupBlock":1}]
+  ok   第一首可提交
+  ok   同一首歌本周不可重复（被拦）  [本周已经有人点过《song-a》了，换一首吧]
+  ok   换一首可以
+  ok   第 3 次被每周上限拦下  [本周点歌次数已用完（每周最多 2 次），下周再来吧]
+  ok   用量统计正确（2/2）  [{"ok":false,"used":2,"limit":2,"remaining":0}]
+  ok   系统自动驳回的不占个人次数  [{"ok":true,"used":0,"limit":2,"remaining":2}]
+  ok   待审的会锁住
+  ok   人工驳回后这首歌可以再点
+  ok   归一化：全角折半角  [song-a]
+  ok   归一化：去空白（含全角空格）  [songa]
+  ok   归一化：忽略大小写  [song.a]
+  ok   《晴天》锁住「晴 天 」
+  ok   空格+大小写变体也锁住（SONG-A vs song-a）
+  ok   queen 还没被点过（全角写法先放行）
+  ok   queen 落库后全角 ＱＵＥＥＮ 被锁
+  ok   不同歌不受影响  [晴天.alt 是不同字符串]
+  ok   改成 5 次且关闭去重后立即生效  [{"weeklyUserLimit":5,"dupBlock":0}]
+  ok   关掉去重后同曲可以再点
+  ok   上限放宽后额度跟着变（2/5）  [{"ok":true,"used":2,"limit":5,"remaining":3}]
+  ok   普通管理员进不来（不调 next）
+  ok   超级管理员放行
+  ok   清空前既有点歌也有文稿  [16 / 2]
+  ok   不带 confirm 被拒（40001）  [高危操作：请传 confirm: "DELETE" 明确确认]
+  ok   清空成功且返回条数  [16]
+  ok   点歌全部删除
+  ok   文稿一条不动  [2]
+  ok   名额计数器整表清空
+  ok   计数从 0 重新开始  [{"limit":2,"used":0,"remaining":2,"exhausted":false,"periodKey":"2026-09-19"}]
+  ok   清空后可重新占名额
+  ok   个人每周次数跟着清零
+  ok   未发布时来源是台词解析  [schedule]
+  ok   发布后来源变 custom 且按时间排序  [[{"time":"07:20","label":"早间"},{"time":"12:20","label":"午间"},{"time":"20:00","label":"晚间"}]]
+  ok   每天时段数跟着变为 3 个 → 5 天 15 个  [count=15]
+  ok   新时段进入可选列表  [2026-09-22 早间 07:20]
+  ok   按新列表校验合法值
+  ok   旧时段的遗留值不再合法
+  ok   不在列表里的时间被拒
+  ok   非法格式被拒（40001）  [至少要有一个合法时段，格式 HH:mm，最多 6 个]
+  ok   空列表被拒
+  ok   超过 6 个自动截断  [n=6]
+  ok   用户端已挂载 GET /submit/notice
+  ok   用户端已挂载 POST /submit/notice/ack
+  ok   用户端已挂载 GET /submit/timeslots
+  ok   管理端已挂载 GET /submit/notice
+  ok   管理端已挂载 PUT /submit/notice
+  ok   管理端已挂载 GET /submit/timeslots
+  ok   管理端已挂载 PUT /submit/slots
+  ok   管理端已挂载 GET /submit/rules
+  ok   管理端已挂载 PUT /submit/rules
+  ok   管理端已挂载 DELETE /submit/songs
+  ok   DELETE /submit/songs 排在 /submit/:id 之前  [15<20]
+  ok   用户端 /submit/quota 排在 /submit/:id 之前  [6<10]
+  ok   用户端 /submit/notice 排在 /submit/:id 之前  [7<10]
+  ok   用户端 /submit/timeslots 排在 /submit/:id 之前  [9<10]
+  ok   管理端字面量路由排在 /submit/:id 之前  [5<16]
+
+sync ok（自动建表：submit / song_quota / notice_ack / system_setting …）
+
+--- A. 点歌名额 ---
+periodKey  day=2026-09-19  week=2026-W38
+dayRange   2026-09-18T16:00:00.000Z → 2026-09-19T16:00:00.000Z
+并发 10 次 claim（上限 2）→ 成功 2 异常 0 计数器 2
+
+--- B. 点歌注意事项 ---
+
+--- C. 播出时段（下周一到周五） ---
+范围 09-21 ~ 09-25  共 15 个时段；首个 = 周一 09-21 · 早间 07:20
+
+--- B2. 文稿注意事项（独立一份） ---
+
+--- B3. 提交规则 ---
+
+--- B4. 一键清空点歌数据（仅超管） ---
+
+--- C2. 后台发布 / 修改播出时段 ---
+
+--- D. 路由挂载与顺序 ---

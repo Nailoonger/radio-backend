@@ -1,7 +1,15 @@
+/* pages/noticeDetail/noticeDetail.wxss */
+
+/* 底部留白 */
+.body { padding-bottom: 80rpx; }
+
+/* 公告正文：编辑式排版，不用卡片包 */
 .content {
-  margin-top: 24rpx;
   font-size: 30rpx;
-  line-height: 1.8;
-  color: #333;
+  line-height: 1.75;
+  color: var(--ink-2);
+  word-break: break-all;
   white-space: pre-wrap;
 }
+
+.pressed { opacity: 0.72; }

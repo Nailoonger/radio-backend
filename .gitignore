@@ -1,7 +1,7 @@
 # ============== 依赖 ==============
 node_modules/
 
-# =============== 环境变量 ===============
+# =============== 环境变量（含密钥，绝不入库）===============
 .env
 .env.local
 .env.*.local
@@ -15,10 +15,12 @@ yarn-error.log*
 pnpm-debug.log*
 
 # =============== 运行时数据 ===============
-data/mysql/         # Docker MySQL 数据卷（含 .sock / .pid / binlog 等）
-data/uploads/       # Docker uploads 持久化（用户头像）
-data/radio.db*      # 旧 SQLite（已切 MySQL，不再用）
-uploads/            # 本地 uploads 目录（兼容旧代码）
+# Docker MySQL 数据卷（含 .sock / .pid / binlog 等）
+data/mysql/
+# Docker uploads 持久化（用户上传文件）
+data/uploads/
+# 旧 SQLite（已弃用）
+data/radio.db*
 *.sqlite
 *.db
 *.db-journal
@@ -32,8 +34,8 @@ dist/
 admin-web/dist/
 *.tsbuildinfo
 
-# =============== Docker / 证书 ===============
-deploy/certs/        # 自签证书（不入 git）
+# =============== Docker / 证书（自签证书含私钥，不入库）===============
+deploy/certs/
 
 # =============== 测试覆盖 ===============
 coverage/
@@ -48,12 +50,14 @@ coverage/
 .DS_Store
 Thumbs.db
 
-# =============== 调试 / 临时 ===============
-_*.txt
-_*.jpg
-_*.png
-_*.json
-.workbuddy/
+# =============== 调试 / 临时文件（下划线开头 = 本机排查垃圾）===============
+_*
+radio-deploy.tar.gz
+uploads.tar.gz
+radio_data.sql
+
+# =============== 备份目录 ===============
+admin-web/_backup/
 
 # =============== Python（脚本）==============
 __pycache__/
@@ -63,15 +67,5 @@ __pycache__/
 .Python
 
 # =============== Node ===============
-npm-debug.log*
-node_modules/
 jspm_packages/
-
-# =============== Misc ===============
 .pnpm-store/
-*.log
-.DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local

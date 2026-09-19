@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>菁悠广播站 · 管理后台 UI 方案 · 版本对比</title>
+<style>
+:root{
+  --ink:#1d1d1f; --ink-2:#333; --muted:#7a7a7a; --muted-2:#6e6e73;
+  --hairline:#e0e0e0; --divider:#f0f0f0; --parchment:#f5f5f7;
+  --accent:#0066cc; --green-bg:#e7f5ec; --green-fg:#1e7a46;
+  --amber-bg:#fef3c7; --amber-fg:#8a6100;
+  --r-card:18px; --r-pill:9999px;
+  --font:-apple-system,BlinkMacSystemFont,"HarmonyOS Sans SC","MiSans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:#fafafc;color:var(--ink);font-size:14px;line-height:1.55;
+     padding:48px 40px 72px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto}
+.eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.9px;color:var(--accent);text-transform:uppercase}
+h1{font-size:34px;font-weight:600;letter-spacing:-.9px;margin:9px 0 10px}
+.lead{font-size:14.5px;color:var(--ink-2);max-width:760px}
+.rule{background:#fff;border:1px solid var(--hairline);border-radius:var(--r-card);padding:18px 22px;margin:22px 0 26px}
+.rule h2{font-size:14px;font-weight:600;margin-bottom:10px}
+.rule ul{padding-left:19px;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--ink-2)}
+.rule code{font-family:var(--mono);font-size:12px;background:var(--parchment);border-radius:5px;padding:1px 5px}
+.ver{display:flex;align-items:center;gap:22px;background:#fff;border:1px solid var(--hairline);
+     border-radius:var(--r-card);padding:22px 24px;margin-bottom:14px;text-decoration:none;color:inherit;
+     transition:border-color .16s,box-shadow .16s}
+.ver:hover{border-color:#c9c9ce;box-shadow:0 8px 24px rgba(0,0,0,.06)}
+.ver.cur{background:var(--parchment);border-color:transparent}
+.badge{flex:none;width:52px;height:52px;border-radius:50%;background:var(--ink);color:#fff;
+       display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600}
+.ver.old .badge{background:#ebebee;color:var(--muted)}
+.ver .body{flex:1;min-width:0}
+.ver .t{font-size:17px;font-weight:600;letter-spacing:-.4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ver .m{font-size:12.5px;color:var(--muted-2);margin-top:5px;letter-spacing:.3px}
+.ver .d{font-size:13px;color:var(--ink-2);margin-top:9px;line-height:1.7}
+.tag{display:inline-flex;align-items:center;height:23px;padding:0 10px;border-radius:var(--r-pill);
+     font-size:11.5px;font-weight:500}
+.tag-green{background:var(--green-bg);color:var(--green-fg)}
+.tag-amber{background:var(--amber-bg);color:var(--amber-fg)}
+.arrow{flex:none;font-size:13px;font-weight:600;color:var(--accent)}
+.foot{margin-top:26px;font-size:12px;color:var(--muted-2);line-height:1.8}
+.foot b{color:var(--ink-2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">版本索引</div>
+  <h1>管理后台 UI 方案 · 版本对比</h1>
+  <p class="lead">每一版方案都是独立、可单独打开的静态网页，<b>旧版一律保留不删</b>，方便对照着看改了哪里。</p>
+
+  <div class="rule">
+    <h2>命名与存放规则</h2>
+    <ul>
+      <li>一版一个文件夹：<code>preview/admin-ui-v&lt;版本号&gt;/</code></li>
+      <li>主文件与文件夹同名带版本号：<code>admin-ui-v1.html</code>、<code>admin-ui-v2.html</code> —— 两版同时打开时不会认错</li>
+      <li>渲染图放在各自目录下的 <code>shots/</code>，<b>文件名带版本前缀</b>（如 <code>v2-03-dashboard.png</code>）</li>
+      <li><b>新版本只新增目录，不改也不删旧目录</b></li>
+    </ul>
+  </div>
+
+  <a class="ver cur" href="admin-ui-v8/admin-ui-v8.html">
+    <span class="badge">v8</span>
+    <span class="body">
+      <span class="t">管理后台 UI 方案 v8 <span class="tag tag-green">当前版本</span></span>
+      <span class="m">2026-09-18 · 25 屏 · 25 张渲染图 · 完整版（全部模块）· 当前唯一权威方案</span>
+      <span class="d">
+        <b>v8 现在是完整版</b>：v7 的全部 18 屏（设计系统 / 规范 / 数据来源 + 各模块画布）与 v8 增量
+        合并为一份，以后只按这一版落地，旧版只留档对比。构成：
+        设计底座 4 屏（方案说明 / <b>设计系统（已修复布局塌陷）</b> / 规范 / 数据来源）；
+        内容运营 7 屏（数据概览、投稿 &amp; 点歌审核、处理台、<b>点歌设置</b>、学生账号列表 / 导入 / 批次）；
+        <b>学生账号 · 年级视图 5 屏</b>（按年级总览、年级详情、毕业清理确认 → 手打年级名危险确认 → 完成，
+        后端 <code>student/grades</code> 系列已实现）；
+        其余模块 7 屏（栏目 / 公告 / 留言 / 风采 / 开关 / 账号 / 设置）；
+        危险区与边界 2 屏（<b>点歌数据一键清空</b> 仅超管 confirm DELETE、<b>权限边界</b>
+        —— 普通管理员=日常运营，超管=改全局·动账号·不可逆批量，越权 40301，详见
+        <code>docs/admin-permissions.md</code>）。
+      </span>
+    </span>
+    <span class="arrow">打开 →</span>
+  </a>
+
+  <a class="ver" href="admin-ui-v7/admin-ui-v7.html">
+    <span class="badge">v7</span>
+    <span class="body">
+      <span class="t">管理后台 UI 方案 v7 <span class="tag tag-amber">保留对比</span></span>
+      <span class="m">2026-09-18 · 18 屏 · 点歌规则落地 + 学生账号模块 · 已并入 v8，仅留档</span>
+      <span class="d">
+        <b>本版内容已全部并入 v8 完整版，落地请看 v8。</b>保留此档用于对比。
+        ① 「点歌设置」屏：每人每周点歌上限（默认 2 次）、同曲一周去重开关、
+        <b>播出时段后台发布</b>（管理员改了时段，用户端立即只能从新时段里选，含与用户端同源的预览）；
+        点歌 / 文稿<b>两份独立注意事项</b>编辑器（各自版本号、互不影响）。
+        ② 「学生账号」模块（3 屏）：账号列表（486 个 · 筛选 · 批量重置 / 停用）、
+        <b>批量导入 · 预览</b>（新建 / 覆盖 / 异常逐行标红，确认后才写入）、导入批次（可撤销整批，
+        撤销只降级为停用不物理删）。
+        ③ 2026-09-18 晚修复「设计系统」屏布局塌陷（骨架板挤爆双栏行）。
+      </span>
+    </span>
+    <span class="arrow">打开 →</span>
+  </a>
+
+  <a class="ver" href="admin-ui-v6/admin-ui-v6.html">
+    <span class="badge">v6</span>
+    <span class="body">
+      <span class="t">管理后台 UI 方案 v6 <span class="tag tag-amber">保留对比</span></span>
+      <span class="m">2026-09-18 · 14 屏 · 点歌前置（注意事项 + 播出时段）+ 加载骨架规范</span>
+      <span class="d">
+        ① <b>点歌注意事项</b>编辑器（带版本号，内容改了才 +1）、确认人数统计、用户可选时段预览；
+        ② <b>加载骨架成体系</b>：从「组件板里放了三根灰条」补成完整规范 ——
+        尺寸/圆角/底色/动效逐项定死，含表格 / 内容行 / 深色卡 / 统计卡 + 图表四种骨架，
+        外加「规范」屏第 7 节的 8 条使用规则（阈值 300ms、防跳版、深色底换半透明白、减少动效、无障碍）。
+      </span>
+    </span>
+    <span class="arrow">打开 →</span>
+  </a>
+
+  <a class="ver" href="admin-ui-v5/admin-ui-v5.html">
+    <span class="badge">v5</span>
+    <span class="body">
+      <span class="t">管理后台 UI 方案 v5 <span class="tag tag-amber">保留对比</span></span>
+      <span class="m">2026-09-18 · 14 屏 · 点歌名额（含后端实现）</span>
+      <span class="d">
+        新增<b>点歌名额</b>：管理员在「投稿 &amp; 点歌审核」页顶部设每日 / 每周上限（0=不限）；
+        名额占满后该周期剩余待审点歌<b>由系统自动驳回</b>，之后新提交的也立刻驳回并落库（学生可见原因），文稿不受影响。
+        数据库按高并发设计 —— 新增 <code>song_quota</code> 计数器表 + 唯一键，占名额用<b>一条带条件的 UPDATE</b>，
+        状态流转与占位同事务。<code>docs/song-quota.md</code> 里有完整设计与 <b>21 项实测记录</b>
+        （含「10 并发抢 2 个名额 → 成功 2、零超发」）。
+      </span>
+    </span>
+    <span class="arrow">打开 →</span>
+  </a>
+
+  <a class="ver" href="admin-ui-v4/admin-ui-v4.html">
+    <span class="badge">v4</span>
+    <span class="body">
+      <span class="t">管理后台 UI 方案 v4 <span class="tag tag-amber">保留对比</span></span>
+      <span class="m">2026-09-17 · 14 屏 · 5 张渲染图（部分历史渲染图缺失）· 含后端改动</span>
+      <span class="d">
+        按你的七条反馈重做：批量操作条改浅色；投稿人头像改白底描边并垂直居中（实测偏移 0.0px）；
+        表格改 fixed 布局 + 新增「审核人 / 时间」列；模块改名「投稿 &amp; 点歌审核」并补上<b>审核处理台</b>
+        （左看全文、右处理，<b>驳回必填原因</b> + 四个常用原因预设）；
+        <b>风采展示把社干与部员合并成一个模块</b>（含新增后端接口 <code>/admin/showcase/list</code>）；
+        系统设置去掉那块没必要的深色胶囊，换成「键 → 小程序位置」映射表。
+      </span>
+    </span>
+    <span class="arrow">打开 →</span>
+  </a>
+
+  <a class="ver" href="admin-ui-v3/admin-ui-v3.html">
+    <span class="badge">v3</span>
+    <span class="body">
+      <span class="t">管理后台 UI 方案 v3 <span class="tag tag-amber">保留对比</span></span>
+      <span class="m">2026-09-17 · 15 屏（方案说明 + 设计系统 + 规范 + 数据来源 + 11 屏画布）· 15 张渲染图</span>
+      <span class="d">
+        按你的四条反馈重做：<b>新增「规范」屏</b>（字号 / 行高 / 字距 / 间距定成 8 档 + token，附「改哪里」映射表）；
+        <b>投稿详情从右侧抽屉改成居中弹窗</b>（原遮罩 <code>inset:40px 0 0</code> 顶部漏盖 40px，已修，实测遮罩与工作区矩形完全一致）；
+        <b>补齐无直播 / 无置顶的降级设计</b>；<b>删掉模块开关那块没必要的深色条</b>；
+        <b>新增「数据来源」屏</b> —— 逐字段标明现有接口 / 前端可推导 / 需后端新增。
+      </span>
+    </span>
+    <span class="arrow">打开 →</span>
+  </a>
+
+  <a class="ver" href="admin-ui-v2/admin-ui-v2.html">
+    <span class="badge">v2</span>
+    <span class="body">
+      <span class="t">管理后台 UI 方案 v2 <span class="tag tag-amber">保留对比</span></span>
+      <span class="m">2026-09-17 · 14 屏 · 13 张渲染图</span>
+      <span class="d">
+        修掉 v1 的「色板塌陷」（CSS 类名 <code>.sw</code> 与开关组件撞名）＋ 2 个未定义的类名缺口
+        ＋ 间距全面对齐阶梯；色板分三组、微标对比度提到 5.0:1；按你的要求移除了「登录页」画布。
+      </span>
+    </span>
+    <span class="arrow">打开 →</span>
+  </a>
+
+  <a class="ver old" href="admin-ui-v1/admin-ui-v1.html">
+    <span class="badge">v1</span>
+    <span class="body">
+      <span class="t">管理后台 UI 方案 v1 <span class="tag tag-amber">首版 · 留档对比</span></span>
+      <span class="m">2026-09-17 · 14 屏（含登录页）· 14 张渲染图</span>
+      <span class="d">
+        首版方案。<b>色板那一块是坏的</b>（你截图指出的问题就出在这里）：
+        色块被压成 44×26 的小胶囊、色值条高度为 0。留档用于对照 v2 的修复效果，不要拿去落地。
+      </span>
+    </span>
+    <span class="arrow">打开 →</span>
+  </a>
+
+  <p class="foot">
+    <b>目录结构</b><br>
+    <code>preview/admin-ui-versions.html</code> ← 本页<br>
+    <code>preview/admin-ui-v1/admin-ui-v1.html</code> ＋ <code>shots/</code><br>
+    <code>preview/admin-ui-v2/admin-ui-v2.html</code> ＋ <code>shots/</code><br>
+    <code>preview/admin-ui-v8/admin-ui-v8.html</code> ＋ <code>shots/</code>（最新）<br>
+    以上文件均为独立静态页，直接双击或拖进浏览器即可，不依赖任何服务。
+  </p>
+  <p class="foot" style="margin-top:30px">
+    <b>相关方案（小程序端）</b><br>
+    <a href="song-notice-v1/index.html" style="color:var(--accent);font-weight:600">点歌前置方案 v1</a>
+    —— 进点歌模块弹出注意事项（滑到页底才能确认）+ 播出时段改成系统下发（下周一到周五）+ 加载骨架，共 6 个手机框。<br>
+    <a href="student-account-v1/student-account-v1.html" style="color:var(--accent);font-weight:600">学生账号方案 v1</a>
+    —— 小程序端登录页（学号 + 初始密码首登激活）方案稿；管理端三屏已并入上方 v7。
+  </p>
+</div>
+</body>
+</html>

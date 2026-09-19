@@ -1,0 +1,101 @@
+/* custom-tab-bar/index.wxss
+ * 胶囊浮动底部导航。色值写死（不依赖 app.wxss 的变量），避免组件样式隔离带来的不确定性。
+ * 设计稿：容器高 94px，胶囊 62px / 圆角 36px / 内边距 4px，选中项实心墨黑 + 白图标。
+ * rpx = 设计px × 1.923
+ * 左右内边距 40rpx 与页面 .body / .bottom-cta 对齐 → 胶囊和页面里的块级按钮等宽。
+ */
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  background: transparent;   /* 容器不做任何底色 —— 只留胶囊浮着 */
+  padding: 24rpx 40rpx calc(42rpx + constant(safe-area-inset-bottom));
+  padding: 24rpx 40rpx calc(42rpx + env(safe-area-inset-bottom));
+}
+
+/* 隐藏态：胶囊退到屏幕外（容器已无底色，不再存在"一块白板出现"的问题） */
+.tabbar-hidden {
+  pointer-events: none;
+}
+.tabbar-hidden .pill {
+  transform: translateY(220%);
+}
+
+/* 退场：胶囊自下而上滑入 */
+.tabbar-enter .pill {
+  animation: pillUp 480ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes pillUp {
+  from { transform: translateY(220%); }
+  to   { transform: translateY(0); }
+}
+
+.pill {
+  position: relative;          /* 滑动指示器的定位基准 */
+  height: 124rpx;
+  box-sizing: border-box;
+  display: flex;
+  padding: 8rpx;
+  border: 2rpx solid #E6E6E8;
+  border-radius: 72rpx;
+  background: #FFFFFF;
+  overflow: hidden;            /* 指示器滑出胶囊范围时裁掉 */
+}
+
+/* 滑动指示器：一块深色胶囊，随 selected 在四格之间平移。
+ * 宽度 = 胶囊内宽的 1/4（与每个 flex:1 的 tab 等宽），
+ * 用 translateX(selected × 100%) 位移，一格正好是一倍自身宽。 */
+.indicator {
+  position: absolute;
+  top: 8rpx;
+  bottom: 8rpx;
+  left: 8rpx;
+  width: calc((100% - 16rpx) / 4);
+  border-radius: 52rpx;
+  background: #1D1D1F;
+  transition: transform 360ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 160ms ease;
+}
+
+/* 首次落位前隐藏：实例初渲染时 selected 恒为 0（初始值不可信），
+ * 若直接画出来，用户会看到指示器"闪回第一格再滑向目标"——跨格时像方向错了 */
+.indicator-off {
+  opacity: 0;
+}
+
+/* 【契约 3】瞬移落位：页面到达时同帧禁用过渡，
+ * 指示器从毒化位置直接跳到正确格位，物理上不可能产生第二次动画 */
+.tabbar.noanim .indicator {
+  transition: none;
+}
+
+.tab {
+  position: relative;          /* 图标/文字要压在指示器上面 */
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  border-radius: 52rpx;
+}
+
+.tab-icon {
+  width: 40rpx;
+  height: 40rpx;
+}
+
+.tab-label {
+  font-size: 21rpx;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 1rpx;
+  color: #7A7A7A;
+}
+
+.tab.on .tab-label {
+  color: #FFFFFF;
+}

@@ -1,0 +1,28 @@
+/* pages/programs/programs.wxss */
+
+.body { padding-bottom: 80rpx; }
+
+/* 直播中标记（小红点 + 文字） */
+.live-flag {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  flex: none;
+  font-size: 21rpx;
+  font-weight: 500;
+  color: var(--live);
+}
+.live-flag .dot-live { width: 10rpx; height: 10rpx; }
+
+.row-time {
+  flex: none;
+  min-width: 150rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.footnote { text-align: center; }
+.row-hover { background: rgba(0, 0, 0, 0.035); }
+.pressed { opacity: 0.72; }

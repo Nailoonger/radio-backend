@@ -1,0 +1,58 @@
+<!-- pages/programs/programs.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
+    </view>
+    <view class="navbar-title">节目单</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+
+    <view class="stack">
+      <view class="t-page">节目单</view>
+      <view class="t-sub">未来 7 天的节目安排，点击可查看详情</view>
+    </view>
+
+    <view class="loading" wx:if="{{loading}}">加载中……</view>
+
+    <view class="empty" wx:elif="{{!groups.length}}">未来一周暂无节目安排</view>
+
+    <block wx:else>
+      <view class="section" wx:for="{{groups}}" wx:for-item="g" wx:key="date">
+        <view class="section-head">
+          <text class="t-section">{{g.label}}</text>
+        </view>
+        <view class="card-flush">
+          <view
+            class="card-row"
+            wx:for="{{g.list}}"
+            wx:for-item="p"
+            wx:key="id"
+            hover-class="row-hover"
+            data-id="{{p.id}}"
+            bindtap="goDetail"
+          >
+            <text class="row-time">{{p.broadcastTime}}</text>
+            <view class="stack grow">
+              <view class="between">
+                <text class="t-strong">{{p.title}}</text>
+                <view class="live-flag" wx:if="{{p.isLive === 1}}">
+                  <view class="dot-live"></view>
+                  <text>直播中</text>
+                </view>
+              </view>
+              <text class="t-cap">{{p.host || '主持人未定'}}</text>
+            </view>
+            <view class="chev-r"></view>
+          </view>
+        </view>
+      </view>
+      <view class="t-micro footnote">节目如有临时调整，以广播站当日通知为准</view>
+    </block>
+
+  </view>
+</view>

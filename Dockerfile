@@ -1,33 +1,23 @@
 # =================================================================
 #  菁悠广播站后端 - 生产镜像
-#  支持 MySQL（生产）+ SQLite（开发）
-#  多阶段构建，runtime 仅保留必要依赖
+#  构建时在容器内 npm ci 安装依赖（跨平台可重建，不依赖主机的 node_modules）
 # =================================================================
 
-# ---------- deps ----------
-FROM node:20-alpine AS deps
+FROM node:20-alpine
 WORKDIR /app
-
-# 装构建工具（mysql2 用）
-RUN apk add --no-cache python3 make g++ \
-    && ln -sf python3 /usr/bin/python
-
-COPY package*.json ./
-RUN npm ci --omit=dev --no-audit --no-fund
-
-# ---------- runtime ----------
-FROM node:20-alpine AS runtime
-WORKDIR /app
-
-# 系统依赖（wget 给 HEALTHCHECK，curl 给 wait-for-mysql）
-RUN apk add --no-cache wget curl tini bash
 
 # 创建非 root 用户
 RUN addgroup -S app && adduser -S app -G app
 
-# 拷贝生产依赖与源码
-COPY --from=deps /app/node_modules ./node_modules
+# 先拷依赖清单、装依赖（利用层缓存），再拷源码
+COPY package*.json ./
+RUN npm ci --omit=dev --registry=https://mirrors.cloud.tencent.com/npm/
 COPY . .
+
+# 永久 patch mysql2 charsets.js：UTF8_GENERAL_CI (33) → UTF8MB4_GENERAL_CI (45)
+# 解决 mysql2 v3 + Sequelize 6 的 latin1 bug（写入中文变 EFBFBD）
+RUN sed -i 's/exports\.UTF8_GENERAL_CI = 33;/exports.UTF8_GENERAL_CI = 45;/' \
+       node_modules/mysql2/lib/constants/charsets.js
 
 # 数据/上传目录可写
 RUN mkdir -p /app/data /app/uploads \
@@ -42,9 +32,7 @@ ENV NODE_ENV=production \
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:3000/health || exit 1
+  CMD node -e "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
-# tini 收 SIGTERM/SIGINT，干净退出
-ENTRYPOINT ["/sbin/tini", "--"]
-# wait-for-mysql：等 MySQL TCP 通后再启动 Node（避免 Sequelize 启动报错）
-CMD ["bash", "-c", "/app/deploy/wait-for-mysql.sh $DB_HOST $DB_PORT && node src/app.js"]
+# wait-for-mysql inline + 启动 Node（用 exec 避免 Windows Node 路径转换问题）
+CMD ["node", "src/wait-and-start.js"]

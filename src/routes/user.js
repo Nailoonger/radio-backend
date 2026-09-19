@@ -10,7 +10,9 @@ const message = require('../controllers/user/messageController');
 const program = require('../controllers/user/programController');
 const notice = require('../controllers/user/noticeController');
 const profile = require('../controllers/user/profileController');
-const member = require('../controllers/user/memberController');
+const showcase = require('../controllers/user/showcaseController');
+const cadre = require('../controllers/user/cadreController');
+const staff = require('../controllers/user/staffController');
 const sw = require('../controllers/user/switchController');
 
 /**
@@ -60,6 +62,61 @@ const sw = require('../controllers/user/switchController');
  *                       $ref: '#/components/schemas/LoginResponse'
  */
 router.post('/login', auth.login);
+
+/**
+ * @swagger
+ * /api/user/login/account:
+ *   post:
+ *     tags: [用户端-登录]
+ *     summary: 学生账号密码登录（主通道）
+ *     description: |
+ *       账号 = 入学年级 + 班级 + 序号，如 `20240101`；初始密码统一 `usr123456`。
+ *       账号不存在 / 密码错误返回同一句文案（防学号枚举）；账号被停用返回 40301。
+ *       返回体里的 `user.isDefaultPwd=true` 表示还是初始密码，前端应引导改密。
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username, password]
+ *             properties:
+ *               username: { type: string, example: '20240101' }
+ *               password: { type: string, example: usr123456 }
+ *     responses:
+ *       200:
+ *         description: 登录成功，返回 token + user
+ *       401: { description: 账号或密码错误 }
+ *       403: { description: 账号已停用 }
+ */
+router.post('/login/account', auth.loginByAccount);
+
+/**
+ * @swagger
+ * /api/user/change-password:
+ *   put:
+ *     tags: [用户端-登录]
+ *     summary: 修改自己的密码
+ *     description: |
+ *       新密码需 ≥8 位且同时含字母和数字，不能与原密码相同。
+ *       改密成功后签发新 token（旧 token 因密码版本不匹配立刻失效）。
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [oldPassword, newPassword]
+ *             properties:
+ *               oldPassword: { type: string }
+ *               newPassword: { type: string, example: abc123456 }
+ *     responses:
+ *       200: { description: 返回新 token }
+ *       400: { description: 原密码不正确 / 新密码不符合要求 }
+ *       401: { description: 未登录 }
+ */
+router.put('/change-password', userAuth, auth.changePassword);
 
 /**
  * @swagger
@@ -161,6 +218,94 @@ router.post('/submit', userAuth, submitLimiter, submit.create);
  *                               items: { $ref: '#/components/schemas/Submit' }
  */
 router.get('/submit/my', userAuth, submit.myList);
+
+/**
+ * @swagger
+ * /api/user/submit/quota:
+ *   get:
+ *     tags: [用户端-投稿]
+ *     summary: 点歌名额状态（是否已满 / 还剩几个）
+ *     description: |
+ *       投稿页用来提前提示「今日点歌名额已满」，避免学生白填一遍表单。
+ *       没有登录也能看，但接口在需登录的分组里，保持与 /submit 一致。
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: ok
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         song:
+ *                           type: object
+ *                           properties:
+ *                             exhausted: { type: boolean }
+ *                             daily: { type: object, nullable: true }
+ *                             weekly: { type: object, nullable: true }
+ */
+router.get('/submit/quota', userAuth, submit.quota);
+
+/**
+ * @swagger
+ * /api/user/submit/notice:
+ *   get:
+ *     tags: [用户端-投稿]
+ *     summary: 点歌注意事项（进入点歌模块时调用）
+ *     description: |
+ *       返回 `{configured, needAck, content, version}`。
+ *       `configured=false`（后台没配内容）时前端**不要弹**，直接放行。
+ *       确认后需调 `POST /submit/notice/ack`。
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: ok }
+ */
+router.get('/submit/notice', userAuth, submit.notice);
+
+/**
+ * @swagger
+ * /api/user/submit/notice/ack:
+ *   post:
+ *     tags: [用户端-投稿]
+ *     summary: 确认已阅读点歌注意事项
+ *     description: |
+ *       前端在「滑到页底 + 点我已知晓」后调用，传当前 `version`。
+ *       幂等：重复确认不会报错；服务端会取 min(传入版本, 当前版本)。
+ *       ⚠️「必须滑到底」只是前端交互，服务端只能校验「确认过没有」。
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               version: { type: integer }
+ *     responses:
+ *       200: { description: ok }
+ */
+router.post('/submit/notice/ack', userAuth, submit.ackNotice);
+
+/**
+ * @swagger
+ * /api/user/submit/timeslots:
+ *   get:
+ *     tags: [用户端-投稿]
+ *     summary: 可选的播出时段（下一周周一到周五）
+ *     description: |
+ *       播出时间**不允许用户手输**，只能从这个列表里选。
+ *       范围 = 下一周的周一到周五（严格下一周）× 系统设置 `broadcast_schedule` 里的每日时段。
+ *       返回的每一项里 `value` 就是提交时要回传的字符串，`label` 可直接展示。
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: ok }
+ */
+router.get('/submit/timeslots', userAuth, submit.timeslots);
 
 /**
  * @swagger
@@ -451,26 +596,26 @@ router.get('/station/contact', profile.stationContact);
 // ============= 风采展示 =============
 /**
  * @swagger
- * /api/user/member/list:
+ * /api/user/showcase:
  *   get:
  *     tags: [用户端-风采展示]
- *     summary: 成员列表（按职务分组）
- *     parameters:
- *       - in: query
- *         name: role
- *         schema: { type: string }
- *         description: 可选，按职务精确筛选
+ *     summary: 风采展示（社干 + 部门人员）
+ *     description: |
+ *       一次返回所有在岗社干 + 部门人员。
+ *       - cadre: 社干列表（按 sort DESC, id ASC）
+ *       - staff: 按部门分组的人员
  *     responses:
  *       200: { description: ok }
  */
-router.get('/member/list', member.list);
+router.get('/showcase', showcase.showcase);
 
+// ============= 社干 / 部员详情 =============
 /**
  * @swagger
- * /api/user/member/{id}:
+ * /api/user/cadre/{id}:
  *   get:
  *     tags: [用户端-风采展示]
- *     summary: 成员详情
+ *     summary: 社干详情（仅 is_show=1）
  *     parameters:
  *       - in: path
  *         name: id
@@ -478,9 +623,26 @@ router.get('/member/list', member.list);
  *         schema: { type: integer }
  *     responses:
  *       200: { description: ok }
- *       404: { description: 不存在或已下架 }
+ *       404: { description: 成员不存在 }
  */
-router.get('/member/:id', member.detail);
+router.get('/cadre/:id', cadre.detail);
+
+/**
+ * @swagger
+ * /api/user/staff/{id}:
+ *   get:
+ *     tags: [用户端-风采展示]
+ *     summary: 部员详情（仅 is_show=1）
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: ok }
+ *       404: { description: 成员不存在 }
+ */
+router.get('/staff/:id', staff.detail);
 
 // ============= 模块开关 =============
 /**

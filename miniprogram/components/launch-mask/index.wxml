@@ -1,0 +1,31 @@
+<!-- components/launch-mask/index.wxml -->
+<view class="mask {{leaving ? 'leaving' : ''}} {{gone ? 'gone' : ''}}" catchtouchmove="noop">
+  <view class="brand">
+    <!-- 浅色开场：直接用彩色原图（透明底 PNG 在白底上观感最好） -->
+    <image class="badge" src="/assets/station-badge.png" mode="aspectFit" />
+
+    <view class="wordmark">
+      <text
+        wx:for="{{chars}}"
+        wx:key="i"
+        class="ch"
+        style="animation-delay: {{item.d}}ms"
+      >{{item.c}}</text>
+    </view>
+
+    <view class="tagline">菁菁校园情，悠悠广播声</view>
+  </view>
+
+  <view class="wave">
+    <view
+      wx:for="{{bars}}"
+      wx:key="i"
+      class="bar"
+      style="height: {{item.h}}rpx; animation-delay: {{item.d}}ms"
+    >
+      <view class="bar-in" style="animation-delay: {{item.pd}}ms"></view>
+    </view>
+  </view>
+
+  <view class="caption">正在准备今天的节目……</view>
+</view>

@@ -1,80 +1,332 @@
-/* app.wxss - 全局样式（青蓝主题） */
+/* app.wxss — 菁悠广播站 · 设计系统 v2
+ * 依据：Ardot 设计稿「菁悠广播站 · 小程序改版方案」（fileId 726404665321310）
+ *
+ * 三条硬规则：
+ *   1. 全局只有一个强调色 --accent，所有"可点"的东西都用它
+ *   2. 不用任何装饰性渐变、不用彩色投影
+ *   3. 深色卡（--tile）是视觉主角，其余信息一律退到羊皮纸（--parchment）
+ *
+ * 尺寸换算：设计稿按 390pt 宽出图，1px(设计) ≈ 1.923rpx；正文 15px → 28rpx。
+ */
+
 page {
-  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
-  background: linear-gradient(180deg, #ecfeff 0%, #f0f9ff 100%);
-  color: #0f172a;
+  /* ---- 色板 ---- */
+  --ink: #1D1D1F;
+  --ink-2: #333333;
+  --muted: #7A7A7A;
+  --soft: #C7C7CC;
+  --hairline: #E0E0E0;
+  --divider: #F0F0F0;
+  --parchment: #F5F5F7;
+  --canvas: #FFFFFF;
+  --tile: #272729;
+  --tile-2: #3A3A3C;
+  --accent: #0066CC;
+  --accent-on-dark: #2997FF;
+  --live: #FF453A;
+
+  --amber-bg: #FEF3C7;
+  --amber-fg: #8A6100;
+  --green-bg: #E7F5EC;
+  --green-fg: #1E7A46;
+  --red-bg: #FDE8E8;
+  --red-fg: #B42318;
+
+  /* ---- 圆角 ---- */
+  --r-card: 34rpx;
+  --r-input: 23rpx;
+  --r-pill: 9999rpx;
+
+  /* ---- 间距阶梯 ---- */
+  --s1: 8rpx;
+  --s2: 16rpx;
+  --s3: 25rpx;
+  --s4: 34rpx;
+  --s5: 50rpx;
+  --s6: 64rpx;
+
+  background: var(--canvas);
+  color: var(--ink);
+  /* 字体栈：真机走系统中文（iOS 苹方 / 安卓 MiSans）；Windows 工具里没有苹方，
+   * 依次尝试鸿蒙 / 小米 / 思源，都没有才退到雅黑（雅黑小字号发闷，是工具里显挤的主因） */
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC",
+               "MiSans", "Noto Sans SC", "Source Han Sans SC", "Helvetica Neue",
+               "Microsoft YaHei", sans-serif;
   font-size: 28rpx;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
-.container {
-  padding: 24rpx;
+/* ============ 文字层级（只有 5 档，不要临时加） ============ */
+.t-page    { font-size: 54rpx; font-weight: 600; letter-spacing: -0.8rpx; line-height: 1.25; }
+.t-title   { font-size: 42rpx; font-weight: 600; letter-spacing: -0.6rpx; line-height: 1.3; }
+.t-section { font-size: 32rpx; font-weight: 600; letter-spacing: -0.7rpx; line-height: 1.35; }
+.t-strong  { font-size: 30rpx; font-weight: 500; line-height: 1.4; }
+.t-body    { font-size: 28rpx; line-height: 1.5; }
+/* 小字号中文加一点点字距，可读性明显更好（设计稿同级文本均为 0.5px 左右） */
+.t-sub     { font-size: 25rpx; color: var(--muted); line-height: 1.5; letter-spacing: 0.5rpx; }
+.t-cap     { font-size: 23rpx; color: var(--muted); line-height: 1.5; letter-spacing: 0.5rpx; }
+.t-micro   { font-size: 21rpx; color: var(--muted); line-height: 1.45; letter-spacing: 0.5rpx; }
+.t-link    { font-size: 25rpx; color: var(--accent); }
+.t-on-dark { color: var(--canvas); }
+.t-dim     { color: #CCCCCC; }
+
+/* ============ 页面骨架 ============ */
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+}
+/* 自定义导航：让出状态栏 */
+.statusbar { width: 100%; flex: none; }
+/* 再让出右上角微信胶囊那一行（44px） */
+.navreserve { height: 88rpx; flex: none; }
+
+/* 非 tab 页的标题栏（替原来的原生导航） */
+.navbar {
+  height: 88rpx;
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0 40rpx;
+  gap: 16rpx;
+}
+.navbar-back {
+  width: 72rpx; height: 72rpx; flex: none;
+  border-radius: var(--r-pill);
+  background: var(--parchment);
+  display: flex; align-items: center; justify-content: center;
+}
+.navbar-back-icon { width: 36rpx; height: 36rpx; }
+.navbar-title { flex: 1; text-align: center; font-size: 30rpx; font-weight: 600; }
+.navbar-spacer { width: 72rpx; flex: none; }
+
+/* 正文容器 */
+.body {
+  flex: 1;
+  padding: 0 40rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 34rpx;
+}
+/* 给固定 tabBar 留位 */
+.pb-tabbar {
+  flex: none;
+  height: calc(190rpx + constant(safe-area-inset-bottom));
+  height: calc(190rpx + env(safe-area-inset-bottom));
 }
 
+/* ============ 通用排布 ============ */
+.row { display: flex; align-items: center; }
+.between { display: flex; align-items: center; justify-content: space-between; }
+.grow { flex: 1; min-width: 0; }
+.stack { display: flex; flex-direction: column; }
+
+/* ============ 卡片 ============ */
 .card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 28rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 4rpx 16rpx rgba(6, 182, 212, 0.06);
+  background: var(--parchment);
+  border-radius: var(--r-card);
+  padding: 32rpx;
+}
+/* 列表型卡片：行自带内边距，卡片只留上下 8rpx */
+.card-flush {
+  background: var(--parchment);
+  border-radius: var(--r-card);
+  padding: 8rpx 0;
+}
+.card-row {
+  display: flex;
+  align-items: center;
+  gap: 28rpx;
+  padding: 18rpx 32rpx;
 }
 
-.title {
-  font-size: 32rpx;
-  font-weight: bold;
-  margin-bottom: 12rpx;
-  color: #0f172a;
+/* ============ 按钮 ============ */
+button::after { border: none; }
+/* 微信默认 button 是「固定宽度 + auto margin 居中」，且默认样式的优先级
+ * 比单个类名高（会压过 .btn-block 的 width:100%），必须用元素+类选择器压回去。
+ * 普通按钮回到内容宽（flex 行内当 flex-item 用），需要铺满的加 .btn-block。 */
+button.btn {
+  display: block;
+  width: auto;
+  margin-left: 0;
+  margin-right: 0;
 }
-
-.subtitle {
-  font-size: 26rpx;
-  color: #64748b;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #6366f1 100%);
-  color: #fff;
-  border-radius: 12rpx;
+.btn {
   font-size: 30rpx;
-  padding: 22rpx 0;
+  border-radius: var(--r-pill);
+  padding: 22rpx 44rpx;
   text-align: center;
+  line-height: 1.2;
   border: none;
-  box-shadow: 0 6rpx 16rpx rgba(6, 182, 212, 0.3);
+}
+.btn-primary { background: var(--accent); color: #fff; font-weight: 600; }
+.btn-primary[disabled] { background: #B9D2EE; color: #fff; }
+.btn-ghost {
+  background: transparent;
+  color: var(--accent-on-dark);
+  border: 2rpx solid var(--accent-on-dark);
   font-weight: 500;
 }
+.btn-on-tile { background: #fff; color: var(--accent); font-weight: 600; }
+/* 铺满：声明在 button.btn 之后，同优先级下后者生效 */
+button.btn-block,
+.btn-block { width: 100%; font-size: 32rpx; padding: 30rpx 0; }
+/* 底部固定操作区（投稿页用）。左右 40rpx 与 .body 一致，这样按钮和 tabBar 胶囊等宽 */
+.bottom-cta { flex: none; padding: 16rpx 40rpx 28rpx; }
 
-.btn-primary[disabled] {
-  background: linear-gradient(135deg, #bae6fd, #c7d2fe);
-  color: #fff;
-  box-shadow: none;
-}
-
-.btn-secondary {
-  background: #fff;
-  color: #0891b2;
-  border: 2rpx solid #06b6d4;
-  border-radius: 12rpx;
-  font-size: 30rpx;
-  padding: 20rpx 0;
-  text-align: center;
-}
-
+/* ============ 标签 / 状态 ============ */
 .tag {
   display: inline-block;
-  padding: 6rpx 16rpx;
-  border-radius: 8rpx;
-  font-size: 22rpx;
-  margin-right: 8rpx;
+  font-size: 24rpx;
   font-weight: 500;
+  border-radius: var(--r-pill);
+  padding: 8rpx 22rpx;
+  line-height: 1.35;
+}
+.tag-pending { background: var(--amber-bg); color: var(--amber-fg); }
+.tag-pass    { background: var(--green-bg); color: var(--green-fg); }
+.tag-reject  { background: var(--red-bg);   color: var(--red-fg); }
+/* 直播小圆点 */
+.dot-live {
+  width: 14rpx; height: 14rpx; flex: none;
+  border-radius: var(--r-pill);
+  background: var(--live);
+}
+/* 深色卡上的浅色小标签 */
+.chip {
+  font-size: 21rpx;
+  font-weight: 500;
+  color: #CCCCCC;
+  background: var(--tile-2);
+  border-radius: var(--r-pill);
+  padding: 12rpx 24rpx;
+  letter-spacing: 1rpx;
 }
 
-.tag-pending { background: #fef3c7; color: #b45309; }
-.tag-pass { background: linear-gradient(135deg, #cffafe, #dbeafe); color: #0e7490; }
-.tag-reject { background: #fee2e2; color: #b91c1c; }
+/* ============ 筛选胶囊 ============ */
+.filter { font-size: 25rpx; font-weight: 500; border-radius: var(--r-pill); padding: 14rpx 28rpx; color: var(--muted); background: var(--divider); }
+.filter.on { color: #fff; background: var(--ink); }
 
-.empty {
-  padding: 80rpx 0;
+/* ============ 分段控件（胶囊内嵌白块） ============ */
+/* 白色高亮块做成滑动指示器（与 tabBar 同一套模式）：
+ * .segment 定位基准，指示器的宽度/位移由页面按自己的格数内联传入 */
+.segment {
+  position: relative;
+  display: flex;
+  background: var(--divider);
+  border-radius: var(--r-pill);
+  padding: 8rpx;
+}
+.segment-indicator {
+  position: absolute;
+  top: 8rpx;
+  bottom: 8rpx;
+  left: 8rpx;
+  border-radius: var(--r-pill);
+  background: #fff;
+  transition: transform 360ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.segment-item {
+  position: relative;          /* 文字压在指示器上面 */
+  flex: 1;
   text-align: center;
-  color: #94a3b8;
-  font-size: 26rpx;
+  font-size: 28rpx;
+  color: var(--muted);
+  padding: 16rpx 0;
+  border-radius: var(--r-pill);
+  line-height: 1.2;
+  transition: color 240ms ease;
+}
+.segment-item.on { color: var(--ink); font-weight: 600; }
+
+/* ============ 深色卡（直播 / 节目头） ============ */
+.tile {
+  background: var(--tile);
+  border-radius: 38rpx;
+  padding: 32rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+.tile-title { font-size: 50rpx; font-weight: 600; color: #fff; letter-spacing: -0.8rpx; line-height: 1.3; }
+.tile-meta { font-size: 25rpx; color: #CCCCCC; letter-spacing: 0.5rpx; }
+.tile-status { display: flex; align-items: center; gap: 16rpx; font-size: 23rpx; font-weight: 500; color: #CCCCCC; }
+.tile-actions { display: flex; gap: 20rpx; margin-top: 4rpx; }
+.tile-chips { display: flex; gap: 16rpx; }
+
+/* ============ 表单 ============ */
+.form { background: var(--parchment); border-radius: var(--r-card); padding: 34rpx; display: flex; flex-direction: column; gap: 34rpx; }
+.field { display: flex; flex-direction: column; gap: 16rpx; }
+.field-label { font-size: 25rpx; font-weight: 500; color: var(--muted); }
+/* ⚠️ 微信 input 组件自带默认高度，如果只加上下 padding 不设 height，
+ *    内容区会被挤成负数，占位文字直接被裁掉一半。
+ *    单行输入统一用「固定高 + 行高居中」，不要上下 padding。 */
+.input {
+  background: #fff;
+  border-radius: var(--r-input);
+  height: 88rpx;
+  line-height: 88rpx;
+  padding: 0 28rpx;
+  font-size: 28rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+.input-sm { height: 76rpx; line-height: 76rpx; padding: 0 26rpx; }
+/* 多行 textarea：恢复行高、保留上下 padding。
+ * .input-area / .input-area-lg 各自都带全行高和内边距，单独用哪个都不会漏。 */
+.input-area { height: 176rpx; line-height: 1.5; padding: 24rpx 28rpx; }
+.input-area-lg { height: 300rpx; line-height: 1.5; padding: 24rpx 28rpx; }
+.ph { color: var(--soft); }
+
+/* ============ 空态 / 加载 ============ */
+.empty { padding: 140rpx 40rpx; text-align: center; color: var(--soft); font-size: 26rpx; }
+.loading { padding: 120rpx 0; text-align: center; color: var(--soft); font-size: 26rpx; }
+
+/* ============ 图标（由 scripts 从设计稿 SVG 栅格化生成） ============ */
+.ic { flex: none; }
+.ic-16 { width: 32rpx; height: 32rpx; }
+.ic-18 { width: 36rpx; height: 36rpx; }
+.ic-20 { width: 40rpx; height: 40rpx; }
+.chev { width: 32rpx; height: 32rpx; flex: none; }
+
+/* ============ tab 页通用头部 ============ */
+.brand-head { display: flex; align-items: center; gap: 28rpx; }
+.brand-logo { width: 88rpx; height: 88rpx; flex: none; }
+.brand-name { font-size: 42rpx; font-weight: 600; letter-spacing: -0.6rpx; line-height: 1.25; }
+/* 设计稿里口号有 1.2px 字距（≈2.3rpx），漏了会显得挤 */
+.brand-slogan { font-size: 25rpx; color: var(--muted); margin-top: 6rpx; letter-spacing: 2rpx; }
+.icon-btn {
+  width: 80rpx; height: 80rpx; flex: none;
+  border-radius: var(--r-pill);
+  background: var(--parchment);
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* 区块标题行 */
+.section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24rpx; }
+.section { display: flex; flex-direction: column; }
+
+/* ============ CSS 画的通用小图标（免素材） ============ */
+/* 右箭头：旋转 45° 的方框，只留上、右两条边 */
+.chev-r {
+  width: 18rpx; height: 18rpx; flex: none;
+  border-top: 4rpx solid var(--soft);
+  border-right: 4rpx solid var(--soft);
+  transform: rotate(45deg);
+}
+/* 左箭头（返回键用）：只留下、左两条边 */
+.chev-l {
+  width: 20rpx; height: 20rpx; flex: none;
+  border-left: 4rpx solid var(--ink);
+  border-bottom: 4rpx solid var(--ink);
+  transform: rotate(45deg);
+  margin-left: 6rpx;
+}
+/* 多行截断 */
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }

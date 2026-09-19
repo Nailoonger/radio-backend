@@ -1,0 +1,11 @@
+node_modules
+data
+uploads
+*.sock
+*.pid
+*.log
+deploy/certs
+admin-web
+miniprogram
+tests
+docs

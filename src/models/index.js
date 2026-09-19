@@ -11,8 +11,13 @@ const Program = require('./program')(sequelize, DataTypes);
 const Notice = require('./notice')(sequelize, DataTypes);
 const Message = require('./message')(sequelize, DataTypes);
 const SystemSetting = require('./systemSetting')(sequelize, DataTypes);
-const Member = require('./member')(sequelize, DataTypes);
+const Cadre = require('./cadre')(sequelize, DataTypes);
+const Staff = require('./staff')(sequelize, DataTypes);
 const SystemSwitch = require('./systemSwitch')(sequelize, DataTypes);
+const SongQuota = require('./songQuota')(sequelize, DataTypes);
+const NoticeAck = require('./noticeAck')(sequelize, DataTypes);
+const ImportBatch = require('./importBatch')(sequelize, DataTypes);
+const CleanupLog = require('./cleanupLog')(sequelize, DataTypes);
 
 // 关联关系
 // 留言 -> 节目（多对一）
@@ -28,6 +33,11 @@ module.exports = {
   Notice,
   Message,
   SystemSetting,
-  Member,
+  Cadre,
+  Staff,
   SystemSwitch,
+  SongQuota,
+  NoticeAck,
+  ImportBatch,
+  CleanupLog,
 };

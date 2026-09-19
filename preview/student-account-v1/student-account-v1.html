@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>学生账号体系 · 方案 v1 · 菁悠广播站</title>
+<style>
+:root{
+  --accent:#0066CC; --accent-soft:#E8F1FB; --accent-line:#B9D5EF;
+  --ink:#1D1D1F; --ink2:#515154; --ink3:#7A7A7A;
+  --page:#F5F5F7; --card:#FFFFFF; --line:#E3E3E6; --line2:#EFEFF2;
+  --warn:#8A5A00; --warn-bg:#FFF6E5; --warn-line:#F0D9A8;
+  --ok:#0F6E56; --ok-bg:#E7F5F0; --ok-line:#B6DFD3;
+  --bad:#A32D2D; --bad-bg:#FCECEC; --bad-line:#F3C7C7;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Cascadia Mono",monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--page); color:var(--ink);
+  font:14px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","HarmonyOS Sans SC","MiSans","Source Han Sans SC","Microsoft YaHei",sans-serif;
+}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:1080px;margin:0 auto;padding:32px 24px 80px}
+
+/* 头部 */
+.hero{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px 28px;margin-bottom:24px}
+.hero h1{margin:0 0 10px;font-size:24px;font-weight:600;letter-spacing:.2px}
+.hero .sub{color:var(--ink2);font-size:14px;margin-bottom:16px}
+.meta{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:#FAFAFB;color:var(--ink2)}
+.chip.todo{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
+.chip.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
+.chip.num{border-color:var(--accent-line);background:var(--accent-soft);color:#0B4C8C;font-family:var(--mono);font-size:12px}
+
+/* 导航 */
+.nav{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin-bottom:24px;display:flex;flex-wrap:wrap;gap:6px}
+.nav a{font-size:12.5px;color:var(--ink2);padding:4px 10px;border-radius:8px;border:1px solid transparent}
+.nav a:hover{background:var(--accent-soft);border-color:var(--accent-line);color:#0B4C8C;text-decoration:none}
+
+/* 卡片 / 章节 */
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px 28px;margin-bottom:20px}
+section > h2{margin:0 0 6px;font-size:17px;font-weight:600;display:flex;align-items:center;gap:10px}
+section > h2 .idx{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;background:var(--accent);color:#fff;font-size:12.5px;font-weight:600;flex:0 0 auto}
+section > p.lead{color:var(--ink2);margin:0 0 18px;font-size:13.5px}
+h3{font-size:14.5px;font-weight:600;margin:22px 0 10px;padding-left:9px;border-left:3px solid var(--accent-line)}
+h4{font-size:13.5px;font-weight:600;margin:16px 0 8px;color:var(--ink2)}
+p{margin:8px 0}
+ul,ol{margin:8px 0;padding-left:22px}
+li{margin:5px 0}
+li::marker{color:var(--ink3)}
+strong{font-weight:600}
+code{font-family:var(--mono);font-size:12.5px;background:#F2F3F5;border:1px solid var(--line2);border-radius:5px;padding:1px 5px;color:#303034}
+pre{font-family:var(--mono);font-size:12.5px;line-height:1.7;background:#F7F8FA;border:1px solid var(--line2);border-radius:10px;padding:14px 16px;overflow:auto;margin:10px 0}
+pre code{background:none;border:none;padding:0}
+
+/* 表格 */
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:#FAFAFB;font-weight:600;color:var(--ink2);white-space:nowrap;font-size:12.5px}
+td code{white-space:nowrap}
+tbody tr:nth-child(even) td{background:#FCFCFD}
+.tw{overflow-x:auto}
+
+/* 调用块 */
+.note{border-radius:10px;padding:12px 15px;margin:14px 0;font-size:13.5px;border:1px solid}
+.note .t{font-weight:600;display:block;margin-bottom:3px}
+.note.info{background:var(--accent-soft);border-color:var(--accent-line);color:#0B3F73}
+.note.warn{background:var(--warn-bg);border-color:var(--warn-line);color:#6B4600}
+.note.ok{background:var(--ok-bg);border-color:var(--ok-line);color:#0A5341}
+.note.bad{background:var(--bad-bg);border-color:var(--bad-line);color:#7C2020}
+
+/* 账号示意 */
+.acct{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;margin:16px 0 6px}
+.acct .seg{border:1px solid var(--accent-line);background:var(--accent-soft);border-radius:10px;padding:12px 16px;min-width:120px;text-align:center}
+.acct .seg b{display:block;font-family:var(--mono);font-size:22px;letter-spacing:2px;color:#0B4C8C;font-weight:600}
+.acct .seg span{font-size:12px;color:var(--ink2)}
+.acct .eq{display:flex;align-items:center;font-size:18px;color:var(--ink3)}
+.acct .res{border:1px solid var(--ok-line);background:var(--ok-bg);border-radius:10px;padding:12px 18px;text-align:center;min-width:170px}
+.acct .res b{display:block;font-family:var(--mono);font-size:26px;letter-spacing:3px;color:var(--ok);font-weight:600}
+.acct .res span{font-size:12px;color:var(--ink2)}
+.foot{color:var(--ink3);font-size:12px;text-align:center;margin-top:34px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:820px){.two{grid-template-columns:1fr}}
+.mini{font-size:12.5px;color:var(--ink3)}
+.tag{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:5px;border:1px solid var(--line);background:#FAFAFB;color:var(--ink2);font-family:var(--mono);margin-right:6px}
+.tag.new{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
+.tag.mod{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
+.tag.keep{background:var(--accent-soft);border-color:var(--accent-line);color:#0B4C8C}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hero">
+  <h1>学生账号体系 · 方案 v1</h1>
+  <div class="sub">小程序端「凭账号密码登录」+ 管理端「导入名册 · 自动分发账号」</div>
+  <div class="meta">
+    <span class="chip num">2026-09-18</span>
+    <span class="chip num">v1</span>
+    <span class="chip todo">状态：待你确认</span>
+    <span class="chip">代码改动：0 行</span>
+    <span class="chip">影响面：后端 / 小程序 / 管理端</span>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="#s1">1 目标与边界</a>
+  <a href="#s2">2 账号规则</a>
+  <a href="#s3">3 数据模型</a>
+  <a href="#s4">4 接口清单</a>
+  <a href="#s5">5 导入与识别</a>
+  <a href="#s6">6 登录与门禁</a>
+  <a href="#s7">7 安全设计</a>
+  <a href="#s8">8 改造清单</a>
+  <a href="#s9">9 测试与验收</a>
+  <a href="#s10">10 待你拍板</a>
+  <a href="#s11">11 落地顺序</a>
+</div>
+
+<section id="s1">
+  <h2><span class="idx">1</span>目标与边界</h2>
+  <p class="lead">一句话：给小程序加一道「学号账号」门禁，账号由管理端导入名册后自动生成，学生凭分发的账号密码才能进入。</p>
+  <div class="two">
+    <div>
+      <h4>本期要做</h4>
+      <ul>
+        <li>管理端新增「学生账号」模块：导入名册 → 自动识别 → 校验预览 → 生成账号 → 导出分发</li>
+        <li>账号规则：<code>入学年级 + 班级 + 序号</code>，统一 8 位</li>
+        <li>初始密码统一 <code>usr123456</code>，学生首次登录后可自行修改</li>
+        <li>小程序登录页改为账号 + 密码表单，未登录不允许进入</li>
+        <li>管理员可重置密码、启停账号、查看激活进度</li>
+      </ul>
+    </div>
+    <div>
+      <h4>本期不做（留位置）</h4>
+      <ul>
+        <li>微信 openid 绑定 / 免密登录（字段预留，暂不启用）</li>
+        <li>学生自助找回密码（统一走管理员重置）</li>
+        <li>家长、教师等多角色体系</li>
+        <li>导出为 PDF / 打印条排版</li>
+      </ul>
+    </div>
+  </div>
+  <div class="note ok">
+    <span class="t">对你现有东西的态度：不动</span>
+    管理端已有的 10 个页面、样式、路由一行不改，只加一个菜单项和一个新页面；后端现有接口签名全部保持兼容，<strong>新增</strong>接口而不是改造旧接口。现有 56 条 Jest 用例必须继续全绿。
+  </div>
+</section>
+
+<section id="s2">
+  <h2><span class="idx">2</span>账号规则</h2>
+  <p class="lead">账号由名册里的三元组直接拼出来，不由人工指定，所以不重复、可反查。</p>
+
+  <div class="acct">
+    <div class="seg"><b>2024</b><span>入学年级（4 位）</span></div>
+    <div class="eq">＋</div>
+    <div class="seg"><b>01</b><span>班级（2 位）</span></div>
+    <div class="eq">＋</div>
+    <div class="seg"><b>01</b><span>序号（2 位）</span></div>
+    <div class="eq">＝</div>
+    <div class="res"><b>20240101</b><span>登录账号</span></div>
+  </div>
+
+  <div class="tw">
+  <table>
+    <tr><th>项</th><th>规则</th><th>说明</th></tr>
+    <tr><td>账号</td><td>年级 4 + 班级 2 + 序号 2 = 8 位数字</td><td>例：2024 级 01 班 01 号 → <code>20240101</code></td></tr>
+    <tr><td>初始密码</td><td><code>usr123456</code>（全员统一）</td><td>首次登录后可自行修改</td></tr>
+    <tr><td>班级范围</td><td>01 ~ 99</td><td>表格写 <code>1</code> / <code>1班</code> / <code>01</code> 都能识别</td></tr>
+    <tr><td>序号范围</td><td>01 ~ 99</td><td>一个班最多 99 人；超范围该行报错</td></tr>
+    <tr><td>唯一性</td><td>账号全局唯一</td><td>同一人重复导入不会生成第二条</td></tr>
+    <tr><td>姓名</td><td>非必需，可选列</td><td>传了就存备注，不参与账号生成</td></tr>
+  </table>
+  </div>
+
+  <div class="note warn">
+    <span class="t">一个要提前说清的限制</span>
+    账号里含班级但<strong>不含年份内的学期</strong>，所以「2024 级 1 班 01 号」这辈子就是 <code>20240101</code>，升年级、换班都不会自动改。学生转班要管理员在列表里手工改（会一并改账号）。这也是学号体系的常规做法，先按这个来。
+  </div>
+</section>
+
+<section id="s3">
+  <h2><span class="idx">3</span>数据模型</h2>
+  <p class="lead">扩展现有 <code>user</code> 表，不新建身份表 —— 这样投稿、留言、点歌名额、注意事项确认这些已有逻辑一行都不用改。</p>
+
+  <h3>3.1 user 表新增列</h3>
+  <div class="tw">
+  <table>
+    <tr><th>列名</th><th>类型</th><th>说明</th></tr>
+    <tr><td><code>username</code></td><td>VARCHAR(32) UNIQUE</td><td>登录账号（学号），例 20240101</td></tr>
+    <tr><td><code>password</code></td><td>VARCHAR(72)</td><td>bcrypt 哈希，永不返回给前端</td></tr>
+    <tr><td><code>grade</code></td><td>VARCHAR(8)</td><td>入学年级，如 2024</td></tr>
+    <tr><td><code>class_no</code></td><td>VARCHAR(4)</td><td>班级，如 01</td></tr>
+    <tr><td><code>seat_no</code></td><td>VARCHAR(4)</td><td>序号，如 01</td></tr>
+    <tr><td><code>status</code></td><td>TINYINT 默认 1</td><td>1 启用 / 0 禁用（毕业、转出时关掉）</td></tr>
+    <tr><td><code>pwd_changed_at</code></td><td>DATETIME NULL</td><td><strong>为空 = 还是初始密码</strong>，导出和进度统计都靠它</td></tr>
+    <tr><td><code>last_login_at</code> / <code>login_count</code></td><td>DATETIME / INT</td><td>最近登录、累计次数</td></tr>
+    <tr><td><code>import_batch_id</code></td><td>INT NULL</td><td>来源批次，支持按批撤销</td></tr>
+    <tr><td><code>remark</code></td><td>VARCHAR(64)</td><td>备注（可存姓名）</td></tr>
+    <tr><td colspan="3"><span class="tag mod">改动</span><code>openid</code> 由 NOT NULL 改为 <strong>允许 NULL</strong>（学生账号没有微信 openid）；唯一约束保留，MySQL / SQLite 都允许多行 NULL。</td></tr>
+  </table>
+  </div>
+
+  <h3>3.2 索引</h3>
+  <ul>
+    <li><code>uk_username</code>（username 唯一）—— 登录查账号走它。</li>
+    <li><code>uk_grade_class_seat</code>（grade, class_no, seat_no 联合唯一）—— 从根上防住「同一个人被导入两次」。</li>
+    <li><code>idx_grade_class</code> —— 列表按年级班级筛选。</li>
+  </ul>
+
+  <h3>3.3 新增 import_batch 表（导入批次）</h3>
+  <div class="tw">
+  <table>
+    <tr><th>列名</th><th>说明</th></tr>
+    <tr><td><code>id</code></td><td>批次号</td></tr>
+    <tr><td><code>filename</code></td><td>上传的原始文件名</td></tr>
+    <tr><td><code>total</code> / <code>created</code> / <code>skipped</code> / <code>invalid</code></td><td>总行数 / 新建 / 跳过 / 异常</td></tr>
+    <tr><td><code>operator</code></td><td>操作的管理员</td></tr>
+    <tr><td><code>create_time</code></td><td>导入时间</td></tr>
+  </table>
+  </div>
+  <p class="mini">有批次才能「传错表格一键撤销」：撤销只删本批次里<strong>还没被激活</strong>（从未登录）的账号，已经用过的账号不动，避免把学生的投稿记录打断。</p>
+
+  <h3>3.4 迁移脚本</h3>
+  <p>新建 <code>sql/migrations/2026-09-18-student-account.sql</code>（<code>ALTER TABLE user</code> + 建 <code>import_batch</code> + 建索引），同时同步改 <code>sql/schema.sql</code> 与 Sequelize 模型。</p>
+  <div class="note warn">
+    <span class="t">老规矩，别忘了</span>
+    <code>schema.sql</code> 只在数据卷首次启动时执行，你现有的库里数据已经在跑，必须手动跑一次迁移脚本，否则新列不存在。文档里会给出一行 <code>docker exec</code> 执行命令。
+  </div>
+</section>
+
+<section id="s4">
+  <h2><span class="idx">4</span>接口清单</h2>
+  <p class="lead">用户端 3 个（1 新增 2 微调），管理端 12 个（全部新增，全部仅超管可调）。</p>
+
+  <h3>4.1 小程序端</h3>
+  <div class="tw">
+  <table>
+    <tr><th>方法</th><th>路径</th><th>说明</th></tr>
+    <tr><td>POST</td><td><code>/api/user/login/account</code> <span class="tag new">新增</span></td><td>入参 <code>{username, password}</code>；出参 <code>{token, user:{username, nickname, grade, classNo, seatNo, isDefaultPwd}}</code></td></tr>
+    <tr><td>PUT</td><td><code>/api/user/change-password</code> <span class="tag new">新增</span></td><td>入参 <code>{oldPassword, newPassword}</code>；成功后返回新 token</td></tr>
+    <tr><td>GET</td><td><code>/api/user/me</code> <span class="tag mod">微调</span></td><td>多返回年级 / 班级 / 序号 / 是否仍是初始密码</td></tr>
+    <tr><td>POST</td><td><code>/api/user/login</code> <span class="tag keep">保留</span></td><td>原微信登录不动；开关打开时返回 <code>40302</code>，提示「请使用学号账号登录」</td></tr>
+  </table>
+  </div>
+
+  <div class="note info">
+    <span class="t">为什么单开一个接口，而不是改造 /user/login</span>
+    现有 <code>/user/login</code> 牵着 56 条 Jest 用例里的登录链路（<code>member.test.js</code> / <code>switch.test.js</code> 都靠它拿 token）。单开新接口 + 一个开关来「关掉微信通道」，既能真正强制账号登录，又不会把测试打崩。
+  </div>
+
+  <h3>4.2 管理端（全部 <code>adminAuth + requireSuperAdmin</code>）</h3>
+  <div class="tw">
+  <table>
+    <tr><th>方法</th><th>路径</th><th>说明</th></tr>
+    <tr><td>POST</td><td><code>/api/admin/student/import/preview</code></td><td>上传 Excel / CSV，<strong>只解析不落库</strong>，返回逐行预览与统计</td></tr>
+    <tr><td>POST</td><td><code>/api/admin/student/import/commit</code></td><td>传合法行数组，服务端<strong>重新校验一遍</strong>后落库</td></tr>
+    <tr><td>GET</td><td><code>/api/admin/student/template</code></td><td>下载导入模板 xlsx</td></tr>
+    <tr><td>GET</td><td><code>/api/admin/student/list</code></td><td>账号列表：关键字 / 年级 / 班级 / 状态 / 是否已激活筛选 + 分页</td></tr>
+    <tr><td>GET</td><td><code>/api/admin/student/stats</code></td><td>按年级、班级汇总：总数 / 已激活 / 未激活</td></tr>
+    <tr><td>PUT</td><td><code>/api/admin/student/:id</code></td><td>改备注 / 年级 / 班级 / 序号（改三元组会连带改账号）</td></tr>
+    <tr><td>PUT</td><td><code>/api/admin/student/:id/status</code></td><td>启用 / 禁用单个账号</td></tr>
+    <tr><td>PUT</td><td><code>/api/admin/student/:id/reset-password</code></td><td>重置为 <code>usr123456</code>，并清掉改密标记</td></tr>
+    <tr><td>POST</td><td><code>/api/admin/student/reset-password/batch</code></td><td>批量重置（选中 id 或按班级）</td></tr>
+    <tr><td>DELETE</td><td><code>/api/admin/student/:id</code></td><td>删除账号（有投稿记录时改为禁用，不硬删）</td></tr>
+    <tr><td>GET</td><td><code>/api/admin/student/export</code></td><td>导出 xlsx，支持按年级 / 班级 / 批次 / 仅未激活筛选</td></tr>
+    <tr><td>GET / POST</td><td><code>/api/admin/student/batches</code>、<code>/batch/:id/rollback</code></td><td>批次列表与撤销</td></tr>
+  </table>
+  </div>
+</section>
+
+<section id="s5">
+  <h2><span class="idx">5</span>导入与自动识别</h2>
+  <p class="lead">「自动识别」不是猜，是三段确定性规则：先认表头，再逐格归一化，最后逐行出结论。</p>
+
+  <h3>5.1 五步流程</h3>
+  <ol>
+    <li><strong>上传</strong> —— 收 .xlsx / .xls / .csv，2MB 上限，内存解析不落盘。</li>
+    <li><strong>认表头</strong> —— 扫前 3 行找关键词（年级 / 入学 / 届 / 班级 / 班 / 序号 / 号 / 学号）。<br>
+      命中 → 按列名映射；一个都没命中 → 按列序取第 1、2、3 列，并拿首行试解析，解析不出就报「未识别到列」。</li>
+    <li><strong>逐行归一化</strong> —— 见下表，全部格式统一成 4+2+2。</li>
+    <li><strong>校验预览</strong> —— 每行给出结论：可导入 / 异常（附原因）/ 库中已存在。这一步结束后<strong>什么都不写库</strong>。</li>
+    <li><strong>确认落库 + 导出</strong> —— 只提交合法行；服务端重新校验，落库后立刻可导出分发条。</li>
+  </ol>
+
+  <h3>5.2 归一化规则</h3>
+  <div class="tw">
+  <table>
+    <tr><th>字段</th><th>表格里可能写成</th><th>统一成</th></tr>
+    <tr><td>年级</td><td><code>2024</code> / <code>2024级</code> / <code>24级</code> / <code>24</code> / <code>2024届</code></td><td><code>2024</code>（两位数字补 20；不在 19xx / 20xx 内报错）</td></tr>
+    <tr><td>班级</td><td><code>1</code> / <code>01</code> / <code>1班</code> / <code>高一(1)班</code></td><td><code>01</code>（只取数字，左补 0）</td></tr>
+    <tr><td>序号</td><td><code>5</code> / <code>05</code> / <code>5号</code> / <code>第5</code></td><td><code>05</code>（只取数字，左补 0）</td></tr>
+    <tr><td>整列合并成一条</td><td><code>20240101</code> / <code>2024-01-01</code> / <code>2024 01 01</code> / <code>2024级1班1号</code></td><td>自动切三段</td></tr>
+    <tr><td>脏数据</td><td>全角数字、前后空格、<code>'2024</code> 撇号、Excel 文本格式</td><td>先清洗再解析</td></tr>
+  </table>
+  </div>
+
+  <h3>5.3 冲突与重复的处理</h3>
+  <div class="tw">
+  <table>
+    <tr><th>情况</th><th>默认行为</th></tr>
+    <tr><td>本批内重复（同年级班级序号出现两次）</td><td>只留第一行，后面的标异常</td></tr>
+    <tr><td>库里已存在，且<strong>仍是初始密码</strong>（没登录过 / 没改过密）</td><td>覆盖更新，不重复占位</td></tr>
+    <tr><td>库里已存在，且<strong>已经改过密码</strong>（真人在用）</td><td>默认跳过保护，列表里标「已激活」；需要强制覆盖要显式勾选</td></tr>
+    <tr><td>异常行（缺序号、格式烂、超范围）</td><td>默认<strong>不导入</strong>，逐行给原因，导出错误清单给你回去改表</td></tr>
+  </table>
+  </div>
+  <div class="note info">
+    <span class="t">模板长这样（就三列，多一列姓名也无所谓）</span>
+    <pre><code>年级    班级   序号   （姓名，可选）
+2024    01     01     张三
+2024    01     02     李四
+2024    02     01     王五</code></pre>
+    同样接受「没有表头的三列纯数字」和「一列 20240101」两种极端写法 —— 你手头的表原样丢进来就行。
+  </div>
+
+  <h3>5.4 导出内容</h3>
+  <div class="tw">
+  <table>
+    <tr><th>列</th><th>说明</th></tr>
+    <tr><td>年级 / 班级 / 序号</td><td>分列，方便按班级剪开分发</td></tr>
+    <tr><td>账号</td><td>20240101</td></tr>
+    <tr><td>初始密码</td><td>仍是初始密码 → <code>usr123456</code>；<strong>已改过密码 → 留空</strong>（哈希不可逆，也导不出来）</td></tr>
+    <tr><td>状态 / 是否已激活 / 最近登录</td><td>便于统计分发覆盖率</td></tr>
+  </table>
+  </div>
+  <p class="mini">支持筛选导出：按年级、按班级、按批次、<strong>仅未激活</strong>（这个最常用 —— 补发那一小撮没登过的）。文件名形如 <code>学生账号_2024级01班_20260918.xlsx</code>。</p>
+</section>
+
+<section id="s6">
+  <h2><span class="idx">6</span>登录与门禁</h2>
+  <p class="lead">小程序端从「微信一键登录」换成「账号 + 密码」，未登录的人进不了任何页面。</p>
+
+  <h3>6.1 小程序侧的四处改动</h3>
+  <ul>
+    <li><strong>登录页</strong>：改账号 + 密码表单（含「账号为 8 位学号」「初始密码 usr123456，首次登录请修改」的说明文案）。界面会<strong>先出静态预览 v1</strong> 给你确认，再动代码。</li>
+    <li><strong>冷启动门禁</strong>：<code>App.onLaunch</code> 发现本地没 token，直接 <code>reLaunch</code> 到登录页；回来后进原页。</li>
+    <li><strong>401 兜底</strong>：<code>utils/request.js</code> 收到 401 / 40301 时清 token 并跳登录页（账号被禁用也能被踢出去）。</li>
+    <li><strong>改密入口</strong>：「我的」页用户卡上加入口，新增 <code>pages/changePassword</code>；首次登录后弹一次提示引导改密。</li>
+  </ul>
+
+  <h3>6.2 服务端侧的真强制</h3>
+  <p>前端换页面只是体验，<strong>真正的强制在服务端</strong>：新增系统开关 <code>account_login_required</code>（默认 <strong>on</strong>）。开关打开时，<code>POST /api/user/login</code>（微信那条）一律拒绝，返回 <code>40302</code>。这样即使有人装旧版小程序、或直接调接口，也拿不到 token。需要回退时超管在模块开关页一键关掉即可。</p>
+
+  <h3>6.3 登录链路</h3>
+  <pre><code>学生输入 20240101 / usr123456
+        ↓
+POST /api/user/login/account
+        ↓
+查 user.username → 查不到 → 统一回「账号或密码错误」（防枚举）
+                 → status=0 → 回「账号已停用，请联系广播站」
+        ↓
+bcrypt.compare → 通过 → 写 last_login_at / login_count
+        ↓
+签发 JWT（openid 字段填账号，兼容存量所有业务逻辑）
+        ↓
+返回 token + user{ username, grade, classNo, seatNo, isDefaultPwd }
+        ↓
+isDefaultPwd=true → 提示「你还在用初始密码，建议现在修改」</code></pre>
+</section>
+
+<section id="s7">
+  <h2><span class="idx">7</span>安全与性能设计</h2>
+  <p class="lead">这套东西有两个必须提前踩掉的坑：批量 bcrypt 会超时，账号状态改了 token 还活着。</p>
+
+  <div class="note bad">
+    <span class="t">坑 1：初始密码千万别逐行 hash</span>
+    bcrypt 每行约 60 ~ 100ms，导入 2000 人 = <strong>2~3 分钟</strong>，接口铁定超时。<br>
+    对策：初始密码全员相同，<strong>只 hash 一次，整批复用同一个哈希串</strong>。导入 2000 行从分钟级降到毫秒级。（学生改密后各自生成新哈希，不受影响。）
+  </div>
+
+  <div class="note warn">
+    <span class="t">坑 2：禁用了账号，token 还能用 7 天</span>
+    JWT 是无状态的，管理员禁用账号后旧 token 仍有效到过期。<br>
+    对策：在鉴权中间件里加一层<strong>账号状态检查 + 30 秒内存缓存</strong>（照搬项目里 <code>switchService</code> 那套缓存模式）。禁用 / 重置密码 / 改密最多 30 秒生效，且不给数据库加压力。这也是「改密后旧 token 失效」的同一套机制。
+  </div>
+
+  <h3>其余约定</h3>
+  <div class="tw">
+  <table>
+    <tr><th>项</th><th>做法</th></tr>
+    <tr><td>密码存储</td><td>bcrypt 10 轮，与现有管理员密码同规格</td></tr>
+    <tr><td>改密强度</td><td>≥ 8 位，且必须同时含字母和数字；与原密码不同</td></tr>
+    <tr><td>登录限流</td><td>IP + 账号双维度，10 分钟内 5 次失败锁定（复用现有 express-rate-limit）</td></tr>
+    <tr><td>错误文案</td><td>「账号不存在」与「密码错误」合并成一句，避免被拿来探测学号</td></tr>
+    <tr><td>接口返回</td><td>所有学生接口 <code>attributes</code> 白名单，password 永不外泄</td></tr>
+    <tr><td>导入权限</td><td>仅超管（<code>requireSuperAdmin</code>），与「账号管理」同级别</td></tr>
+    <tr><td>导出审计</td><td>导出（含初始密码）与重置密码都写操作日志，含操作人 / 时间 / 条数</td></tr>
+    <tr><td>时区</td><td>批次时间、登录时间统一走 <code>bjTime.js</code>，不用裸 dayjs</td></tr>
+    <tr><td>事务</td><td>落库整批放一个事务里，中途失败全部回滚，不留半批脏数据</td></tr>
+  </table>
+  </div>
+</section>
+
+<section id="s8">
+  <h2><span class="idx">8</span>改造清单（文件级）</h2>
+  <p class="lead">新增 7 个文件，修改 12 个文件。管理端只碰路由和一个菜单项，界面另出预览。</p>
+
+  <div class="two">
+    <div>
+      <h4>后端 · 新增</h4>
+      <ul>
+        <li><code>src/models/importBatch.js</code></li>
+        <li><code>src/services/studentAccountService.js</code>（归一化 + 账号生成 + 校验）</li>
+        <li><code>src/services/studentImportService.js</code>（xlsx / csv 解析）</li>
+        <li><code>src/controllers/admin/studentController.js</code></li>
+        <li><code>src/middlewares/uploadExcel.js</code></li>
+        <li><code>sql/migrations/2026-09-18-student-account.sql</code></li>
+        <li><code>tests/studentAccount.test.js</code></li>
+      </ul>
+      <h4>后端 · 修改</h4>
+      <ul>
+        <li><code>src/models/user.js</code>（加列）</li>
+        <li><code>src/models/index.js</code>（注册模型）</li>
+        <li><code>src/controllers/user/authController.js</code>（账号登录 / 改密）</li>
+        <li><code>src/middlewares/auth.js</code>（带 uid + 状态缓存）</li>
+        <li><code>src/routes/user.js</code> / <code>src/routes/admin.js</code></li>
+        <li><code>src/services/switchService.js</code> + <code>src/utils/seed.js</code>（新开关默认 on）</li>
+        <li><code>sql/schema.sql</code>、<code>package.json</code>（+ exceljs）</li>
+      </ul>
+    </div>
+    <div>
+      <h4>小程序 · 修改</h4>
+      <ul>
+        <li><code>pages/login/*</code>（账号密码表单）</li>
+        <li><code>app.js</code>（loginByAccount + 门禁）</li>
+        <li><code>utils/request.js</code>（401 跳登录）</li>
+        <li><code>pages/mySubmit/*</code>（用户卡 + 改密入口）</li>
+        <li><code>app.json</code>（注册新页面）</li>
+      </ul>
+      <h4>小程序 · 新增</h4>
+      <ul>
+        <li><code>pages/changePassword/</code>（4 个文件）</li>
+      </ul>
+      <h4>管理端 · 修改</h4>
+      <ul>
+        <li><code>router/index.js</code>（加 1 条路由）</li>
+        <li><code>layouts/MainLayout.vue</code>（加 1 个菜单项）</li>
+        <li>新增 <code>views/Student.vue</code>（导入 / 预览 / 列表 / 导出 / 重置）</li>
+      </ul>
+      <p class="mini">页面视觉风格沿用你现有的 theme.css，但<strong>界面稿不在本方案里画</strong> —— 你点头之后我再单独出静态预览。</p>
+    </div>
+  </div>
+
+  <h3>依赖</h3>
+  <p>后端加一个 <code>exceljs</code>（读写 xlsx）。不用 SheetJS 的 <code>xlsx</code> 包是因为它 npm 上的公开版本（0.18.5）已停更且有已知漏洞，后续版本只走自建 CDN；exceljs 在 npm 上活跃维护、纯 JS、支持流式读写，适合这个场景。CSV 用自己的轻量解析（30 行内），不再加依赖。</p>
+</section>
+
+<section id="s9">
+  <h2><span class="idx">9</span>测试与验收</h2>
+  <div class="two">
+    <div>
+      <h4>自动化（新增 tests/studentAccount.test.js）</h4>
+      <ul>
+        <li>归一化规则矩阵：<code>2024级</code> / <code>24</code> / <code>1班</code> / <code>第5</code> / 全角数字 / 单列合并格式，各 1~2 条</li>
+        <li>账号生成正确性 + 边界（班级 00、序号 100 报错）</li>
+        <li>表头识别：有表头 / 无表头 / 乱序列名</li>
+        <li>重复行、库中已存在（未激活覆盖 / 已激活跳过）</li>
+        <li>登录：成功 / 密码错 / 账号不存在 / 禁用 / 限流</li>
+        <li>改密：旧密码错 / 强度不足 / 成功后 <code>pwd_changed_at</code> 落值</li>
+        <li>重置密码后 <code>pwd_changed_at</code> 清空、可用初始密码登录</li>
+        <li>导出数据结构：已改密行密码列为空</li>
+        <li>开关 <code>account_login_required=on</code> 时 <code>/user/login</code> 返回 40302</li>
+      </ul>
+      <p class="mini">现有 56 条用例必须继续全绿。<strong>不通过不交付。</strong></p>
+    </div>
+    <div>
+      <h4>手工验收（跑真实环境）</h4>
+      <ol>
+        <li>拿你的真实名册（挑一个班）导入 → 预览行数与异常数对得上</li>
+        <li>故意改坏几行（缺序号、班级写成「高一(1)」）→ 异常原因能看懂</li>
+        <li>同一份表导两次 → 第二次全部「已存在」，不产生重复账号</li>
+        <li>导出 → 表里账号与预览一致，初始密码列有值</li>
+        <li>用导出的账号在真机小程序登录 → 进入首页</li>
+        <li>改密 → 用新密码重登成功，旧密码失败</li>
+        <li>管理端重置密码 → 学生用 usr123456 登录成功</li>
+        <li>禁用账号 → 该学生 30 秒内被踢到登录页</li>
+        <li>关掉 <code>account_login_required</code> 开关 → 老微信登录恢复可用（回退验证）</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <h2><span class="idx">10</span>需要你拍板的 4 件事</h2>
+  <p class="lead">每项我都给了推荐值，你不说就按推荐走；有不同意见直接说编号。</p>
+  <div class="tw">
+  <table>
+    <tr><th>#</th><th>问题</th><th>选项</th><th>推荐</th></tr>
+    <tr>
+      <td>1</td>
+      <td>门禁范围：未登录时能看什么？</td>
+      <td>A. 全站强制，进来就是登录页<br>B. 只拦投稿 / 点歌 / 留言 / 我的</td>
+      <td><strong>A</strong>（你说的「必须登录才能用」，A 才是真门禁；且分发制的意义就是限校内人）</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>首次登录是否强制改密？</td>
+      <td>A. 只提示，可跳过<br>B. 不改密就进不去</td>
+      <td><strong>A</strong>（B 会在开学季制造大量卡壳，还要人工兜底；A 更稳）</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>序号缺失或重复怎么处理？</td>
+      <td>A. 报错不导入，回去改表<br>B. 按班级内出现顺序自动补号</td>
+      <td><strong>A</strong>（学号是身份，自动补号一旦和学校名册错位就是灾难）</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>已激活账号被再次导入时</td>
+      <td>A. 跳过保护（默认），要覆盖得显式勾选<br>B. 直接覆盖重置</td>
+      <td><strong>A</strong>（避免把已改密的学生打回初始密码）</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>是否保留微信一键登录作为备用通道？</td>
+      <td>A. 保留接口但默认关闭（开关可控）<br>B. 彻底删掉</td>
+      <td><strong>A</strong>（保命用：出问题时一键回退，测试也不受影响）</td>
+    </tr>
+  </table>
+  </div>
+  <div class="note warn">
+    <span class="t">另外想确认一件事</span>
+    你手头那张名册的<strong>「年级班级序号」到底长什么样</strong> —— 是三列分开，还是拼成一列（像 <code>2024级1班1号</code>）？把表头那一行拍给我，或直接丢个样例文件过来，我把识别规则按你的真实格式再收一遍，避免上线才发现识别不了。
+  </div>
+</section>
+
+<section id="s11">
+  <h2><span class="idx">11</span>确认后的落地顺序</h2>
+  <ol>
+    <li><strong>规则层先跑通</strong>：迁移脚本 + 模型 + 归一化 / 账号生成服务 + Jest 用例（不碰界面就能验）</li>
+    <li><strong>导入导出接口</strong>：用一个真实班级灰度试导入 → 导出对照，确认无误</li>
+    <li><strong>小程序登录页</strong>：先出静态预览 v1 → 你确认 → 接接口 + 门禁</li>
+    <li><strong>管理端页面</strong>：先出静态预览 → 你确认 → 接接口</li>
+    <li><strong>全量导入 + 灰度放开</strong>：先一个年级，观察登录成功率与激活进度</li>
+  </ol>
+  <div class="note info">
+    <span class="t">顺序的理由</span>
+    前两步是纯后端、可自动化验证、可灰度、随时回退，风险最低；界面放后面，是因为界面得等你的设计确认，而且它不影响规则正确性。
+  </div>
+</section>
+
+<div class="foot">菁悠广播站 · 学生账号体系方案 v1 · 2026-09-18 · 本页仅为方案，未改动任何代码</div>
+</div>
+</body>
+</html>

@@ -71,6 +71,10 @@ async function seedSwitches() {
     { key: 'submit_article', value: 'on', desc: '文稿投稿' },
     { key: 'message',        value: 'on', desc: '节目留言' },
     { key: 'member',         value: 'on', desc: '风采展示' },
+    // ⚠️ 学生账号体系的开关 account_login_required 故意不写在这里：
+    //    switch.test.js 断言 seed 恰好 4 条；它由 switchService 的 KNOWN_SWITCHES
+    //    在管理端列表里补默认行（缺行时业务判断本来就算「开」），
+    //    已有库则由 sql/migrations/2026-09-18-student-account.sql 写入。
   ];
   for (const item of defaults) {
     await SystemSwitch.findOrCreate({ where: { key: item.key }, defaults: item });

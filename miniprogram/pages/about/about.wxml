@@ -1,22 +1,40 @@
-<view class="container">
-  <view class="brand-hero">
-    <image src="/assets/station-logo.jpg" class="brand-hero-img" mode="aspectFit" />
-    <view class="brand-hero-name">菁悠广播站</view>
-    <view class="brand-hero-slogan">JING YOU GUANG BO ZHAN</view>
+<!-- pages/about/about.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
+    </view>
+    <view class="navbar-title">关于广播站</view>
+    <view class="navbar-spacer"></view>
   </view>
 
-  <view class="card">
-    <view class="title">📻 关于我们</view>
-    <view class="content">{{intro}}</view>
-  </view>
+  <view class="body">
 
-  <view class="card">
-    <view class="title">🕐 开播时间</view>
-    <view class="content">{{schedule}}</view>
-  </view>
+    <!-- 品牌区 -->
+    <view class="brand">
+      <image class="brand-logo-lg" src="/assets/station-badge.png" mode="aspectFit" />
+      <view class="t-title">菁悠广播站</view>
+      <view class="t-cap en">JING YOU GUANG BO ZHAN</view>
+    </view>
 
-  <view class="card">
-    <view class="title">📮 联系方式</view>
-    <view class="content">{{contact}}</view>
+    <view class="card info">
+      <view class="info-block">
+        <text class="t-section">关于我们</text>
+        <text class="info-text">{{intro}}</text>
+      </view>
+      <view class="divider"></view>
+      <view class="info-block">
+        <text class="t-section">开播时间</text>
+        <text class="info-text">{{schedule}}</text>
+      </view>
+      <view class="divider"></view>
+      <view class="info-block">
+        <text class="t-section">联系方式</text>
+        <text class="info-text">{{contact}}</text>
+      </view>
+    </view>
+
   </view>
 </view>

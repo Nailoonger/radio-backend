@@ -1,76 +1,118 @@
-<view class="container">
-  <!-- 顶部站徽横条 -->
-  <view class="hero">
-    <view class="hero-title">风采展示</view>
-    <view class="hero-sub">认识广播站里的每一位伙伴</view>
-  </view>
+<!-- pages/members/members.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navreserve" style="height: {{navBarHeight}}px"></view>
 
-  <!-- 职务 tab -->
-  <scroll-view scroll-x class="role-bar" enable-flex>
-    <view
-      class="role-tab {{activeRole === '' ? 'active' : ''}}"
-      data-role=""
-      bindtap="switchRole"
-    >全部</view>
-    <view
-      wx:for="{{roles}}"
-      wx:key="*this"
-      class="role-tab {{activeRole === item ? 'active' : ''}}"
-      data-role="{{item}}"
-      bindtap="switchRole"
-    >{{item}}</view>
-  </scroll-view>
+  <view class="body">
 
-  <!-- 成员卡片 -->
-  <view wx:if="{{loading}}" class="loading">加载中...</view>
+    <!-- 页面标题 -->
+    <view class="stack">
+      <view class="t-page">风采</view>
+      <view class="t-sub">认识广播站里的每一位伙伴</view>
+    </view>
 
-  <block wx:elif="{{groups.length === 0}}">
-    <view class="empty">暂无展示成员</view>
-  </block>
+    <!-- 模块开关关闭：页内提示（框架保留，只是不展示数据） -->
+    <view class="paused" wx:if="{{disabled}}">
+      <text class="paused-title">风采展示暂停开放</text>
+      <text class="paused-desc">管理员已暂时关闭该模块，内容暂不展示，请稍后再来。</text>
+    </view>
 
-  <block wx:else>
-    <!-- 当选了具体职务 -->
-    <block wx:if="{{activeRole !== ''}}">
-      <view class="group-title">{{activeRole}}</view>
-      <view class="grid">
+    <!-- 顶层 tab：社干 / 部门人员（滑动分段） -->
+    <view class="segment">
+      <view class="segment-indicator" style="width: calc((100% - 16rpx) / 2); transform: translateX({{categoryIndex * 100}}%);"></view>
+      <view
+        wx:for="{{categories}}"
+        wx:key="key"
+        class="segment-item {{categoryIndex === index ? 'on' : ''}}"
+        data-index="{{index}}"
+        bindtap="switchCategory"
+        hover-class="none"
+      >{{item.label}}</view>
+    </view>
+
+    <!-- 部门筛选（仅"部门人员"时显示；无部门数据时不占位） -->
+    <scroll-view
+      wx:if="{{activeCategory === 'staff' && departments.length}}"
+      scroll-x
+      class="filters-scroll"
+      enhanced
+      show-scrollbar="{{false}}"
+    >
+      <view class="filters">
         <view
-          class="card member-card"
-          wx:for="{{groups}}"
-          wx:for-item="g"
-          wx:key="role"
-          wx:if="{{g.role === activeRole}}"
-        >
-          <block wx:for="{{g.list}}" wx:for-item="m" wx:key="id">
-            <view class="member-cell" data-id="{{m.id}}" bindtap="goDetail">
-              <image class="avatar" src="{{m.avatar}}" mode="aspectFill" />
-              <view class="name">{{m.name}}</view>
-              <view class="role">{{m.role}}</view>
-              <view class="grade">{{m.grade}}</view>
-            </view>
-          </block>
-        </view>
+          wx:for="{{departments}}"
+          wx:key="*this"
+          class="filter {{activeDept === item ? 'on' : ''}}"
+          data-dept="{{item}}"
+          bindtap="switchDept"
+          hover-class="none"
+        >{{item}}</view>
       </view>
-    </block>
+    </scroll-view>
 
-    <!-- 全部模式：按职务分组展示 -->
-    <block wx:else>
-      <block wx:for="{{groups}}" wx:for-item="g" wx:key="role">
-        <view class="group-title">{{g.role}}</view>
+    <view class="loading" wx:if="{{loading}}">加载中……</view>
+
+    <!-- 模块关闭时：分段 tab / 筛选条照旧渲染（框架保留），数据区刻意留空 -->
+
+    <!-- ============ 社干分支 ============ -->
+    <block wx:if="{{!loading && !disabled && activeCategory === 'cadre'}}">
+      <view class="empty" wx:if="{{!cadre.length}}">暂无社干</view>
+      <block wx:else>
         <view class="grid">
           <view
-            class="member-cell"
-            wx:for="{{g.list}}"
-            wx:for-item="m"
+            class="mcard"
+            wx:for="{{cadre}}"
             wx:key="id"
-            data-id="{{m.id}}"
-            bindtap="goDetail"
+            hover-class="mcard-hover"
+            data-id="{{item.id}}"
+            bindtap="goCadreDetail"
           >
-            <image class="avatar" src="{{m.avatar}}" mode="aspectFill" />
-            <view class="name">{{m.name}}</view>
-            <view class="grade">{{m.grade}}</view>
+            <view class="mphoto-wrap">
+              <image wx:if="{{item.avatar}}" class="mphoto" src="{{item.avatar}}" mode="aspectFill" lazy-load />
+              <view wx:else class="mphoto mphoto-fallback">{{item.initial}}</view>
+            </view>
+            <text class="mname">{{item.name}}</text>
+            <text class="mrole">{{item.role}}</text>
+            <text class="mgrade" wx:if="{{item.grade}}">{{item.grade}}</text>
+          </view>
+        </view>
+        <view class="t-micro footnote">广播站领导团队</view>
+      </block>
+    </block>
+
+    <!-- ============ 部门人员分支 ============ -->
+    <block wx:if="{{!loading && !disabled && activeCategory === 'staff'}}">
+      <view class="empty" wx:if="{{!visibleGroups.length}}">该部门暂无人员</view>
+      <block wx:else>
+        <view class="section" wx:for="{{visibleGroups}}" wx:for-item="g" wx:key="dept">
+          <view class="section-head">
+            <text class="t-section">{{g.dept}}</text>
+            <text class="t-micro">{{g.list.length}} 人</text>
+          </view>
+          <view class="grid">
+            <view
+              class="mcard"
+              wx:for="{{g.list}}"
+              wx:for-item="m"
+              wx:key="id"
+              hover-class="mcard-hover"
+              data-id="{{m.id}}"
+              bindtap="goStaffDetail"
+            >
+              <view class="mphoto-wrap">
+                <image wx:if="{{m.avatar}}" class="mphoto" src="{{m.avatar}}" mode="aspectFill" lazy-load />
+                <view wx:else class="mphoto mphoto-fallback">{{m.initial}}</view>
+              </view>
+              <text class="mname">{{m.name}}</text>
+              <text class="mrole">{{m.role}}</text>
+              <text class="mgrade" wx:if="{{m.grade}}">{{m.grade}}</text>
+            </view>
           </view>
         </view>
       </block>
     </block>
-  </block>
+
+  </view>
+
+  <view class="pb-tabbar"></view>
 </view>

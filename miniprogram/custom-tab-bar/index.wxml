@@ -1,0 +1,23 @@
+<!-- custom-tab-bar/index.wxml -->
+<view class="tabbar {{noanim ? 'noanim' : ''}} {{hidden ? 'tabbar-hidden' : ''}} {{enter ? 'tabbar-enter' : ''}}">
+  <view class="pill">
+    <!-- 滑动指示器：深色胶囊本体，随 selected 在四格之间滑动。
+         首次落位（revealed）之前不渲染，避免"闪回第一格再滑"的错觉 -->
+    <view class="indicator {{revealed ? '' : 'indicator-off'}}" style="transform: translateX({{selected * 100}}%);"></view>
+    <view
+      wx:for="{{list}}"
+      wx:key="pagePath"
+      class="tab {{selected === index ? 'on' : ''}}"
+      data-index="{{index}}"
+      bindtap="switchTab"
+      hover-class="none"
+    >
+      <image
+        class="tab-icon"
+        src="{{selected === index ? item.iconOn : item.icon}}"
+        mode="aspectFit"
+      />
+      <text class="tab-label">{{item.text}}</text>
+    </view>
+  </view>
+</view>

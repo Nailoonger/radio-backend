@@ -8,43 +8,49 @@
     "pages/login/login",
     "pages/noticeDetail/noticeDetail",
     "pages/programDetail/programDetail",
-    "pages/memberDetail/memberDetail"
+    "pages/memberDetail/memberDetail",
+    "pages/programs/programs",
+    "pages/notices/notices"
   ],
   "window": {
-    "navigationBarBackgroundColor": "#0891b2",
+    "navigationStyle": "custom",
     "navigationBarTitleText": "菁悠广播站",
-    "navigationBarTextStyle": "white",
-    "backgroundColor": "#f0f9ff"
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#FFFFFF",
+    "backgroundTextStyle": "dark",
+    "enablePullDownRefresh": false
   },
   "tabBar": {
-    "color": "#94a3b8",
-    "selectedColor": "#0891b2",
-    "backgroundColor": "#ffffff",
-    "borderStyle": "black",
+    "custom": true,
+    "color": "#7A7A7A",
+    "selectedColor": "#1D1D1F",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
     "list": [
       {
         "pagePath": "pages/index/index",
         "text": "首页",
-        "iconPath": "assets/home.png",
-        "selectedIconPath": "assets/home-active.png"
+        "iconPath": "assets/tab-home.png",
+        "selectedIconPath": "assets/tab-home-on.png"
       },
       {
         "pagePath": "pages/submit/submit",
         "text": "投稿",
-        "iconPath": "assets/edit.png",
-        "selectedIconPath": "assets/edit-active.png"
+        "iconPath": "assets/tab-submit.png",
+        "selectedIconPath": "assets/tab-submit-on.png"
       },
       {
         "pagePath": "pages/members/members",
         "text": "风采",
-        "iconPath": "assets/member.png",
-        "selectedIconPath": "assets/member-active.png"
+        "iconPath": "assets/tab-members.png",
+        "selectedIconPath": "assets/tab-members-on.png"
       },
       {
         "pagePath": "pages/mySubmit/mySubmit",
         "text": "我的",
-        "iconPath": "assets/user.png",
-        "selectedIconPath": "assets/user-active.png"
+        "iconPath": "assets/tab-user.png",
+        "selectedIconPath": "assets/tab-user-on.png"
       }
     ]
   },

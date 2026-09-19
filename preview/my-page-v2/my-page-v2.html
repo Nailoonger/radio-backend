@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>我的页 Hero 配色对比 · 墨黑 vs 深灰</title>
+<style>
+  :root {
+    --ink: #1d1d1f;
+    --muted: #6b7280;
+    --soft: #9aa3ae;
+    --parchment: #f5f5f7;
+    --divider: #f0f0f0;
+    --hairline: #e0e0e0;
+    --amber-bg: #fdf2df; --amber-fg: #b7791f;
+    --green-bg: #e5f6ec; --green-fg: #178a4c;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f5f7; color: var(--ink); padding: 34px 30px 50px; }
+
+  .head { max-width: 1100px; margin: 0 auto 26px; }
+  .head h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+  .head p { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.8; }
+  .head b { color: var(--ink); }
+
+  .stage { display: flex; gap: 30px; justify-content: center; flex-wrap: wrap; }
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .phone { width: 330px; height: 700px; border-radius: 44px; background: #0b0b0f; padding: 10px; box-shadow: 0 30px 60px -22px rgba(15,28,46,.35); flex: none; }
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 35px; overflow: hidden; background: var(--divider); display: flex; flex-direction: column; }
+  .cap { font-size: 12.5px; color: var(--muted); text-align: center; }
+  .cap b { color: var(--ink); }
+
+  .statusbar { height: 34px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font-size: 11.5px; font-weight: 600; color: var(--ink); flex: none; background: var(--divider); }
+  .sig { display: flex; gap: 4px; }
+  .sig i { display: block; background: var(--ink); border-radius: 1px; }
+
+  .body { flex: 1; padding: 14px 20px 0; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+
+  /* Hero：背景色由每屏 inline style 传入 */
+  .hero {
+    background: var(--tile);
+    border-radius: 22px;
+    padding: 22px 20px 18px;
+    color: #fff;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .hero-top { display: flex; align-items: center; gap: 13px; }
+  .avatar {
+    width: 52px; height: 52px; border-radius: 50%; flex: none;
+    background: rgba(255,255,255,0.12);
+    border: 1.5px solid rgba(255,255,255,0.35);
+    color: #fff; font-size: 20px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .hero-id { flex: 1; min-width: 0; }
+  .hero-name { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .hero-meta { font-size: 11.5px; color: rgba(255,255,255,0.62); margin-top: 4px; letter-spacing: 0.4px; }
+  .hero-badge { font-size: 10.5px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.85); flex: none; }
+
+  .hero-stats { display: flex; background: rgba(255,255,255,0.08); border-radius: 14px; padding: 12px 0; }
+  .stat { flex: 1; text-align: center; position: relative; }
+  .stat + .stat::before { content: ''; position: absolute; left: 0; top: 15%; bottom: 15%; width: 1px; background: rgba(255,255,255,0.14); }
+  .stat .n { font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat.warn .n { color: #ffd591; }
+  .stat .l { font-size: 10.5px; color: rgba(255,255,255,0.62); margin-top: 3px; letter-spacing: 0.5px; }
+
+  .segment { position: relative; display: flex; background: #fff; border: 1px solid var(--hairline); border-radius: 999px; padding: 3px; }
+  .seg-ind { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 4); background: var(--ink); border-radius: 999px; }
+  .seg-item { position: relative; z-index: 1; flex: 1; text-align: center; padding: 7px 0; font-size: 12px; color: var(--muted); border-radius: 999px; }
+  .seg-item.on { color: #fff; font-weight: 600; }
+
+  .item { background: var(--parchment); border-radius: 16px; padding: 15px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .between { display: flex; align-items: center; justify-content: space-between; }
+  .tag { font-size: 10.5px; padding: 3px 9px; border-radius: 999px; }
+  .t-pending { background: var(--amber-bg); color: var(--amber-fg); }
+  .t-pass { background: var(--green-bg); color: var(--green-fg); }
+  .time { font-size: 10.5px; color: var(--soft); }
+  .s-title { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+  .s-cap { font-size: 11.5px; color: var(--muted); line-height: 1.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cancel { margin-left: auto; font-size: 11.5px; color: var(--muted); padding: 5px 14px; border-radius: 999px; background: #fff; }
+
+  .entries { display: flex; flex-direction: column; gap: 10px; margin-top: auto; margin-bottom: 12px; }
+  .entry { display: flex; align-items: center; justify-content: space-between; background: var(--parchment); border-radius: 16px; padding: 15px 16px; font-size: 13.5px; font-weight: 600; color: var(--ink); }
+  .chev { width: 7px; height: 7px; border-right: 1.5px solid #c6cbd2; border-top: 1.5px solid #c6cbd2; transform: rotate(45deg); }
+  .entry-logout { justify-content: center; color: var(--red-fg); }
+
+  .tabbar { height: 58px; background: #fff; border-top: 1px solid var(--hairline); display: flex; flex: none; }
+  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 10px; color: var(--soft); }
+  .tab .ico { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid currentColor; opacity: .7; }
+  .tab.on { color: var(--ink); font-weight: 600; }
+  .tab.on .ico { background: var(--ink); border-color: var(--ink); border-radius: 50%; opacity: 1; }
+
+  .notes { max-width: 1100px; margin: 30px auto 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .note { background: #fff; border: 1px solid #e8e8ec; border-radius: 14px; padding: 14px 18px; }
+  .note .n-t { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .note .n-b { font-size: 12px; color: var(--muted); line-height: 1.8; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>「我的」Hero 配色对比 · 三档深色</h1>
+  <p>
+    同一版式换三种底色，看哪个当全页焦点最舒服：<b>A 墨黑 #272729</b>（现状 / 与管理端深色卡同源）、
+    <b>B 深灰 #3d3d42</b>（比墨黑亮半档，和羊皮纸卡的反差柔一点）、<b>C 石墨灰 #4a4a50</b>（再亮一档，最接近「深灰」直觉）。
+    三个版的文字/统计/徽章透明度都做了对应微调，保证对比度够。
+  </p>
+</div>
+
+<div class="stage">
+  <!-- ══════════ A 墨黑 ══════════ -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="screen">
+        <div class="statusbar">
+          <span>17:45</span>
+          <span class="sig"><i style="width:14px;height:8px"></i><i style="width:16px;height:8px;opacity:.4"></i></span>
+        </div>
+        <div class="body">
+          <div class="hero" style="background:#272729">
+            <div class="hero-top">
+              <span class="avatar">陈</span>
+              <div class="hero-id">
+                <div class="hero-name">陈思琪</div>
+                <div class="hero-meta">2023 级 1 班 · 20230101</div>
+              </div>
+              <span class="hero-badge">菁悠成员</span>
+            </div>
+            <div class="hero-stats">
+              <div class="stat"><div class="n">6</div><div class="l">全部投稿</div></div>
+              <div class="stat warn"><div class="n">1</div><div class="l">待审核</div></div>
+              <div class="stat"><div class="n">4</div><div class="l">已通过</div></div>
+              <div class="stat"><div class="n">1</div><div class="l">已驳回</div></div>
+            </div>
+          </div>
+          <div class="segment">
+            <span class="seg-ind"></span>
+            <div class="seg-item on">全部</div><div class="seg-item">待审核</div><div class="seg-item">已通过</div><div class="seg-item">已驳回</div>
+          </div>
+          <div class="item">
+            <div class="between"><span class="tag t-pending">待审核</span><span class="time">2026-09-19 01:08</span></div>
+            <div class="s-title">秋日私语：写给十月的校园</div>
+            <div class="s-cap">每当樱花季来的时候，我就会想起操场旁那排银杏……</div>
+            <div class="between"><span></span><span class="cancel">撤销</span></div>
+          </div>
+          <div class="entries">
+            <div class="entry">关于菁悠广播站 <span class="chev"></span></div>
+            <div class="entry entry-logout">退出登录</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><span class="ico"></span>首页</div>
+          <div class="tab"><span class="ico"></span>投稿</div>
+          <div class="tab"><span class="ico"></span>风采</div>
+          <div class="tab on"><span class="ico"></span>我的</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>A · 墨黑 #272729</b><br />焦点最强 · 与管理端深色卡同源</div>
+  </div>
+
+  <!-- ══════════ B 深灰 ══════════ -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="screen">
+        <div class="statusbar">
+          <span>17:45</span>
+          <span class="sig"><i style="width:14px;height:8px"></i><i style="width:16px;height:8px;opacity:.4"></i></span>
+        </div>
+        <div class="body">
+          <div class="hero" style="background:#3d3d42">
+            <div class="hero-top">
+              <span class="avatar">陈</span>
+              <div class="hero-id">
+                <div class="hero-name">陈思琪</div>
+                <div class="hero-meta">2023 级 1 班 · 20230101</div>
+              </div>
+              <span class="hero-badge">菁悠成员</span>
+            </div>
+            <div class="hero-stats">
+              <div class="stat"><div class="n">6</div><div class="l">全部投稿</div></div>
+              <div class="stat warn"><div class="n">1</div><div class="l">待审核</div></div>
+              <div class="stat"><div class="n">4</div><div class="l">已通过</div></div>
+              <div class="stat"><div class="n">1</div><div class="l">已驳回</div></div>
+            </div>
+          </div>
+          <div class="segment">
+            <span class="seg-ind"></span>
+            <div class="seg-item on">全部</div><div class="seg-item">待审核</div><div class="seg-item">已通过</div><div class="seg-item">已驳回</div>
+          </div>
+          <div class="item">
+            <div class="between"><span class="tag t-pending">待审核</span><span class="time">2026-09-19 01:08</span></div>
+            <div class="s-title">秋日私语：写给十月的校园</div>
+            <div class="s-cap">每当樱花季来的时候，我就会想起操场旁那排银杏……</div>
+            <div class="between"><span></span><span class="cancel">撤销</span></div>
+          </div>
+          <div class="entries">
+            <div class="entry">关于菁悠广播站 <span class="chev"></span></div>
+            <div class="entry entry-logout">退出登录</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><span class="ico"></span>首页</div>
+          <div class="tab"><span class="ico"></span>投稿</div>
+          <div class="tab"><span class="ico"></span>风采</div>
+          <div class="tab on"><span class="ico"></span>我的</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>B · 深灰 #3d3d42</b><br />反差柔一档 · 更「灰」更耐看</div>
+  </div>
+
+  <!-- ══════════ C 石墨灰 ══════════ -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="screen">
+        <div class="statusbar">
+          <span>17:45</span>
+          <span class="sig"><i style="width:14px;height:8px"></i><i style="width:16px;height:8px;opacity:.4"></i></span>
+        </div>
+        <div class="body">
+          <div class="hero" style="background:#4a4a50">
+            <div class="hero-top">
+              <span class="avatar">陈</span>
+              <div class="hero-id">
+                <div class="hero-name">陈思琪</div>
+                <div class="hero-meta">2023 级 1 班 · 20230101</div>
+              </div>
+              <span class="hero-badge">菁悠成员</span>
+            </div>
+            <div class="hero-stats">
+              <div class="stat"><div class="n">6</div><div class="l">全部投稿</div></div>
+              <div class="stat warn"><div class="n">1</div><div class="l">待审核</div></div>
+              <div class="stat"><div class="n">4</div><div class="l">已通过</div></div>
+              <div class="stat"><div class="n">1</div><div class="l">已驳回</div></div>
+            </div>
+          </div>
+          <div class="segment">
+            <span class="seg-ind"></span>
+            <div class="seg-item on">全部</div><div class="seg-item">待审核</div><div class="seg-item">已通过</div><div class="seg-item">已驳回</div>
+          </div>
+          <div class="item">
+            <div class="between"><span class="tag t-pending">待审核</span><span class="time">2026-09-19 01:08</span></div>
+            <div class="s-title">秋日私语：写给十月的校园</div>
+            <div class="s-cap">每当樱花季来的时候，我就会想起操场旁那排银杏……</div>
+            <div class="between"><span></span><span class="cancel">撤销</span></div>
+          </div>
+          <div class="entries">
+            <div class="entry">关于菁悠广播站 <span class="chev"></span></div>
+            <div class="entry entry-logout">退出登录</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><span class="ico"></span>首页</div>
+          <div class="tab"><span class="ico"></span>投稿</div>
+          <div class="tab"><span class="ico"></span>风采</div>
+          <div class="tab on"><span class="ico"></span>我的</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>C · 石墨灰 #4a4a50</b><br />最接近「深灰」直觉 · 但焦点开始变弱</div>
+  </div>
+</div>
+
+<div class="notes">
+  <div class="note">
+    <div class="n-t">A · 墨黑 #272729（v1 现状）</div>
+    <div class="n-b">与管理端深色卡同源，焦点最强，「这是我的地盘」的存在感最高；代价是深浅反差最硬，页面里最重的就是它。如果想要「一眼定位」，选它。</div>
+  </div>
+  <div class="note">
+    <div class="n-t">B · 深灰 #3d3d42（推荐折中）</div>
+    <div class="n-b">亮半档后和羊皮纸卡的反差柔和一些，依然明确是页面焦点；半透明白的统计格、徽章在灰底上层次更自然。想要「深灰但不压抑」就选它——<b>三个里我推荐这版</b>。</div>
+  </div>
+  <div class="note">
+    <div class="n-t">C · 石墨灰 #4a4a50</div>
+    <div class="n-b">最接近「深灰」的直觉，但和浅灰列表卡开始有点「沾亲带故」，焦点在减弱；白色文字对比度也最接近底线。除非你想要非常克制的低调感，否则不建议。</div>
+  </div>
+</div>
+
+</body>
+</html>

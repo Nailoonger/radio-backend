@@ -50,6 +50,13 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         field: 'review_time',
       },
+      autoRejected: {
+        type: DataTypes.TINYINT,
+        allowNull: false,
+        defaultValue: 0,
+        field: 'auto_rejected',
+        comment: '1=由系统自动驳回（点歌名额已满），0=人工处理',
+      },
       createTime: {
         type: DataTypes.DATE,
         field: 'create_time',
@@ -71,6 +78,8 @@ module.exports = (sequelize, DataTypes) => {
         { fields: ['status'] },
         { fields: ['type'] },
         { fields: ['create_time'] },
+        // 名额自动驳回要按「type + status + 时间区间」批量扫，单列索引不够
+        { name: 'idx_type_status_create', fields: ['type', 'status', 'create_time'] },
       ],
     }
   );

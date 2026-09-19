@@ -1,22 +1,214 @@
-.logo {
-  font-size: 120rpx;
-  text-align: center;
-  margin: 80rpx 0 24rpx;
+/* pages/login/login.wxss
+   v2：沿用管理端登录视觉 —— 淡蓝对角渐变底 + 收音机线条插画 + 玻璃卡 + 整宽实心蓝按钮 */
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  /* 管理端同款对角淡渐变，为玻璃卡提供可透的底色 */
+  background: linear-gradient(135deg, #e1ecf8 0%, #fbfdfe 100%);
 }
-.brand {
-  text-align: center;
-  font-size: 40rpx;
-  font-weight: bold;
-  margin-bottom: 16rpx;
+
+/* ══════════ 顶栏（管理端同款：徽章 + 站名） ══════════ */
+.topbar {
+  height: 96rpx;
+  padding: 0 36rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
 }
-.intro {
-  text-align: center;
-  color: #888;
-  margin-bottom: 80rpx;
+.back {
+  width: 60rpx; height: 60rpx; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.66);
+  box-shadow: 0 2rpx 8rpx rgba(15, 28, 46, 0.08);
+  display: flex; align-items: center; justify-content: center;
 }
-.tips {
-  margin-top: 24rpx;
-  text-align: center;
-  font-size: 22rpx;
-  color: #aaa;
+.chev-l {
+  width: 16rpx; height: 16rpx;
+  border-left: 3rpx solid #4b5563; border-bottom: 3rpx solid #4b5563;
+  transform: rotate(45deg); margin-left: 6rpx;
 }
+.topbar-brand { display: flex; align-items: center; gap: 14rpx; }
+.badge { width: 48rpx; height: 48rpx; border-radius: 50%; flex: none; }
+.topbar-name { font-size: 26rpx; font-weight: 600; color: #1d1d1f; letter-spacing: -0.2rpx; }
+.topbar-spacer { width: 60rpx; }
+
+/* ══════════ 内容区（方案：padding 6px → 12rpx，顶对齐不居中） ══════════ */
+.body {
+  flex: 1;
+  padding: 12rpx 44rpx 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ══════════ 品牌区：收音机线条插画 ══════════
+   方案里的 SVG viewBox 是 330×240，1 单位 = 1rpx 直接映射（整机 336×244rpx，和预览稿 168×122px 一致）。
+   喇叭/旋钮/信号弧全部按 SVG 坐标绝对定位，不再用 flex 拼装。 */
+.brand { display: flex; flex-direction: column; align-items: center; gap: 16rpx; margin: 8rpx 0 28rpx; flex: none; }
+.radio-art { position: relative; width: 336rpx; height: 244rpx; flex: none; }
+
+/* 机身：SVG rect x75 y130 w180 h76 rx10 */
+.radio-body {
+  position: absolute; left: 75rpx; top: 130rpx;
+  width: 180rpx; height: 76rpx;
+  border: 5rpx solid #0066cc; border-radius: 10rpx;
+  box-sizing: border-box;
+}
+/* 喇叭：外环 r26 / 内环 r15 / 圆心 r4.5，圆心 (122,168) */
+.sp-outer {
+  position: absolute; left: 96rpx; top: 142rpx;
+  width: 52rpx; height: 52rpx;
+  border: 5rpx solid #0066cc; border-radius: 50%;
+  box-sizing: border-box;
+}
+.sp-inner {
+  position: absolute; left: 107rpx; top: 153rpx;
+  width: 30rpx; height: 30rpx;
+  border: 4rpx solid rgba(0, 102, 204, 0.55); border-radius: 50%;
+  box-sizing: border-box;
+}
+.sp-dot {
+  position: absolute; left: 117rpx; top: 163rpx;
+  width: 9rpx; height: 9rpx;
+  background: #0066cc; border-radius: 50%;
+}
+/* 旋钮：cx200 / cx232，cy168，r9；刻度是 y161→165 的 4 单位小竖线 */
+.knob { position: absolute; width: 18rpx; height: 18rpx; border: 4rpx solid #0066cc; border-radius: 50%; box-sizing: border-box; }
+.knob.k1 { left: 191rpx; top: 159rpx; }
+.knob.k2 { left: 223rpx; top: 159rpx; }
+.tick { position: absolute; width: 4rpx; height: 8rpx; background: #0066cc; border-radius: 2rpx; }
+.k1 .tick { left: 7rpx; top: 2rpx; }
+.k2 .tick { left: 7rpx; top: 2rpx; }
+
+/* 三道信号弧：SVG 里是圆心同在 (165,130)、半径 42/64/86 的上弧。
+   用「圆环只描 border-top」近似（约 90° 弧，比 SVG 的 ~80° 略饱满，视觉一致）：
+   圆心对齐 → 盒子 left = 165 - r，top = 130 - r。 */
+.wave {
+  position: absolute;
+  border: 5rpx solid transparent;
+  border-top-color: rgba(0, 102, 204, 0.9);
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.w1 { left: 123rpx; top: 88rpx; width: 84rpx; height: 84rpx; }
+.w2 { left: 101rpx; top: 66rpx; width: 128rpx; height: 128rpx; border-top-color: rgba(0, 102, 204, 0.55); }
+.w3 { left: 79rpx; top: 44rpx; width: 172rpx; height: 172rpx; border-top-color: rgba(0, 102, 204, 0.3); }
+
+.tagline { font-size: 24rpx; color: #6b7280; letter-spacing: 0.4rpx; }
+
+/* ══════════ 玻璃卡（管理端同款配方） ══════════ */
+.glass {
+  position: relative;
+  border-radius: 44rpx;
+  padding: 44rpx 40rpx 38rpx;
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  box-shadow:
+    inset 0 2rpx 4rpx rgba(255, 255, 255, 0.55),
+    0 8rpx 20rpx -8rpx rgba(15, 28, 46, 0.045),
+    0 24rpx 56rpx -16rpx rgba(15, 28, 46, 0.04),
+    0 48rpx 112rpx -24rpx rgba(15, 28, 46, 0.03);
+}
+/* 渐变描边：上沿受光发白、下沿收暗（微信不支持 mask-composite，用边框近似） */
+.glass::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: 44rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.55);
+  border-bottom-color: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+}
+
+.card-title { font-size: 36rpx; font-weight: 600; color: #141519; letter-spacing: -0.6rpx; }
+.card-sub { font-size: 24rpx; color: #6e7178; margin-top: 8rpx; line-height: 1.5; }
+
+/* ══════════ 字段 ══════════ */
+.field { margin-top: 26rpx; }
+.field-label { font-size: 22rpx; font-weight: 500; color: #6b7280; margin-bottom: 10rpx; display: block; }
+.input {
+  display: flex; align-items: center; gap: 12rpx;
+  background: #fff; border-radius: 20rpx;
+  padding: 4rpx 22rpx;
+  box-shadow: inset 0 0 0 2rpx rgba(10, 26, 46, 0.08);
+  transition: box-shadow 0.16s var(--ease);
+}
+.input.err { box-shadow: inset 0 0 0 3rpx #d64541; }
+.ipt { flex: 1; min-width: 0; height: 80rpx; font-size: 27rpx; color: #141519; }
+.ph { color: #b3bac2; }
+.eye { flex: none; font-size: 21rpx; color: #b3bac2; padding: 10rpx 0 10rpx 12rpx; }
+
+/* 错误条：贴在按钮上方 */
+.error-bar {
+  margin-top: 28rpx;
+  background: #fdecea; color: #c0392b;
+  font-size: 23rpx; line-height: 1.6;
+  border-radius: 20rpx; padding: 16rpx 22rpx;
+}
+
+/* ══════════ 登录按钮：整宽实心蓝（管理端同款） ══════════ */
+button.submit {
+  width: 100%; height: 88rpx; margin-top: 40rpx;
+  padding: 0; box-sizing: border-box;
+  border-radius: 24rpx;
+  font-size: 29rpx; font-weight: 600; letter-spacing: 10rpx;
+  color: #fff; background: #2f6be8; border: none;
+  box-shadow: 0 16rpx 36rpx -12rpx rgba(47, 107, 232, 0.45);
+  /* 微信 button 自带 padding/line-height，必须显式清掉再用 flex 居中，否则文字会挤出盒子 */
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+}
+button.submit::after { border: none; }
+button.submit[disabled] { color: rgba(255, 255, 255, 0.75); background: #2f6be8; opacity: 0.7; }
+
+/* ══════════ 「或」分隔 + 微信一键登录 ══════════ */
+.or-row { display: flex; align-items: center; gap: 20rpx; margin: 30rpx 0 22rpx; }
+.or-line { flex: 1; height: 2rpx; background: rgba(10, 26, 46, 0.09); }
+.or-txt { font-size: 22rpx; color: #9aa3ae; }
+
+button.ghost-btn {
+  width: 100%; height: 84rpx;
+  padding: 0; box-sizing: border-box;
+  border-radius: 24rpx;
+  background: transparent; border: 2rpx solid rgba(10, 26, 46, 0.16);
+  color: #141519; font-size: 27rpx; font-weight: 500;
+  display: flex; align-items: center; justify-content: center; gap: 14rpx;
+  line-height: 1;
+}
+button.ghost-btn::after { border: none; }
+.wx {
+  width: 34rpx; height: 34rpx; border-radius: 50%;
+  background: #2aae67; position: relative; flex: none;
+}
+.wx::before, .wx::after {
+  content: ''; position: absolute; background: #fff;
+  border-radius: 50%; width: 8rpx; height: 8rpx; top: 10rpx;
+}
+.wx::before { left: 8rpx; }
+.wx::after { right: 8rpx; }
+
+/* ══════════ 卡底注（管理端「记住账号/帮助」一栏 → 隐私口径） ══════════ */
+.card-divider { height: 2rpx; margin: 30rpx 0 22rpx; background: rgba(10, 26, 46, 0.09); }
+.card-foot { display: flex; align-items: center; justify-content: space-between; }
+.foot-txt { font-size: 22rpx; color: #8a9199; }
+
+/* ══════════ 激活屏 ══════════ */
+.hello-row { display: flex; align-items: center; gap: 20rpx; }
+.avatar {
+  width: 80rpx; height: 80rpx; border-radius: 50%; flex: none;
+  background: #1d1d1f; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 32rpx; font-weight: 600;
+}
+.hello-meta { min-width: 0; }
+.pwd-rule { display: flex; gap: 12rpx; margin-top: 14rpx; flex-wrap: wrap; }
+.rule {
+  font-size: 21rpx; padding: 6rpx 18rpx; border-radius: 999rpx;
+  background: rgba(10, 26, 46, 0.05); color: #9aa3ae;
+}
+.rule.on { background: rgba(0, 102, 204, 0.08); color: #0066cc; }
+
+.skip { text-align: center; margin-top: 26rpx; font-size: 24rpx; color: #9aa3ae; text-decoration: underline; text-underline-offset: 6rpx; }
+
+.pressed { opacity: 0.72; }

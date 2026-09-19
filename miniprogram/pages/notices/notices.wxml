@@ -1,0 +1,48 @@
+<!-- pages/notices/notices.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
+    </view>
+    <view class="navbar-title">公告</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+
+    <view class="stack">
+      <view class="t-page">公告</view>
+      <view class="t-sub">校园广播相关的通知与安排</view>
+    </view>
+
+    <view class="loading" wx:if="{{loading}}">加载中……</view>
+
+    <view class="empty" wx:elif="{{!list.length}}">暂无公告</view>
+
+    <block wx:else>
+      <view class="card-flush">
+        <view
+          class="card-row"
+          wx:for="{{list}}"
+          wx:key="id"
+          hover-class="row-hover"
+          data-id="{{item.id}}"
+          bindtap="goDetail"
+        >
+          <view class="tag tag-top" wx:if="{{item.isTop === 1}}">置顶</view>
+          <view class="stack grow">
+            <text class="notice-txt">{{item.title}}</text>
+            <text class="t-micro">{{item.publishTimeFmt}}</text>
+          </view>
+          <view class="chev-r"></view>
+        </view>
+      </view>
+
+      <view class="loading" wx:if="{{!finished}}">加载中……</view>
+      <view class="t-micro footnote" wx:else>没有更多了</view>
+    </block>
+
+  </view>
+</view>

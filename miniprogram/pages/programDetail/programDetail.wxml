@@ -1,22 +1,90 @@
-<view class="container" wx:if="{{program}}">
-  <view class="card">
-    <view class="title">{{program.title}}</view>
-    <view class="subtitle">主持人：{{program.host || '未知'}}</view>
-    <view class="subtitle">播出时间：{{program.broadcastTime}}</view>
-    <view class="content" wx:if="{{program.desc}}">{{program.desc}}</view>
+<!-- pages/programDetail/programDetail.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
+    </view>
+    <view class="navbar-title">节目详情</view>
+    <view class="navbar-spacer"></view>
   </view>
 
-  <view class="card">
-    <view class="title">💬 节目留言（{{messages.length}}）</view>
-    <view class="msg" wx:for="{{messages}}" wx:key="id">
-      <image class="avatar" src="{{item.avatar || '/assets/default-avatar.png'}}" mode="aspectFill"></image>
-      <view class="msg-body">
-        <view class="msg-name">{{item.nickname}}</view>
-        <view class="msg-content">{{item.content}}</view>
-        <view class="msg-time">{{item.createTimeFmt}}</view>
+  <view class="body">
+
+    <block wx:if="{{program}}">
+      <!-- 节目头卡 -->
+      <view class="tile">
+        <view class="tile-status">
+          <view class="dot-live" wx:if="{{program.isLive === 1}}"></view>
+          <text>{{program.isLive === 1 ? '正在直播·' + program.broadcastTime : program.broadcastTime}}</text>
+        </view>
+        <view class="tile-title">{{program.title}}</view>
+        <view class="tile-meta" wx:if="{{program.host}}">主持人 {{program.host}}</view>
+        <view class="tile-actions" wx:if="{{program.isLive === 1}}">
+          <button class="btn btn-on-tile" hover-class="pressed" bindtap="goSubmit">我要投稿</button>
+        </view>
       </view>
-    </view>
-    <view class="empty" wx:if="{{!messages.length}}">暂无留言，快来抢沙发</view>
+
+      <!-- 节目简介 -->
+      <view class="t-body intro" wx:if="{{program.desc}}">{{program.desc}}</view>
+
+      <!-- 留言 -->
+      <view class="section">
+        <view class="section-head">
+          <text class="t-section">留言</text>
+          <text class="t-cap">{{messages.length}} 条</text>
+        </view>
+
+        <view class="comments" wx:if="{{messages.length}}">
+          <view class="cmt" wx:for="{{messages}}" wx:key="id">
+            <view class="cmt-avatar-wrap">
+              <image wx:if="{{item.avatar}}" class="cmt-avatar" src="{{item.avatar}}" mode="aspectFill" />
+              <view wx:else class="cmt-avatar cmt-avatar-fallback">{{item.initial}}</view>
+            </view>
+            <view class="stack grow">
+              <text class="cmt-name">{{item.nickname}}</text>
+              <text class="cmt-content">{{item.content}}</text>
+              <text class="t-micro">{{item.createTimeFmt}}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="empty" wx:else style="padding: 60rpx 0;">暂无留言，快来抢沙发</view>
+      </view>
+    </block>
+
+    <view class="empty" wx:elif="{{!loading}}">节目不存在或已下线</view>
+    <view class="loading" wx:else>加载中……</view>
+
+  </view>
+
+  <!-- 给固定留言输入栏留位 -->
+  <view class="pb-inputbar"></view>
+
+  <!-- 留言输入栏 -->
+  <view class="input-bar">
+    <block wx:if="{{!loggedIn}}">
+      <view class="grow t-sub">登录后才能留言</view>
+      <view class="send" hover-class="pressed" bindtap="goLogin">去登录</view>
+    </block>
+    <block wx:else>
+      <input
+        class="input input-sm grow"
+        placeholder="{{canMessage ? '说点什么……' : '留言通道已关闭'}}"
+        placeholder-class="ph"
+        value="{{inputContent}}"
+        disabled="{{!canMessage || sending}}"
+        confirm-type="send"
+        bindinput="onInput"
+        bindconfirm="sendMessage"
+      />
+      <view
+        class="send {{canMessage && inputContent && !sending ? '' : 'send-off'}}"
+        hover-class="pressed"
+        data-go="send"
+        bindtap="sendMessage"
+      >{{sending ? '……' : '发送'}}</view>
+    </block>
   </view>
 </view>
-<view class="empty" wx:elif="{{!loading}}">节目不存在或已下线</view>

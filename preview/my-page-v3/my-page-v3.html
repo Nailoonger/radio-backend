@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>我的页 Hero 浅色三案 · 白卡投影 / 淡蓝 / 蓝描边</title>
+<style>
+  :root {
+    --accent: #0066cc;
+    --ink: #1d1d1f;
+    --muted: #6b7280;
+    --soft: #9aa3ae;
+    --parchment: #f5f5f7;
+    --divider: #f0f0f0;
+    --hairline: #e0e0e0;
+    --amber-bg: #fdf2df; --amber-fg: #b7791f;
+    --green-bg: #e5f6ec; --green-fg: #178a4c;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f5f7; color: var(--ink); padding: 34px 30px 50px; }
+
+  .head { max-width: 1100px; margin: 0 auto 26px; }
+  .head h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+  .head p { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.8; }
+  .head b { color: var(--ink); }
+
+  .stage { display: flex; gap: 30px; justify-content: center; flex-wrap: wrap; }
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .phone { width: 330px; height: 700px; border-radius: 44px; background: #0b0b0f; padding: 10px; box-shadow: 0 30px 60px -22px rgba(15,28,46,.35); flex: none; }
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 35px; overflow: hidden; background: var(--divider); display: flex; flex-direction: column; }
+  .cap { font-size: 12.5px; color: var(--muted); text-align: center; }
+  .cap b { color: var(--ink); }
+
+  .statusbar { height: 34px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font-size: 11.5px; font-weight: 600; color: var(--ink); flex: none; background: var(--divider); }
+  .sig { display: flex; gap: 4px; }
+  .sig i { display: block; background: var(--ink); border-radius: 1px; }
+
+  .body { flex: 1; padding: 14px 20px 0; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+
+  /* Hero：浅色系，靠「海拔 / 底色 / 描边」做焦点 */
+  .hero { border-radius: 22px; padding: 20px 20px 18px; color: var(--ink); display: flex; flex-direction: column; gap: 15px; }
+
+  .hero-top { display: flex; align-items: center; gap: 13px; }
+  .avatar {
+    width: 52px; height: 52px; border-radius: 50%; flex: none;
+    background: var(--ink); color: #fff;
+    font-size: 20px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .hero-id { flex: 1; min-width: 0; }
+  .hero-name { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .hero-meta { font-size: 11.5px; color: var(--muted); margin-top: 4px; letter-spacing: 0.4px; }
+  .hero-badge { font-size: 10.5px; padding: 4px 10px; border-radius: 999px; background: rgba(0,102,204,0.08); color: var(--accent); flex: none; }
+
+  .hero-stats { display: flex; background: var(--parchment); border-radius: 14px; padding: 12px 0; }
+  .stat { flex: 1; text-align: center; position: relative; }
+  .stat + .stat::before { content: ''; position: absolute; left: 0; top: 15%; bottom: 15%; width: 1px; background: var(--hairline); }
+  .stat .n { font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
+  .stat.warn .n { color: var(--amber-fg); }
+  .stat .l { font-size: 10.5px; color: var(--muted); margin-top: 3px; letter-spacing: 0.5px; }
+
+  /* L1 白卡大投影：靠海拔凸显 */
+  .hero-l1 { background: #fff; box-shadow: 0 6px 14px -6px rgba(15,28,46,.08), 0 22px 44px -18px rgba(15,28,46,.16); }
+
+  /* L2 淡蓝渐变卡：呼应管理端登录的淡蓝底 */
+  .hero-l2 { background: linear-gradient(135deg, #e1ecf8 0%, #f6fafd 100%); box-shadow: 0 4px 12px -6px rgba(15,28,46,.06); }
+  .hero-l2 .hero-stats { background: rgba(0,102,204,0.07); }
+  .hero-l2 .hero-stats .stat .n { color: var(--accent); }
+  .hero-l2 .hero-stats .stat.warn .n { color: var(--amber-fg); }
+  .hero-l2 .hero-badge { background: #fff; }
+
+  /* L3 白卡 + 蓝描边：像「选中态」的卡 */
+  .hero-l3 { background: #fff; box-shadow: inset 0 0 0 1.5px rgba(0,102,204,0.55), 0 4px 12px -6px rgba(15,28,46,.06); }
+
+  .segment { position: relative; display: flex; background: #fff; border: 1px solid var(--hairline); border-radius: 999px; padding: 3px; }
+  .seg-ind { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 4); background: var(--ink); border-radius: 999px; }
+  .seg-item { position: relative; z-index: 1; flex: 1; text-align: center; padding: 7px 0; font-size: 12px; color: var(--muted); border-radius: 999px; }
+  .seg-item.on { color: #fff; font-weight: 600; }
+
+  .item { background: var(--parchment); border-radius: 16px; padding: 15px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .between { display: flex; align-items: center; justify-content: space-between; }
+  .tag { font-size: 10.5px; padding: 3px 9px; border-radius: 999px; }
+  .t-pending { background: var(--amber-bg); color: var(--amber-fg); }
+  .t-pass { background: var(--green-bg); color: var(--green-fg); }
+  .time { font-size: 10.5px; color: var(--soft); }
+  .s-title { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+  .s-cap { font-size: 11.5px; color: var(--muted); line-height: 1.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cancel { margin-left: auto; font-size: 11.5px; color: var(--muted); padding: 5px 14px; border-radius: 999px; background: #fff; }
+
+  .entries { display: flex; flex-direction: column; gap: 10px; margin-top: auto; margin-bottom: 12px; }
+  .entry { display: flex; align-items: center; justify-content: space-between; background: var(--parchment); border-radius: 16px; padding: 15px 16px; font-size: 13.5px; font-weight: 600; color: var(--ink); }
+  .chev { width: 7px; height: 7px; border-right: 1.5px solid #c6cbd2; border-top: 1.5px solid #c6cbd2; transform: rotate(45deg); }
+  .entry-logout { justify-content: center; color: var(--red-fg); }
+
+  .tabbar { height: 58px; background: #fff; border-top: 1px solid var(--hairline); display: flex; flex: none; }
+  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 10px; color: var(--soft); }
+  .tab .ico { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid currentColor; opacity: .7; }
+  .tab.on { color: var(--ink); font-weight: 600; }
+  .tab.on .ico { background: var(--ink); border-color: var(--ink); border-radius: 50%; opacity: 1; }
+
+  .notes { max-width: 1100px; margin: 30px auto 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .note { background: #fff; border: 1px solid #e8e8ec; border-radius: 14px; padding: 14px 18px; }
+  .note .n-t { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .note .n-b { font-size: 12px; color: var(--muted); line-height: 1.8; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>「我的」Hero 浅色三案</h1>
+  <p>
+    浅色系没有「深色压场」的天然对比，焦点要换一种挣法：<b>L1 白卡大投影</b>（靠海拔浮起来）、
+    <b>L2 淡蓝渐变卡</b>（呼应管理端登录的淡蓝底，统计数字走强调蓝）、
+    <b>L3 白卡蓝描边</b>（像「选中态」，强调色最少）。
+    头像统一换回墨黑首字圆（白字），深色点收在头像上，页面不至于全飘。
+  </p>
+</div>
+
+<div class="stage">
+  <!-- ══════════ L1 白卡大投影 ══════════ -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="screen">
+        <div class="statusbar">
+          <span>17:49</span>
+          <span class="sig"><i style="width:14px;height:8px"></i><i style="width:16px;height:8px;opacity:.4"></i></span>
+        </div>
+        <div class="body">
+          <div class="hero hero-l1">
+            <div class="hero-top">
+              <span class="avatar">陈</span>
+              <div class="hero-id">
+                <div class="hero-name">陈思琪</div>
+                <div class="hero-meta">2023 级 1 班 · 20230101</div>
+              </div>
+              <span class="hero-badge">菁悠成员</span>
+            </div>
+            <div class="hero-stats">
+              <div class="stat"><div class="n">6</div><div class="l">全部投稿</div></div>
+              <div class="stat warn"><div class="n">1</div><div class="l">待审核</div></div>
+              <div class="stat"><div class="n">4</div><div class="l">已通过</div></div>
+              <div class="stat"><div class="n">1</div><div class="l">已驳回</div></div>
+            </div>
+          </div>
+          <div class="segment">
+            <span class="seg-ind"></span>
+            <div class="seg-item on">全部</div><div class="seg-item">待审核</div><div class="seg-item">已通过</div><div class="seg-item">已驳回</div>
+          </div>
+          <div class="item">
+            <div class="between"><span class="tag t-pending">待审核</span><span class="time">2026-09-19 01:08</span></div>
+            <div class="s-title">秋日私语：写给十月的校园</div>
+            <div class="s-cap">每当樱花季来的时候，我就会想起操场旁那排银杏……</div>
+            <div class="between"><span></span><span class="cancel">撤销</span></div>
+          </div>
+          <div class="entries">
+            <div class="entry">关于菁悠广播站 <span class="chev"></span></div>
+            <div class="entry entry-logout">退出登录</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><span class="ico"></span>首页</div>
+          <div class="tab"><span class="ico"></span>投稿</div>
+          <div class="tab"><span class="ico"></span>风采</div>
+          <div class="tab on"><span class="ico"></span>我的</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>L1 · 白卡大投影</b><br />靠「海拔」当焦点 · 全页最干净</div>
+  </div>
+
+  <!-- ══════════ L2 淡蓝渐变卡 ══════════ -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="screen">
+        <div class="statusbar">
+          <span>17:49</span>
+          <span class="sig"><i style="width:14px;height:8px"></i><i style="width:16px;height:8px;opacity:.4"></i></span>
+        </div>
+        <div class="body">
+          <div class="hero hero-l2">
+            <div class="hero-top">
+              <span class="avatar">陈</span>
+              <div class="hero-id">
+                <div class="hero-name">陈思琪</div>
+                <div class="hero-meta">2023 级 1 班 · 20230101</div>
+              </div>
+              <span class="hero-badge">菁悠成员</span>
+            </div>
+            <div class="hero-stats">
+              <div class="stat"><div class="n">6</div><div class="l">全部投稿</div></div>
+              <div class="stat warn"><div class="n">1</div><div class="l">待审核</div></div>
+              <div class="stat"><div class="n">4</div><div class="l">已通过</div></div>
+              <div class="stat"><div class="n">1</div><div class="l">已驳回</div></div>
+            </div>
+          </div>
+          <div class="segment">
+            <span class="seg-ind"></span>
+            <div class="seg-item on">全部</div><div class="seg-item">待审核</div><div class="seg-item">已通过</div><div class="seg-item">已驳回</div>
+          </div>
+          <div class="item">
+            <div class="between"><span class="tag t-pending">待审核</span><span class="time">2026-09-19 01:08</span></div>
+            <div class="s-title">秋日私语：写给十月的校园</div>
+            <div class="s-cap">每当樱花季来的时候，我就会想起操场旁那排银杏……</div>
+            <div class="between"><span></span><span class="cancel">撤销</span></div>
+          </div>
+          <div class="entries">
+            <div class="entry">关于菁悠广播站 <span class="chev"></span></div>
+            <div class="entry entry-logout">退出登录</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><span class="ico"></span>首页</div>
+          <div class="tab"><span class="ico"></span>投稿</div>
+          <div class="tab"><span class="ico"></span>风采</div>
+          <div class="tab on"><span class="ico"></span>我的</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>L2 · 淡蓝渐变卡</b><br />呼应管理端登录底色 · 统计数字走强调蓝</div>
+  </div>
+
+  <!-- ══════════ L3 白卡蓝描边 ══════════ -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="screen">
+        <div class="statusbar">
+          <span>17:49</span>
+          <span class="sig"><i style="width:14px;height:8px"></i><i style="width:16px;height:8px;opacity:.4"></i></span>
+        </div>
+        <div class="body">
+          <div class="hero hero-l3">
+            <div class="hero-top">
+              <span class="avatar">陈</span>
+              <div class="hero-id">
+                <div class="hero-name">陈思琪</div>
+                <div class="hero-meta">2023 级 1 班 · 20230101</div>
+              </div>
+              <span class="hero-badge">菁悠成员</span>
+            </div>
+            <div class="hero-stats">
+              <div class="stat"><div class="n">6</div><div class="l">全部投稿</div></div>
+              <div class="stat warn"><div class="n">1</div><div class="l">待审核</div></div>
+              <div class="stat"><div class="n">4</div><div class="l">已通过</div></div>
+              <div class="stat"><div class="n">1</div><div class="l">已驳回</div></div>
+            </div>
+          </div>
+          <div class="segment">
+            <span class="seg-ind"></span>
+            <div class="seg-item on">全部</div><div class="seg-item">待审核</div><div class="seg-item">已通过</div><div class="seg-item">已驳回</div>
+          </div>
+          <div class="item">
+            <div class="between"><span class="tag t-pending">待审核</span><span class="time">2026-09-19 01:08</span></div>
+            <div class="s-title">秋日私语：写给十月的校园</div>
+            <div class="s-cap">每当樱花季来的时候，我就会想起操场旁那排银杏……</div>
+            <div class="between"><span></span><span class="cancel">撤销</span></div>
+          </div>
+          <div class="entries">
+            <div class="entry">关于菁悠广播站 <span class="chev"></span></div>
+            <div class="entry entry-logout">退出登录</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><span class="ico"></span>首页</div>
+          <div class="tab"><span class="ico"></span>投稿</div>
+          <div class="tab"><span class="ico"></span>风采</div>
+          <div class="tab on"><span class="ico"></span>我的</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>L3 · 白卡蓝描边</b><br />像「选中态」 · 强调色用得最少</div>
+  </div>
+</div>
+
+<div class="notes">
+  <div class="note">
+    <div class="n-t">L1 · 白卡大投影</div>
+    <div class="n-b">不引入任何新颜色，纯靠<b>海拔差</b>当焦点：白卡浮在灰底上，投影比普通卡重两档。最干净、最不出错，但焦点感在三案里最温和。</div>
+  </div>
+  <div class="note">
+    <div class="n-t">L2 · 淡蓝渐变卡（推荐）</div>
+    <div class="n-b">底色直接复用<b>管理端登录的淡蓝渐变</b>，和管理端「浅色但有身份感」的气质接上了；统计数字走强调蓝、徽章反白，页面里唯一的蓝色块就是它，焦点明确又不深色压顶。</div>
+  </div>
+  <div class="note">
+    <div class="n-t">L3 · 白卡蓝描边</div>
+    <div class="n-b">强调色最省（只一条描边），但这圈描边更像「这张卡被选中了」，语义稍微有点歪；对比 L1 焦点感强一点，比 L2 弱。</div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -15,10 +15,15 @@ const routes = [
     children: [
       { path: 'dashboard', name: 'Dashboard', component: () => import('@/views/Dashboard.vue'), meta: { title: '数据概览' } },
       { path: 'submit', name: 'Submit', component: () => import('@/views/SubmitList.vue'), meta: { title: '投稿审核' } },
+      // v8：点歌设置不是独立模块，是「投稿 & 点歌审核」里的子页面（列表右上角入口进入）
+      { path: 'submit/settings', name: 'SongSettings', component: () => import('@/views/SongSettings.vue'), meta: { title: '点歌设置' } },
       { path: 'program', name: 'Program', component: () => import('@/views/Program.vue'), meta: { title: '节目排期' } },
       { path: 'notice', name: 'Notice', component: () => import('@/views/Notice.vue'), meta: { title: '公告管理' } },
       { path: 'message', name: 'Message', component: () => import('@/views/Message.vue'), meta: { title: '留言审核' } },
-      { path: 'member', name: 'Member', component: () => import('@/views/Member.vue'), meta: { title: '风采展示', superAdmin: true } },
+      { path: 'student', name: 'Student', component: () => import('@/views/StudentAccounts.vue'), meta: { title: '学生账号', superAdmin: true } },
+      { path: 'showcase', name: 'Showcase', component: () => import('@/views/Showcase.vue'), meta: { title: '风采展示', superAdmin: true } },
+      { path: 'cadre', name: 'Cadre', component: () => import('@/views/Cadre.vue'), meta: { title: '风采展示 - 社干', superAdmin: true } },
+      { path: 'staff', name: 'Staff', component: () => import('@/views/Staff.vue'), meta: { title: '风采展示 - 部门人员', superAdmin: true } },
       { path: 'switch', name: 'Switch', component: () => import('@/views/Switch.vue'), meta: { title: '模块开关', superAdmin: true } },
       { path: 'account', name: 'Account', component: () => import('@/views/Account.vue'), meta: { title: '账号管理', superAdmin: true } },
       { path: 'setting', name: 'Setting', component: () => import('@/views/Setting.vue'), meta: { title: '系统设置', superAdmin: true } },

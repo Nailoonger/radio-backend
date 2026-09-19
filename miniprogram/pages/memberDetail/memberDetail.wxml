@@ -1,27 +1,58 @@
-<view class="container" wx:if="{{member}}">
-  <view class="hero">
-    <image class="hero-avatar" src="{{member.avatar}}" mode="aspectFill" />
-    <view class="hero-name">{{member.name}}</view>
-    <view class="hero-role">{{member.role}}</view>
+<!-- pages/memberDetail/memberDetail.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
+    </view>
+    <view class="navbar-title">{{type === 'staff' ? '部员详情' : '社干详情'}}</view>
+    <view class="navbar-spacer"></view>
   </view>
 
-  <view class="card">
-    <view class="row">
-      <view class="label">年级班级</view>
-      <view class="value">{{member.grade || '未填写'}}</view>
-    </view>
-    <view class="row" wx:if="{{programList.length}}">
-      <view class="label">负责栏目</view>
-      <view class="value">
-        <text class="program-tag" wx:for="{{programList}}" wx:key="*this">{{item}}</text>
+  <view class="body">
+
+    <block wx:if="{{member}}">
+      <!-- 成员 hero -->
+      <view class="hero">
+        <view class="hero-photo-wrap">
+          <image wx:if="{{member.avatar}}" class="hero-photo" src="{{member.avatar}}" mode="aspectFill" />
+          <view wx:else class="hero-photo hero-photo-fallback">{{member.initial}}</view>
+        </view>
+        <view class="t-title">{{member.name}}</view>
+        <view class="t-sub" wx:if="{{member.role}}">{{member.role}}</view>
       </view>
-    </view>
-    <view class="row" wx:if="{{member.motto}}">
-      <view class="label">个人寄语</view>
-      <view class="value motto">{{member.motto}}</view>
-    </view>
+
+      <!-- 信息 -->
+      <view class="card info">
+        <view class="info-row">
+          <text class="info-label">职务</text>
+          <text class="info-value">{{member.role || '未填写'}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">年级班级</text>
+          <text class="info-value">{{member.grade || '未填写'}}</text>
+        </view>
+        <!-- 部门 / 负责栏目：仅部员（staff）有 -->
+        <view class="info-row" wx:if="{{type === 'staff'}}">
+          <text class="info-label">所属部门</text>
+          <text class="info-value">{{member.department || '未分配'}}</text>
+        </view>
+        <view class="info-row" wx:if="{{type === 'staff' && programList.length}}">
+          <text class="info-label">负责栏目</text>
+          <view class="stack grow info-programs">
+            <text class="info-value" wx:for="{{programList}}" wx:key="*this">{{item}}</text>
+          </view>
+        </view>
+        <view class="info-row" wx:if="{{member.motto}}">
+          <text class="info-label">个人寄语</text>
+          <text class="info-value motto">{{member.motto}}</text>
+        </view>
+      </view>
+    </block>
+
+    <view class="empty" wx:elif="{{!loading}}">成员不存在或已下架</view>
+    <view class="loading" wx:else>加载中……</view>
+
   </view>
 </view>
-
-<view wx:elif="{{!loading}}" class="empty">成员不存在或已下架</view>
-<view wx:else class="loading">加载中...</view>

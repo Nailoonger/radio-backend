@@ -30,7 +30,7 @@ exports.list = async (req, res, next) => {
 
     const rows = await Member.findAll({
       where,
-      order: [['sort', 'DESC'], ['id', 'DESC']],
+      order: [['department', 'ASC'], ['sort', 'DESC'], ['id', 'DESC']],
     });
 
     // 提取出现过的角色（去重，按出现顺序）

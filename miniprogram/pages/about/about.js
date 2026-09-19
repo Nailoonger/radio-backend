@@ -3,12 +3,14 @@ const { request } = require('../../utils/request.js');
 
 Page({
   data: {
+    statusBarHeight: 20,
     intro: '',
     schedule: '',
     contact: '',
   },
 
   onLoad() {
+    this.setData({ statusBarHeight: getApp().globalData.statusBarHeight || 20 });
     Promise.all([
       request('/user/station/intro').catch(() => null),
       request('/user/station/schedule').catch(() => null),
@@ -20,5 +22,11 @@ Page({
         contact: contact?.value || '暂未提供',
       });
     });
+  },
+
+  goBack() {
+    const pages = getCurrentPages();
+    if (pages.length > 1) wx.navigateBack();
+    else wx.switchTab({ url: '/pages/index/index' });
   },
 });

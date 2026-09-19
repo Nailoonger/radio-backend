@@ -1,8 +1,6 @@
 <template>
-  <span class="status-tag" :class="`status-${status}`">
-    <span class="status-dot"></span>
-    {{ text }}
-  </span>
+  <!-- v8：状态胶囊＝浅色底 + 语义字色，无圆点无描边 -->
+  <span class="status-tag" :class="`status-${status}`">{{ text }}</span>
 </template>
 
 <script setup>
@@ -32,42 +30,31 @@ const status = computed(() => STATUS_MAP[props.status]?.key || 'unknown');
 .status-tag {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 24px;
+  height: 23px;
   padding: 0 10px;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs);
   font-weight: 500;
   line-height: 1;
   white-space: nowrap;
-  border: 1px solid transparent;
-}
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: currentColor;
+  letter-spacing: var(--ls-wide-sm);
+  border: none;
 }
 
 .status-pending {
-  color: #b45309;
-  background: #fffbeb;
-  border-color: #fde68a;
+  color: var(--amber-fg);
+  background: var(--amber-bg);
 }
 .status-approved {
-  color: #047857;
-  background: #ecfdf5;
-  border-color: #a7f3d0;
+  color: var(--green-fg);
+  background: var(--green-bg);
 }
 .status-rejected {
-  color: #b91c1c;
-  background: #fef2f2;
-  border-color: #fecaca;
+  color: var(--red-fg);
+  background: var(--red-bg);
 }
 .status-unknown {
-  color: #475569;
-  background: #f8fafc;
-  border-color: #e2e8f0;
+  color: var(--muted-2);
+  background: var(--divider);
 }
 </style>

@@ -6,7 +6,14 @@ const { success, ApiError, Codes } = require('../../utils/response');
 exports.list = async (req, res, next) => {
   try {
     const rows = await switchService.listAll();
-    return success(res, { list: rows });
+    // updatedBy 存的是 admin.id，给前端换成姓名
+    const ids = [...new Set(rows.map((r) => r.updatedBy).filter(Boolean))];
+    const { Admin } = require('../../models');
+    const admins = ids.length ? await Admin.findAll({ where: { id: ids }, attributes: ['id', 'username', 'nickname'] }) : [];
+    const nameMap = new Map(admins.map((a) => [Number(a.id), a.nickname || a.username]));
+    return success(res, {
+      list: rows.map((r) => ({ ...r, updatedByName: r.updatedBy ? nameMap.get(Number(r.updatedBy)) || null : null })),
+    });
   } catch (e) { return next(e); }
 };
 

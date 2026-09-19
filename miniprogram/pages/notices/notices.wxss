@@ -1,0 +1,16 @@
+/* pages/notices/notices.wxss */
+
+.body { padding-bottom: 80rpx; }
+
+/* 置顶标签：墨黑底白字（与首页一致） */
+.tag-top { background: var(--ink); color: #fff; }
+
+.notice-txt {
+  font-size: 27rpx;
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+.footnote { text-align: center; }
+.row-hover { background: rgba(0, 0, 0, 0.035); }
+.pressed { opacity: 0.72; }

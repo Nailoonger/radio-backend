@@ -136,9 +136,11 @@ radio-backend/
 ├── tests/
 │   └── switch.test.js                 NEW（覆盖 AC2-AC11）
 ├── miniprogram/
-│   ├── app.js                         +onLaunch 拉开关 +globalData.switches
+│   ├── app.js                         +onLaunch/onShow 拉开关 +globalData.switches +并发去重
 │   ├── pages/submit/submit.{js,wxml}  +tab 灰显 + 提交失败 toast
+│   ├── pages/members/members.{js,wxml,wxss} +关闭时不取数：框架保留、数据区留空
 │   └── utils/request.js               (无需改)
+│   （custom-tab-bar 与 app.json 均不动 —— 风采入口不受开关影响）
 └── admin-web/
     ├── src/router/index.js            +/switch 路由
     ├── src/layouts/MainLayout.vue     +「模块开关」菜单
@@ -159,7 +161,7 @@ radio-backend/
 | 用户端是否登录可读 | 否，开关公开 | 用户必须能看到模块状态以获得提示 |
 | Swagger tag 名 | 「管理端-模块开关」/「用户端-模块开关」 | 与现有命名一致 |
 | 小程序端缓存 | 不缓存，每次 onLaunch 拉一次 | 启动慢 50ms，换 30s 内一定最新 |
-| 风采 tab 灰显 | 图标置灰 + 文案加「（暂停）」 | 不移除 tabBar 项（避免微信 tabBar 配置变更审核） |
+| 风采 tab 视觉 | **完全不动 tabBar**（不灰显、不加后缀） | 用户要求入口保持最原始的样子；开关只作用于风采页内部（不取数、框架保留） |
 
 ## 被否决的方案
 
@@ -176,7 +178,10 @@ radio-backend/
 - 缓存是进程内 Map，多实例部署时各节点状态可能不一致 30 秒
 - 没有写入审计 log，无法追溯"谁在什么时候改的开关"
 - 开关值未做白名单校验（理论上能传任意字符串），靠代码层约定
-- 风采展示（member）目前没有写入拦截（没有 admin 写入路径），后续如加"申请成为成员"等功能需补
+- 风采展示（member）后端没有写入拦截（没有 admin 写入路径），也没有读拦截（按 F4.3 有意为之）；
+  它在前端的落点**只有 members 页**：关闭时不请求数据、框架保留。
+  底部 tabBar 完全不受开关影响（入口随时可进）—— 这是刻意的产品选择。
+  后续如加"申请成为成员"等功能，需在写入路径补 `assertEnabled('member')`
 
 ## 验收对应
 
@@ -191,5 +196,5 @@ radio-backend/
 | AC7 留言关闭 → 40302 | messageController + assertEnabled |
 | AC8 风采列表不拦截 | 不改 memberController |
 | AC9 小程序 onLaunch 拉一次 | app.js |
-| AC10 tab 灰显 + 提示 | submit.wxml + submit.js |
+| AC10 风采关闭时的表现 | 底部 tabBar 完全不动（custom-tab-bar / app.json 无改动）；members.js 不取数、members.wxml 保留框架 |
 | AC11 30s 内恢复 | 缓存 30s TTL |

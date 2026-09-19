@@ -17,6 +17,8 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --default-authentication-plugin=mysql_native_password
+      # 关键：连接握手也用 utf8mb4（默认 latin1 会让中文写入变 ?）
+      - --init-connect='SET NAMES utf8mb4'
     volumes:
       - ./data/mysql:/var/lib/mysql
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
@@ -33,7 +35,7 @@ services:
   radio-backend:
     build:
       context: .
-      dockerfile: Dockerfile
+      
     container_name: radio-backend
     restart: unless-stopped
     depends_on:
@@ -73,7 +75,7 @@ services:
   admin-web:
     build:
       context: ./admin-web
-      dockerfile: Dockerfile
+      
     container_name: radio-admin-web
     restart: unless-stopped
     depends_on:

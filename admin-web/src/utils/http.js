@@ -15,6 +15,8 @@ http.interceptors.request.use((config) => {
 
 http.interceptors.response.use(
   (resp) => {
+    // 二进制流（xlsx 下载等）不走 {code:0} 解包，直接返回 Blob
+    if (resp.config.responseType === 'blob') return resp.data;
     const body = resp.data;
     if (body?.code === 0) return body.data;
     // 业务错误：抛出，让调用方决定如何提示
@@ -32,6 +34,11 @@ http.interceptors.response.use(
       if (router.currentRoute.value.name !== 'Login') {
         router.push({ name: 'Login' });
       }
+    }
+    // 40301 = 仅超级管理员可操作（权限边界在服务端，前端只负责把文案说人话）
+    if (body?.code === 40301 || status === 403) {
+      ElMessage.error(body?.message || '仅超级管理员可操作');
+      return Promise.reject(err);
     }
     ElMessage.error(body?.message || err.message || '网络异常');
     return Promise.reject(err);

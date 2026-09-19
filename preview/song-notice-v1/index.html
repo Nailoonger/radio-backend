@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>点歌前置方案 v1 · 注意事项确认 + 播出时段选择</title>
+<style>
+/* ============================================================
+   菁悠广播站 · 点歌前置方案 v1（小程序端静态预览）
+   token 全部来自 miniprogram/app.wxss，三条硬规则：
+     ① 只有一个强调色 #0066CC；② 不用装饰性渐变/彩色投影；
+     ③ 深色卡 #272729 是主角，其余退到羊皮纸 #F5F5F7
+   ============================================================ */
+:root{
+  --ink:#1d1d1f; --ink-2:#333; --muted:#7a7a7a; --muted-2:#6e6e73; --soft:#c7c7cc;
+  --hairline:#e0e0e0; --divider:#f0f0f0; --parchment:#f5f5f7;
+  --dark:#272729; --dark-2:#3a3a3c;
+  --accent:#0066cc; --accent-dark:#2997ff; --live:#ff453a;
+  --amber-bg:#fef3c7; --amber-fg:#8a6100;
+  --green-bg:#e7f5ec; --green-fg:#1e7a46;
+  --red-bg:#fde8e8;  --red-fg:#b42318;
+  --r-card:18px; --r-input:12px; --r-pill:9999px;
+  --font:-apple-system,BlinkMacSystemFont,"HarmonyOS Sans SC","MiSans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:#fafafc;color:var(--ink);font-size:14px;line-height:1.5;
+     -webkit-font-smoothing:antialiased;padding:40px 36px 72px}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;font-size:inherit;border:none;background:none;cursor:pointer;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- 页面头 ---------- */
+.head{max-width:1440px;margin:0 auto 30px}
+.eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.9px;color:var(--accent);text-transform:uppercase}
+.head h1{font-size:34px;font-weight:600;letter-spacing:-.9px;margin:9px 0 10px}
+.head p{font-size:14.5px;color:var(--ink-2);max-width:900px;line-height:1.6}
+.head code{font-family:var(--mono);font-size:12px;background:var(--parchment);border-radius:5px;padding:1px 5px}
+.spec{display:flex;gap:18px;margin-top:22px;flex-wrap:wrap}
+.spec>div{flex:1;min-width:280px;background:#fff;border:1px solid var(--hairline);border-radius:var(--r-card);padding:18px 20px}
+.spec h2{font-size:14px;font-weight:600;margin-bottom:10px}
+.spec ul{list-style:disc;padding-left:19px;display:flex;flex-direction:column;gap:7px;font-size:13px;color:var(--ink-2);line-height:1.65}
+.spec b{color:var(--ink)}
+.spec .tagline{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:var(--r-pill);
+  font-size:10.5px;font-weight:600;background:var(--green-bg);color:var(--green-fg);vertical-align:1px}
+
+/* ---------- 手机框 ---------- */
+.board{display:flex;gap:30px;max-width:1440px;margin:0 auto;flex-wrap:wrap;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:12px}
+.cap{font-size:13px;color:var(--muted);padding-left:4px;max-width:390px;line-height:1.6}
+.cap b{color:var(--ink);font-weight:600}
+.phone{width:390px;height:844px;background:#fff;border:1px solid var(--hairline);border-radius:22px;
+  overflow:hidden;display:flex;flex-direction:column;box-shadow:0 18px 48px rgba(0,0,0,.07);position:relative}
+.status{height:56px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 26px;
+  font-size:14px;font-weight:600}
+.navbar{height:50px;flex:none;display:flex;align-items:center;padding:0 20px;gap:12px}
+.navbar .back{width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:var(--ink)}
+.navbar .t{font-size:17px;font-weight:600;letter-spacing:-.37px}
+.body{flex:1;min-height:0;overflow:hidden;padding:4px 20px 0;display:flex;flex-direction:column;gap:13px}
+.body.pad{padding-bottom:20px}
+
+/* ---------- 通用件 ---------- */
+.t-page{font-size:28px;font-weight:600;letter-spacing:-.5px;line-height:1.25}
+.t-sub{font-size:13px;color:var(--muted);margin-top:5px;line-height:1.4}
+.t-section{font-size:17px;font-weight:600;letter-spacing:-.37px}
+.card{background:var(--parchment);border-radius:var(--r-card);padding:16px;display:flex;flex-direction:column;gap:13px}
+.card-white{background:#fff;border:1px solid var(--hairline);border-radius:var(--r-card);padding:16px}
+.row{display:flex;align-items:center;gap:10px}
+.between{display:flex;align-items:center;justify-content:space-between}
+.stack{display:flex;flex-direction:column;gap:13px}
+.grow{flex:1;min-width:0}
+.el{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.micro{font-size:11px;color:var(--muted-2);letter-spacing:.3px;line-height:1.5}
+.sub{font-size:13px;color:var(--muted);letter-spacing:.3px}
+.divider{height:1px;background:var(--divider)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:46px;padding:0 22px;
+  border-radius:var(--r-pill);font-size:15px;font-weight:600;line-height:1}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-off{background:#b9d2ee;color:#fff;font-weight:600}   /* 禁用态也用强调色的浅色调，不要用灰底 —— 白底上几乎看不见，用户会以为没有按钮 */
+.btn-block{width:100%}
+.tag{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:var(--r-pill);
+  font-size:11px;font-weight:500}
+.tag-amber{background:var(--amber-bg);color:var(--amber-fg)}
+.tag-green{background:var(--green-bg);color:var(--green-fg)}
+.tag-red{background:var(--red-bg);color:var(--red-fg)}
+.tag-mute{background:#ebebee;color:var(--muted)}
+.progress{height:3px;border-radius:var(--r-pill);background:var(--divider);overflow:hidden}
+.progress i{display:block;height:100%;background:var(--accent);border-radius:var(--r-pill)}
+.field{display:flex;flex-direction:column;gap:7px}
+.field-label{font-size:12.5px;color:var(--muted);letter-spacing:.3px}
+.input{height:44px;border-radius:var(--r-input);background:#fff;border:1px solid var(--hairline);
+  padding:0 13px;display:flex;align-items:center;font-size:14px;color:var(--ink)}
+.input.placeholder{color:var(--soft)}
+.input.err{border-color:var(--red-fg);background:#fffafa}
+.chev{width:8px;height:8px;border-right:1.6px solid var(--soft);border-bottom:1.6px solid var(--soft);
+  transform:rotate(45deg);flex:none}
+.cta{flex:none;padding:12px 20px calc(22px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:9px}
+.cta .hint{text-align:center;font-size:11px;color:var(--muted-2)}
+textarea.ta{width:100%;height:86px;border-radius:var(--r-input);border:1px solid var(--hairline);
+  padding:11px 13px;font-family:inherit;font-size:14px;color:var(--ink);resize:none;background:#fff}
+
+/* ---------- 注意事项（全屏层） ---------- */
+.notice-layer{position:absolute;inset:0;background:#fff;display:flex;flex-direction:column;z-index:5}
+.notice-head{flex:none;padding:0 20px 13px;border-bottom:1px solid var(--divider)}
+.notice-scroll{flex:1;min-height:0;overflow:hidden;padding:16px 20px 0;position:relative}
+.notice-scroll .progress{position:sticky;top:0;z-index:2}
+.rule{display:flex;gap:11px;margin-bottom:15px}
+.rule .no{width:20px;height:20px;border-radius:50%;background:var(--ink);color:#fff;flex:none;
+  font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.rule .tx{font-size:13.5px;line-height:1.7;color:var(--ink-2)}
+.rule .tx b{color:var(--ink)}
+.notice-tail{padding:16px 0 22px;text-align:center}
+.fade{position:absolute;left:0;right:0;height:52px;background:linear-gradient(180deg,rgba(255,255,255,0),#fff);
+  pointer-events:none;bottom:0}
+.scroll-hint{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11.5px;color:var(--accent);font-weight:500}
+
+/* ---------- 时段选择（底部弹层） ---------- */
+.sheet-mask{position:absolute;inset:0;background:rgba(0,0,0,.34);z-index:6}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:20px 20px 0 0;
+  z-index:7;display:flex;flex-direction:column;max-height:78%}
+.sheet-head{flex:none;padding:18px 20px 13px;border-bottom:1px solid var(--divider)}
+.sheet-body{flex:1;min-height:0;overflow:hidden;padding:16px 20px 0;display:flex;flex-direction:column;gap:18px}
+.day-row{display:flex;flex-direction:column;gap:9px}
+.day-label{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.day-label b{color:var(--ink);font-weight:600}
+.slots{display:flex;gap:8px;flex-wrap:wrap}
+.slot{height:32px;padding:0 13px;border-radius:var(--r-pill);background:var(--parchment);
+  display:inline-flex;align-items:center;font-size:12.5px;color:var(--ink-2)}
+.slot.on{background:var(--ink);color:#fff;font-weight:600}
+.slot.off{color:var(--soft);text-decoration:line-through}
+
+/* ---------- 加载骨架（尺寸 = 真实组件，不许拍脑袋） ---------- */
+.sk{position:relative;overflow:hidden;background:var(--divider);border-radius:6px;flex:none}
+.sk::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.8),transparent);
+  transform:translateX(-100%);animation:sweep 1.4s cubic-bezier(.22,.61,.36,1) infinite}
+@keyframes sweep{to{transform:translateX(100%)}}
+.sk-av{border-radius:50%}
+.sk-line{height:12px}
+.sk-title{height:15px}
+.sk-field{height:44px;border-radius:var(--r-input)}
+.sk-btn{height:46px;border-radius:var(--r-pill)}
+.sk-tag{height:22px;border-radius:var(--r-pill)}
+@media (prefers-reduced-motion:reduce){.sk::after{animation:none;background:none}}
+
+@media print{.board{display:block}.col{margin-bottom:26px}}
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div class="eyebrow">小程序端方案 v1 · 2026-09-18</div>
+  <h1>点歌前置：注意事项确认 + 播出时段选择</h1>
+  <p>两条规则：<b>没读完注意事项不能点歌</b>；<b>播出时间不许手输，只能从系统给的下周一到周五里选</b>。
+    下面 6 个手机框是完整交互链路，可直接对着看。</p>
+
+  <div class="spec">
+    <div>
+      <h2>交互流程</h2>
+      <ul>
+        <li>进点歌模块 → <b>先取注意事项</b>（<code>GET /submit/notice</code>）；<code>needAck=false</code> 就直接进表单</li>
+        <li>需要确认 → 全屏层展示正文，<b>滚动到底部才允许点「我已知晓」</b></li>
+        <li>点确认 → <code>POST /notice/ack</code> → 关闭弹层、表单可用</li>
+        <li>表单里「播出时段」是<b>只读行</b>，点开底部弹层选，选完回填</li>
+      </ul>
+    </div>
+    <div>
+      <h2>服务端一起做的两件事</h2>
+      <ul>
+        <li><b>确认闸门</b>：提交点歌时再校验一次，未确认返回 <code>40303</code>，前端据此弹窗</li>
+        <li><b>时段校验</b>：重算「下一周周一到周五 × 每日时段」的合法集合，
+          自由文本 / 周末 / 其它周一律拒（<code>40001</code>）</li>
+      </ul>
+    </div>
+    <div>
+      <h2>边界都画了</h2>
+      <ul>
+        <li><b>内容一屏放得下</b> → 按钮直接可用，不能让用户去滑一个滚不动的区域</li>
+        <li><b>后台没配内容</b> → 不弹窗、不拦人</li>
+        <li><b>加载骨架</b> → 阈值 300ms、尺寸照真实组件、深色底改半透明白、减少动效时停扫光</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="board">
+
+  <!-- ① 注意事项：未读完 -->
+  <div class="col">
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>●●●</span></div>
+      <div class="navbar">
+        <div class="back">‹</div><div class="t">我要点歌</div>
+      </div>
+      <div class="body" style="filter:blur(0.4px);opacity:.5">
+        <div class="card"><div class="sk sk-line" style="width:46%"></div><div class="sk sk-field"></div><div class="sk sk-field"></div></div>
+        <div class="card"><div class="sk sk-line" style="width:32%"></div><div class="sk sk-field"></div></div>
+        <div class="sk sk-btn" style="width:100%"></div>
+      </div>
+
+      <div class="notice-layer">
+        <div class="status"><span>9:41</span><span>●●●</span></div>
+        <div class="notice-head">
+          <div class="t-section">点歌注意事项</div>
+          <div class="micro" style="margin-top:6px">阅读并确认后才能开始点歌</div>
+        </div>
+        <div class="notice-scroll">
+          <div class="progress" style="margin-bottom:15px"><i style="width:20%"></i></div>
+          <div class="rule"><div class="no">1</div><div class="tx">点歌前请确认<b>歌曲名与歌手</b>填写正确，写错会影响播出。</div></div>
+          <div class="rule"><div class="no">2</div><div class="tx">同一周内请勿重复点同一首歌，重复投稿会被系统自动驳回。</div></div>
+          <div class="rule"><div class="no">3</div><div class="tx">播出时段只能选择<b>下周一到周五</b>的时段，提交后不接受加急。</div></div>
+          <div class="rule"><div class="no">4</div><div class="tx">点歌内容需积极健康，含敏感内容的会被拦截并记录。</div></div>
+          <div class="rule"><div class="no">5</div><div class="tx">通过后的歌曲会排进对应时段的节目，请留意「我的投稿」里的状态。</div></div>
+          <div class="rule"><div class="no">6</div><div class="tx">每日 / 每周点歌名额有限，名额用满后当天剩余的点歌会被自动驳回。</div></div>
+          <div class="rule"><div class="no">7</div><div class="tx">若所选时段已排满，歌曲会顺延到同一天的其它场次，请留意状态变化。</div></div>
+          <div class="rule"><div class="no">8</div><div class="tx">同一账号每天最多提交 3 次点歌，超出会被限流处理。</div></div>
+          <div class="rule"><div class="no">9</div><div class="tx">已通过的歌曲如遇节目调整，可能改到相邻场次播出。</div></div>
+          <div class="rule"><div class="no">10</div><div class="tx">点歌记录保留一学期，学期末统一清理；有异议请联系广播站值班同学。</div></div>
+          <div class="rule"><div class="no">11</div><div class="tx">本注意事项由广播站维护，内容更新后会要求重新确认一次。</div></div>
+          <div class="fade"></div>
+        </div>
+        <div class="cta" style="border-top:1px solid var(--divider)">
+          <div class="scroll-hint">继续向下滑动到页底 ›</div>
+          <button class="btn btn-off btn-block">我已知晓</button>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>① 未读完</b>（共 11 条，一屏放不下）· 顶部细进度条告诉用户「还有多少」，底部按钮置灰并给一句「继续向下滑动到页底」。<b>不能用 toast 提示「请读完」——用户不知道该读到哪里。</b></div>
+  </div>
+
+  <!-- ② 滑到底 -->
+  <div class="col">
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>●●●</span></div>
+      <div class="navbar"><div class="back">‹</div><div class="t">我要点歌</div></div>
+      <div class="body" style="opacity:.5">
+        <div class="card"><div class="sk sk-line" style="width:46%"></div><div class="sk sk-field"></div><div class="sk sk-field"></div></div>
+        <div class="sk sk-btn" style="width:100%"></div>
+      </div>
+
+      <div class="notice-layer">
+        <div class="status"><span>9:41</span><span>●●●</span></div>
+        <div class="notice-head">
+          <div class="t-section">点歌注意事项</div>
+          <div class="micro" style="margin-top:6px">阅读并确认后才能开始点歌</div>
+        </div>
+        <div class="notice-scroll">
+          <div class="progress" style="margin-bottom:15px"><i style="width:100%"></i></div>
+          <div class="rule"><div class="no">10</div><div class="tx">点歌记录保留一学期，学期末统一清理；有异议请联系广播站值班同学。</div></div>
+          <div class="rule"><div class="no">11</div><div class="tx">本注意事项由广播站维护，内容更新后会要求重新确认一次。</div></div>
+          <div class="notice-tail">
+            <div class="micro">—— 以上为全部内容 ——</div>
+            <div class="micro" style="margin-top:6px">已阅读完毕，可以开始点歌了</div>
+          </div>
+        </div>
+        <div class="cta" style="border-top:1px solid var(--divider)">
+          <button class="btn btn-primary btn-block">我已知晓</button>
+          <div class="hint">确认后 30 天内不再重复弹出；管理员改了内容才会再次提醒</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>② 滑到底</b> · 进度条走满、按钮变强调色。容器检测 <code>scrollHeight &lt;= clientHeight</code> 时（内容一屏放得下）直接算「已读完」，按钮一开始就是可点的。</div>
+  </div>
+
+  <!-- ③ 表单 -->
+  <div class="col">
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>●●●</span></div>
+      <div class="navbar"><div class="back">‹</div><div class="t">我要点歌</div></div>
+      <div class="body pad">
+        <div class="card">
+          <div class="field">
+            <div class="field-label">歌曲名</div>
+            <div class="input">起风了</div>
+          </div>
+          <div class="field">
+            <div class="field-label">歌手</div>
+            <div class="input">买辣椒也用券</div>
+          </div>
+          <div class="field">
+            <div class="field-label">想说的话（选填）</div>
+            <div class="input placeholder">点给谁、想说什么…</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="field">
+            <div class="row between">
+              <div class="field-label">播出时段</div>
+              <div class="micro">只能选，不能手输</div>
+            </div>
+            <div class="input" style="justify-content:space-between">
+              <span>周一 09-21 · 午间 12:20</span>
+              <span class="chev"></span>
+            </div>
+            <div class="micro">可选范围：<b>下周 09-21 ~ 09-25（周一到周五）</b>，共 15 个时段</div>
+          </div>
+        </div>
+
+        <div class="card-white" style="display:flex;align-items:center;gap:11px">
+          <span class="tag tag-amber">名额</span>
+          <div class="grow micro" style="font-size:11.5px">今日还剩 <b class="num">8</b> 个名额 · 本周还剩 <b class="num">72</b> 个</div>
+        </div>
+
+        <div style="margin-top:auto">
+          <button class="btn btn-primary btn-block">提交点歌</button>
+          <div class="micro" style="text-align:center;margin-top:10px">提交后可在「我的投稿」查看审核进度</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>③ 表单</b> · 播出时段变成<b>只读行 + 右侧箭头</b>（一眼看出是「选」不是「填」），下面直接写明可选范围；名额余量做成浅色提示条，不用深色占位。</div>
+  </div>
+
+  <!-- ④ 时段弹层 -->
+  <div class="col">
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>●●●</span></div>
+      <div class="navbar"><div class="back">‹</div><div class="t">我要点歌</div></div>
+      <div class="body pad" style="opacity:.45">
+        <div class="card"><div class="sk sk-line" style="width:46%"></div><div class="sk sk-field"></div><div class="sk sk-field"></div></div>
+      </div>
+
+      <div class="sheet-mask"></div>
+      <div class="sheet">
+        <div class="sheet-head">
+          <div class="row between">
+            <div class="t-section">选择播出时段</div>
+            <div class="micro">09-21 ~ 09-25</div>
+          </div>
+          <div class="micro" style="margin-top:6px">只能选下周一到周五的时段，每天三个场次</div>
+        </div>
+        <div class="sheet-body">
+          <div class="day-row">
+            <div class="day-label"><b>周一</b><span>09-21</span></div>
+            <div class="slots">
+              <span class="slot">早间 07:20</span><span class="slot on">午间 12:20</span><span class="slot">晚间 17:30</span>
+            </div>
+          </div>
+          <div class="day-row">
+            <div class="day-label"><b>周二</b><span>09-22</span></div>
+            <div class="slots"><span class="slot">早间 07:20</span><span class="slot">午间 12:20</span><span class="slot">晚间 17:30</span></div>
+          </div>
+          <div class="day-row">
+            <div class="day-label"><b>周三</b><span>09-23</span></div>
+            <div class="slots"><span class="slot">早间 07:20</span><span class="slot">午间 12:20</span><span class="slot">晚间 17:30</span></div>
+          </div>
+          <div class="day-row">
+            <div class="day-label"><b>周四</b><span>09-24</span></div>
+            <div class="slots"><span class="slot off">早间 07:20</span><span class="slot">午间 12:20</span><span class="slot">晚间 17:30</span></div>
+          </div>
+          <div class="day-row">
+            <div class="day-label"><b>周五</b><span>09-25</span></div>
+            <div class="slots"><span class="slot">早间 07:20</span><span class="slot">午间 12:20</span><span class="slot">晚间 17:30</span></div>
+          </div>
+        </div>
+        <div class="cta" style="border-top:1px solid var(--divider)">
+          <button class="btn btn-primary btn-block">确定</button>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>④ 时段弹层</b> · 按天分组的胶囊，选中转墨黑（沿用小程序 tabBar / 筛选胶囊的选中语言）。划掉的场次表示该场已过或已排满。</div>
+  </div>
+
+  <!-- ⑤ 表单骨架 -->
+  <div class="col">
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>●●●</span></div>
+      <div class="navbar"><div class="back">‹</div><div class="t">我要点歌</div></div>
+      <div class="body pad">
+        <div class="card">
+          <div class="field"><div class="sk sk-line" style="width:22%"></div><div class="sk sk-field"></div></div>
+          <div class="field"><div class="sk sk-line" style="width:18%"></div><div class="sk sk-field"></div></div>
+          <div class="field"><div class="sk sk-line" style="width:32%"></div><div class="sk sk-field"></div></div>
+        </div>
+        <div class="card">
+          <div class="row between"><div class="sk sk-line" style="width:26%"></div><div class="sk sk-line" style="width:30%"></div></div>
+          <div class="sk sk-field"></div>
+          <div class="sk sk-line" style="width:64%"></div>
+        </div>
+        <div class="sk sk-btn" style="width:100%"></div>
+      </div>
+      <div class="cta">
+        <div class="sk sk-btn" style="width:100%"></div>
+      </div>
+    </div>
+    <div class="cap"><b>⑤ 表单骨架</b> · 骨架块尺寸 = 真实组件（输入框 44、按钮 46、正文行 12、标签行 15），所以数据回来时<b>不会跳版</b>。超过 300ms 才显示，短于 300ms 宁可空白。</div>
+  </div>
+
+  <!-- ⑥ 列表骨架 -->
+  <div class="col">
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>●●●</span></div>
+      <div class="navbar"><div class="back">‹</div><div class="t">我的投稿</div></div>
+      <div class="body pad">
+        <div class="row" style="gap:8px">
+          <span class="sk sk-tag" style="width:56px"></span>
+          <span class="sk sk-tag" style="width:56px"></span>
+          <span class="sk sk-tag" style="width:56px"></span>
+        </div>
+        <div class="card" style="gap:11px">
+          <div class="row"><span class="sk sk-av" style="width:22px;height:22px"></span><span class="sk sk-line" style="width:34%"></span><span class="sk sk-tag" style="width:52px;margin-left:auto"></span></div>
+          <div class="sk sk-title" style="width:52%"></div>
+          <div class="sk sk-line" style="width:78%"></div>
+        </div>
+        <div class="card" style="gap:11px">
+          <div class="row"><span class="sk sk-av" style="width:22px;height:22px"></span><span class="sk sk-line" style="width:28%"></span><span class="sk sk-tag" style="width:52px;margin-left:auto"></span></div>
+          <div class="sk sk-title" style="width:44%"></div>
+          <div class="sk sk-line" style="width:66%"></div>
+        </div>
+        <div class="card" style="gap:11px">
+          <div class="row"><span class="sk sk-av" style="width:22px;height:22px"></span><span class="sk sk-line" style="width:40%"></span><span class="sk sk-tag" style="width:52px;margin-left:auto"></span></div>
+          <div class="sk sk-title" style="width:58%"></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>⑥ 列表骨架</b> · 切换筛选 / 分页时用；<b>骨架张数 = 上一次的条数</b>（最多 5 张），不要铺满整屏 —— 那会让用户以为列表很长。</div>
+  </div>
+
+</div>
+
+</body>
+</html>

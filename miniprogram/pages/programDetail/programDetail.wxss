@@ -1,42 +1,51 @@
-.content {
-  margin-top: 16rpx;
-  font-size: 28rpx;
-  line-height: 1.8;
-  color: #444;
-  white-space: pre-wrap;
+/* pages/programDetail/programDetail.wxss */
+
+.intro { color: var(--ink-2); line-height: 1.6; }
+
+/* ---- 留言 ---- */
+.comments { display: flex; flex-direction: column; gap: 32rpx; }
+.cmt { display: flex; gap: 24rpx; }
+.cmt-avatar-wrap {
+  width: 72rpx; height: 72rpx; flex: none;
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  background: var(--divider);
 }
-.msg {
+.cmt-avatar { width: 100%; height: 100%; }
+.cmt-avatar-fallback {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30rpx; font-weight: 500; color: var(--muted);
+}
+.cmt-name { font-size: 25rpx; font-weight: 500; color: var(--ink); }
+.cmt-content { font-size: 27rpx; color: var(--ink-2); line-height: 1.55; }
+
+/* ---- 底部留言输入栏（固定） ---- */
+.pb-inputbar {
+  flex: none;
+  height: calc(150rpx + constant(safe-area-inset-bottom));
+  height: calc(150rpx + env(safe-area-inset-bottom));
+}
+.input-bar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 90;
   display: flex;
-  padding: 16rpx 0;
-  border-bottom: 1rpx solid #f0f0f0;
+  align-items: center;
+  gap: 20rpx;
+  padding: 20rpx 40rpx calc(24rpx + constant(safe-area-inset-bottom));
+  padding: 20rpx 40rpx calc(24rpx + env(safe-area-inset-bottom));
+  background: var(--canvas);
+  border-top: 2rpx solid var(--divider);
 }
-.msg:last-child {
-  border-bottom: none;
+.send {
+  flex: none;
+  font-size: 27rpx;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border-radius: var(--r-pill);
+  padding: 18rpx 34rpx;
+  line-height: 1.2;
 }
-.avatar {
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: 50%;
-  margin-right: 16rpx;
-  background: #eee;
-}
-.msg-body {
-  flex: 1;
-  min-width: 0;
-}
-.msg-name {
-  font-size: 26rpx;
-  color: #666;
-  margin-bottom: 6rpx;
-}
-.msg-content {
-  font-size: 28rpx;
-  color: #333;
-  line-height: 1.6;
-  word-break: break-all;
-}
-.msg-time {
-  font-size: 22rpx;
-  color: #aaa;
-  margin-top: 8rpx;
-}
+.send-off { background: var(--soft); }
+.pressed { opacity: 0.72; }

@@ -1,49 +1,102 @@
-<view class="container">
-  <!-- 未登录提示 -->
-  <view class="empty" wx:if="{{!loggedIn}}">
-    <view>登录后查看你的投稿记录</view>
-    <button class="btn-primary" style="margin: 24rpx auto; width: 240rpx;" bindtap="doLogin">微信登录</button>
+<!-- pages/mySubmit/mySubmit.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navreserve" style="height: {{navBarHeight}}px"></view>
+
+  <view class="body">
+
+    <!-- 未登录 -->
+    <block wx:if="{{!loggedIn}}">
+      <view class="nologin">
+        <image class="nologin-logo" src="/assets/station-badge.png" mode="aspectFit" />
+        <view class="t-title">登录后查看你的投稿</view>
+        <view class="t-sub" style="text-align: center;">不收集头像与手机号，头像由姓名生成</view>
+        <button class="btn btn-primary nologin-btn" hover-class="pressed" bindtap="doLogin">使用学号登录</button>
+      </view>
+    </block>
+
+    <block wx:else>
+      <!-- 用户 Hero 卡（L1：白卡大投影，全页唯一焦点；四格统计 = 我的进度） -->
+      <view class="hero">
+        <view class="hero-top">
+          <view class="avatar">{{nicknameInitial}}</view>
+          <view class="hero-id">
+            <view class="hero-name">{{userInfo.nickname || '同学'}}</view>
+            <view class="hero-meta" wx:if="{{heroMeta}}">{{heroMeta}}</view>
+          </view>
+          <view class="hero-badge">菁悠成员</view>
+        </view>
+        <view class="hero-stats">
+          <view class="stat"><view class="n">{{stats.all}}</view><view class="l">全部投稿</view></view>
+          <view class="stat warn"><view class="n">{{stats.pending}}</view><view class="l">待审核</view></view>
+          <view class="stat"><view class="n">{{stats.passed}}</view><view class="l">已通过</view></view>
+          <view class="stat"><view class="n">{{stats.rejected}}</view><view class="l">已驳回</view></view>
+        </view>
+      </view>
+
+      <!-- 状态筛选 -->
+      <view class="segment">
+        <view class="segment-indicator" style="width: calc((100% - 16rpx) / 4); transform: translateX({{statusIndex * 100}}%);"></view>
+        <view class="segment-item {{statusFilter === '' ? 'on' : ''}}" data-status="" bindtap="switchFilter" hover-class="none">全部</view>
+        <view class="segment-item {{statusFilter === '0' ? 'on' : ''}}" data-status="0" bindtap="switchFilter" hover-class="none">待审核</view>
+        <view class="segment-item {{statusFilter === '1' ? 'on' : ''}}" data-status="1" bindtap="switchFilter" hover-class="none">已通过</view>
+        <view class="segment-item {{statusFilter === '2' ? 'on' : ''}}" data-status="2" bindtap="switchFilter" hover-class="none">已驳回</view>
+      </view>
+
+      <!-- v8 方案 ⑥：列表骨架（张数 = 上一次条数，最多 5 张；不铺满整屏） -->
+      <block wx:if="{{skList}}">
+        <view class="item sk-item" wx:for="{{[1,2,3,4,5]}}" wx:key="*this" wx:if="{{index < skCount}}">
+          <view class="between">
+            <view class="sk sk-tag"></view>
+            <view class="sk sk-time"></view>
+          </view>
+          <view class="sk sk-title"></view>
+          <view class="sk sk-line"></view>
+        </view>
+      </block>
+
+      <view class="loading" wx:if="{{loading && !skList}}">加载中……</view>
+
+      <view class="empty" wx:if="{{!list.length && !loading}}">暂无投稿记录</view>
+
+      <!-- 投稿条目 -->
+      <view class="item" wx:for="{{list}}" wx:key="id">
+        <view class="between">
+          <text class="tag {{item.statusClass}}">{{item.statusText}}</text>
+          <text class="t-micro">{{item.createTimeText}}</text>
+        </view>
+
+        <view class="stack" style="gap: 8rpx;">
+          <view class="t-strong" wx:if="{{item.type === 1}}">{{item.songName}} — {{item.singer}}</view>
+          <view class="t-strong" wx:if="{{item.type === 2}}">{{item.articleTitle}}</view>
+          <view class="t-cap clamp-2" wx:if="{{item.type === 1 && item.wishContent}}">{{item.wishContent}}</view>
+          <view class="t-cap clamp-2" wx:if="{{item.type === 2 && item.articleContent}}">{{item.articleContent}}</view>
+        </view>
+
+        <view class="reason" wx:if="{{item.rejectReason}}">驳回原因：{{item.rejectReason}}</view>
+
+        <view class="between" wx:if="{{item.status === 0}}" style="justify-content: flex-end;">
+          <view class="cancel" data-id="{{item.id}}" bindtap="cancel" hover-class="pressed">撤销</view>
+        </view>
+      </view>
+
+      <view class="loading" wx:if="{{list.length < total}}">加载中……</view>
+      <view class="t-micro footnote" wx:elif="{{finished && list.length}}">没有更多了</view>
+
+      <!-- 入口 -->
+      <view class="entries">
+        <view class="entry" hover-class="row-hover" bindtap="goAbout">
+          <text class="t-strong">关于菁悠广播站</text>
+          <view class="chev-r"></view>
+        </view>
+        <!-- 退出登录：退出前二次确认（退出后要用学号密码才能再进来） -->
+        <view class="entry entry-logout" hover-class="row-hover" bindtap="doLogout">
+          <text class="logout-text">退出登录</text>
+        </view>
+      </view>
+    </block>
+
   </view>
 
-  <block wx:if="{{loggedIn}}">
-    <!-- 筛选 -->
-    <view class="filter-bar">
-      <view class="filter {{statusFilter === '' ? 'active' : ''}}" data-status="" bindtap="switchFilter">全部</view>
-      <view class="filter {{statusFilter === '0' ? 'active' : ''}}" data-status="0" bindtap="switchFilter">待审核</view>
-      <view class="filter {{statusFilter === '1' ? 'active' : ''}}" data-status="1" bindtap="switchFilter">已通过</view>
-      <view class="filter {{statusFilter === '2' ? 'active' : ''}}" data-status="2" bindtap="switchFilter">已驳回</view>
-    </view>
-
-    <view class="empty" wx:if="{{!list.length && !loading}}">暂无记录</view>
-
-    <view class="card submit-item" wx:for="{{list}}" wx:key="id">
-      <view class="submit-head">
-        <text class="tag {{item.status === 0 ? 'tag-pending' : item.status === 1 ? 'tag-pass' : 'tag-reject'}}">
-          {{item.status === 0 ? '待审核' : item.status === 1 ? '已通过' : '已驳回'}}
-        </text>
-        <text class="subtitle">{{item.createTime}}</text>
-      </view>
-
-      <view wx:if="{{item.type === 1}}">
-        <view class="title">🎵 {{item.songName}} - {{item.singer}}</view>
-        <view class="subtitle" wx:if="{{item.wishContent}}">{{item.wishContent}}</view>
-      </view>
-
-      <view wx:if="{{item.type === 2}}">
-        <view class="title">📝 {{item.articleTitle}}</view>
-        <view class="subtitle ellipsis-2">{{item.articleContent}}</view>
-      </view>
-
-      <view class="reject" wx:if="{{item.rejectReason}}">
-        驳回原因：{{item.rejectReason}}
-      </view>
-
-      <view class="actions" wx:if="{{item.status === 0}}">
-        <view class="action cancel" data-id="{{item.id}}" bindtap="cancel">撤销</view>
-      </view>
-    </view>
-
-    <view class="empty" wx:if="{{list.length < total}}">加载中...</view>
-    <view class="empty" wx:elif="{{finished && list.length}}">— 没有更多了 —</view>
-  </block>
+  <view class="pb-tabbar"></view>
 </view>

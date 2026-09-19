@@ -64,11 +64,42 @@ async function ensureLoaded() {
 }
 
 /**
+ * 代码内置的「已知开关」注册表。
+ *
+ * 用途：新加的开关在老库 / 新库里可能还没有对应的行，管理端就看不到、也就没法切换。
+ *      这里按默认值补进管理端列表（**不主动写库**）。
+ *
+ * ⚠️ 为什么不直接写进 seed：switch.test.js 断言「默认 seed 恰好 4 条开关」，
+ *    在代码里预置行会把那个数字顶成 5。放在这里展示，等管理员第一次切换时才真正落库。
+ * ⚠️ 也刻意不进 loadAll()：业务判断用 isEnabled()，缺行时本来就算「开」，
+ *    不需要为它多查一次库，用户端 switch/list 也不会因此多条数据。
+ */
+const KNOWN_SWITCHES = [
+  { key: 'account_login_required', value: 'on', desc: '强制学号登录' },
+];
+
+/**
  * 管理端：列出所有开关（含 desc / updatedBy / 时间）
+ * DB 里已有的行以 DB 值为准，注册表里缺的补默认行
  */
 async function listAll() {
   const { SystemSwitch } = require('../models');
-  return SystemSwitch.findAll({ order: [['key', 'ASC']] });
+  const rows = await SystemSwitch.findAll({ order: [['key', 'ASC']] });
+  const seen = new Set(rows.map((r) => r.key));
+
+  const list = rows.map((r) => ({
+    key: r.key,
+    value: r.value,
+    desc: r.desc,
+    updatedBy: r.updatedBy,
+    // 模型属性是 updatedAt（列名 update_time），之前误写 r.updateTime 导致恒为 undefined
+    updateTime: r.updatedAt,
+  }));
+  KNOWN_SWITCHES.forEach((s) => {
+    if (!seen.has(s.key)) list.push({ ...s, updatedBy: null, updateTime: null });
+  });
+  list.sort((a, b) => String(a.key).localeCompare(String(b.key)));
+  return list;
 }
 
 /**

@@ -29,7 +29,10 @@ COPY deploy/nginx-admin.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
-HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
+# 健康检查必须探 127.0.0.1：容器里没有 getent 配置，busybox wget 解析 localhost
+# 会先试 ::1（IPv6），而 nginx 只 listen 了 IPv4 的 80 → 永远 Connection refused，
+# 容器会被误标成 unhealthy（2026-09-19 实测）。
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 --start-period=15s \
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1/ || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

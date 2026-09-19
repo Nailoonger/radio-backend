@@ -1,60 +1,108 @@
-.filter-bar {
-  display: flex;
+/* pages/mySubmit/mySubmit.wxss */
+
+/* 标题块已移除：页面平铺，第一张卡直接顶到导航带下方（body 自带 34rpx 间距，这里补顶距） */
+.body { padding-top: 16rpx; }
+
+/* ══════════ 用户 Hero 卡（L1 白卡大投影：全页唯一焦点，靠海拔凸显） ══════════
+   投影比普通羊皮纸卡重两档；不引入任何新颜色，待审核数字用暖黄点亮 */
+.hero {
   background: #fff;
-  border-radius: 16rpx;
-  padding: 8rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 4rpx 12rpx rgba(6, 182, 212, 0.06);
-}
-.filter {
-  flex: 1;
-  text-align: center;
-  padding: 14rpx 0;
-  font-size: 26rpx;
-  color: #64748b;
-  border-radius: 10rpx;
-  transition: all 0.2s;
-}
-.filter.active {
-  background: linear-gradient(135deg, #06b6d4, #3b82f6);
-  color: #fff;
-  font-weight: 500;
-  box-shadow: 0 4rpx 10rpx rgba(6, 182, 212, 0.3);
-}
-.submit-item .submit-head {
+  border-radius: 44rpx;
+  padding: 40rpx 40rpx 36rpx;
+  box-shadow:
+    0 12rpx 28rpx -12rpx rgba(15, 28, 46, 0.08),
+    0 44rpx 88rpx -36rpx rgba(15, 28, 46, 0.16);
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12rpx;
+  flex-direction: column;
+  gap: 30rpx;
 }
-.submit-item .reject {
-  margin-top: 12rpx;
-  padding: 12rpx 16rpx;
-  background: #fef2f2;
-  border-radius: 8rpx;
-  font-size: 24rpx;
-  color: #b91c1c;
-  border-left: 4rpx solid #ef4444;
+.hero-top { display: flex; align-items: center; gap: 26rpx; }
+.avatar {
+  width: 104rpx; height: 104rpx; flex: none;
+  border-radius: 50%;
+  background: var(--ink); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 40rpx; font-weight: 600;
 }
-.ellipsis-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.hero-id { flex: 1; min-width: 0; }
+.hero-name { font-size: 36rpx; font-weight: 600; color: var(--ink); letter-spacing: -0.6rpx; }
+.hero-meta { font-size: 23rpx; color: var(--muted); margin-top: 8rpx; letter-spacing: 0.8rpx; }
+.hero-badge {
+  flex: none;
+  font-size: 21rpx; padding: 8rpx 20rpx; border-radius: 999rpx;
+  background: rgba(0, 102, 204, 0.08); color: var(--accent);
 }
-.actions {
-  margin-top: 16rpx;
-  text-align: right;
+.hero-stats {
+  display: flex;
+  background: var(--parchment);
+  border-radius: 28rpx;
+  padding: 24rpx 0;
 }
-.action {
-  display: inline-block;
-  padding: 8rpx 24rpx;
-  border-radius: 6rpx;
-  font-size: 24rpx;
-  margin-left: 12rpx;
+.stat { flex: 1; text-align: center; position: relative; }
+.stat + .stat::before {
+  content: '';
+  position: absolute; left: 0; top: 15%; bottom: 15%;
+  width: 2rpx; background: var(--hairline);
 }
-.action.cancel {
-  color: #ef4444;
-  border: 1rpx solid #ef4444;
+.stat .n { font-size: 38rpx; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.2; }
+.stat.warn .n { color: var(--amber-fg); }
+.stat .l { font-size: 21rpx; color: var(--muted); margin-top: 6rpx; letter-spacing: 1rpx; }
+
+/* ---- 未登录：同款白色浮卡当焦点（与 Hero 一致的海拔） ---- */
+.nologin {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 24rpx;
+  padding: 72rpx 40rpx;
+  background: #fff;
+  border-radius: 44rpx;
+  box-shadow:
+    0 12rpx 28rpx -12rpx rgba(15, 28, 46, 0.08),
+    0 44rpx 88rpx -36rpx rgba(15, 28, 46, 0.16);
+}
+.nologin-logo { width: 168rpx; height: 168rpx; }
+/* 元素+类选择器，避免被 button.btn 的 width:auto 压过 */
+button.nologin-btn { margin-top: 16rpx; width: 420rpx; }
+
+/* ---- 投稿条目 ---- */
+.item {
+  background: var(--parchment);
+  border-radius: var(--r-card);
+  padding: 32rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+.reason { font-size: 23rpx; color: var(--red-fg); line-height: 1.45; }
+
+.cancel {
+  font-size: 25rpx;
+  color: var(--muted);
+  padding: 10rpx 28rpx;
+  border-radius: var(--r-pill);
   background: #fff;
 }
+
+/* ---- 入口 ---- */
+.entries { display: flex; flex-direction: column; gap: 20rpx; }
+.entry {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--parchment);
+  border-radius: var(--r-card);
+  padding: 32rpx;
+}
+.footnote { text-align: center; }
+
+.row-hover { opacity: 0.72; }
+.pressed { opacity: 0.6; }
+
+/* ── v8 方案 ⑥：列表骨架（尺寸=真实条目，底色 --divider，不动画） ── */
+.sk-item { pointer-events: none; }
+.sk { border-radius: 10rpx; background: var(--divider); }
+.sk-tag { width: 108rpx; height: 40rpx; border-radius: 999rpx; }
+.sk-time { width: 200rpx; height: 26rpx; }
+.sk-title { height: 34rpx; margin-top: 22rpx; width: 62%; }
+.sk-line { height: 28rpx; margin-top: 16rpx; width: 86%; }
+
+/* ── 退出登录：白色卡里的红字行，无右箭头（它不是去别的页，是动作） ── */
+.entry-logout { justify-content: center; }
+.logout-text { font-size: 30rpx; font-weight: 500; color: var(--red-fg); letter-spacing: 0.5rpx; }

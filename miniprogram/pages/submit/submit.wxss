@@ -1,85 +1,183 @@
-.type-tabs {
-  display: flex;
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 8rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 4rpx 12rpx rgba(6, 182, 212, 0.06);
+/* pages/submit/submit.wxss */
+
+/* 模块被后台关闭的分段项 */
+.segment-item.is-off { color: var(--soft); }
+
+.hint { text-align: center; margin-bottom: 20rpx; }
+
+.bottom-cta { background: var(--canvas); }
+
+.pressed { opacity: 0.72; }
+
+/* ══════════ 次数 / 名额提示 ══════════ */
+.quota-hint {
+  display: flex; align-items: center; gap: 12rpx;
+  margin-top: 20rpx; padding: 16rpx 24rpx;
+  background: var(--parchment); border-radius: 16rpx;
+  font-size: 24rpx; color: var(--ink-2);
+  animation: quotaIn 0.36s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
-.tab {
-  flex: 1;
-  text-align: center;
-  padding: 18rpx 0;
-  border-radius: 10rpx;
-  font-size: 28rpx;
-  color: #64748b;
-  transition: all 0.2s;
+@keyframes quotaIn { from { opacity: 0; transform: translateY(8rpx); } to { opacity: 1; transform: none; } }
+.quota-dot { width: 12rpx; height: 12rpx; border-radius: 50%; background: var(--accent); flex: none; }
+.quota-hint.is-blocked .quota-dot { background: var(--red-fg, #b42318); }
+.quota-hint.is-blocked { color: var(--red-fg, #b42318); }
+
+/* ══════════ 播出时段：只读行（选，不是填） ══════════ */
+.slot-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16rpx;
+  height: 88rpx; padding: 0 28rpx;
+  background: var(--canvas); border: 2rpx solid var(--hairline); border-radius: 20rpx;
 }
-.tab.active {
-  background: linear-gradient(135deg, #06b6d4, #3b82f6);
-  color: #fff;
-  font-weight: 500;
-  box-shadow: 0 4rpx 12rpx rgba(6, 182, 212, 0.3);
+.slot-value { font-size: 28rpx; color: var(--ink); }
+.slot-value.is-ph { color: var(--soft); }
+.slot-arrow {
+  width: 16rpx; height: 16rpx; flex: none;
+  border-top: 4rpx solid var(--soft); border-right: 4rpx solid var(--soft);
+  transform: rotate(45deg);
 }
-.tab.disabled {
-  background: #f1f5f9;
-  color: #94a3b8;
-  box-shadow: none;
-  pointer-events: auto;  /* 仍可点击，给提示 */
+.slot-sub { margin-top: 10rpx; font-size: 22rpx; color: var(--muted); letter-spacing: 0.5rpx; }
+
+/* ══════════ 注意事项闸门（全屏遮罩，z-index 要压过 tabBar 的 100） ══════════ */
+.ntc-mask {
+  position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 999;
+  background: rgba(29, 29, 31, 0.5);
+  display: flex; align-items: center; justify-content: center;
+  padding: 48rpx 40rpx;
+  animation: ntcFade 0.28s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
-.closed-tag {
-  font-size: 22rpx;
-  margin-left: 8rpx;
-  opacity: 0.8;
+@keyframes ntcFade { from { opacity: 0; } to { opacity: 1; } }
+
+.ntc-card {
+  width: 100%; max-height: 78vh;
+  background: var(--canvas); border-radius: 34rpx;
+  display: flex; flex-direction: column; overflow: hidden;
+  animation: ntcUp 0.36s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
-.form-row {
-  margin-bottom: 24rpx;
+@keyframes ntcUp { from { opacity: 0; transform: translateY(48rpx); } to { opacity: 1; transform: none; } }
+
+.ntc-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 30rpx 34rpx 22rpx;
 }
-.form-row:last-child {
-  margin-bottom: 0;
+.ntc-title { font-size: 34rpx; font-weight: 600; color: var(--ink); letter-spacing: -0.5rpx; }
+.ntc-close {
+  width: 52rpx; height: 52rpx; border-radius: 50%;
+  background: var(--parchment);
+  display: flex; align-items: center; justify-content: center;
 }
-.label {
-  font-size: 26rpx;
-  color: #475569;
-  margin-bottom: 12rpx;
-  font-weight: 500;
+.ntc-x { position: relative; width: 24rpx; height: 24rpx; }
+.ntc-x::before, .ntc-x::after {
+  content: ''; position: absolute; left: 2rpx; top: 10rpx;
+  width: 20rpx; height: 3rpx; border-radius: 2rpx; background: var(--muted);
 }
-.required {
-  color: #ef4444;
-  margin-left: 4rpx;
+.ntc-x::before { transform: rotate(45deg); }
+.ntc-x::after { transform: rotate(-45deg); }
+
+.ntc-scroll { flex: 1; min-height: 0; max-height: 52vh; padding: 0 34rpx; box-sizing: border-box; }
+.ntc-inner { padding: 6rpx 0 30rpx; }
+.ntc-line {
+  font-size: 27rpx; line-height: 1.7; color: var(--ink-2);
+  letter-spacing: 0.5rpx; padding: 8rpx 0;
 }
-.input {
-  background: #f8fafc;
-  border-radius: 10rpx;
-  padding: 18rpx 20rpx;
-  font-size: 28rpx;
-  border: 2rpx solid transparent;
-  transition: border-color 0.2s;
+/* v1 方案①：阅读进度条（强调色细条，走满即页底） */
+.ntc-progress {
+  flex: none; height: 6rpx; border-radius: 999rpx;
+  background: var(--divider); margin: 0 34rpx 6rpx; overflow: hidden;
 }
-.input:focus {
-  border-color: #06b6d4;
-  background: #fff;
+.ntc-progress-fill {
+  height: 100%; border-radius: 999rpx; background: var(--accent);
+  transition: width 0.18s ease-out;
 }
-.textarea {
+/* 滑到页底后的结尾标记（和方案②一致，告诉用户「真的没有了」） */
+.ntc-tail {
+  text-align: center; font-size: 22rpx; color: var(--muted);
+  letter-spacing: 0.5rpx; padding: 18rpx 0 6rpx;
+}
+
+.ntc-foot { padding: 20rpx 34rpx calc(30rpx + env(safe-area-inset-bottom)); background: var(--canvas); }
+.ntc-hint {
+  text-align: center; font-size: 22rpx; color: var(--muted);
+  margin-bottom: 14rpx; letter-spacing: 0.5rpx;
+}
+/* 禁用态：强调色浅调，别用纯灰（白底上看不见） */
+button.btn-disabled {
+  background: #b9d2ee; color: #ffffff;
+}
+/* 微信 button[disabled] 默认灰会压过 .btn-primary，必须元素+类+属性优先级 */
+button.btn-primary[disabled] {
+  background: #b9d2ee; color: #ffffff;
+}
+
+/* ══════════ 播出时段底部弹层 ══════════ */
+.slot-mask {
+  position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 999;
+  background: rgba(29, 29, 31, 0.5);
+  display: flex; align-items: flex-end;
+  animation: ntcFade 0.28s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.slot-sheet {
   width: 100%;
-  background: #f8fafc;
-  border-radius: 10rpx;
-  padding: 18rpx 20rpx;
-  font-size: 28rpx;
-  min-height: 160rpx;
+  /* v8 方案 ④ 修订：写死高度而非 max-height，避免 scroll-view 在 iOS 上无法滚动 */
+  height: 72vh;
+  background: var(--canvas);
+  border-radius: 34rpx 34rpx 0 0;
+  display: flex; flex-direction: column;
+  animation: sheetUp 0.36s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+@keyframes sheetUp { from { transform: translateY(30%); opacity: 0.4; } to { transform: none; opacity: 1; } }
+
+.slot-sheet-head { padding: 32rpx 34rpx 18rpx; flex: none; }
+.slot-sheet-title { font-size: 34rpx; font-weight: 600; color: var(--ink); letter-spacing: -0.5rpx; }
+.slot-sheet-sub { margin-top: 6rpx; font-size: 23rpx; color: var(--muted); }
+
+/* 小程序 scroll-view 必须显式给高度才会滚 —— 不能再用 max-height */
+.slot-sheet-body {
+  flex: 1 1 0;
+  min-height: 0;
+  height: 0;
+  padding: 0 34rpx 24rpx;
   box-sizing: border-box;
-  border: 2rpx solid transparent;
 }
-.textarea:focus {
-  border-color: #06b6d4;
-  background: #fff;
+/* 底部状态行：选中结果 + 提示，收住弹层下半的空白 */
+.slot-sheet-foot {
+  flex: none;
+  padding: 20rpx 34rpx calc(26rpx + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--divider);
+  display: flex; align-items: baseline; gap: 12rpx;
 }
-.textarea.large {
-  min-height: 320rpx;
+.slot-foot-label {
+  flex: none; font-size: 23rpx; color: var(--muted); letter-spacing: 0.5rpx;
 }
-.tips {
-  margin-top: 24rpx;
-  font-size: 24rpx;
-  color: #94a3b8;
-  text-align: center;
+.slot-foot-value {
+  font-size: 26rpx; font-weight: 600; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+.slot-day { margin-top: 26rpx; }
+.slot-day:first-child { margin-top: 4rpx; }
+.slot-day-head {
+  font-size: 24rpx; color: var(--muted); letter-spacing: 0.5rpx; margin-bottom: 14rpx;
+}
+.slot-chips { display: flex; flex-wrap: wrap; gap: 14rpx; }
+/* 胶囊 flex 撑满整行（≥2 个时段时平分一行宽度），不再缩在左上角 */
+.slot-chip {
+  flex: 1 1 auto;
+  min-height: 68rpx;
+  padding: 14rpx 26rpx; border-radius: 999rpx;
+  background: var(--parchment); font-size: 26rpx; color: var(--ink-2);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8rpx;
+}
+.slot-chip.on { background: var(--ink); color: #ffffff; }
+/* v8 方案 ④：已排满的场次划掉、不可选 */
+.slot-chip.off { background: var(--divider); color: var(--soft); }
+.slot-chip.off text:first-child { text-decoration: line-through; }
+.slot-picked { font-size: 21rpx; color: var(--muted); letter-spacing: 0.5rpx; }
+.slot-chip.on .slot-picked { color: rgba(255, 255, 255, 0.7); }
+
+/* ── 表单骨架（尺寸=真实组件） ── */
+.sk { border-radius: 12rpx; background: var(--divider); }
+.sk + .sk { margin-top: 16rpx; }
+.field + .field .sk:first-child { margin-top: 0; }
+.sk-label { width: 140rpx; height: 30rpx; border-radius: 8rpx; }
+.sk-input { height: 88rpx; }
+.sk-area { height: 176rpx; }

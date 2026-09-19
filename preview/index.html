@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>菁悠广播站 · 小程序改版方案 v2</title>
+<style>
+:root{
+  --ink:#1d1d1f;
+  --muted:#7a7a7a;
+  --soft:#c7c7cc;
+  --hairline:#e0e0e0;
+  --divider:#f0f0f0;
+  --parchment:#f5f5f7;
+  --dark:#272729;
+  --dark-2:#3a3a3c;
+  --accent:#0066cc;
+  --accent-dark:#2997ff;
+  --live:#ff453a;
+  --amber-bg:#fef3c7; --amber-fg:#8a6100;
+  --green-bg:#e7f5ec; --green-fg:#1e7a46;
+  --red-bg:#fde8e8;  --red-fg:#b42318;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:var(--font);
+  background:#fafafc;
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+  padding:48px 40px 72px;
+}
+
+/* ---------- page head ---------- */
+.page-head{max-width:1440px;margin:0 auto 40px}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;color:var(--accent);text-transform:uppercase}
+.page-head h1{font-size:40px;font-weight:600;letter-spacing:-.4px;line-height:1.1;margin:10px 0 12px}
+.page-head p{font-size:17px;line-height:1.5;color:var(--muted);max-width:720px}
+.tokens{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+.token{font-size:12px;color:var(--ink);background:#fff;border:1px solid var(--hairline);border-radius:999px;padding:6px 14px}
+
+/* ---------- board ---------- */
+.board{display:flex;gap:44px;max-width:1440px;margin:0 auto;flex-wrap:wrap;align-items:flex-start}
+.screen-wrap{display:flex;flex-direction:column;gap:14px}
+.caption{font-size:13px;color:var(--muted);padding-left:6px}
+.caption b{color:var(--ink);font-weight:600}
+
+.phone{
+  width:390px;height:844px;background:#fff;border:1px solid var(--hairline);
+  border-radius:22px;overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:0 18px 48px rgba(0,0,0,.07);
+}
+
+/* ---------- status bar ---------- */
+.status{height:62px;flex:0 0 62px;display:flex;align-items:center;justify-content:space-between;padding:0 28px}
+.status .time{font-size:15px;font-weight:600;letter-spacing:-.2px}
+
+/* ---------- content ---------- */
+.content{flex:1;display:flex;flex-direction:column;padding:4px 20px 0;gap:13px;overflow:hidden}
+.content.s2,.content.s3,.content.s4,.content.s5{gap:18px}
+
+/* ---------- typography ---------- */
+.page-title{font-size:28px;font-weight:600;letter-spacing:-.5px;line-height:1.25}
+.page-sub{font-size:13px;color:var(--muted);margin-top:5px;line-height:1.4}
+.sec-title{font-size:17px;font-weight:600;letter-spacing:-.37px}
+.link{font-size:13px;color:var(--accent);text-decoration:none}
+
+/* ---------- brand head ---------- */
+.brand-head{display:flex;align-items:center;justify-content:space-between}
+.brand-lockup{display:flex;align-items:center;gap:14px;min-width:0}
+.brand-logo{width:44px;height:44px;flex:0 0 44px;display:block}
+.brand-name{font-size:24px;font-weight:600;letter-spacing:-.4px;line-height:1.25}
+.brand-slogan{font-size:13px;color:var(--muted);margin-top:3px}
+.icon-btn{width:40px;height:40px;border-radius:999px;background:var(--parchment);display:flex;align-items:center;justify-content:center;flex:0 0 40px}
+
+/* ---------- live card ---------- */
+.live{background:var(--dark);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.live-top{display:flex;align-items:center;gap:8px}
+.dot{width:7px;height:7px;border-radius:999px;background:var(--live);flex:0 0 7px}
+.live-label{font-size:12px;font-weight:500;color:#ccc}
+.live-title{font-size:26px;font-weight:600;color:#fff;letter-spacing:-.5px;line-height:1.3}
+.live-meta{font-size:13px;color:#ccc}
+.chips{display:flex;gap:8px}
+.chip{font-size:11px;font-weight:500;color:#ccc;background:var(--dark-2);border-radius:999px;padding:6px 12px}
+.cta{display:flex;gap:10px;margin-top:2px}
+.btn{font-size:15px;border-radius:999px;padding:11px 22px;border:none;font-family:var(--font);cursor:default;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff;font-weight:600}
+.btn-ghost{background:transparent;color:var(--accent-dark);font-weight:500;border:1px solid var(--accent-dark)}
+.btn-block{display:block;width:100%;text-align:center;font-size:17px;padding:15px 0;font-weight:600}
+
+/* ---------- cards & lists ---------- */
+.sec{display:flex;flex-direction:column;gap:12px}
+.sec-head{display:flex;align-items:center;justify-content:space-between}
+.card{background:var(--parchment);border-radius:18px;padding:4px 0}
+.row{display:flex;align-items:center;gap:14px;padding:8px 16px}
+.row .t{font-size:14px;font-weight:600;flex:0 0 auto}
+.row .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.row .body .n{font-size:15px;font-weight:500}
+.row .body .s{font-size:12px;color:var(--muted)}
+.chev{flex:0 0 16px;display:flex}
+
+.notice{display:flex;align-items:center;gap:10px;padding:9px 16px}
+.notice .tag{font-size:10px;font-weight:500;color:#fff;background:var(--ink);border-radius:999px;padding:3px 8px;flex:0 0 auto}
+.notice .txt{font-size:14px;flex:1;min-width:0}
+
+/* ---------- segments & chips ---------- */
+.segment{display:flex;background:var(--divider);border-radius:999px;padding:4px}
+.segment .seg{flex:1;text-align:center;font-size:14px;color:var(--muted);padding:8px 0;border-radius:999px}
+.segment .seg.on{background:#fff;color:var(--ink);font-weight:600}
+.filters{display:flex;gap:8px}
+.filter{font-size:13px;font-weight:500;color:var(--muted);background:var(--divider);border-radius:999px;padding:7px 14px}
+.filter.on{background:var(--ink);color:#fff}
+
+/* ---------- form ---------- */
+.form{background:var(--parchment);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:18px}
+.field{display:flex;flex-direction:column;gap:8px}
+.field .lb{font-size:13px;font-weight:500;color:var(--muted)}
+.input{background:#fff;border-radius:12px;padding:13px 14px;font-size:15px;color:var(--soft)}
+.input.area{height:88px;padding-top:14px}
+.hint{font-size:12px;color:var(--muted);text-align:center}
+
+/* ---------- member grid ---------- */
+.group{display:flex;flex-direction:column;gap:12px}
+.group h3{font-size:15px;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 10px}
+.mcard{width:auto;display:flex;flex-direction:column;gap:8px;align-items:center}
+.mcard .photo{width:100%;aspect-ratio:1/1;height:auto;border-radius:14px;background:
+  linear-gradient(135deg,#e9e9ee 0%,#dedee4 100%);display:flex;align-items:center;justify-content:center;
+  font-size:11px;color:#9a9aa2;letter-spacing:.04em}
+.mcard .n{font-size:13px;font-weight:500;text-align:center}
+.mcard .g{font-size:11px;color:var(--muted);text-align:center}
+.foot-note{font-size:12px;color:var(--soft);text-align:center;padding-top:2px}
+
+/* ---------- profile ---------- */
+.profile{display:flex;align-items:center;gap:14px;background:var(--parchment);border-radius:18px;padding:16px}
+.avatar-round{width:56px;height:56px;border-radius:999px;background:linear-gradient(135deg,#e9e9ee,#dedee4);display:flex;align-items:center;justify-content:center;font-size:10px;color:#9a9aa2;flex:0 0 56px;text-align:center;line-height:1.1}
+.profile .n{font-size:17px;font-weight:600}
+.profile .s{font-size:12px;color:var(--muted);margin-top:3px}
+
+/* ---------- submission items ---------- */
+.item{background:var(--parchment);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.item .top{display:flex;align-items:center;justify-content:space-between}
+.item .date{font-size:12px;color:var(--muted)}
+.item .t{font-size:15px;font-weight:500}
+.item .s{font-size:13px;color:var(--muted)}
+.item .reason{font-size:12px;color:var(--red-fg)}
+.badge{font-size:11px;font-weight:500;border-radius:999px;padding:3px 9px}
+.badge.amber{background:var(--amber-bg);color:var(--amber-fg)}
+.badge.green{background:var(--green-bg);color:var(--green-fg)}
+.badge.red{background:var(--red-bg);color:var(--red-fg)}
+
+/* ---------- entries ---------- */
+.entries{display:flex;flex-direction:column;gap:10px}
+.entry{display:flex;align-items:center;justify-content:space-between;background:var(--parchment);border-radius:18px;padding:16px}
+.entry span{font-size:15px;font-weight:500}
+
+/* ---------- bottom action bar ---------- */
+.bottom-cta{padding:8px 20px 14px}
+
+/* ---------- tab bar ---------- */
+.tabbar{flex:0 0 94px;display:flex;padding:12px 21px 21px}
+.pillbar{flex:1;height:62px;border:1px solid #e6e6e8;border-radius:36px;padding:4px;display:flex;background:#fff}
+.tab{flex:1;border-radius:26px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--muted)}
+.tab span{font-size:11px;font-weight:500;letter-spacing:.04em}
+.tab.on{background:var(--ink);color:#fff}
+
+/* ---------- nav bar (detail) ---------- */
+.navbar{height:44px;flex:0 0 44px;display:flex;align-items:center;gap:8px;padding:0 20px}
+.navbar .back{width:36px;height:36px;border-radius:999px;background:var(--parchment);display:flex;align-items:center;justify-content:center;flex:0 0 36px}
+.navbar .title{flex:1;text-align:center;font-size:15px;font-weight:600}
+.navbar .spacer{width:36px;flex:0 0 36px}
+
+/* ---------- player ---------- */
+.player{display:flex;align-items:center;gap:12px;margin-top:2px}
+.play{width:40px;height:40px;border-radius:999px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex:0 0 40px}
+.progress{flex:1;height:3px;border-radius:2px;background:var(--dark-2)}
+.duration{font-size:11px;font-weight:500;color:#ccc}
+
+/* ---------- comments ---------- */
+.intro{font-size:14px;color:#333;line-height:1.6}
+.comments{display:flex;flex-direction:column;gap:16px}
+.cmt{display:flex;gap:12px}
+.cmt .photo{width:36px;height:36px;border-radius:999px;background:linear-gradient(135deg,#e9e9ee,#dedee4);flex:0 0 36px}
+.cmt .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.cmt .n{font-size:13px;font-weight:500}
+.cmt .c{font-size:14px;color:#333}
+.cmt .tm{font-size:11px;color:var(--muted)}
+
+.input-bar{display:flex;align-items:center;gap:10px;padding:10px 20px 14px}
+.input-bar .input{margin:0}
+.input-bar .input{flex:1;border-radius:999px;padding:10px 16px}
+.send{background:var(--accent);color:#fff;font-size:14px;font-weight:600;border-radius:999px;padding:10px 18px;border:none;font-family:var(--font)}
+
+@media(max-width:900px){
+  body{padding:28px 16px 48px}
+  .page-head h1{font-size:30px}
+  .board{gap:28px;justify-content:center}
+}
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div class="eyebrow">Jingyou Radio · Mini Program</div>
+  <h1>菁悠广播站 · 小程序改版方案 v2</h1>
+  <p>把「青蓝渐变 + 卡片堆叠」换成克制的内容优先版式：单一强调色、深色直播卡做视觉主角、正文与标题层级固定、图标全部重绘为线性图标。下面是 5 个核心页面。</p>
+  <div class="tokens">
+    <span class="token">强调色 #0066CC</span>
+    <span class="token">墨黑 #1D1D1F</span>
+    <span class="token">羊皮纸 #F5F5F7</span>
+    <span class="token">深色卡 #272729</span>
+    <span class="token">卡片圆角 18 / 胶囊 9999</span>
+    <span class="token">正文 15 · 标题 17 · 页标题 28</span>
+    <span class="token">间距阶梯 4 / 8 / 12 / 13 / 16 / 18 / 20</span>
+  </div>
+</div>
+
+<div class="board">
+
+  <!-- ============ 01 首页 ============ -->
+  <section class="screen-wrap">
+    <div class="phone">
+      <div class="status">
+        <div class="time">9:41</div>
+        <svg width="68" height="13" viewBox="0 0 68 13" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="8" width="3" height="5" rx="1" fill="#1D1D1F"/><rect x="5" y="6" width="3" height="7" rx="1" fill="#1D1D1F"/><rect x="10" y="4" width="3" height="9" rx="1" fill="#1D1D1F"/><rect x="15" y="1.5" width="3" height="11.5" rx="1" fill="#1D1D1F"/><path d="M25.5 5.2a9.5 9.5 0 0 1 11 0" stroke="#1D1D1F" stroke-width="1.6" stroke-linecap="round"/><path d="M27.8 8.1a6 6 0 0 1 6.4 0" stroke="#1D1D1F" stroke-width="1.6" stroke-linecap="round"/><circle cx="31" cy="11" r="1.4" fill="#1D1D1F"/><rect x="45" y="1.5" width="20" height="10" rx="3" stroke="#1D1D1F" stroke-width="1.2" opacity="0.4"/><rect x="47" y="3.5" width="14" height="6" rx="1.6" fill="#1D1D1F"/><path d="M66.5 5v3" stroke="#1D1D1F" stroke-width="1.2" opacity="0.4" stroke-linecap="round"/></svg>
+      </div>
+      <div class="content">
+          <div class="brand-head">
+            <div class="brand-lockup">
+              <img class="brand-logo" src="assets/station-badge.png" alt="菁悠广播站站徽">
+              <div>
+                <div class="brand-name">菁悠广播站</div>
+                <div class="brand-slogan">菁菁校园情，悠悠广播声</div>
+              </div>
+            </div>
+          <div class="icon-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3.2a5.6 5.6 0 0 0-5.6 5.6v3.6l-1.2 2.4c-.3.6.2 1.3.9 1.3h11.8c.7 0 1.2-.7.9-1.3l-1.2-2.4V8.8A5.6 5.6 0 0 0 12 3.2Z" stroke="#1D1D1F" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 19.4a2.2 2.2 0 0 0 4 0" stroke="#1D1D1F" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+
+        <div class="live">
+          <div class="live-top"><span class="dot"></span><span class="live-label">正在直播 · 12:20–13:00</span></div>
+          <div class="live-title">午间音乐时光</div>
+          <div class="live-meta">主持人 林晓 · 校园民谣 · 第 42 期</div>
+          <div class="chips"><span class="chip">点歌互动</span><span class="chip">轻音乐</span></div>
+          <div class="cta">
+            <button class="btn btn-primary">我要投稿</button>
+            <button class="btn btn-ghost">本周节目单</button>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-head"><div class="sec-title">今日节目单</div><a class="link" href="#">查看全部</a></div>
+          <div class="card">
+            <div class="row"><div class="t">17:30</div><div class="body"><div class="n">晚风信箱</div><div class="s">主持人 陈默 · 情感树洞</div></div><div class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 5.5 16 12l-6.5 6.5" stroke="#C7C7CC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+            <div class="row"><div class="t">18:15</div><div class="body"><div class="n">英语角 Live</div><div class="s">主持人 周予 · 双语互动</div></div><div class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 5.5 16 12l-6.5 6.5" stroke="#C7C7CC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+            <div class="row"><div class="t">20:00</div><div class="body"><div class="n">深夜书房</div><div class="s">主持人 苏晚 · 文学共读</div></div><div class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 5.5 16 12l-6.5 6.5" stroke="#C7C7CC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-head"><div class="sec-title">校园公告</div><a class="link" href="#">全部公告</a></div>
+          <div class="card">
+            <div class="notice"><span class="tag">置顶</span><span class="txt">国庆假期播音安排通知</span><div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 5.5 16 12l-6.5 6.5" stroke="#C7C7CC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+            <div class="notice"><span class="txt">新学期节目单调整说明</span><div class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 5.5 16 12l-6.5 6.5" stroke="#C7C7CC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar"><div class="pillbar">
+        <div class="tab on">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.6 10.5 12 3.6l8.4 6.9V20a1 1 0 0 1-1 1h-4.5v-6H9.1v6H4.6a1 1 0 0 1-1-1v-9.5Z" stroke="#FFFFFF" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span>首页</span>
+        </div>
+        <div class="tab">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3.6H5.6a2 2 0 0 0-2 2v12.8a2 2 0 0 0 2 2h12.8a2 2 0 0 0 2-2V12" stroke="#7A7A7A" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M17.1 3.4l3.5 3.5-8.1 8.1-4.3.8.8-4.3 8.1-8.1Z" stroke="#7A7A7A" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span>投稿</span>
+        </div>
+        <div class="tab">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="9.2" cy="8" r="3.4" stroke="#7A7A7A" stroke-width="1.7"/><path d="M2.9 20c0-3.5 2.8-6.3 6.3-6.3s6.3 2.8 6.3 6.3" stroke="#7A7A7A" stroke-width="1.7" stroke-linecap="round"/><path d="M16.4 5.3a3 3 0 0 1 0 5.5" stroke="#7A7A7A" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span>风采</span>
+        </div>
+        <div class="tab">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="3.8" stroke="#7A7A7A" stroke-width="1.7"/><path d="M4.6 20.4c0-4.1 3.3-7.4 7.4-7.4s7.4 3.3 7.4 7.4" stroke="#7A7A7A" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span>我的</span>
+        </div>
+      </div></div>
+    </div>
+    <div class="caption"><b>01 首页 · 正在直播</b> — 深色直播卡作为唯一视觉主角，其余信息降为羊皮纸列表</div>
+  </section>
+
+  <!-- ============ 02 投稿 ============ -->
+  <section class="screen-wrap">
+    <div class="phone">
+      <div class="status">
+        <div class="time">9:41</div>
+        <svg width="68" height="13" viewBox="0 0 68 13" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="8" width="3" height="5" rx="1" fill="#1D1D1F"/><rect x="5" y="6" width="3" height="7" rx="1" fill="#1D1D1F"/><rect x="10" y="4" width="3" height="9" rx="1" fill="#1D1D1F"/><rect x="15" y="1.5" width="3" height="11.5" rx="1" fill="#1D1D1F"/><path d="M25.5 5.2a9.5 9.5 0 0 1 11 0" stroke="#1D1D1F" stroke-width="1.6" stroke-linecap="round"/><path d="M27.8 8.1a6 6 0 0 1 6.4 0" stroke="#1D1D1F" stroke-width="1.6" stroke-linecap="round"/><circle cx="31" cy="11" r="1.4" fill="#1D1D1F"/><rect x="45" y="1.5" width="20" height="10" rx="3" stroke="#1D1D1F" stroke-width="1.2" opacity="0.4"/><rect x="47" y="3.5" width="14" height="6" rx="1.6" fill="#1D1D1F"/><path d="M66.5 5v3" stroke="#1D1D1F" stroke-width="1.2" opacity="0.4" stroke-linecap="round"/></svg>
+      </div>
+      <div class="content s2">
+        <div>
+          <div class="page-title">投稿</div>
+          <div class="page-sub">点歌或文稿，被选中即可在节目中播出</div>
+        </div>
+        <div class="segment"><div class="seg on">点歌</div><div class="seg">文稿投稿</div></div>
+        <div class="form">
+          <div class="field"><div class="lb">歌曲名</div><div class="input">请输入歌曲名</div></div>
+          <div class="field"><div class="lb">歌手</div><div class="input">请输入歌手</div></div>
+          <div class="field"><div class="lb">祝福语（选填）</div><div class="input area">想说点什么…</div></div>
+          <div class="field"><div class="lb">希望播出时间（选填）</div><div class="input">例如 9 月 18 日 午间</div></div>
+        </div>
+        <div class="hint">首次提交将自动登录，不收集手机号</div>
+      </div>
+      <div class="bottom-cta"><button class="btn btn-primary btn-block">提交投稿</button></div>
+      <div class="tabbar"><div class="pillbar">
+        <div class="tab">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.6 10.5 12 3.6l8.4 6.9V20a1 1 0 0 1-1 1h-4.5v-6H9.1v6H4.6a1 1 0 0 1-1-1v-9.5Z" stroke="#7A7A7A" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span>首页</span>
+        </div>
+        <div class="tab on">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3.6H5.6a2 2 0 0 0-2 2v12.8a2 2 0 0 0 2 2h12.8a2 2 0 0 0 2-2V12" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M17.1 3.4l3.5 3.5-8.1 8.1-4.3.8.8-4.3 8.1-8.1Z" stroke="#FFFFFF" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span>投稿</span>
+        </div>
+        <div class="tab">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="9.2" cy="8" r="3.4" stroke="#7A7A7A" stroke-width="1.7"/><path d="M2.9 20c0-3.5 2.8-6.3 6.3-6.3s6.3 2.8 6.3 6.3" stroke="#7A7A7A" stroke-width="1.7" stroke-linecap="round"/><path d="M16.4 5.3a3 3 0 0 1 0 5.5" stroke="#7A7A7A" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span>风采</span>
+        </div>
+        <div class="tab">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="3.8" stroke="#7A7A7A" stroke-width="1.7"/><path d="M4.6 20.4c0-4.1 3.3-7.4 7.4-7.4s7.4 3.3 7.4 7.4" stroke="#7A7A7A" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span>我的</span>
+        </div>
+      </div></div>
+    </div>
+    <div class="caption"><b>02 投稿</b> — 点歌/文稿用分段控件切换，表单收进一张卡，主按钮固定在底部</div>
+  </section>
+
+  <!-- ============ 03 风采 ============ -->
+  <section class="screen-wrap">
+    <div class="phone">
+      <div class="status">
+        <div class="time">9:41</div>
+        <svg width="68" height="13" viewBox="0 0 68 13" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="8" width="3" height="5" rx="1" fill="#1D1D1F"/><rect x="5" y="6" width="3" height="7" rx="1" fill="#1D1D1F"/><rect x="10" y="4" width="3" height="9" rx="1" fill="#1D1D1F"/><rect x="15" y="1.5" width="3" height="11.5" rx="1" fill="#1D1D1F"/><path d="M25.5 5.2a9.5 9.5 0 0 1 11 0" stroke="#1D1D1F" stroke-width="1.6" stroke-linecap="round"/><path d="M27.8 8.1a6 6 0 0 1 6.4 0" stroke="#1D1D1F" stroke-width="1.6" stroke-linecap="round"/><circle cx="31" cy="11" r="1.4" fill="#1D1D1F"/><rect x="45" y="1.5" width="20" height="10" rx="3" stroke="#1D1D1F" stroke-width="1.2" opacity="0.4"/><rect x="47" y="3.5" width="14" height="6" rx="1.6" fill="#1D1D1F"/><path d="M66.5 5v3" stroke="#1D1D1F" stroke-width="1.2" opacity="0.4" stroke-linecap="round"/></svg>
+      </div>
+      <div class="content s3">
+        <div>
+          <div class="page-title">风采</div>
+          <div class="page-sub">认识广播站里的每一位伙伴</div>
+        </div>
+        <div class="filters">
+          <span class="filter on">全部</span><span class="filter">播音组</span><span class="filter">编辑部</span><span class="filter">技术组</span>
+        </div>
+        <div class="group">
+          <h3>播音组</h3>
+          <div class="grid">
+            <div class="mcard"><div class="photo">成员照片</div><div class="n">林晓</div><div class="g">高二(3)班</div></div>
+            <div class="mcard"><div class="photo">成员照片</div><div class="n">陈默</div><div class="g">高三(1)班</div></div>
+            <div class="mcard"><div class="photo">成员照片</div><div class="n">周予</div><div class="g">高二(7)班</div></div>
+          </div>
+        </div>
+        <div class="group">
+          <h3>编辑部</h3>
+          <div class="grid">
+            <div class="mcard"><div class="photo">成员照片</div><div class="n">苏晚</div><div class="g">高三(2)班</div></div>
+            <div class="mcard"><div class="photo">成员照片</div><div class="n">郑一</div><div class="g">高一(5)班</div></div>
+            <div class="mcard"><div class="photo">成员照片</div><div class="n">何佳</div><div class="g">高二(1)班</div></div>
+          </div>
+        </div>
+        <div class="foot-note">以上为在岗成员，名单每学期初更新</div>
+      </div>
+      <div class="tabbar"><div class="pillbar">
+        <div class="tab">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.6 10.5 12 3.6l8.4 6.9V20a1 1 0 0 1-1 1h-4.5v-6H9.1v6H4.6a1 1 0 0 1-1-1v-9.5Z" stroke="#7A7A7A" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span>首页</span>
+        </div>
+        <div class="tab">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3.6H5.6a2 2 0 0 0-2 2v12.8a2 2 0 0 0 2 2h12.8a2 2 0 0 0 2-2V12" stroke="#7A7A7A" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M17.1 3.4l3.5 3.5-8.1 8.1-4.3.8.8-4.3 8.1-8.1Z" stroke="#7A7A7A" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span>投稿</span>
+        </div>
+        <div class="tab on">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="9.2" cy="8" r="3.4" stroke="#FFFFFF" stroke-width="1.7"/><path d="M2.9 20c0-3.5 2.8-6.3 6.3-6.3s6.3 2.8 6.3 6.3" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round"/><path d="M16.4 5.3a3 3 0 0 1 0 5.5" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span>风采</span>
+        </div>
+        <div class="tab">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="3.8" stroke="#7A7A7A" stroke-width="1.7"/><path d="M4.6 20.4c0-4.1 3.3-7.4 7.4-7.4s7.4 3.3 7.4 7.4" stroke="#7A7A7A" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span>我的</span>
+        </div>
+      </div></div>
+    </div>
+    <div class="caption"><b>03 风采</b> — 职务筛选从「渐变方块」改为胶囊 chip，成员照片改为 1:1 圆角方图（更整齐、也更好批量生成）</div>
+  </section>
+
+  <!-- ============ 04 我的 ============ -->
+  <section class="screen-wrap">
+    <div class="phone">
+      <div class="status">
+        <div class="time">9:41</div>
+        <svg width="68" height="13" viewBox="0 0 68 13" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="8" width="3" height="5" rx="1" fill="#1D1D1F"/><rect x="5" y="6" width="3" height="7" rx="1" fill="#1D1D1F"/><rect x="10" y="4" width="3" height="9" rx="1" fill="#1D1D1F"/><rect x="15" y="1.5" width="3" height="11.5" rx="1" fill="#1D1D1F"/><path d="M25.5 5.2a9.5 9.5 0 0 1 11 0" stroke="#1D1D1F" stroke-width="1.6" stroke-linecap="round"/><path d="M27.8 8.1a6 6 0 0 1 6.4 0" stroke="#1D1D1F" stroke-width="1.6" stroke-linecap="round"/><circle cx="31" cy="11" r="1.4" fill="#1D1D1F"/><rect x="45" y="1.5" width="20" height="10" rx="3" stroke="#1D1D1F" stroke-width="1.2" opacity="0.4"/><rect x="47" y="3.5" width="14" height="6" rx="1.6" fill="#1D1D1F"/><path d="M66.5 5v3" stroke="#1D1D1F" stroke-width="1.2" opacity="0.4" stroke-linecap="round"/></svg>
+      </div>
+      <div class="content s4">
+        <div class="profile">
+          <div class="avatar-round">用户<br>头像</div>
+          <div>
+            <div class="n">沈知行</div>
+            <div class="s">投稿 12 次 · 通过 9 次 · 待审核 1 条</div>
+          </div>
+        </div>
+        <div class="segment"><div class="seg on">全部</div><div class="seg">待审核</div><div class="seg">已通过</div><div class="seg">已驳回</div></div>
+        <div class="item">
+          <div class="top"><span class="badge amber">待审核</span><span class="date">09-15 20:14</span></div>
+          <div class="t">《晴天》— 周杰伦</div>
+          <div class="s">送给高三的学长学姐，祝一切顺利！</div>
+        </div>
+        <div class="item">
+          <div class="top"><span class="badge red">已驳回</span><span class="date">09-12 12:30</span></div>
+          <div class="t">《起风了》— 买辣椒也用券</div>
+          <div class="reason">驳回原因：歌曲版权受限，换一首试试</div>
+        </div>
+        <div class="entries">
+          <div class="entry"><span>关于菁悠广播站</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 5.5 16 12l-6.5 6.5" stroke="#C7C7CC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="entry"><span>意见反馈与联系</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 5.5 16 12l-6.5 6.5" stroke="#C7C7CC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        </div>
+      </div>
+      <div class="tabbar"><div class="pillbar">
+        <div class="tab">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.6 10.5 12 3.6l8.4 6.9V20a1 1 0 0 1-1 1h-4.5v-6H9.1v6H4.6a1 1 0 0 1-1-1v-9.5Z" stroke="#7A7A7A" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span>首页</span>
+        </div>
+        <div class="tab">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3.6H5.6a2 2 0 0 0-2 2v12.8a2 2 0 0 0 2 2h12.8a2 2 0 0 0 2-2V12" stroke="#7A7A7A" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M17.1 3.4l3.5 3.5-8.1 8.1-4.3.8.8-4.3 8.1-8.1Z" stroke="#7A7A7A" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span>投稿</span>
+        </div>
+        <div class="tab">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="9.2" cy="8" r="3.4" stroke="#7A7A7A" stroke-width="1.7"/><path d="M2.9 20c0-3.5 2.8-6.3 6.3-6.3s6.3 2.8 6.3 6.3" stroke="#7A7A7A" stroke-width="1.7" stroke-linecap="round"/><path d="M16.4 5.3a3 3 0 0 1 0 5.5" stroke="#7A7A7A" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span>风采</span>
+        </div>
+        <div class="tab on">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="3.8" stroke="#FFFFFF" stroke-width="1.7"/><path d="M4.6 20.4c0-4.1 3.3-7.4 7.4-7.4s7.4 3.3 7.4 7.4" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span>我的</span>
+        </div>
+      </div></div>
+    </div>
+    <div class="caption"><b>04 我的</b> — 顶部加投稿统计，状态标签统一色板（待审核/已通过/已驳回），把「关于」入口收进这里</div>
+  </section>
+
+  <!-- ============ 05 节目详情 ============ -->
+  <section class="screen-wrap">
+    <div class="phone">
+      <div class="status">
+        <div class="time">9:41</div>
+        <svg width="68" height="13" viewBox="0 0 68 13" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="8" width="3" height="5" rx="1" fill="#1D1D1F"/><rect x="5" y="6" width="3" height="7" rx="1" fill="#1D1D1F"/><rect x="10" y="4" width="3" height="9" rx="1" fill="#1D1D1F"/><rect x="15" y="1.5" width="3" height="11.5" rx="1" fill="#1D1D1F"/><path d="M25.5 5.2a9.5 9.5 0 0 1 11 0" stroke="#1D1D1F" stroke-width="1.6" stroke-linecap="round"/><path d="M27.8 8.1a6 6 0 0 1 6.4 0" stroke="#1D1D1F" stroke-width="1.6" stroke-linecap="round"/><circle cx="31" cy="11" r="1.4" fill="#1D1D1F"/><rect x="45" y="1.5" width="20" height="10" rx="3" stroke="#1D1D1F" stroke-width="1.2" opacity="0.4"/><rect x="47" y="3.5" width="14" height="6" rx="1.6" fill="#1D1D1F"/><path d="M66.5 5v3" stroke="#1D1D1F" stroke-width="1.2" opacity="0.4" stroke-linecap="round"/></svg>
+      </div>
+      <div class="navbar">
+        <div class="back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14.5 5.5 8 12l6.5 6.5" stroke="#1D1D1F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="title">节目详情</div>
+        <div class="spacer"></div>
+      </div>
+      <div class="content s5">
+        <div class="live">
+          <div class="live-top"><span class="dot"></span><span class="live-label">正在直播 · 已播出 26 分钟</span></div>
+          <div class="live-title" style="font-size:24px">午间音乐时光</div>
+          <div class="live-meta">主持人 林晓 · 校园民谣 · 第 42 期</div>
+          <div class="player">
+            <div class="play"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 4.5 19 12 7 19.5V4.5Z" fill="#FFFFFF"/></svg></div>
+            <div class="progress"></div>
+            <span class="duration">24:16</span>
+          </div>
+        </div>
+        <div class="intro">每周一至周五午间 12:20 开播，聊聊校园里的新鲜事，播放同学们的点歌与祝福。投稿被选中即可在节目中播出。</div>
+        <div class="sec-head"><div class="sec-title">留言</div><span class="link" style="color:var(--muted)">24 条</span></div>
+        <div class="comments">
+          <div class="cmt"><div class="photo"></div><div class="body"><div class="n">李知夏</div><div class="c">今天这期太治愈了，正好在教室听到！</div><div class="tm">12:41</div></div></div>
+          <div class="cmt"><div class="photo"></div><div class="body"><div class="n">王砚</div><div class="c">求一首《晴天》，送给隔壁班的朋友。</div><div class="tm">12:35</div></div></div>
+          <div class="cmt"><div class="photo"></div><div class="body"><div class="n">陈屿</div><div class="c">主播声音好舒服，每天午休都听。</div><div class="tm">12:28</div></div></div>
+          <div class="cmt"><div class="photo"></div><div class="body"><div class="n">赵小满</div><div class="c">点一首《小美满》，祝大家考试顺利～</div><div class="tm">12:12</div></div></div>
+        </div>
+      </div>
+      <div class="input-bar">
+        <div class="input">说点什么…</div>
+        <button class="send">发送</button>
+      </div>
+    </div>
+    <div class="caption"><b>05 节目详情</b> — 顶部深色卡 + 播放条，留言改为头像左置列表，底部固定留言输入栏</div>
+  </section>
+
+</div>
+</body>
+</html>

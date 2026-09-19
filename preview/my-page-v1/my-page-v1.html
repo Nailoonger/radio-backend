@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>我的页 v1 · 深色 Hero 用户卡</title>
+<style>
+  :root {
+    --accent: #0066cc;
+    --ink: #1d1d1f;
+    --tile: #272729;
+    --muted: #6b7280;
+    --soft: #9aa3ae;
+    --parchment: #f5f5f7;
+    --divider: #f0f0f0;
+    --hairline: #e0e0e0;
+    --green-bg: #e5f6ec; --green-fg: #178a4c;
+    --amber-bg: #fdf2df; --amber-fg: #b7791f;
+    --red-bg: #fdecea; --red-fg: #b42318;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f5f7; color: var(--ink); padding: 34px 30px 50px; }
+
+  .head { max-width: 1000px; margin: 0 auto 26px; }
+  .head h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+  .head p { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.8; }
+  .head b { color: var(--ink); }
+
+  .stage { display: flex; gap: 34px; justify-content: center; flex-wrap: wrap; }
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .phone { width: 340px; height: 720px; border-radius: 44px; background: #0b0b0f; padding: 10px; box-shadow: 0 30px 60px -22px rgba(15,28,46,.35); flex: none; }
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 35px; overflow: hidden; background: var(--divider); display: flex; flex-direction: column; }
+  .cap { font-size: 12.5px; color: var(--muted); }
+  .cap b { color: var(--ink); }
+
+  .statusbar { height: 34px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font-size: 11.5px; font-weight: 600; color: var(--ink); flex: none; background: var(--divider); }
+  .sig { display: flex; gap: 4px; }
+  .sig i { display: block; background: var(--ink); border-radius: 1px; }
+
+  .body { flex: 1; padding: 14px 20px 0; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+
+  /* ══════════ 深色 Hero 用户卡（全页唯一深色块 = 视觉焦点） ══════════ */
+  .hero {
+    background: var(--tile);
+    border-radius: 22px;
+    padding: 22px 20px 18px;
+    color: #fff;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .hero-top { display: flex; align-items: center; gap: 13px; }
+  .avatar {
+    width: 52px; height: 52px; border-radius: 50%; flex: none;
+    background: rgba(255,255,255,0.12);
+    border: 1.5px solid rgba(255,255,255,0.35);
+    color: #fff; font-size: 20px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .hero-id { flex: 1; min-width: 0; }
+  .hero-name { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .hero-meta { font-size: 11.5px; color: rgba(255,255,255,0.62); margin-top: 4px; letter-spacing: 0.4px; }
+  .hero-badge { font-size: 10.5px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.85); flex: none; }
+
+  /* 统计行：三个数字，白 num + 半透明白 label（dark 卡里的骨架/文字配色同 v8） */
+  .hero-stats { display: flex; background: rgba(255,255,255,0.08); border-radius: 14px; padding: 12px 0; }
+  .stat { flex: 1; text-align: center; position: relative; }
+  .stat + .stat::before { content: ''; position: absolute; left: 0; top: 15%; bottom: 15%; width: 1px; background: rgba(255,255,255,0.14); }
+  .stat .n { font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat.warn .n { color: #ffd591; }
+  .stat .l { font-size: 10.5px; color: rgba(255,255,255,0.62); margin-top: 3px; letter-spacing: 0.5px; }
+
+  /* ══════════ 状态筛选（白底胶囊分段，与现版一致） ══════════ */
+  .segment { position: relative; display: flex; background: #fff; border: 1px solid var(--hairline); border-radius: 999px; padding: 3px; }
+  .seg-ind { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 4); background: var(--ink); border-radius: 999px; transition: left .24s; }
+  .seg-item { position: relative; z-index: 1; flex: 1; text-align: center; padding: 7px 0; font-size: 12px; color: var(--muted); border-radius: 999px; }
+  .seg-item.on { color: #fff; font-weight: 600; }
+
+  /* ══════════ 投稿条目（羊皮纸卡不变） ══════════ */
+  .item { background: var(--parchment); border-radius: 16px; padding: 15px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .between { display: flex; align-items: center; justify-content: space-between; }
+  .tag { font-size: 10.5px; padding: 3px 9px; border-radius: 999px; }
+  .t-pending { background: var(--amber-bg); color: var(--amber-fg); }
+  .t-pass { background: var(--green-bg); color: var(--green-fg); }
+  .time { font-size: 10.5px; color: var(--soft); font-variant-numeric: tabular-nums; }
+  .s-title { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+  .s-cap { font-size: 11.5px; color: var(--muted); line-height: 1.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cancel { margin-left: auto; font-size: 11.5px; color: var(--muted); padding: 5px 14px; border-radius: 999px; background: #fff; }
+
+  /* ══════════ 入口 ══════════ */
+  .entries { display: flex; flex-direction: column; gap: 10px; margin-top: auto; margin-bottom: 12px; }
+  .entry { display: flex; align-items: center; justify-content: space-between; background: var(--parchment); border-radius: 16px; padding: 15px 16px; font-size: 13.5px; font-weight: 600; color: var(--ink); }
+  .chev { width: 7px; height: 7px; border-right: 1.5px solid #c6cbd2; border-top: 1.5px solid #c6cbd2; transform: rotate(45deg); }
+  .entry-logout { justify-content: center; color: var(--red-fg); }
+
+  /* tabbar 占位 */
+  .tabbar { height: 58px; background: #fff; border-top: 1px solid var(--hairline); display: flex; flex: none; }
+  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 10px; color: var(--soft); }
+  .tab .ico { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid currentColor; opacity: .7; }
+  .tab.on { color: var(--ink); font-weight: 600; }
+  .tab.on .ico { background: var(--ink); border-color: var(--ink); border-radius: 50%; opacity: 1; }
+
+  /* 未登录 hero */
+  .hero-login { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 26px 20px 24px; }
+  .hero-logo { width: 64px; height: 64px; border-radius: 50%; background: rgba(255,255,255,0.12); border: 1.5px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 22px; font-weight: 700; }
+  .hero-login .t { font-size: 16px; font-weight: 600; }
+  .hero-login .s { font-size: 11.5px; color: rgba(255,255,255,0.62); line-height: 1.6; }
+  .hero-login .btn { margin-top: 6px; height: 40px; padding: 0 34px; border-radius: 999px; background: #fff; color: var(--ink); font-size: 13px; font-weight: 600; display: flex; align-items: center; }
+
+  .notes { max-width: 1000px; margin: 30px auto 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .note { background: #fff; border: 1px solid #e8e8ec; border-radius: 14px; padding: 14px 18px; }
+  .note .n-t { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .note .n-b { font-size: 12px; color: var(--muted); line-height: 1.8; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>「我的」页 v1 预览 · 深色 Hero 用户卡</h1>
+  <p>
+    现在的问题：整页全是同灰底的卡片摞着，<b>没有视觉落点</b>。这版把<b>用户卡升级为全页唯一的深色卡（v8 的焦点手法：深色永远留给「有内容可看」的地方）</b>，
+    里面顺势加了一行<b>三格统计（投稿 / 待审核 / 已通过）</b>——「我的」页的核心问题「我的进度怎么样」一眼就有答案。
+    其余（筛选胶囊 / 投稿列表 / 入口）保持羊皮纸浅色，深浅对比就是层级。<b>确认后我再改 wxml/wxss。</b>
+  </p>
+</div>
+
+<div class="stage">
+  <!-- ══════════ 屏 1：已登录 ══════════ -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="screen">
+        <div class="statusbar">
+          <span>17:36</span>
+          <span class="sig"><i style="width:14px;height:8px"></i><i style="width:16px;height:8px;opacity:.4"></i></span>
+        </div>
+        <div class="body">
+          <div class="hero">
+            <div class="hero-top">
+              <span class="avatar">陈</span>
+              <div class="hero-id">
+                <div class="hero-name">陈思琪</div>
+                <div class="hero-meta">2023 级 1 班 · 20230101</div>
+              </div>
+              <span class="hero-badge">菁悠成员</span>
+            </div>
+            <div class="hero-stats">
+              <div class="stat"><div class="n">6</div><div class="l">全部投稿</div></div>
+              <div class="stat warn"><div class="n">1</div><div class="l">待审核</div></div>
+              <div class="stat"><div class="n">4</div><div class="l">已通过</div></div>
+              <div class="stat"><div class="n">1</div><div class="l">已驳回</div></div>
+            </div>
+          </div>
+
+          <div class="segment">
+            <span class="seg-ind"></span>
+            <div class="seg-item on">全部</div>
+            <div class="seg-item">待审核</div>
+            <div class="seg-item">已通过</div>
+            <div class="seg-item">已驳回</div>
+          </div>
+
+          <div class="item">
+            <div class="between">
+              <span class="tag t-pending">待审核</span>
+              <span class="time">2026-09-19 01:08</span>
+            </div>
+            <div class="s-title">秋日私语：写给十月的校园</div>
+            <div class="s-cap">每当樱花季来的时候，我就会想起操场旁那排银杏……</div>
+            <div class="between"><span></span><span class="cancel">撤销</span></div>
+          </div>
+
+          <div class="item">
+            <div class="between">
+              <span class="tag t-pass">已通过</span>
+              <span class="time">2026-09-16 12:20</span>
+            </div>
+            <div class="s-title">晴天 — 周杰伦</div>
+            <div class="s-cap">点给高三 2 班全体同学，祝大家月考顺利。</div>
+          </div>
+
+          <div class="entries">
+            <div class="entry">关于菁悠广播站 <span class="chev"></span></div>
+            <div class="entry entry-logout">退出登录</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><span class="ico"></span>首页</div>
+          <div class="tab"><span class="ico"></span>投稿</div>
+          <div class="tab"><span class="ico"></span>风采</div>
+          <div class="tab on"><span class="ico"></span>我的</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>屏 1 · 已登录</b>（深色 Hero = 焦点；四格统计直接回答「我的进度」）</div>
+  </div>
+
+  <!-- ══════════ 屏 2：未登录 ══════════ -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="screen">
+        <div class="statusbar">
+          <span>17:36</span>
+          <span class="sig"><i style="width:14px;height:8px"></i><i style="width:16px;height:8px;opacity:.4"></i></span>
+        </div>
+        <div class="body">
+          <div class="hero hero-login">
+            <span class="hero-logo">菁</span>
+            <div class="t">登录后查看你的投稿</div>
+            <div class="s">不收集头像与手机号，头像由姓名生成<br />使用学校分发的学号即可登录</div>
+            <span class="btn">使用学号登录</span>
+          </div>
+
+          <div class="segment">
+            <span class="seg-ind"></span>
+            <div class="seg-item on">全部</div>
+            <div class="seg-item">待审核</div>
+            <div class="seg-item">已通过</div>
+            <div class="seg-item">已驳回</div>
+          </div>
+
+          <div class="item" style="align-items:center;gap:6px;">
+            <div class="s-title" style="text-align:center;width:100%">暂无投稿记录</div>
+            <div class="s-cap" style="text-align:center;width:100%">登录后，点歌与文稿的审核进度都会显示在这里</div>
+          </div>
+
+          <div class="entries">
+            <div class="entry">关于菁悠广播站 <span class="chev"></span></div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><span class="ico"></span>首页</div>
+          <div class="tab"><span class="ico"></span>投稿</div>
+          <div class="tab"><span class="ico"></span>风采</div>
+          <div class="tab on"><span class="ico"></span>我的</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>屏 2 · 未登录</b>（深色卡当登录引导，同一个焦点位置）</div>
+  </div>
+</div>
+
+<div class="notes">
+  <div class="note">
+    <div class="n-t">焦点从哪来</div>
+    <div class="n-b">v8 的既定手法：<b>深色卡 = 全页唯一主角</b>（管理端年级卡、直播行都这么做）。用户卡从灰底升级为墨黑 Hero 后，页面第一次有了「先看哪」的答案；下方所有羊皮纸卡自动退为内容层，深浅对比本身就是层级，不需要加任何高亮色。</div>
+  </div>
+  <div class="note">
+    <div class="n-t">顺手解决一个信息问题</div>
+    <div class="n-b">Hero 卡里加了一行<b>四格统计：全部 / 待审核 / 已通过 / 已驳回</b>。数据后端都有（list 接口的 status 分布，前端汇总即可，不用新接口）。待审核数用暖黄色点亮——它是学生最关心的数字；筛选胶囊的默认态和统计天然呼应。</div>
+  </div>
+  <div class="note">
+    <div class="n-t">改动的边界</div>
+    <div class="n-b">只动「我的」页（mySubmit）的 wxml/wxss + js 里加一个 status 分布汇总（纯前端计算）；用户卡上会补充班级·学号一行（userInfo 里已有）；投稿列表、筛选交互、撤销、关于/退出全部保持现状。</div>
+  </div>
+  <div class="note">
+    <div class="n-t">确认后我做什么</div>
+    <div class="n-b">改 mySubmit 的 wxml/wxss：深色 Hero 卡（含统计行）+ 未登录态同位置换成深色登录引导；segment / 列表 / 入口不动。js 只加几行汇总计算，接口零改动。</div>
+  </div>
+</div>
+
+</body>
+</html>

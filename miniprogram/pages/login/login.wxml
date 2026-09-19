@@ -1,9 +1,138 @@
-<view class="container">
-  <view class="logo">📻</view>
-  <view class="brand">菁悠广播站</view>
-  <view class="intro">点击下方按钮使用微信登录</view>
-  <button class="btn-primary" bindtap="doLogin" disabled="{{loading}}">
-    {{loading ? '登录中...' : '微信一键登录'}}
-  </button>
-  <view class="tips">仅获取微信昵称/头像，不收集手机号</view>
+<!-- pages/login/login.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <!-- 顶栏：管理端同款「徽章 + 站名」，左侧返回 -->
+  <view class="topbar">
+    <view class="back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
+    </view>
+    <view class="topbar-brand">
+      <image class="badge" src="/assets/station-badge.png" mode="aspectFit" />
+      <text class="topbar-name">{{step === 'activate' ? '设置新密码' : '菁悠广播站'}}</text>
+    </view>
+    <view class="topbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <!-- 品牌区：收音机线条插画（管理端 SVG 1 单位 = 1rpx 原样映射，全部绝对定位） -->
+    <view class="brand">
+      <view class="radio-art">
+        <view class="wave w1"></view>
+        <view class="wave w2"></view>
+        <view class="wave w3"></view>
+        <view class="radio-body"></view>
+        <view class="sp-outer"></view>
+        <view class="sp-inner"></view>
+        <view class="sp-dot"></view>
+        <view class="knob k1"><view class="tick"></view></view>
+        <view class="knob k2"><view class="tick"></view></view>
+      </view>
+      <text class="tagline">{{step === 'activate' ? '首次登录 · 激活你的账号' : '让每一个声音，都被听见'}}</text>
+    </view>
+
+    <!-- ══════════ 第一步：学号 + 密码 ══════════ -->
+    <block wx:if="{{step === 'login'}}">
+      <view class="glass">
+        <view class="card-title">学生登录</view>
+        <view class="card-sub">使用学校分发的学号进入广播站</view>
+
+        <view class="field">
+          <view class="field-label">学号</view>
+          <view class="input {{loginError ? 'err' : ''}}">
+            <input class="ipt" type="text" placeholder="学校分发的学号，如 20240101"
+                   placeholder-class="ph" value="{{username}}"
+                   bindinput="inputUsername" confirm-type="next" />
+          </view>
+        </view>
+
+        <view class="field">
+          <view class="field-label">密码</view>
+          <view class="input {{loginError ? 'err' : ''}}">
+            <input class="ipt" password="{{!showPwd}}" placeholder="初始密码为 user+学号（如 user20240101）"
+                   placeholder-class="ph" value="{{password}}"
+                   bindinput="inputPassword" confirm-type="done"
+                   bindconfirm="doAccountLogin" />
+            <text class="eye" hover-class="pressed" bindtap="togglePwd">{{showPwd ? '隐藏' : '显示'}}</text>
+          </view>
+        </view>
+
+        <!-- 错误条：输错时贴在按钮上方 -->
+        <view class="error-bar" wx:if="{{loginError}}">{{loginError}}</view>
+
+        <button class="submit" hover-class="pressed"
+                bindtap="doAccountLogin" disabled="{{loading}}">
+          {{loading ? '登录中……' : '登 录'}}
+        </button>
+
+        <view class="or-row">
+          <view class="or-line"></view>
+          <text class="or-txt">或</text>
+          <view class="or-line"></view>
+        </view>
+
+        <button class="ghost-btn" hover-class="pressed"
+                bindtap="doLogin" disabled="{{loading}}">
+          <view class="wx"></view>微信一键登录
+        </button>
+
+        <view class="card-divider"></view>
+        <view class="card-foot">
+          <text class="foot-txt">不收集头像与手机号</text>
+          <text class="foot-txt">头像由姓名生成</text>
+        </view>
+      </view>
+    </block>
+
+    <!-- ══════════ 第二步：首登激活（初始密码改新密码） ══════════ -->
+    <block wx:if="{{step === 'activate'}}">
+      <view class="glass">
+        <view class="hello-row">
+          <view class="avatar">{{realName ? realName[0] : '学'}}</view>
+          <view class="hello-meta">
+            <view class="card-title">你好，{{realName || '同学'}}</view>
+            <view class="card-sub">{{className ? className + ' · ' : ''}}请设置你的新密码</view>
+          </view>
+        </view>
+
+        <view class="field">
+          <view class="field-label">新密码</view>
+          <view class="input">
+            <input class="ipt" password="{{!showPwd}}" placeholder="至少 8 位，含字母和数字"
+                   placeholder-class="ph" value="{{password}}"
+                   bindinput="inputPassword" />
+            <text class="eye" hover-class="pressed" bindtap="togglePwd">{{showPwd ? '隐藏' : '显示'}}</text>
+          </view>
+          <view class="pwd-rule">
+            <text class="rule {{rLen ? 'on' : ''}}">至少 8 位</text>
+            <text class="rule {{rLetter ? 'on' : ''}}">含字母</text>
+            <text class="rule {{rDigit ? 'on' : ''}}">含数字</text>
+          </view>
+        </view>
+
+        <view class="field">
+          <view class="field-label">再输一遍</view>
+          <view class="input">
+            <input class="ipt" password="{{!showPwd2}}" placeholder="两次输入需一致"
+                   placeholder-class="ph" value="{{pwd2}}"
+                   bindinput="inputPwd2" confirm-type="done"
+                   bindconfirm="doActivate" />
+            <text class="eye" hover-class="pressed" bindtap="togglePwd2">{{showPwd2 ? '隐藏' : '显示'}}</text>
+          </view>
+        </view>
+
+        <button class="submit" hover-class="pressed"
+                bindtap="doActivate" disabled="{{loading}}">
+          {{loading ? '保存中……' : '激活账号'}}
+        </button>
+        <view class="skip" hover-class="pressed" bindtap="skipActivate">暂时跳过，下次登录再改</view>
+
+        <view class="card-divider"></view>
+        <view class="card-foot">
+          <text class="foot-txt">初始密码 = user + 学号</text>
+          <text class="foot-txt">改完即激活</text>
+        </view>
+      </view>
+    </block>
+  </view>
 </view>

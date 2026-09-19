@@ -151,8 +151,8 @@ onMounted(fetch);
   min-width: 0;
 }
 .c-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.c-muted { color: #94a3b8; font-variant-numeric: tabular-nums; }
-.c-time { color: #475569; font-variant-numeric: tabular-nums; font-size: 13px; }
+.c-muted { color: var(--muted); font-variant-numeric: tabular-nums; }
+.c-time { color: var(--ink-2); font-variant-numeric: tabular-nums; font-size: 13px; }
 
 .op-cell {
   display: inline-flex;
@@ -162,10 +162,10 @@ onMounted(fetch);
   white-space: nowrap;
 }
 .op-cell :deep(.el-button) { margin-left: 0; }
-.op-approve { color: #10b981; }
-.op-approve:hover { color: #059669; background: #ecfdf5; }
-.op-reject { color: #f59e0b; }
-.op-reject:hover { color: #d97706; background: #fffbeb; }
-.op-delete { color: #94a3b8; }
-.op-delete:hover { color: #dc2626; background: #fef2f2; }
+.op-approve { color: var(--green-fg); }
+.op-approve:hover { color: var(--green-fg); background: #ecfdf5; }
+.op-reject { color: var(--amber-fg); }
+.op-reject:hover { color: var(--amber-fg); background: #fffbeb; }
+.op-delete { color: var(--muted); }
+.op-delete:hover { color: var(--red-fg); background: #fef2f2; }
 </style>

@@ -1,4 +1,7 @@
 {
-  "navigationBarTitleText": "菁悠广播站",
-  "enablePullDownRefresh": true
+  "usingComponents": {
+    "launch-mask": "/components/launch-mask/index"
+  },
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
 }
