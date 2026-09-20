@@ -1,7 +1,7 @@
 'use strict';
 
 const request = require('supertest');
-const { buildApp, initTestEnv } = require('./app');
+const { buildApp, initTestEnv, nextWeekSlotValues } = require('./app');
 const {
   sequelize, resetDB, seedAdmin, loginAdmin, loginUser,
 } = require('./helpers');
@@ -128,10 +128,12 @@ describe('AC11：恢复后接口可用', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ value: 'on' });
     // 因为有 1 分钟防重复，重复 songName 会被 409。换一个名字
+    // v2 起点歌必须带 wantBroadcastTime（时间窗口已由 initTestEnv → openSongWindowForTest 放开）
+    const [slot] = await nextWeekSlotValues();
     const r = await request(app)
       .post('/api/user/submit')
       .set('Authorization', `Bearer ${userToken}`)
-      .send({ type: 1, songName: '恢复测试', singer: '测试' });
+      .send({ type: 1, songName: '恢复测试', singer: '测试', wantBroadcastTime: slot });
     expect(r.body.code).toBe(0);
   });
 });

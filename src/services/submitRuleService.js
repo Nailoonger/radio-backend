@@ -119,7 +119,9 @@ async function checkSongDuplicate(songName, now = Date.now()) {
   const rows = await Submit.findAll({
     where: {
       type: 1,
-      status: { [Op.in]: [0, 1] },          // 待审 / 已通过 都算占用；已驳回不算
+      // v2：待审(0) / 已排期(1) / 候补中(3) / 已补位待审(4) 都算占用；已驳回(2) 不算
+      //（候补也算占用，否则同一首歌可以堆满整个候补队列）
+      status: { [Op.in]: [0, 1, 3, 4] },
       createTime: { [Op.gte]: r.start, [Op.lt]: r.end },
     },
     attributes: ['songName'],

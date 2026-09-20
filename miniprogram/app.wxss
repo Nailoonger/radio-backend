@@ -32,6 +32,9 @@ page {
   --red-bg: #FDE8E8;
   --red-fg: #B42318;
 
+  /* 强调色浅底：点歌 v2 的「已补位·待审」胶囊与「窗口开放中」状态条用它 */
+  --accent-tint: #EAF3FD;
+
   /* ---- 圆角 ---- */
   --r-card: 34rpx;
   --r-input: 23rpx;
@@ -187,6 +190,31 @@ button.btn-block,
 .tag-pending { background: var(--amber-bg); color: var(--amber-fg); }
 .tag-pass    { background: var(--green-bg); color: var(--green-fg); }
 .tag-reject  { background: var(--red-bg);   color: var(--red-fg); }
+/* v2 第 4 态「候补中」：中性灰 —— 不是失败也不是通过，只是还在排队 */
+.tag-queued  { background: var(--divider);  color: var(--ink-2); }
+/* v2 第 5 态「已补位 · 待审」：占着位、还没人审，是唯一需要管理员尽快动手的状态，给强调色浅底 */
+.tag-promoted { background: var(--accent-tint); color: var(--accent); }
+
+/* ============ 点歌时间窗口状态条（v2，常驻；投稿页与我的投稿页共用） ============
+ * 两行结构：第一行是「规则」（每周六 18:00 – 周日 18:00，稳定不变），
+ * 第二行是「此刻状态 + 倒计时」（变化，开放中走强调色）。
+ * 一行塞不下 —— 390px 下规则串 + 倒计时必然折行，且规则稳定、状态易变，分开讲更清楚。 */
+.win-bar {
+  display: flex; align-items: flex-start; gap: 14rpx;
+  padding: 20rpx 26rpx; border-radius: 20rpx;
+  background: var(--parchment);
+}
+/* 开放中只换底色（平色，不是渐变）+ 圆点变强调色 */
+.win-bar.open { background: var(--accent-tint); }
+.win-dot {
+  width: 12rpx; height: 12rpx; margin-top: 9rpx; flex: none;
+  border-radius: var(--r-pill); background: var(--soft);
+}
+.win-bar.open .win-dot { background: var(--accent); }
+.win-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6rpx; }
+.win-txt { font-size: 25rpx; color: var(--ink-2); }
+.win-sub { font-size: 23rpx; color: var(--muted); letter-spacing: 0.5rpx; }
+.win-bar.open .win-sub { color: var(--accent); font-weight: 600; }
 /* 直播小圆点 */
 .dot-live {
   width: 14rpx; height: 14rpx; flex: none;

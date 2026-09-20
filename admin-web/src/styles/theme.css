@@ -29,6 +29,8 @@
   --amber-bg: #fef3c7; --amber-fg: #8a6100;
   --green-bg: #e7f5ec; --green-fg: #1e7a46;
   --red-bg: #fde8e8;  --red-fg: #b42318;
+  /* 强调色浅底：点歌 v2 的「已补位·待审」胶囊用它（唯一需要优先处理的状态） */
+  --acc-bg: #e6f0fa;
 
   /* ── 圆角 / 间距 / 字号 ── */
   --r-card: 18px;   /* 34rpx */

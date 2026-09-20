@@ -27,13 +27,34 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(64),
         allowNull: true,
         field: 'want_broadcast_time',
-        comment: '希望播出时段，如 2026-09-15 午间',
+        comment: '学生首选播出时段，如 2026-09-21 午间 12:20（意愿数据，永不被覆盖）',
+      },
+      // ── v2 排期容量池 / 候补队列（docs/song-queue-v2.md）──────────────
+      //    容量的「占位」口径 = status ∈ {0,1,4} AND scheduled_slot = 某格
+      //    （不再有独立计数器，位子释放＝状态变化，天然不会泄漏）
+      scheduledSlot: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        field: 'scheduled_slot',
+        comment: '实际排期时段（候补补位后可能与首选不同；候补中为空）',
+      },
+      queueAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        field: 'queue_at',
+        comment: '进入候补队列时刻（FIFO 排序键，同刻用 id 兜底）',
+      },
+      promotedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        field: 'promoted_at',
+        comment: '递补为占位状态的时刻',
       },
       status: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: '0=待审核 1=已通过 2=已驳回',
+        comment: '0=待审 1=已排期 2=已驳回 3=候补中 4=已补位待审',
       },
       rejectReason: {
         type: DataTypes.STRING(255),
@@ -55,7 +76,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 0,
         field: 'auto_rejected',
-        comment: '1=由系统自动驳回（点歌名额已满），0=人工处理',
+        comment: '1=系统自动驳回（满额 / 逾期未审），0=人工处理',
       },
       createTime: {
         type: DataTypes.DATE,
@@ -80,6 +101,10 @@ module.exports = (sequelize, DataTypes) => {
         { fields: ['create_time'] },
         // 名额自动驳回要按「type + status + 时间区间」批量扫，单列索引不够
         { name: 'idx_type_status_create', fields: ['type', 'status', 'create_time'] },
+        // v2：每格容量统计 / 排期矩阵
+        { name: 'idx_sched_status', fields: ['scheduled_slot', 'status'] },
+        // v2：候补队列取队首、算位次
+        { name: 'idx_queue', fields: ['status', 'queue_at', 'id'] },
       ],
     }
   );

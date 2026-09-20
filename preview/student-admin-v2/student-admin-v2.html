@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>菁悠广播站 · 管理后台 · 学生账号模块方案 v2（单页 + 筛选条件）</title>
+<style>
+/* ============================================================
+   菁悠广播站 · 管理后台 · 学生账号模块 v2（静态预览，不改任何业务代码）
+
+   v1（左侧目录树）已被否：用户要的是「可筛选条件」，不是层级下钻。
+   v2 的规则：一个页面 + 一排筛选条件，条件自由组合，选什么看什么。
+
+   设计系统完全继承 preview/admin-ui-v8（源头 miniprogram/app.wxss）：
+     1. 全局只有一个强调色 --accent，所有「可点 / 已生效」的东西都用它
+     2. 不用任何装饰性渐变、不用彩色投影
+     3. 深色卡 --tile 是视觉主角，其余信息一律退到羊皮纸 --parchment
+   本版唯一新增：筛选条件条 + 已选条件胶囊 + 弹层（全部由既有 token 拼成）
+   ============================================================ */
+:root{
+  --ink:#1d1d1f; --ink-2:#333333; --muted:#7a7a7a; --muted-2:#6e6e73;
+  --soft:#c7c7cc; --hairline:#e0e0e0; --divider:#f0f0f0;
+  --parchment:#f5f5f7; --canvas:#ffffff; --tile:#272729; --tile-2:#3a3a3c;
+  --accent:#0066cc; --accent-dark:#2997ff; --live:#ff453a;
+  --amber-bg:#fef3c7; --amber-fg:#8a6100;
+  --green-bg:#e7f5ec; --green-fg:#1e7a46;
+  --red-bg:#fde8e8;  --red-fg:#b42318;
+  --acc-bg:#e6f0fa;
+  --r-card:18px; --r-input:12px; --r-tile:20px; --r-pill:9999px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --fs-2xs:10.5px; --fs-xs:11.5px; --fs-sm:12.5px; --fs-md:13.5px;
+  --fs-xl:17px; --fs-2xl:19px; --fs-3xl:26px; --fs-num:30px;
+  --lh-2xl:1.3; --lh-3xl:1.25; --lh-num:1.15; --lh-read:1.7;
+  --ls-tight:-.6px; --ls-tight-sm:-.4px; --ls-wide:.3px; --ls-wide-sm:.5px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","HarmonyOS Sans SC",
+         "MiSans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:#fafafc}
+body{font-family:var(--font);color:var(--ink);font-size:14px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;padding:0 0 80px}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;font-size:inherit;border:none;background:none;cursor:pointer;color:inherit}
+input,textarea,select{font-family:inherit;font-size:inherit;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- 预览外壳（不属于设计稿本身） ---------- */
+.shell{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);
+  backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid var(--hairline)}
+.shell-in{max-width:1480px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:18px}
+.shell-brand{display:flex;align-items:center;gap:11px;flex:none}
+.shell-mark{width:30px;height:30px;border-radius:9px;background:var(--ink);color:#fff;flex:none;
+  display:flex;align-items:center;justify-content:center}
+.shell-mark svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+.shell-brand b{font-size:14.5px;font-weight:600;display:block}
+.shell-brand span{font-size:11px;color:var(--muted);letter-spacing:.4px}
+.vbadge{font-size:11px;font-weight:600;letter-spacing:.6px;background:var(--ink);color:#fff;
+  border-radius:var(--r-pill);padding:3px 9px;flex:none}
+.tabs{display:flex;gap:6px;overflow-x:auto;flex:1;min-width:0;padding:2px 0}
+.tabs::-webkit-scrollbar{height:0}
+.tab{flex:none;height:28px;padding:0 10px;border-radius:var(--r-pill);font-size:12px;font-weight:500;
+  color:var(--muted);background:var(--divider);transition:background .18s,color .18s;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab.on{background:var(--ink);color:#fff;font-weight:600}
+.tab-sep{flex:none;width:1px;background:var(--hairline);margin:5px 4px}
+.zoombox{display:flex;gap:6px;flex:none}
+.zoombox .tab{height:27px;padding:0 11px;font-size:12px}
+.stage{max-width:1480px;margin:0 auto;padding:24px}
+.screen{display:none}
+.screen.on{display:block;animation:fadeUp .3s var(--ease) both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.frame-outer{width:1440px;transform-origin:top left}
+.frame{width:1440px;height:900px;display:flex;flex-direction:column;background:var(--canvas);
+  border:1px solid var(--hairline);border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.09)}
+.chrome{height:40px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;
+  background:var(--parchment);border-bottom:1px solid var(--hairline)}
+.dots{display:flex;gap:7px;flex:none}
+.dots i{width:11px;height:11px;border-radius:50%;background:#dcdce0;display:block}
+.url{flex:1;max-width:640px;height:24px;border-radius:var(--r-pill);background:#fff;
+  border:1px solid var(--hairline);display:flex;align-items:center;gap:7px;padding:0 11px;
+  font-size:11.5px;color:var(--soft);font-family:var(--mono)}
+.url svg{width:12px;height:12px;flex:none;color:var(--soft);stroke:currentColor;fill:none;stroke-width:1.7}
+.url b{color:var(--ink);font-weight:600}
+.cap{font-size:12.5px;color:var(--muted);margin:12px 0 0 2px;display:flex;align-items:flex-start;
+  gap:10px;line-height:1.7;max-width:1360px}
+.cap b{color:var(--ink);font-weight:600}
+.cap .sep{color:var(--soft)}
+.cap code,.doc-card code,.dtab code,.plist code,.spec code{font-family:var(--mono);font-size:11.5px;
+  background:var(--parchment);border-radius:5px;padding:1px 5px;color:var(--ink-2)}
+.app{flex:1;display:flex;min-height:0;position:relative}
+
+/* ---------- 侧栏 / 顶栏（v8 原样） ---------- */
+.rail{width:232px;flex:none;background:var(--canvas);border-right:1px solid var(--hairline);
+  display:flex;flex-direction:column;padding:18px 14px 14px}
+.rail-brand{display:flex;align-items:center;gap:11px;padding:0 6px 16px}
+.rail-logo{width:36px;height:36px;flex:none;border-radius:11px;background:var(--ink);color:#fff;
+  display:flex;align-items:center;justify-content:center}
+.rail-logo svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+.rail-name{font-size:var(--fs-md);font-weight:600}
+.rail-sub{font-size:var(--fs-2xs);color:var(--muted);letter-spacing:var(--ls-wide-sm);margin-top:1px}
+.rail-search{display:flex;align-items:center;gap:8px;height:34px;padding:0 11px;background:var(--parchment);
+  border-radius:10px;color:var(--soft);font-size:12.5px;margin-bottom:16px}
+.rail-search svg{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+.rail-search kbd{margin-left:auto;font-family:inherit;font-size:10.5px;color:var(--muted);
+  background:#fff;border:1px solid var(--hairline);border-radius:5px;padding:1px 5px}
+.rail-nav{flex:1;min-height:0;overflow:hidden}
+.rail-group{font-size:10.5px;font-weight:600;color:var(--soft);letter-spacing:.9px;padding:12px 8px 7px}
+.rail-group:first-child{padding-top:0}
+.rail-item{display:flex;align-items:center;gap:8px;height:38px;padding:0 11px;border-radius:11px;
+  color:var(--ink-2);font-size:var(--fs-md);margin-bottom:2px}
+.rail-item svg{width:17px;height:17px;flex:none;color:var(--muted);stroke:currentColor;fill:none;
+  stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.rail-item .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rail-item:hover{background:var(--parchment)}
+.rail-item.on{background:var(--ink);color:#fff;font-weight:600}
+.rail-item.on svg{color:#fff}
+.rail-badge{font-style:normal;flex:none;min-width:19px;height:19px;padding:0 6px;border-radius:var(--r-pill);
+  background:var(--ink);color:#fff;font-size:10.5px;font-weight:600;
+  display:inline-flex;align-items:center;justify-content:center}
+.rail-item.on .rail-badge{background:#fff;color:var(--ink)}
+.rail-account{flex:none;display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:13px;
+  background:var(--parchment);margin-top:12px}
+.rail-avatar{width:30px;height:30px;flex:none;border-radius:50%;background:var(--ink);color:#fff;
+  font-size:12.5px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.rail-account .who{flex:1;min-width:0}
+.rail-account .nm{font-size:var(--fs-sm);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rail-account .rl{font-size:var(--fs-2xs);color:var(--muted);margin-top:1px}
+
+.work{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{height:64px;flex:none;display:flex;align-items:center;gap:18px;padding:0 26px;
+  background:var(--canvas);border-bottom:1px solid var(--hairline)}
+.tb-title{font-size:var(--fs-2xl);font-weight:600;letter-spacing:-.3px;line-height:var(--lh-2xl)}
+.tb-sub{font-size:var(--fs-sm);color:var(--muted);margin-top:2px;letter-spacing:var(--ls-wide)}
+.tbright{margin-left:auto;display:flex;align-items:center;gap:8px}
+.tb-search{display:flex;align-items:center;gap:8px;height:34px;width:210px;padding:0 12px;
+  background:var(--parchment);border-radius:10px;color:var(--soft);font-size:12.5px}
+.tb-search svg{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+.iconbtn{width:34px;height:34px;flex:none;border-radius:50%;background:var(--parchment);
+  display:flex;align-items:center;justify-content:center;color:var(--ink-2);transition:background .16s}
+.iconbtn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- 画布 ---------- */
+.canvas{flex:1;min-height:0;overflow-y:auto;background:var(--canvas);padding:20px 26px 30px;
+  display:flex;flex-direction:column;gap:16px}
+/* ⚠️ 固定高取景框里的滚动容器，子项必须 flex:none，否则表格卡会被压矮（overflow:hidden 一裁少整行，
+   且此时 scrollHeight === clientHeight，量的溢出是 0，"溢出"根本量不出来） */
+.canvas>*{flex:none}
+.canvas::-webkit-scrollbar{width:8px}
+.canvas::-webkit-scrollbar-thumb{background:#e3e3e6;border-radius:4px}
+
+/* ---------- 排版 ---------- */
+.sec-title{font-size:var(--fs-xl);font-weight:600;letter-spacing:var(--ls-tight-sm);line-height:1.35}
+.link{font-size:12.5px;color:var(--accent);font-weight:500;cursor:pointer}
+.link:hover{text-decoration:underline}
+.sub{font-size:var(--fs-sm);color:var(--muted);letter-spacing:var(--ls-wide)}
+.micro{font-size:var(--fs-xs);color:var(--muted-2);letter-spacing:var(--ls-wide)}
+.strong{font-size:var(--fs-md);font-weight:500}
+.mono{font-family:var(--mono);font-size:var(--fs-sm);color:var(--ink-2)}
+.rowc{display:flex;align-items:center}
+.between{display:flex;align-items:center;justify-content:space-between}
+.grow{flex:1;min-width:0}
+.gap8{gap:8px}.gap13{gap:13px}.gap18{gap:18px}
+.sec{display:flex;flex-direction:column;gap:13px}
+.sec-head{display:flex;align-items:center;justify-content:space-between;gap:13px}
+.cols{display:flex;gap:18px;align-items:stretch}
+.cols>*{min-width:0}
+.el{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- 卡片 / 深色卡 ---------- */
+.card{background:var(--parchment);border-radius:var(--r-card);padding:20px}
+.card-white{background:#fff;border:1px solid var(--hairline);border-radius:var(--r-card);padding:20px}
+.kv{display:flex;font-size:var(--fs-md);line-height:var(--lh-md);padding:12px 0;
+  border-bottom:1px solid var(--divider);align-items:center}
+.kv:last-child{border-bottom:none}
+.kv .k{width:120px;flex:none;color:var(--muted);font-size:var(--fs-sm)}
+.tile{background:var(--tile);border-radius:var(--r-tile);padding:20px 22px;
+  display:flex;flex-direction:column;gap:12px;color:#fff}
+.tile-status{display:flex;align-items:center;gap:8px;font-size:var(--fs-xs);font-weight:500;
+  color:#ccc;letter-spacing:var(--ls-wide-sm)}
+.dot-live{width:7px;height:7px;border-radius:50%;background:var(--live);flex:none}
+.dot-idle{width:7px;height:7px;border-radius:50%;background:#8e8e93;flex:none}
+.tile-title{font-size:var(--fs-3xl);font-weight:600;color:#fff;letter-spacing:var(--ls-tight);line-height:var(--lh-3xl)}
+.tile-meta{font-size:var(--fs-sm);color:#ccc;letter-spacing:var(--ls-wide);line-height:1.6}
+.tile-meta b{color:#fff;font-weight:600}
+.tile-actions{display:flex;gap:8px}
+
+/* ---------- 按钮 ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 18px;
+  border-radius:var(--r-pill);font-size:var(--fs-md);font-weight:500;line-height:1;white-space:nowrap}
+.btn svg{width:15px;height:15px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.btn-primary{background:var(--accent);color:#fff;font-weight:600}
+.btn-white{background:#fff;color:var(--accent);font-weight:600}
+.btn-quiet{background:#fff;border:1px solid var(--hairline);color:var(--ink-2)}
+.btn-plain{background:transparent;color:var(--muted);padding:0 10px}
+.btn-danger-quiet{background:#fff;border:1px solid var(--red-bg);color:var(--red-fg);font-weight:500}
+.btn-danger-fill{background:var(--red-fg);color:#fff;font-weight:600}
+.btn-sm{height:30px;padding:0 14px;font-size:var(--fs-sm)}
+.btn-xs{height:26px;padding:0 11px;font-size:var(--fs-xs)}
+
+/* ---------- 标签 ---------- */
+.tag{display:inline-flex;align-items:center;height:23px;padding:0 10px;border-radius:var(--r-pill);
+  font-size:var(--fs-xs);font-weight:500;letter-spacing:.2px;line-height:1;white-space:nowrap}
+.tag-ok{background:var(--green-bg);color:var(--green-fg)}
+.tag-warn{background:var(--amber-bg);color:var(--amber-fg)}
+.tag-reject{background:var(--red-bg);color:var(--red-fg)}
+.tag-mute{background:#ebebee;color:var(--muted)}
+.tag-acc{background:var(--acc-bg);color:var(--accent)}
+.tag-top{background:var(--ink);color:#fff}
+.tag-outline{background:#fff;border:1px solid var(--hairline);color:var(--muted)}
+.ano{display:inline-flex;align-items:center;height:19px;padding:0 7px;border-radius:var(--r-pill);
+  font-size:var(--fs-2xs);font-weight:600;letter-spacing:var(--ls-wide);white-space:nowrap}
+.ano-ok{background:var(--green-bg);color:var(--green-fg)}
+.ano-mid{background:var(--amber-bg);color:var(--amber-fg)}
+.ano-acc{background:var(--acc-bg);color:var(--accent)}
+.ano-mute{background:#ebebee;color:var(--muted)}
+.chip-light{display:inline-flex;align-items:center;height:24px;padding:0 11px;border-radius:var(--r-pill);
+  background:var(--divider);color:var(--muted-2);font-size:var(--fs-xs);letter-spacing:var(--ls-wide-sm)}
+
+/* ============================================================
+   筛选条件条（本版核心）
+   ============================================================ */
+.filterbar{background:var(--parchment);border-radius:var(--r-card);padding:16px 18px 14px;
+  display:flex;flex-direction:column;gap:12px}
+.frow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fcond{display:flex;align-items:center;gap:9px;height:36px;padding:0 12px 0 13px;background:#fff;
+  border:1px solid var(--hairline);border-radius:var(--r-pill);flex:none;white-space:nowrap}
+.fcond .lbl{font-size:var(--fs-xs);color:var(--muted);letter-spacing:var(--ls-wide-sm)}
+.fcond .val{font-size:var(--fs-sm);color:var(--ink);font-weight:500}
+.fcond .val.ph{color:var(--soft);font-weight:400}
+.fcond svg{width:12px;height:12px;color:var(--soft);stroke:currentColor;fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round}
+/* 生效中的条件：唯一强调色，一眼能看出"我现在在筛什么" */
+.fcond.on{border-color:var(--accent);background:var(--acc-bg)}
+.fcond.on .lbl{color:var(--accent);opacity:.75}
+.fcond.on .val{color:var(--accent);font-weight:600}
+.fcond.on svg{color:var(--accent)}
+.fcond.lock{background:var(--parchment);border-style:dashed;color:var(--soft)}
+.fcond.lock .val.ph{color:var(--soft)}
+.fsearch{display:flex;align-items:center;gap:9px;height:36px;flex:1;min-width:260px;
+  padding:0 14px;background:#fff;border:1px solid var(--hairline);border-radius:var(--r-pill);
+  color:var(--soft);font-size:12.5px}
+.fsearch.on{border-color:var(--accent)}
+.fsearch svg{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+.fsearch .kw{color:var(--ink);font-size:var(--fs-sm);font-weight:500}
+.fsearch .kk{font-family:inherit;font-size:10.5px;color:var(--muted);background:var(--parchment);
+  border:1px solid var(--hairline);border-radius:5px;padding:1px 5px}
+.picked{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:2px;
+  border-top:1px solid var(--hairline)}
+.picked .pt{font-size:var(--fs-xs);color:var(--muted-2);letter-spacing:var(--ls-wide-sm);padding-top:9px}
+.pk{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 9px 0 11px;
+  border-radius:var(--r-pill);background:#fff;border:1px solid var(--hairline);margin-top:9px;
+  font-size:var(--fs-xs);color:var(--ink-2);letter-spacing:var(--ls-wide-sm);white-space:nowrap}
+.pk b{font-weight:600;color:var(--ink)}
+.pk svg{width:10px;height:10px;color:var(--soft);stroke:currentColor;fill:none;stroke-width:2.4;
+  stroke-linecap:round;stroke-linejoin:round}
+.pk.acc{background:var(--acc-bg);border-color:transparent;color:var(--accent)}
+.pk.acc b{color:var(--accent)}
+.pk.acc svg{color:var(--accent)}
+
+/* 条件下拉的展开面板（画在取景框里，用来解释选项长什么样） */
+.fpop{position:absolute;z-index:20;background:#fff;border:1px solid var(--hairline);border-radius:14px;
+  box-shadow:0 18px 44px -20px rgba(0,0,0,.32);padding:6px;width:230px}
+.fpop.wide{width:290px}
+.fpop .fh{font-size:var(--fs-2xs);font-weight:600;color:var(--soft);letter-spacing:.9px;padding:7px 10px 5px}
+.fopt{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:9px;font-size:var(--fs-md);
+  color:var(--ink-2)}
+.fopt:hover{background:var(--parchment)}
+.stagehold .fpop.inline{position:static;box-shadow:0 8px 22px -14px rgba(0,0,0,.3)}
+.fpop.inline{position:static}
+.fopt .tx{flex:1;min-width:0}
+.fopt .ct{font-size:var(--fs-xs);color:var(--muted);font-variant-numeric:tabular-nums}
+.fopt .ck{width:14px;height:14px;flex:none;color:var(--accent);stroke:currentColor;fill:none;
+  stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.fopt.on{background:var(--acc-bg);color:var(--accent);font-weight:600}
+.fopt.on .ct{color:var(--accent);opacity:.78}
+.fopt.off{color:var(--soft)}
+.fopt.off .ct{color:var(--soft)}
+.fopt .sub2{font-size:var(--fs-2xs);color:var(--muted-2);margin-top:1px}
+.fsep{height:1px;background:var(--divider);margin:6px 8px}
+
+/* 更多操作下拉 */
+.menu{position:absolute;z-index:20;right:26px;top:56px;background:#fff;border:1px solid var(--hairline);
+  border-radius:14px;box-shadow:0 18px 44px -20px rgba(0,0,0,.32);padding:7px;width:286px}
+.menu .mi{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:9px}
+.menu .mi:hover{background:var(--parchment)}
+.menu .mi svg{width:15px;height:15px;flex:none;margin-top:2px;color:var(--muted);stroke:currentColor;
+  fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.menu .mi .t{font-size:var(--fs-md);color:var(--ink);font-weight:500}
+.menu .mi .d{font-size:var(--fs-xs);color:var(--muted);margin-top:1px;line-height:1.55}
+.menu .sep{height:1px;background:var(--divider);margin:6px 8px}
+
+/* ---------- 结果区 ---------- */
+.result-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.result-head .n{font-size:var(--fs-xl);font-weight:600;letter-spacing:var(--ls-tight-sm)}
+.result-head .n b{font-size:var(--fs-2xl)}
+.issue{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--red-bg);
+  border-radius:var(--r-card);padding:12px 16px}
+.issue .ic{width:30px;height:30px;flex:none;border-radius:9px;background:var(--red-bg);color:var(--red-fg);
+  display:flex;align-items:center;justify-content:center}
+.issue .ic svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.issue .t{font-size:var(--fs-md);font-weight:600}
+.issue .m{font-size:var(--fs-sm);color:var(--muted);margin-top:1px}
+
+/* ---------- 表格 ---------- */
+.tb{width:100%;border-collapse:collapse;table-layout:fixed}
+.tb th{text-align:left;font-size:var(--fs-xs);font-weight:500;color:var(--muted);
+  letter-spacing:var(--ls-wide-sm);padding:11px 10px;border-bottom:1px solid rgba(0,0,0,.07);white-space:nowrap}
+.tb th:first-child{padding-left:18px}
+.tb th:last-child{padding-right:18px}
+.tb td{font-size:var(--fs-md);line-height:var(--lh-md);padding:11px 10px;
+  border-bottom:1px solid rgba(0,0,0,.05);vertical-align:middle;color:var(--ink-2)}
+.tb td:first-child{padding-left:18px}
+.tb td:last-child{padding-right:18px}
+.tb tbody tr:hover{background:rgba(255,255,255,.72)}
+.tb tbody tr:last-child td{border-bottom:none}
+.tb .c{text-align:center}
+.tb .r{text-align:right}
+.tb-wrap{background:var(--parchment);border-radius:var(--r-card);padding:5px 0;overflow:hidden}
+.cb{width:16px;height:16px;border-radius:5px;border:1.5px solid #d2d2d7;background:#fff;
+  display:inline-flex;align-items:center;justify-content:center;flex:none;vertical-align:middle}
+.cb.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.cb svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.rowact{display:flex;gap:9px;align-items:center;justify-content:flex-end}
+.rowact .btn{flex:none}
+/* 行内动作分两种语义，别再一律用胶囊：
+   「会改数据的」用实体按钮（撤销 / 停用），「只是切视图的」用强调色文字链接。
+   原来两个都是胶囊，宽度撑爆了操作列，而且主次不分。 */
+.link-btn{display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 2px;flex:none;
+  font-size:var(--fs-xs);font-weight:500;line-height:1;color:var(--accent);white-space:nowrap;
+  transition:color .16s}
+.link-btn:hover{text-decoration:underline}
+.link-btn svg{width:11px;height:11px;flex:none;stroke:currentColor;fill:none;stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .16s var(--ease)}
+.link-btn:hover svg{transform:translateX(2px)}
+/* 链接与实体按钮之间的细分隔线：一眼看出「一个切视图、一个动数据」 */
+.vsep{width:1px;height:13px;background:var(--hairline);flex:none}
+
+/* 空态 */
+.empty{padding:44px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.empty .ei{width:46px;height:46px;border-radius:14px;background:#ebebee;color:var(--muted);
+  display:flex;align-items:center;justify-content:center}
+.empty .ei svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round}
+.empty .et{font-size:var(--fs-md);font-weight:600}
+.empty .em{font-size:var(--fs-sm);color:var(--muted);max-width:420px;line-height:1.7}
+
+/* 分页 */
+.pager{display:flex;align-items:center;gap:6px;justify-content:flex-end;padding:2px 4px 0}
+.pager .info{font-size:var(--fs-sm);color:var(--muted);margin-right:auto}
+.pg{min-width:30px;height:30px;padding:0 9px;border-radius:9px;font-size:var(--fs-sm);color:var(--muted);
+  display:inline-flex;align-items:center;justify-content:center;border:1px solid transparent;
+  font-variant-numeric:tabular-nums}
+.pg.on{background:var(--ink);color:#fff;font-weight:600}
+.pg:hover{border-color:var(--hairline)}
+
+/* 批量操作条 */
+.batchbar{position:sticky;bottom:0;align-self:center;margin-top:auto;display:flex;align-items:center;gap:10px;
+  background:#fff;border:1px solid var(--hairline);border-radius:var(--r-pill);
+  padding:8px 9px 8px 22px;box-shadow:0 10px 28px rgba(0,0,0,.10);z-index:12}
+.batchbar .cnt{font-size:var(--fs-md);font-weight:500;color:var(--ink-2);margin-right:6px}
+.batchbar .cnt b{font-size:var(--fs-xl);font-weight:600;margin:0 3px;color:var(--accent)}
+
+/* 提示条 */
+.noteline{display:flex;gap:8px;font-size:var(--fs-sm);color:var(--ink-2);background:var(--parchment);
+  border:1px solid var(--hairline);border-radius:var(--r-card);padding:10px 16px;line-height:1.65;align-items:flex-start}
+.noteline b{color:var(--accent)}
+.noteline svg{width:15px;height:15px;flex:none;margin-top:2px;stroke:var(--muted);fill:none;
+  stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.warnline{display:flex;gap:8px;font-size:var(--fs-xs);color:var(--red-fg);background:var(--red-bg);
+  border-radius:10px;padding:9px 11px;line-height:1.6}
+.warnline svg{width:14px;height:14px;flex:none;margin-top:2px;stroke:currentColor;fill:none;stroke-width:1.8}
+
+/* ---------- 弹层 ---------- */
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.32);display:flex;align-items:center;
+  justify-content:center;padding:24px;z-index:30}
+.sheet{background:#fff;border-radius:var(--r-tile);display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:0 24px 64px rgba(0,0,0,.28);width:900px;max-height:100%}
+.sheet.wide{width:1020px}
+.sheet.mid{width:700px}
+.sheet-head{flex:none;display:flex;align-items:flex-start;gap:13px;padding:18px 22px;
+  border-bottom:1px solid var(--hairline)}
+.sheet-head .ht{font-size:var(--fs-xl);font-weight:600;letter-spacing:var(--ls-tight-sm)}
+.sheet-head .hs{font-size:var(--fs-sm);color:var(--muted);margin-top:2px;letter-spacing:var(--ls-wide)}
+.sheet-body{flex:1;min-height:0;overflow-y:auto;padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+.sheet-body>*{flex:none}
+.sheet-body::-webkit-scrollbar{width:8px}
+.sheet-body::-webkit-scrollbar-thumb{background:#e3e3e6;border-radius:4px}
+.sheet-foot{flex:none;display:flex;align-items:center;gap:12px;padding:13px 22px;
+  border-top:1px solid var(--hairline)}
+.xbtn{width:30px;height:30px;flex:none;border-radius:50%;background:var(--parchment);margin-left:auto;
+  display:flex;align-items:center;justify-content:center;color:var(--ink-2)}
+.xbtn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+
+/* 步骤条 */
+.stepper{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.st-it{display:inline-flex;align-items:center;gap:8px}
+.st-no{width:23px;height:23px;border-radius:var(--r-pill);display:inline-flex;align-items:center;
+  justify-content:center;background:#ebebee;color:var(--muted);font-size:var(--fs-xs);font-weight:600;line-height:1}
+.st-no.on{background:var(--ink);color:#fff}
+.st-no svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+
+/* 开关 / 表单 */
+.sw{width:44px;height:26px;border-radius:var(--r-pill);background:var(--soft);position:relative;flex:none}
+.sw::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.18)}
+.sw.on{background:var(--accent)}
+.sw.on::after{transform:translateX(18px)}
+.field{display:flex;flex-direction:column;gap:8px}
+.field-label{font-size:var(--fs-sm);font-weight:500;color:var(--muted);letter-spacing:var(--ls-wide)}
+.input{background:#fff;border:1px solid var(--hairline);border-radius:var(--r-input);height:40px;
+  padding:0 13px;font-size:var(--fs-md);width:100%}
+.input.ph{color:var(--soft)}
+.hint{font-size:var(--fs-xs);color:var(--muted-2);letter-spacing:var(--ls-wide);line-height:1.65}
+
+/* ---------- 对照用卡片 ---------- */
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.spec{background:#fff;border:1px solid var(--hairline);border-radius:var(--r-card);padding:18px;
+  display:flex;flex-direction:column;gap:11px}
+.spec .st{font-size:var(--fs-md);font-weight:600;letter-spacing:-.1px}
+.spec .sd{font-size:var(--fs-xs);color:var(--muted-2);line-height:1.6}
+.stagehold{position:relative;background:var(--parchment);border-radius:var(--r-input);
+  padding:14px;display:flex;justify-content:center;min-height:150px}
+
+/* ---------- 方案说明（文档页） ---------- */
+.doc{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+.doc-head{padding:6px 0 4px}
+.eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.4px;color:var(--accent)}
+.doc-head h1{font-size:34px;font-weight:600;letter-spacing:-.9px;margin:9px 0 10px}
+.doc-head p{font-size:14.5px;color:var(--ink-2);max-width:920px;line-height:1.7}
+.doc-head p b{font-weight:600;color:var(--ink)}
+.doc-card{background:#fff;border:1px solid var(--hairline);border-radius:var(--r-card);padding:22px 24px}
+.doc-card h2{font-size:15px;font-weight:600;margin-bottom:13px}
+.doc-p{font-size:13px;color:var(--ink-2);line-height:1.75}
+.doc-p+.doc-p{margin-top:9px}
+.doc-p b{color:var(--ink);font-weight:600}
+.dtab{width:100%;border-collapse:collapse}
+.dtab th{text-align:left;font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.5px;
+  padding:9px 12px;border-bottom:1px solid var(--hairline);background:var(--parchment)}
+.dtab td{font-size:12.5px;padding:9px 12px;border-bottom:1px solid var(--divider);color:var(--ink-2);
+  vertical-align:top;line-height:1.65}
+.dtab tr:last-child td{border-bottom:none}
+.dtab .nt{color:var(--muted)}
+.plist{display:flex;flex-direction:column;gap:9px}
+.plist>div{display:flex;gap:12px;font-size:12.5px;line-height:1.7}
+.plist b{flex:none;width:88px;color:var(--ink);font-weight:600}
+.plist span{color:var(--ink-2);min-width:0}
+.numchip{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;flex:none;
+  border-radius:50%;background:var(--ink);color:#fff;font-size:11px;font-weight:600;line-height:1}
+.rank{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--divider)}
+.rank:last-child{border-bottom:none}
+.rank .rk{flex:none;padding-top:1px}
+.rank .rb{min-width:0}
+.rank .rt{font-size:13px;font-weight:600;color:var(--ink);line-height:1.5}
+.rank .rd{font-size:12.5px;color:var(--ink-2);line-height:1.75;margin-top:3px}
+</style>
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-grid" viewBox="0 0 20 20"><rect x="2.6" y="2.6" width="6.2" height="6.2" rx="2"/><rect x="11.2" y="2.6" width="6.2" height="6.2" rx="2"/><rect x="2.6" y="11.2" width="6.2" height="6.2" rx="2"/><rect x="11.2" y="11.2" width="6.2" height="6.2" rx="2"/></symbol>
+  <symbol id="i-list" viewBox="0 0 20 20"><path d="M7.2 5h9.4M7.2 10h9.4M7.2 15h9.4"/><circle cx="3.6" cy="5" r="1.1"/><circle cx="3.6" cy="10" r="1.1"/><circle cx="3.6" cy="15" r="1.1"/></symbol>
+  <symbol id="i-user" viewBox="0 0 20 20"><circle cx="10" cy="7" r="3.2"/><path d="M4.2 17c.7-3.2 3.1-5 5.8-5s5.1 1.8 5.8 5"/></symbol>
+  <symbol id="i-users" viewBox="0 0 20 20"><circle cx="7.4" cy="7.4" r="2.9"/><path d="M2.6 16.4c.6-2.9 2.5-4.4 4.8-4.4s4.2 1.5 4.8 4.4"/><path d="M13.2 5.1a2.7 2.7 0 0 1 0 5.2M14.4 16.4c-.2-1.7-.7-3-1.5-3.8 2.3-.4 4.3 1 4.8 3.8"/></symbol>
+  <symbol id="i-toggle" viewBox="0 0 20 20"><rect x="2.6" y="6.2" width="14.8" height="7.6" rx="3.8"/><circle cx="13.5" cy="10" r="2.5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 20 20"><path d="M10 2.8 15.8 5v5c0 3.3-2.3 6-5.8 7.2C6.5 16 4.2 13.3 4.2 10V5z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.7"/><path d="M10 2.8v2.1M10 15.1v2.1M2.8 10h2.1M15.1 10h2.1M4.9 4.9l1.5 1.5M13.6 13.6l1.5 1.5M15.1 4.9l-1.5 1.5M6.4 13.6l-1.5 1.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="8.7" cy="8.7" r="5.3"/><path d="M12.6 12.6 16.9 16.9"/></symbol>
+  <symbol id="i-check" viewBox="0 0 20 20"><path d="M4 10.6 7.9 14.5 16 6.2"/></symbol>
+  <symbol id="i-close" viewBox="0 0 20 20"><path d="M5.4 5.4l9.2 9.2M14.6 5.4l-9.2 9.2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.3"/><path d="M10 9.1v4.4M10 6.5v.2"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.3"/><path d="M10 5.9V10l2.9 1.7"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 20 20"><path d="M7.6 5.2 12.8 10l-5.2 4.8"/></symbol>
+  <symbol id="i-chevdown" viewBox="0 0 20 20"><path d="M5.2 7.6 10 12.8l4.8-5.2"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 20 20"><path d="M16.3 10a6.3 6.3 0 1 1-2-4.6"/><path d="M16.5 3.6v3.2h-3.2"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 20 20"><rect x="4.4" y="8.8" width="11.2" height="7.8" rx="2.4"/><path d="M7.2 8.8V6.9a2.8 2.8 0 0 1 5.6 0v1.9"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 20 20"><path d="M4.4 6.4h11.2M8 6.4V4.8h4v1.6M6 6.4l.8 9.2h6.4l.8-9.2"/></symbol>
+  <symbol id="i-radio" viewBox="0 0 20 20"><circle cx="10" cy="11" r="2.4"/><path d="M6 7.2a5.4 5.4 0 0 1 8 0M3.6 4.9a8.6 8.6 0 0 1 12.8 0"/><path d="M10 13.4v3"/></symbol>
+  <symbol id="i-star" viewBox="0 0 20 20"><path d="M10 3.4l2 4.3 4.6.6-3.4 3.2.9 4.6L10 13.9l-4.1 2.2.9-4.6L3.4 8.3l4.6-.6z"/></symbol>
+  <symbol id="i-article" viewBox="0 0 20 20"><rect x="3.6" y="2.8" width="12.8" height="14.4" rx="2.2"/><path d="M6.8 7h6.4M6.8 10.2h6.4M6.8 13.4h4"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 20 20"><rect x="3" y="4.4" width="14" height="12.4" rx="2.2"/><path d="M3 8.2h14M7 2.8v3.2M13 2.8v3.2"/></symbol>
+  <symbol id="i-mega" viewBox="0 0 20 20"><path d="M3.4 8.4v3.2l2.4.6v4h2.4v-3.4l6.4 1.8V4.4L5.8 7.8z"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 20 20"><path d="M3.4 5.2a1.8 1.8 0 0 1 1.8-1.8h9.6a1.8 1.8 0 0 1 1.8 1.8v6a1.8 1.8 0 0 1-1.8 1.8H8.2l-3.6 2.8v-2.8h-.2a1.8 1.8 0 0 1-1-1.8z"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 20 20"><path d="M4 12.6v2.6a1.8 1.8 0 0 0 1.8 1.8h8.4a1.8 1.8 0 0 0 1.8-1.8v-2.6"/><path d="M10 13.4V3.6M6.4 7.2 10 3.6l3.6 3.6"/></symbol>
+  <symbol id="i-batch" viewBox="0 0 20 20"><rect x="2.8" y="3.2" width="14.4" height="4.2" rx="1.4"/><rect x="2.8" y="9.4" width="14.4" height="3"/><path d="M2.8 14.6h14.4"/></symbol>
+  <symbol id="i-download" viewBox="0 0 20 20"><path d="M4 12.6v2.6a1.8 1.8 0 0 0 1.8 1.8h8.4a1.8 1.8 0 0 0 1.8-1.8v-2.6"/><path d="M10 3.6v9.8M6.4 9.8 10 13.4l3.6-3.6"/></symbol>
+  <symbol id="i-key" viewBox="0 0 20 20"><circle cx="7.4" cy="12.6" r="3.4"/><path d="M9.9 10.1 16.4 3.6M14 6.1l1.9 1.9M12.2 7.9l1.9 1.9"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 20 20"><circle cx="4.4" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="15.6" cy="10" r="1.5"/></symbol>
+  <symbol id="i-save" viewBox="0 0 20 20"><path d="M4.6 3.4h8.2l2.6 2.6v10.6H4.6z"/><path d="M7.4 3.4v5h5.2v-5M7.4 14.2h5.2"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 20 20"><path d="M3 11.2 5.2 4.4h9.6L17 11.2v4.4H3z"/><path d="M3 11.2h4l.9 2.2h4.2l.9-2.2h4"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 20 20"><path d="M4.6 10h10.4M11.4 6.2 15.2 10l-3.8 3.8"/></symbol>
+</svg>
+
+<div class="shell">
+  <div class="shell-in">
+    <div class="shell-brand">
+      <div class="shell-mark"><svg><use href="#i-radio"/></svg></div>
+      <div><b>管理后台 · 学生账号 v2</b><span>菁悠广播站 · 静态预览</span></div>
+    </div>
+    <em class="vbadge">v2</em>
+    <div class="tabs" id="tabs">
+      <button class="tab on" data-i="0">方案说明</button>
+      <span class="tab-sep"></span>
+      <button class="tab" data-i="1">默认态</button>
+      <button class="tab" data-i="2">组合筛选</button>
+      <button class="tab" data-i="3">条件边界</button>
+      <button class="tab" data-i="4">范围与整届操作</button>
+      <span class="tab-sep"></span>
+      <button class="tab" data-i="5">名册导入</button>
+      <button class="tab" data-i="6">导入批次</button>
+      <button class="tab" data-i="7">毕业清理</button>
+    </div>
+    <div class="zoombox">
+      <button class="tab" id="zFit">适应宽度</button>
+      <button class="tab" id="z100">100%</button>
+    </div>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+
+<!-- ══════════ 0 · 方案说明 ══════════ -->
+<section class="screen on">
+  <div class="doc">
+    <div class="doc-head">
+      <div class="eyebrow">v2 · 依据「不要树，要可筛选条件」</div>
+      <h1>学生账号 · 单页 + 筛选条件</h1>
+      <p>v1 那版把年级 / 班级做成了目录树，方向错了 —— 你否得对。
+        年级和班级本来就该是<b>筛选条件</b>，不是要一层层点进去的目录。
+        v2 只有一个页面：<b>一排条件自由组合，选什么看什么</b>。
+        导入、批次、毕业清理不再各占一屏，改成页内按钮和弹层。</p>
+    </div>
+
+    <div class="doc-card">
+      <h2>一、v2 的三条硬规则</h2>
+      <div class="rank">
+        <div class="rk"><span class="numchip">1</span></div>
+        <div class="rb">
+          <div class="rt">条件按「从粗到细」排，一律可组合、可单独摘掉</div>
+          <div class="rd">
+            <b>年级 → 班级 → 启用状态 → 激活状态 → 导入批次 → 关键字</b>。
+            前五个是下拉，最后一个是输入框。生效中的条件会额外在下面汇总成一行胶囊
+            （<code>2023 级 ✕</code> <code>01 班 ✕</code> <code>未激活 ✕</code>），
+            可以只摘掉其中一个，也可以一键「重置」。
+          </div>
+        </div>
+      </div>
+      <div class="rank">
+        <div class="rk"><span class="numchip">2</span></div>
+        <div class="rb">
+          <div class="rt">班级的选项来自「当前选中的年级」，不再来自任何访问痕迹</div>
+          <div class="rd">
+            没选年级 → 班级条件是<b>禁用</b>的，写着「先选年级」；选了 2023 级 → 只列 2023 级的 7 个班；
+            把年级改掉 → 班级自动清空。<br>
+            v1 里那个 bug（<code>classOptions</code> 取自 <code>gradeInfo?.classes</code>，
+            取决于你上一次打开过哪个年级详情）从根上没有了 —— 班级只认<span>年级这个条件本身</span>。
+          </div>
+        </div>
+      </div>
+      <div class="rank">
+        <div class="rk"><span class="numchip">3</span></div>
+        <div class="rb">
+          <div class="rt">批量操作的基准是「筛选结果」，不是「筛选 + 勾选」两套语义</div>
+          <div class="rd">
+            没勾选 → 按钮文案是「重置<b>筛选出的 7 个</b>密码」；勾了 3 个 → 变成「重置<b>选中的 3 个</b>」。
+            一个入口，一种语义，跟着当前范围走。v1 里那个「工具栏按范围、批量条按 ids」的两套入口没有了。
+          </div>
+        </div>
+      </div>
+      <div class="rank">
+        <div class="rk"><span class="numchip">4</span></div>
+        <div class="rb">
+          <div class="rt">毕业清理由「年级条件」派生，而不是藏在别的页签里</div>
+          <div class="rd">
+            整届操作必须绑定一个明确年级 —— 所以它<b>只在年级条件被选中时出现</b>，
+            出现在结果区右上角（导出本届 / 毕业清理）。没选年级时它压根不存在，不会误点。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="doc-card">
+      <h2>二、条件写进地址栏</h2>
+      <table class="dtab">
+        <thead><tr><th style="width:420px">地址</th><th>含义</th></tr></thead>
+        <tbody>
+          <tr><td><code>/student</code></td><td>没条件 —— 全部账号 1,284</td></tr>
+          <tr><td><code>/student?grade=2023</code></td><td>2023 级 · 312 人</td></tr>
+          <tr><td><code>/student?grade=2023&amp;class=01</code></td><td>2023 级 01 班 · 45 人</td></tr>
+          <tr><td><code>/student?grade=2023&amp;class=01&amp;state=inactive</code></td><td>其中未激活的 · 7 人</td></tr>
+          <tr><td><code>/student?batch=7</code></td><td>第 7 批导入进来的 · 43 人</td></tr>
+          <tr><td><code>/student?q=转学</code></td><td>关键字命中（姓名 / 账号 / 备注）</td></tr>
+        </tbody>
+      </table>
+      <div class="doc-p" style="margin-top:12px">
+        刷新、后退、把链接发给同事都能还原同一组条件。这是 v1 里唯一保留的东西 ——
+        你没否它，它也确实治「刷新就回总览」那个毛病。
+      </div>
+    </div>
+
+    <div class="doc-card">
+      <h2>三、和旧版的差别</h2>
+      <table class="dtab">
+        <thead><tr><th style="width:170px">维度</th><th style="width:330px">旧（页签 + 两个下拉）</th><th>v2（单页 + 条件条）</th></tr></thead>
+        <tbody>
+          <tr><td>年级 / 班级</td><td class="nt">两个独立下拉，班级选项取决于上次打开过的年级详情</td>
+            <td><b>级联的两个条件</b>：没选年级班级不可用；改年级班级自动清空</td></tr>
+          <tr><td>年级详情 / 清理回执</td><td class="nt">两个隐形页签，页签条零高亮</td>
+            <td>不再是页面。年级详情 = 结果区上方的汇总条；清理回执 = 清理完成后的一次弹层</td></tr>
+          <tr><td>模块边界</td><td class="nt">4 个页签挤在一个菜单项里</td>
+            <td>一个页面 + 三个弹层（导入 / 批次 / 清理），菜单项还是一个</td></tr>
+          <tr><td>批量重置密码</td><td class="nt">两套入口两套语义</td>
+            <td>一个入口，跟随当前范围（勾选优先，否则整个筛选结果）</td></tr>
+          <tr><td>位置感</td><td class="nt">共用 <code>/student</code></td>
+            <td>条件全在 query 里，刷新 / 后退 / 分享可用</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="doc-card">
+      <h2>四、改动清单</h2>
+      <div class="plist">
+        <div><b>前端</b><span>重写 <code>views/StudentAccounts.vue</code>：页签与年级详情整段删掉，
+          换成「筛选条件条 + 结果表 + 三个弹层」。建议顺带拆出 <code>components/StudentFilterBar.vue</code>
+          与 <code>views/student/ImportSheet.vue</code>、<code>BatchSheet.vue</code>、<code>PurgeSheet.vue</code>。
+          路由仍是单条 <code>/student</code>（条件走 query，不新增子路由）。</span></div>
+        <div><b>后端</b><span><b>0 改动。</b><code>/student/list</code> 已经支持
+          <code>keyword / grade / classNo / state / activated / batch</code> 全部条件 + 分页，
+          正好就是这一排筛选。唯一可选：给 <code>/student/list</code> 的返回加一个
+          <code>facets</code>（各级人数），用来在下拉里显示「2023 级 · 312」这种计数。</span></div>
+        <div><b>不动的</b><span>接口路径与权限、清理三模式（safe / disable / purge）、
+          导入识别的三段规则、v8 设计系统、侧栏菜单。</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 1 · 默认态 ══════════ -->
+<section class="screen">
+  <div class="frame-outer"><div class="frame">
+    <div class="chrome">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg><use href="#i-lock"/></svg>admin.radio.local<b>/student</b></div>
+    </div>
+    <div class="app">
+      <aside class="rail"></aside>
+      <div class="work">
+        <div class="topbar">
+          <div>
+            <div class="tb-title">学生账号</div>
+            <div class="tb-sub">4 届 · 1,284 个账号 · 已激活 1,106 · 停用 23</div>
+          </div>
+          <div class="tbright">
+            <button class="btn btn-primary btn-sm"><svg><use href="#i-upload"/></svg>名册导入</button>
+            <button class="btn btn-quiet btn-sm"><svg><use href="#i-dots"/></svg>更多操作</button>
+          </div>
+        </div>
+        <main class="canvas">
+
+          <div class="filterbar">
+            <div class="frow">
+              <div class="fcond"><span class="lbl">年级</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond lock"><span class="lbl">班级</span><span class="val ph">先选年级</span></div>
+              <div class="fcond"><span class="lbl">启用状态</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">激活状态</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">导入批次</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fsearch"><svg><use href="#i-search"/></svg>搜索姓名 / 账号 / 备注<span class="kk" style="margin-left:auto">Enter</span></div>
+              <button class="btn btn-plain btn-sm">重置</button>
+            </div>
+            <div class="picked">
+              <span class="pt">未设置条件 —— 显示全部 1,284 个账号。点上面任意条件即可组合筛选；条件会写进地址栏，刷新和分享都不会丢。</span>
+            </div>
+          </div>
+
+          <div class="result-head">
+            <span class="n">全部账号 <b class="num">1,284</b></span>
+            <span class="micro">2023 级 312 · 2024 级 330 · 2025 级 321 · 2026 级 321</span>
+            <span style="margin-left:auto" class="rowc gap8">
+              <button class="btn btn-quiet btn-sm"><svg><use href="#i-download"/></svg>导出全部 1,284 条</button>
+            </span>
+          </div>
+
+          <div class="tb-wrap">
+            <table class="tb">
+              <colgroup>
+                <col style="width:46px"><col style="width:126px"><col style="width:100px">
+                <col style="width:126px"><col style="width:96px"><col style="width:96px">
+                <col style="width:130px"><col>
+              </colgroup>
+              <thead><tr>
+                <th class="c"><span class="cb"></span></th>
+                <th>账号</th><th>姓名</th><th>届 · 班</th>
+                <th class="c">启用</th><th class="c">激活</th><th>导入批次</th><th class="r">操作</th>
+              </tr></thead>
+              <tbody>
+                <tr>
+                  <td class="c"><span class="cb"></span></td>
+                  <td><span class="mono">20230101</span></td><td>许知野</td>
+                  <td><span class="micro">2023 级 · 01 班</span></td>
+                  <td class="c"><span class="tag tag-ok">启用</span></td>
+                  <td class="c"><span class="tag tag-ok">已激活</span></td>
+                  <td><span class="micro mono">#5 · 08-30</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td>
+                </tr>
+                <tr>
+                  <td class="c"><span class="cb"></span></td>
+                  <td><span class="mono">20230102</span></td><td>钱思远</td>
+                  <td><span class="micro">2023 级 · 01 班</span></td>
+                  <td class="c"><span class="tag tag-ok">启用</span></td>
+                  <td class="c"><span class="tag tag-mute">未激活</span></td>
+                  <td><span class="micro mono">#5 · 08-30</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td>
+                </tr>
+                <tr>
+                  <td class="c"><span class="cb"></span></td>
+                  <td><span class="mono">20240101</span></td><td>陈以宁</td>
+                  <td><span class="micro">2024 级 · 01 班</span></td>
+                  <td class="c"><span class="tag tag-ok">启用</span></td>
+                  <td class="c"><span class="tag tag-ok">已激活</span></td>
+                  <td><span class="micro mono">#3 · 03-11</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td>
+                </tr>
+                <tr>
+                  <td class="c"><span class="cb"></span></td>
+                  <td><span class="mono">20240102</span></td><td>李承泽</td>
+                  <td><span class="micro">2024 级 · 01 班</span></td>
+                  <td class="c"><span class="tag tag-ok">启用</span></td>
+                  <td class="c"><span class="tag tag-mute">未激活</span></td>
+                  <td><span class="micro mono">#3 · 03-11</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td>
+                </tr>
+                <tr>
+                  <td class="c"><span class="cb"></span></td>
+                  <td><span class="mono">20250203</span></td><td>周晚棠</td>
+                  <td><span class="micro">2025 级 · 02 班</span></td>
+                  <td class="c"><span class="tag tag-ok">启用</span></td>
+                  <td class="c"><span class="tag tag-ok">已激活</span></td>
+                  <td><span class="micro mono">#1 · 2025-09-06</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td>
+                </tr>
+                <tr>
+                  <td class="c"><span class="cb"></span></td>
+                  <td><span class="mono">20260101</span></td><td>郑亦舟</td>
+                  <td><span class="micro">2026 级 · 01 班</span></td>
+                  <td class="c"><span class="tag tag-ok">启用</span></td>
+                  <td class="c"><span class="tag tag-ok">已激活</span></td>
+                  <td><span class="micro mono">#7 · 09-14</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td>
+                </tr>
+                <tr>
+                  <td class="c"><span class="cb"></span></td>
+                  <td><span class="mono">20260102</span></td><td>孙可</td>
+                  <td><span class="micro">2026 级 · 01 班</span></td>
+                  <td class="c"><span class="tag tag-ok">启用</span></td>
+                  <td class="c"><span class="tag tag-mute">未激活</span></td>
+                  <td><span class="micro mono">#7 · 09-14</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td>
+                </tr>
+                <tr>
+                  <td class="c"><span class="cb"></span></td>
+                  <td><span class="mono">20230117</span></td><td>郑一诺</td>
+                  <td><span class="micro">2023 级 · 02 班</span></td>
+                  <td class="c"><span class="tag tag-reject">停用</span></td>
+                  <td class="c"><span class="tag tag-ok">已激活</span></td>
+                  <td><span class="micro mono">#5 · 08-30</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-quiet btn-xs">启用</button></div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pager">
+            <span class="info">显示 1 – 8 条，共 1,284 条 · 每页 20 条</span>
+            <span class="pg on">1</span><span class="pg">2</span><span class="pg">3</span>
+            <span class="pg">…</span><span class="pg">65</span>
+          </div>
+
+        </main>
+      </div>
+    </div>
+  </div></div>
+  <div class="cap">
+    <b>默认态</b><span class="sep">|</span>
+    <span>一屏就是全部：<b>一排条件 + 一张表</b>。注意「班级」是灰虚线框、写着「先选年级」——
+      没选年级时它不给你选，这样就不可能再出现「班级选项是上一个年级的班」。
+      条件行下面那行是「已选条件」的位置，没条件时就写清楚现在看的是全部 1,284 个。
+      <b>导出、批量操作都在这一页</b>，没有任何页签。</span>
+  </div>
+</section>
+
+<!-- ══════════ 2 · 组合筛选 ══════════ -->
+<section class="screen">
+  <div class="frame-outer"><div class="frame">
+    <div class="chrome">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg><use href="#i-lock"/></svg>admin.radio.local<b>/student?grade=2023&amp;class=01&amp;activated=0</b></div>
+    </div>
+    <div class="app">
+      <aside class="rail"></aside>
+      <div class="work">
+        <div class="topbar">
+          <div>
+            <div class="tb-title">学生账号</div>
+            <div class="tb-sub">命中 7 人 · 2023 级 01 班 · 未激活</div>
+          </div>
+          <div class="tbright">
+            <button class="btn btn-primary btn-sm"><svg><use href="#i-upload"/></svg>名册导入</button>
+            <button class="btn btn-quiet btn-sm"><svg><use href="#i-dots"/></svg>更多操作</button>
+          </div>
+        </div>
+        <main class="canvas">
+
+          <div class="filterbar">
+            <div class="frow">
+              <div class="fcond on"><span class="lbl">年级</span><span class="val">2023 级</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond on"><span class="lbl">班级</span><span class="val">01 班</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">启用状态</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond on"><span class="lbl">激活状态</span><span class="val">未激活</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">导入批次</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fsearch"><svg><use href="#i-search"/></svg>搜索姓名 / 账号 / 备注<span class="kk" style="margin-left:auto">Enter</span></div>
+              <button class="btn btn-plain btn-sm">重置</button>
+            </div>
+            <div class="picked">
+              <span class="pt">已选条件</span>
+              <span class="pk acc"><b>2023 级</b><svg><use href="#i-close"/></svg></span>
+              <span class="pk acc"><b>01 班</b><svg><use href="#i-close"/></svg></span>
+              <span class="pk acc"><b>未激活</b><svg><use href="#i-close"/></svg></span>
+              <button class="btn btn-plain btn-xs" style="margin-top:9px">全部清掉</button>
+            </div>
+          </div>
+
+          <div class="result-head">
+            <span class="n">命中 <b class="num">7</b> 人</span>
+            <span class="micro">2023 级 / 01 班 / 未激活 —— 这 7 个人就是「密码发出去了但还没登录过」的名单</span>
+            <span style="margin-left:auto" class="rowc gap8">
+              <button class="btn btn-quiet btn-sm"><svg><use href="#i-download"/></svg>导出这 7 条</button>
+              <button class="btn btn-quiet btn-sm"><svg><use href="#i-key"/></svg>重置这 7 个的密码</button>
+            </span>
+          </div>
+
+          <div class="tb-wrap">
+            <table class="tb">
+              <colgroup>
+                <col style="width:46px"><col style="width:126px"><col style="width:104px">
+                <col style="width:96px"><col style="width:96px"><col style="width:150px"><col>
+              </colgroup>
+              <thead><tr>
+                <th class="c"><span class="cb"></span></th>
+                <th>账号</th><th>姓名</th>
+                <th class="c">启用</th><th class="c">激活</th><th>最近登录</th><th class="r">操作</th>
+              </tr></thead>
+              <tbody>
+                <tr><td class="c"><span class="cb"></span></td><td><span class="mono">20230102</span></td><td>钱思远</td>
+                  <td class="c"><span class="tag tag-ok">启用</span></td><td class="c"><span class="tag tag-mute">未激活</span></td>
+                  <td><span class="micro">从未登录</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td></tr>
+                <tr><td class="c"><span class="cb"></span></td><td><span class="mono">20230103</span></td><td>王砚</td>
+                  <td class="c"><span class="tag tag-ok">启用</span></td><td class="c"><span class="tag tag-mute">未激活</span></td>
+                  <td><span class="micro">从未登录</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td></tr>
+                <tr><td class="c"><span class="cb"></span></td><td><span class="mono">20230105</span></td><td>蒋屿</td>
+                  <td class="c"><span class="tag tag-ok">启用</span></td><td class="c"><span class="tag tag-mute">未激活</span></td>
+                  <td><span class="micro">从未登录</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td></tr>
+                <tr><td class="c"><span class="cb"></span></td><td><span class="mono">20230108</span></td><td>范书言</td>
+                  <td class="c"><span class="tag tag-ok">启用</span></td><td class="c"><span class="tag tag-mute">未激活</span></td>
+                  <td><span class="micro">从未登录</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td></tr>
+                <tr><td class="c"><span class="cb"></span></td><td><span class="mono">20230111</span></td><td>秦思远</td>
+                  <td class="c"><span class="tag tag-ok">启用</span></td><td class="c"><span class="tag tag-mute">未激活</span></td>
+                  <td><span class="micro">从未登录</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td></tr>
+                <tr><td class="c"><span class="cb"></span></td><td><span class="mono">20230114</span></td><td>唐屿舟</td>
+                  <td class="c"><span class="tag tag-ok">启用</span></td><td class="c"><span class="tag tag-mute">未激活</span></td>
+                  <td><span class="micro">从未登录</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td></tr>
+                <tr><td class="c"><span class="cb"></span></td><td><span class="mono">20230119</span></td><td>白羽</td>
+                  <td class="c"><span class="tag tag-ok">启用</span></td><td class="c"><span class="tag tag-mute">未激活</span></td>
+                  <td><span class="micro">从未登录</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="noteline">
+            <svg><use href="#i-info"/></svg>
+            <span>条件改动会立刻重查并同步地址栏。上表这 7 个人 和「2023 级 01 班 45 人」是两个不同的筛选结果 ——
+              <b>没有层级，没有"进去再出来"</b>，改条件就是换结果。</span>
+          </div>
+
+        </main>
+      </div>
+    </div>
+  </div></div>
+  <div class="cap">
+    <b>组合筛选</b><span class="sep">|</span>
+    <span>三个条件叠在一起：年级 <b>2023 级</b> → 班级 <b>01 班</b> → 激活 <b>未激活</b>，命中 7 人。
+      生效的条件在下面汇总成胶囊，每个都能单独 ✕ 掉（比如只摘掉「未激活」，立刻变回该班 45 人）。
+      地址栏是 <code>/student?grade=2023&amp;class=01&amp;activated=0</code> —— 这一组条件可以直接发给同事。
+      右上两个按钮的范围都写着「这 7 个」，跟着结果走。</span>
+  </div>
+</section>
+
+<!-- ══════════ 3 · 条件边界 ══════════ -->
+<section class="screen">
+  <div class="doc">
+    <div class="doc-head">
+      <div class="eyebrow">v2 · 条件的四种边界情况</div>
+      <h1>条件怎么联动、怎么收场</h1>
+      <p>全是下拉容易糊的地方。这四格把边界一次性画清楚：<b>级联怎么走</b>、<b>什么时候不给选</b>、
+        <b>批次和年级能不能叠加</b>、<b>筛不出人是什么样</b>。</p>
+    </div>
+
+    <div class="grid2">
+
+      <div class="spec">
+        <div class="st">① 年级下拉</div>
+        <div class="sd">每个年级带人数，一眼知道哪届大。</div>
+        <div class="stagehold">
+          <div class="fpop wide inline">
+            <div class="fh">年级</div>
+            <div class="fopt on"><span class="tx">全部年级</span><span class="ct">1,284</span><svg class="ck"><use href="#i-check"/></svg></div>
+            <div class="fsep"></div>
+            <div class="fopt"><span class="tx">2023 级</span><span class="ct">312</span></div>
+            <div class="fopt"><span class="tx">2024 级</span><span class="ct">330</span></div>
+            <div class="fopt"><span class="tx">2025 级</span><span class="ct">321</span></div>
+            <div class="fopt"><span class="tx">2026 级</span><span class="ct">321</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="spec">
+        <div class="st">② 班级下拉（已选 2023 级）</div>
+        <div class="sd"><b>只列该年级的班</b>，并回显「属于 2023 级」。选项跟着年级条件走。</div>
+        <div class="stagehold">
+          <div class="fpop wide inline">
+            <div class="fh">班级 · 属于 2023 级</div>
+            <div class="fopt on"><span class="tx">全部班级</span><span class="ct">312</span><svg class="ck"><use href="#i-check"/></svg></div>
+            <div class="fsep"></div>
+            <div class="fopt"><span class="tx">01 班</span><span class="ct">45</span></div>
+            <div class="fopt"><span class="tx">02 班</span><span class="ct">44</span></div>
+            <div class="fopt"><span class="tx">03 班</span><span class="ct">46</span></div>
+            <div class="fopt"><span class="tx">04 班</span><span class="ct">44</span></div>
+            <div class="fopt"><span class="tx">… 还有 3 个班</span><span class="ct"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="spec">
+        <div class="st">③ 没选年级时的班级</div>
+        <div class="sd">禁用态。点它只会提示一句话，不会给你一份来路不明的班级列表。</div>
+        <div class="stagehold" style="flex-direction:column;align-items:center;gap:10px">
+          <div class="fcond lock" style="background:#fff"><span class="lbl">班级</span><span class="val ph">先选年级</span></div>
+          <div class="micro" style="text-align:center;max-width:260px;line-height:1.6">
+            「班级」是依赖年级的条件：<br>没选年级时不列任何班，避免出现"上次看的是哪个年级"这种残留。
+          </div>
+        </div>
+      </div>
+
+      <div class="spec">
+        <div class="st">④ 筛不出人</div>
+        <div class="sd">条件互斥时给空态，并直接指出哪个条件把它筛空了。</div>
+        <div class="stagehold" style="padding:0;background:#fff;border:1px solid var(--hairline)">
+          <div class="empty">
+            <div class="ei"><svg><use href="#i-inbox"/></svg></div>
+            <div class="et">没有符合条件的账号</div>
+            <div class="em">当前条件：2026 级 × 导入批次 #1（2025 级入学名册）。<br>这两个条件没有交集。</div>
+            <div class="rowc gap8" style="margin-top:4px">
+              <button class="btn btn-quiet btn-sm">清掉「导入批次 #1」</button>
+              <button class="btn btn-plain btn-sm">重置全部</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="doc-card">
+      <h2>两条不冲突的规则（批次 × 年级）</h2>
+      <div class="doc-p">
+        <b>导入批次和年级 / 班级是并列的，不是互斥的。</b>
+        叠加起来读作「<b>这一批导进来的、该届的账号</b>」——
+        例如「批次 #7 × 2026 级 01 班」= 这次高一新生导入里 01 班那 45 人，正好用来核对「这批人进对了没有」。
+        只有真的没有交集时（比如 #1 是 2025 级的批次）才会空，空态会像上面第 ④ 格那样直接告诉你哪两个条件打架。
+      </div>
+      <div class="doc-p">
+        批次下拉里只列<b>生效中</b>的批次；已撤销的批次置灰不可选（撤销记录仍在导入批次弹层里能查到）。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 4 · 范围与整届操作 ══════════ -->
+<section class="screen">
+  <div class="frame-outer"><div class="frame">
+    <div class="chrome">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg><use href="#i-lock"/></svg>admin.radio.local<b>/student?grade=2023</b></div>
+    </div>
+    <div class="app">
+      <aside class="rail"></aside>
+      <div class="work">
+        <div class="topbar">
+          <div>
+            <div class="tb-title">学生账号</div>
+            <div class="tb-sub">命中 312 人 · 2023 级 · 这一届可选毕业清理</div>
+          </div>
+          <div class="tbright">
+            <button class="btn btn-primary btn-sm"><svg><use href="#i-upload"/></svg>名册导入</button>
+            <button class="btn btn-quiet btn-sm"><svg><use href="#i-dots"/></svg>更多操作</button>
+          </div>
+        </div>
+        <main class="canvas">
+
+          <div class="filterbar">
+            <div class="frow">
+              <div class="fcond on"><span class="lbl">年级</span><span class="val">2023 级</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">班级</span><span class="val ph">全部班级</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">启用状态</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">激活状态</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">导入批次</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fsearch"><svg><use href="#i-search"/></svg>搜索姓名 / 账号 / 备注<span class="kk" style="margin-left:auto">Enter</span></div>
+              <button class="btn btn-plain btn-sm">重置</button>
+            </div>
+            <div class="picked">
+              <span class="pt">已选条件</span>
+              <span class="pk acc"><b>2023 级</b><svg><use href="#i-close"/></svg></span>
+              <span class="micro" style="margin-top:9px">选中一个年级后，右边才会出现「整届操作」</span>
+            </div>
+          </div>
+
+          <div class="result-head">
+            <span class="n">2023 级 <b class="num">312</b> 人</span>
+            <span class="micro">7 个班 · 已激活 265 · 未激活 47 · 有投稿记录 37</span>
+          </div>
+
+          <div class="issue">
+            <div class="ic"><svg><use href="#i-trash"/></svg></div>
+            <div class="grow">
+              <div class="t">整届操作 · 2023 级</div>
+              <div class="m">毕业清理按 <b>safe</b> 规则：没有投稿记录的 <b>275 人真删</b>，有投稿记录的 <b>37 人改为停用</b>。
+                执行后这一届的登录态立即作废。建议先导出本届名单留档。</div>
+            </div>
+            <button class="btn btn-quiet btn-sm"><svg><use href="#i-download"/></svg>导出本届 312 条</button>
+            <button class="btn btn-danger-fill btn-sm">毕业清理…</button>
+          </div>
+
+          <div class="tb-wrap">
+            <table class="tb">
+              <colgroup>
+                <col style="width:46px"><col style="width:126px"><col style="width:104px">
+                <col style="width:126px"><col style="width:96px"><col style="width:96px"><col>
+              </colgroup>
+              <thead><tr>
+                <th class="c"><span class="cb"></span></th>
+                <th>账号</th><th>姓名</th><th>届 · 班</th>
+                <th class="c">启用</th><th class="c">激活</th><th class="r">操作</th>
+              </tr></thead>
+              <tbody>
+                <tr><td class="c"><span class="cb"></span></td><td><span class="mono">20230101</span></td><td>许知野</td>
+                  <td><span class="micro">2023 级 · 01 班</span></td><td class="c"><span class="tag tag-ok">启用</span></td>
+                  <td class="c"><span class="tag tag-ok">已激活</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td></tr>
+                <tr><td class="c"><span class="cb"></span></td><td><span class="mono">20230102</span></td><td>钱思远</td>
+                  <td><span class="micro">2023 级 · 01 班</span></td><td class="c"><span class="tag tag-ok">启用</span></td>
+                  <td class="c"><span class="tag tag-mute">未激活</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td></tr>
+                <tr><td class="c"><span class="cb"></span></td><td><span class="mono">20230201</span></td><td>周晚棠</td>
+                  <td><span class="micro">2023 级 · 02 班</span></td><td class="c"><span class="tag tag-ok">启用</span></td>
+                  <td class="c"><span class="tag tag-ok">已激活</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td></tr>
+                <tr><td class="c"><span class="cb"></span></td><td><span class="mono">20230315</span></td><td>冯一诺</td>
+                  <td><span class="micro">2023 级 · 03 班</span></td><td class="c"><span class="tag tag-ok">启用</span></td>
+                  <td class="c"><span class="tag tag-ok">已激活</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td></tr>
+                <tr><td class="c"><span class="cb"></span></td><td><span class="mono">20230422</span></td><td>沈亦白</td>
+                  <td><span class="micro">2023 级 · 04 班</span></td><td class="c"><span class="tag tag-ok">启用</span></td>
+                  <td class="c"><span class="tag tag-mute">未激活</span></td>
+                  <td><div class="rowact"><button class="btn btn-quiet btn-xs">改名</button><button class="btn btn-quiet btn-xs">重置密码</button><button class="btn btn-danger-quiet btn-xs">停用</button></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="batchbar">
+            <span class="cnt">未勾选任何行</span>
+            <span class="micro" style="margin-right:auto">按钮范围＝当前筛选结果（2023 级 312 人）；勾选之后会自动收敛成「选中的 N 个」</span>
+            <button class="btn btn-quiet btn-sm">重置这 312 个的密码</button>
+            <button class="btn btn-quiet btn-sm">停用这 312 个</button>
+            <button class="btn btn-plain btn-sm">全选本页 20 条</button>
+          </div>
+
+        </main>
+      </div>
+    </div>
+  </div></div>
+  <div class="cap">
+    <b>范围与整届操作</b><span class="sep">|</span>
+    <span>两件事同时解决了。① <b>整届操作只在选中某个年级时出现</b>（红框那条），它必须知道是哪一届才能清理 ——
+      没选年级它压根不存在，不会误点。② 批量条的文案是「<b>这 312 个</b>」——
+      范围来自筛选结果；一旦勾选，就自动变成「选中的 N 个」。<b>一个入口、一种语义</b>，
+      原来那套「工具栏按范围、批量条按 ids」的双轨没有了。</span>
+  </div>
+</section>
+
+<!-- ══════════ 5 · 名册导入（弹层） ══════════ -->
+<section class="screen">
+  <div class="frame-outer"><div class="frame">
+    <div class="chrome">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg><use href="#i-lock"/></svg>admin.radio.local<b>/student?grade=2023</b></div>
+    </div>
+    <div class="app">
+      <aside class="rail"></aside>
+      <div class="work">
+        <div class="topbar">
+          <div>
+            <div class="tb-title">学生账号</div>
+            <div class="tb-sub">命中 312 人 · 2023 级</div>
+          </div>
+          <div class="tbright">
+            <button class="btn btn-primary btn-sm"><svg><use href="#i-upload"/></svg>名册导入</button>
+            <button class="btn btn-quiet btn-sm"><svg><use href="#i-dots"/></svg>更多操作</button>
+          </div>
+        </div>
+        <main class="canvas">
+          <div class="filterbar">
+            <div class="frow">
+              <div class="fcond on"><span class="lbl">年级</span><span class="val">2023 级</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">班级</span><span class="val ph">全部班级</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">启用状态</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">激活状态</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">导入批次</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fsearch"><svg><use href="#i-search"/></svg>搜索姓名 / 账号 / 备注</div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <div class="scrim">
+        <div class="sheet wide">
+          <div class="sheet-head">
+            <div class="grow">
+              <div class="ht">名册导入</div>
+              <div class="hs">2026-09 高一新生名册.xlsx · 已解析 47 行 · 表头识别在第 1 行</div>
+            </div>
+            <button class="xbtn"><svg><use href="#i-close"/></svg></button>
+          </div>
+          <div class="sheet-body">
+            <div class="card" style="padding:16px 18px">
+              <div class="stepper">
+                <span class="st-it"><span class="st-no on"><svg><use href="#i-check"/></svg></span><span class="micro">上传表格</span></span>
+                <span class="micro">›</span>
+                <span class="st-it"><span class="st-no on">2</span><span class="strong">预览与确认</span></span>
+                <span class="micro">›</span>
+                <span class="st-it"><span class="st-no">3</span><span class="micro">完成</span></span>
+                <span class="micro" style="margin-left:auto">这一步只解析不落库</span>
+              </div>
+            </div>
+
+            <div class="card" style="padding:16px 18px">
+              <div class="rowc gap18" style="flex-wrap:wrap">
+                <span class="rowc gap8"><span class="tag tag-ok">新建</span><b class="num" style="font-size:var(--fs-xl)">43</b></span>
+                <span class="rowc gap8"><span class="tag tag-warn">覆盖</span><b class="num" style="font-size:var(--fs-xl)">0</b><span class="micro">未激活，可覆盖</span></span>
+                <span class="rowc gap8"><span class="tag tag-mute">受保护</span><b class="num" style="font-size:var(--fs-xl)">2</b><span class="micro">已激活，默认跳过</span></span>
+                <span class="rowc gap8"><span class="tag tag-reject">异常</span><b class="num" style="font-size:var(--fs-xl)">2</b><span class="micro">带原文行号，不写库</span></span>
+              </div>
+            </div>
+
+            <div class="tb-wrap">
+              <table class="tb">
+                <colgroup><col style="width:86px"><col style="width:250px"><col style="width:130px"><col style="width:98px"><col></colgroup>
+                <thead><tr><th class="c">行号</th><th>表格原内容</th><th>识别结果</th><th class="c">结论</th><th>说明</th></tr></thead>
+                <tbody>
+                  <tr><td class="c"><span class="micro mono">第 2 行</span></td><td><span class="mono">2026 级 · 1 班 · 1 号 · 郑亦舟</span></td>
+                    <td><span class="mono strong">20260101</span></td><td class="c"><span class="tag tag-ok">新建</span></td>
+                    <td><span class="micro">初始密码 <b>user20260101</b></span></td></tr>
+                  <tr><td class="c"><span class="micro mono">第 3 行</span></td><td><span class="mono">2026 级 · 1 班 · 2 号 · 孙可</span></td>
+                    <td><span class="mono strong">20260102</span></td><td class="c"><span class="tag tag-ok">新建</span></td>
+                    <td><span class="micro">初始密码 <b>user20260102</b></span></td></tr>
+                  <tr><td class="c"><span class="micro mono">第 4 行</span></td><td><span class="mono">2026 级 · 2 班 · 3 号 · 周晚棠</span></td>
+                    <td><span class="mono strong">20260203</span></td><td class="c"><span class="tag tag-ok">新建</span></td>
+                    <td><span class="micro">初始密码 <b>user20260203</b></span></td></tr>
+                  <tr><td class="c"><span class="micro mono">第 5 行</span></td><td><span class="mono">2026 级 · 1 班 · （空） · 冯一诺</span></td>
+                    <td><span class="mono">—</span></td><td class="c"><span class="tag tag-reject">异常</span></td>
+                    <td><span class="micro" style="color:var(--red-fg)">序号缺失：这一行凑不出三元组，请回表格补齐</span></td></tr>
+                  <tr><td class="c"><span class="micro mono">第 6 行</span></td><td><span class="mono">2026 级 · 1 班 · 2 号 · 沈亦白</span></td>
+                    <td><span class="mono">—</span></td><td class="c"><span class="tag tag-reject">异常</span></td>
+                    <td><span class="micro" style="color:var(--red-fg)">与第 3 行重复：同一班内序号 02 已经出现过</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="cols">
+              <div class="card grow" style="display:flex;flex-direction:column;gap:13px">
+                <div class="rowc gap13"><span class="sw"></span>
+                  <div class="grow"><div class="strong">强制覆盖已激活</div>
+                    <div class="micro">默认关。打开后覆盖备注与三元组，<b>仍然不碰密码</b></div></div></div>
+                <div class="rowc gap13"><span class="sw on"></span>
+                  <div class="grow"><div class="strong">严格模式</div>
+                    <div class="micro">有异常行就整批不导入（当前 2 行异常，整批会被拦下）</div></div></div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:11px;min-width:0">
+                <div class="warnline"><svg><use href="#i-info"/></svg>
+                  <span>导出文件<b>含初始密码明文</b>，只用于分发给本人；已改过密码的行留空。</span></div>
+                <div class="noteline"><svg><use href="#i-info"/></svg>
+                  <span>导入完成后这里只给一次回执，<b>关掉就没有了</b> —— 不会再像以前那样挂在页面上切来切去还在。</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="sheet-foot">
+            <span class="micro">本次会写入 43 个账号</span>
+            <span class="rowc gap8" style="margin-left:auto">
+              <button class="btn btn-quiet btn-sm">取消</button>
+              <button class="btn btn-plain btn-sm">忽略异常行继续</button>
+              <button class="btn btn-primary">确认导入 43 行</button>
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div></div>
+  <div class="cap">
+    <b>名册导入</b><span class="sep">|</span>
+    <span>从右上角「名册导入」打开的弹层，<b>不再是一整个页签</b>。关掉就回到原来那组筛选条件，
+      不会把你已经选好的年级 / 班级弄丢。原来那个「切走再回来导入回执还挂着」的毛病也一并没了 ——
+      回执只属于这次弹层。</span>
+  </div>
+</section>
+
+<!-- ══════════ 6 · 导入批次（弹层） ══════════ -->
+<section class="screen">
+  <div class="frame-outer"><div class="frame">
+    <div class="chrome">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg><use href="#i-lock"/></svg>admin.radio.local<b>/student?batch=7</b></div>
+    </div>
+    <div class="app">
+      <aside class="rail"></aside>
+      <div class="work">
+        <div class="topbar">
+          <div>
+            <div class="tb-title">学生账号</div>
+            <div class="tb-sub">命中 43 人 · 导入批次 #7</div>
+          </div>
+          <div class="tbright">
+            <button class="btn btn-primary btn-sm"><svg><use href="#i-upload"/></svg>名册导入</button>
+            <button class="btn btn-quiet btn-sm"><svg><use href="#i-dots"/></svg>更多操作</button>
+          </div>
+        </div>
+        <main class="canvas">
+          <div class="filterbar">
+            <div class="frow">
+              <div class="fcond"><span class="lbl">年级</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond lock"><span class="lbl">班级</span><span class="val ph">先选年级</span></div>
+              <div class="fcond"><span class="lbl">启用状态</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">激活状态</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond on"><span class="lbl">导入批次</span><span class="val">#7</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fsearch"><svg><use href="#i-search"/></svg>搜索姓名 / 账号 / 备注</div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <div class="scrim">
+        <div class="sheet wide">
+          <div class="sheet-head">
+            <div class="grow">
+              <div class="ht">导入批次</div>
+              <div class="hs">7 个批次 · 撤销只删「本次新建且没有投稿记录」的账号</div>
+            </div>
+            <button class="xbtn"><svg><use href="#i-close"/></svg></button>
+          </div>
+          <div class="sheet-body">
+            <div class="tb-wrap">
+              <table class="tb">
+                <colgroup>
+                  <col style="width:70px"><col style="width:140px"><col>
+                  <col style="width:98px"><col style="width:70px"><col style="width:70px"><col style="width:70px">
+                  <col style="width:96px"><col style="width:162px">
+                </colgroup>
+                <thead><tr>
+                  <th>批次</th><th>时间</th><th>文件</th><th>操作人</th>
+                  <th class="r">新建</th><th class="r">更新</th><th class="r">跳过</th>
+                  <th class="c">状态</th><th class="r">操作</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td><span class="mono">#7</span></td><td><span class="micro num">2026-09-14 08:32</span></td>
+                    <td><span class="el">2026-09 高一新生名册.xlsx</span></td><td>王老师</td>
+                    <td class="r num">43</td><td class="r num">0</td><td class="r num">2</td>
+                    <td class="c"><span class="tag tag-ok">生效中</span></td>
+                    <td class="r"><div class="rowact"><button class="link-btn">筛选这批<svg><use href="#i-arrow"/></svg></button><span class="vsep"></span><button class="btn btn-danger-quiet btn-xs">撤销</button></div></td></tr>
+                  <tr><td><span class="mono">#6</span></td><td><span class="micro num">2026-09-02 15:07</span></td>
+                    <td><span class="el">2026 级补录（转学生）.xlsx</span></td><td>王老师</td>
+                    <td class="r num">3</td><td class="r num">0</td><td class="r num">0</td>
+                    <td class="c"><span class="tag tag-ok">生效中</span></td>
+                    <td class="r"><div class="rowact"><button class="link-btn">筛选这批<svg><use href="#i-arrow"/></svg></button><span class="vsep"></span><button class="btn btn-danger-quiet btn-xs">撤销</button></div></td></tr>
+                  <tr><td><span class="mono">#5</span></td><td><span class="micro num">2026-08-30 09:41</span></td>
+                    <td><span class="el">2025 级班级调整.xlsx</span></td><td>王老师</td>
+                    <td class="r num">0</td><td class="r num">318</td><td class="r num">12</td>
+                    <td class="c"><span class="tag tag-ok">生效中</span></td>
+                    <td class="r"><div class="rowact"><button class="link-btn">筛选这批<svg><use href="#i-arrow"/></svg></button><span class="vsep"></span><button class="btn btn-danger-quiet btn-xs">撤销</button></div></td></tr>
+                  <tr><td><span class="mono">#4</span></td><td><span class="micro num">2026-07-05 14:02</span></td>
+                    <td><span class="el">2022 届名单（备份）.xlsx</span></td><td>王老师</td>
+                    <td class="r num">0</td><td class="r num">0</td><td class="r num">309</td>
+                    <td class="c"><span class="tag tag-mute">已撤销</span></td>
+                    <td class="r"><div class="rowact"><button class="link-btn">筛选这批<svg><use href="#i-arrow"/></svg></button></div></td></tr>
+                  <tr><td><span class="mono">#3</span></td><td><span class="micro num">2026-03-11 10:26</span></td>
+                    <td><span class="el">2024 级名册（修正版）.xlsx</span></td><td>李老师</td>
+                    <td class="r num">0</td><td class="r num">330</td><td class="r num">0</td>
+                    <td class="c"><span class="tag tag-ok">生效中</span></td>
+                    <td class="r"><div class="rowact"><button class="link-btn">筛选这批<svg><use href="#i-arrow"/></svg></button><span class="vsep"></span><button class="btn btn-danger-quiet btn-xs">撤销</button></div></td></tr>
+                  <tr><td><span class="mono">#2</span></td><td><span class="micro num">2026-03-11 10:19</span></td>
+                    <td><span class="el">2024 级名册.xlsx</span></td><td>李老师</td>
+                    <td class="r num">330</td><td class="r num">0</td><td class="r num">0</td>
+                    <td class="c"><span class="tag tag-mute">已撤销</span></td>
+                    <td class="r"><div class="rowact"><button class="link-btn">筛选这批<svg><use href="#i-arrow"/></svg></button></div></td></tr>
+                  <tr><td><span class="mono">#1</span></td><td><span class="micro num">2025-09-06 16:44</span></td>
+                    <td><span class="el">2025 级入学名册.xlsx</span></td><td>王老师</td>
+                    <td class="r num">321</td><td class="r num">0</td><td class="r num">0</td>
+                    <td class="c"><span class="tag tag-ok">生效中</span></td>
+                    <td class="r"><div class="rowact"><button class="link-btn">筛选这批<svg><use href="#i-arrow"/></svg></button><span class="vsep"></span><button class="btn btn-danger-quiet btn-xs">撤销</button></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="noteline">
+              <svg><use href="#i-info"/></svg>
+              <span><b>「筛选这批」就是批次条件的入口</b> —— 点它等于把「导入批次 = #7」加进上面那排条件里，
+                弹层关掉，列表已经筛好了。撤销的边界：只删本次新建且没有投稿记录的；有投稿记录的改停用；
+                学生已经自己改过密码的不动。</span>
+            </div>
+          </div>
+          <div class="sheet-foot">
+            <span class="micro" style="margin-right:auto">蓝色文字「筛选这批」只把批次加进筛选条件，<b>不改任何数据</b>；描边按钮才会改数据</span>
+            <span class="micro">生效后 URL 出现 <code>?batch=7</code></span>
+            <button class="btn btn-quiet btn-sm">关闭</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div></div>
+  <div class="cap">
+    <b>导入批次</b><span class="sep">|</span>
+    <span>批次也是一个<b>筛选条件</b>（<code>?batch=7</code>），不是一屏独立页面。所以这张表现在只干一件事：
+      选批次 / 撤销批次；选完就关掉，用条件去看那批人。<code>batch=7</code> 和 <code>grade=</code>、<code>class=</code>
+      <b>可以叠加</b>，用来核对「这批人进对班了没有」。<br>
+      行内两个动作在视觉上分开了：<b>蓝色文字＝只切视图（能筛什么就筛什么，不动数据）</b>，
+      <b>描边按钮＝会改数据（撤销）</b>。原来是两个一模一样的胶囊挤在一起，既撑爆了操作列，也分不清哪个碰不得。</span>
+  </div>
+</section>
+
+<!-- ══════════ 7 · 毕业清理（弹层） ══════════ -->
+<section class="screen">
+  <div class="frame-outer"><div class="frame">
+    <div class="chrome">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg><use href="#i-lock"/></svg>admin.radio.local<b>/student?grade=2023</b></div>
+    </div>
+    <div class="app">
+      <aside class="rail"></aside>
+      <div class="work">
+        <div class="topbar">
+          <div>
+            <div class="tb-title">学生账号</div>
+            <div class="tb-sub">命中 312 人 · 2023 级</div>
+          </div>
+          <div class="tbright">
+            <button class="btn btn-primary btn-sm"><svg><use href="#i-upload"/></svg>名册导入</button>
+            <button class="btn btn-quiet btn-sm"><svg><use href="#i-dots"/></svg>更多操作</button>
+          </div>
+        </div>
+        <main class="canvas">
+          <div class="filterbar">
+            <div class="frow">
+              <div class="fcond on"><span class="lbl">年级</span><span class="val">2023 级</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">班级</span><span class="val ph">全部班级</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">启用状态</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">激活状态</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+              <div class="fcond"><span class="lbl">导入批次</span><span class="val ph">全部</span><svg><use href="#i-chevdown"/></svg></div>
+            </div>
+            <div class="picked">
+              <span class="pt">已选条件</span>
+              <span class="pk acc"><b>2023 级</b><svg><use href="#i-close"/></svg></span>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <div class="scrim">
+        <div class="sheet mid">
+          <div class="sheet-head">
+            <div class="grow">
+              <div class="ht">毕业清理 · 2023 级</div>
+              <div class="hs">只处理这一届的 312 个账号，其它届一概不动</div>
+            </div>
+            <button class="xbtn"><svg><use href="#i-close"/></svg></button>
+          </div>
+          <div class="sheet-body">
+            <div class="warnline" style="font-size:var(--fs-sm);padding:11px 13px">
+              <svg><use href="#i-trash"/></svg>
+              <span><b>此操作不可恢复。</b>执行后这 312 个账号的登录态会立即作废，不等 30 秒缓存。
+                建议先点「导出本届」留档。</span>
+            </div>
+
+            <div class="card" style="padding:16px 18px">
+              <div class="rowc gap18" style="flex-wrap:wrap">
+                <span class="rowc gap8"><span class="micro">本届账号</span><b class="num" style="font-size:var(--fs-xl)">312</b></span>
+                <span class="rowc gap8"><span class="micro">将真删</span><b class="num" style="font-size:var(--fs-xl);color:var(--red-fg)">275</b></span>
+                <span class="rowc gap8"><span class="micro">将停用</span><b class="num" style="font-size:var(--fs-xl);color:var(--amber-fg)">37</b></span>
+                <span class="rowc gap8"><span class="micro">涉及班级</span><b class="num" style="font-size:var(--fs-xl)">7</b></span>
+              </div>
+              <div class="hint" style="margin-top:10px">
+                「将停用」= 有投稿记录的人。不能删，否则审核列表里就查不到作者了。
+              </div>
+            </div>
+
+            <div class="sec">
+              <span class="sec-title" style="font-size:14px">处理方式</span>
+              <div class="sec" style="gap:9px">
+                <div class="card-white" style="padding:13px 15px;border-color:var(--accent)">
+                  <div class="rowc" style="gap:11px">
+                    <span class="cb on"><svg><use href="#i-check"/></svg></span>
+                    <div class="grow">
+                      <div class="strong">safe · 默认</div>
+                      <div class="micro">无投稿记录的 275 个真删；有投稿记录的 37 个改为停用</div>
+                    </div>
+                    <span class="tag tag-acc">推荐</span>
+                  </div>
+                </div>
+                <div class="card-white" style="padding:13px 15px">
+                  <div class="rowc" style="gap:11px">
+                    <span class="cb"></span>
+                    <div class="grow">
+                      <div class="strong">disable · 只停用</div>
+                      <div class="micro">312 个全部改为停用，一个都不删 —— 留着以后复查</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card-white" style="padding:13px 15px;border-color:var(--red-bg)">
+                  <div class="rowc" style="gap:11px">
+                    <span class="cb"></span>
+                    <div class="grow">
+                      <div class="strong">purge · 全删（危险）</div>
+                      <div class="micro">312 个全部真删，含 37 个有投稿记录的人 —— 作者名会从审核列表里消失</div>
+                    </div>
+                    <span class="tag tag-reject">需二确认</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <span class="field-label">输入 <b style="color:var(--ink)">2023</b> 确认执行</span>
+              <input class="input ph" value="2023" readonly>
+            </div>
+          </div>
+          <div class="sheet-foot">
+            <span class="micro">本次影响 312 个账号</span>
+            <span class="rowc gap8" style="margin-left:auto">
+              <button class="btn btn-quiet btn-sm">先导出本届</button>
+              <button class="btn btn-plain btn-sm">取消</button>
+              <button class="btn btn-danger-fill">确认清理 2023 级</button>
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div></div>
+  <div class="cap">
+    <b>毕业清理</b><span class="sep">|</span>
+    <span>从「整届操作」进来的危险弹层。三种模式的差别摊开写清楚（safe / disable / purge），
+      数字在点下去之前就告诉你「删多少、停用多少」。确认方式是<b>把年级原样输入</b>——
+      和原来一致，但这次它只可能从「已选中某个年级」的状态进来，不会再出现「不知道在清哪一届」。</span>
+  </div>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var NAV = [
+    ['group', '内容运营'],
+    ['item', 'i-grid', '数据概览', 0],
+    ['item', 'i-article', '投稿 & 点歌审核', 6],
+    ['item', 'i-cal', '栏目管理', 0],
+    ['item', 'i-mega', '公告管理', 0],
+    ['item', 'i-chat', '留言审核', 0],
+    ['group', '系统管理'],
+    ['item', 'i-users', '学生账号', 0, 1],
+    ['item', 'i-star', '风采展示', 0],
+    ['item', 'i-toggle', '模块开关', 0],
+    ['item', 'i-shield', '账号管理', 0],
+    ['item', 'i-gear', '系统设置', 0]
+  ];
+  Array.prototype.slice.call(document.querySelectorAll('.rail')).forEach(function (host) {
+    var h = '<div class="rail-brand">'
+      + '<div class="rail-logo"><svg><use href="#i-radio"/></svg></div>'
+      + '<div><div class="rail-name">菁悠广播站</div><div class="rail-sub">管理后台</div></div></div>'
+      + '<div class="rail-search"><svg><use href="#i-search"/></svg>搜索菜单<kbd>Ctrl K</kbd></div>'
+      + '<nav class="rail-nav">';
+    NAV.forEach(function (r) {
+      if (r[0] === 'group') { h += '<div class="rail-group">' + r[1] + '</div>'; return; }
+      h += '<div class="rail-item' + (r[4] ? ' on' : '') + '">'
+        + '<svg><use href="#' + r[1] + '"/></svg><span class="txt">' + r[2] + '</span>'
+        + (r[3] ? '<em class="rail-badge">' + r[3] + '</em>' : '') + '</div>';
+    });
+    host.innerHTML = h + '</nav>'
+      + '<div class="rail-account"><div class="rail-avatar">王</div>'
+      + '<div class="who"><div class="nm">王老师</div><div class="rl">超级管理员</div></div></div>';
+  });
+
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab[data-i]'));
+  var screens = Array.prototype.slice.call(document.querySelectorAll('.screen'));
+  var stage = document.getElementById('stage');
+  var fit = true;
+  function zoom() {
+    var outer = document.querySelector('.screen.on .frame-outer');
+    if (!outer) return;
+    if (!fit) { outer.style.zoom = 1; return; }
+    outer.style.zoom = Math.min(1, Math.max(320, stage.clientWidth - 48) / 1440);
+  }
+  function show(i) {
+    screens.forEach(function (s, k) { s.classList.toggle('on', k === i); });
+    tabs.forEach(function (t) { t.classList.toggle('on', Number(t.dataset.i) === i); });
+    zoom();
+    window.scrollTo(0, 0);
+  }
+  tabs.forEach(function (t) { t.addEventListener('click', function () { show(Number(t.dataset.i)); }); });
+  document.getElementById('zFit').addEventListener('click', function () { fit = true; zoom(); });
+  document.getElementById('z100').addEventListener('click', function () { fit = false; zoom(); });
+  window.addEventListener('resize', zoom);
+  zoom();
+})();
+</script>
+</body>
+</html>

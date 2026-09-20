@@ -11,6 +11,16 @@
       <view class="t-sub">点歌或文稿，被选中即可在节目中播出</view>
     </view>
 
+    <!-- 点歌时间窗口状态条（v2，常驻不可折叠）：第一行规则、第二行此刻状态与倒计时 -->
+    <!-- 文案全部由服务端下发（GET /user/submit/window），前端不硬编码星期与时刻 -->
+    <view class="win-bar {{winOpen ? 'open' : ''}}" wx:if="{{type === 1 && winEnabled}}">
+      <view class="win-dot"></view>
+      <view class="win-main">
+        <view class="win-txt">点歌时间：{{winLine1}}</view>
+        <view class="win-sub">{{winLine2}}</view>
+      </view>
+    </view>
+
     <!-- 点歌 / 文稿 切换 -->
     <view class="segment">
       <view class="segment-indicator" style="width: calc((100% - 16rpx) / 2); transform: translateX({{(type - 1) * 100}}%);"></view>
@@ -28,7 +38,7 @@
       >文稿投稿{{switches.submit_article === 'off' ? '（已关闭）' : ''}}</view>
     </view>
 
-    <!-- 点歌侧提示：本周还可点 N 次 / 名额已满 -->
+    <!-- 点歌侧提示：本周还能点 N 次 / 已用完 -->
     <view class="quota-hint {{quotaBlocked ? 'is-blocked' : ''}}" wx:if="{{type === 1 && quotaText}}">
       <view class="quota-dot"></view>
       <text>{{quotaText}}</text>
@@ -92,10 +102,10 @@
 
   <!-- 底部固定操作 -->
   <view class="bottom-cta">
-    <view class="t-cap hint" wx:if="{{!loggedIn}}">首次提交将自动登录，不收集手机号</view>
+    <view class="t-cap hint" wx:if="{{hintText}}">{{hintText}}</view>
     <button class="btn btn-primary btn-block" hover-class="pressed"
-            bindtap="doSubmit" disabled="{{submitting}}">
-      {{submitting ? '提交中……' : '提交投稿'}}
+            bindtap="doSubmit" disabled="{{submitting || ctaClosed}}">
+      {{submitting ? '提交中……' : (ctaClosed ? '未到点歌时间' : '提交投稿')}}
     </button>
   </view>
 
@@ -144,6 +154,8 @@
     <view class="slot-sheet-head">
       <view class="slot-sheet-title">选择播出时段</view>
       <view class="slot-sheet-sub" wx:if="{{slotRangeText}}">{{slotRangeText}} · 下周一到周五</view>
+      <!-- v2：选到一半也得知道截止点 -->
+      <view class="slot-sheet-win" wx:if="{{winEnabled}}">点歌时间：{{winLine1}} · {{winLine2}}</view>
     </view>
     <scroll-view class="slot-sheet-body" scroll-y>
       <view class="slot-day" wx:for="{{slotDays}}" wx:key="date" wx:for-item="day">

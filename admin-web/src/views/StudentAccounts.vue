@@ -661,7 +661,11 @@
 
     <!-- ══════════ 改名 / 批量重置密码 ══════════ -->
     <el-dialog v-model="renameVisible" width="420px" title="修改姓名">
-      <el-input v-model="renameValue" placeholder="学生姓名" />
+      <div class="micro" style="margin:-4px 0 10px">
+        账号 <span class="mono">{{ renameRow?.username || '—' }}</span> ·
+        {{ renameRow?.className || '未分班' }} —— 保存后学生端「我的」页也会同步显示新名字。
+      </div>
+      <el-input v-model="renameValue" placeholder="学生姓名" maxlength="64" @keyup.enter="submitRename" />
       <template #footer>
         <el-button @click="renameVisible = false">取消</el-button>
         <el-button type="primary" @click="submitRename">保存</el-button>
@@ -987,10 +991,24 @@ function openRename(row) {
   renameVisible.value = true;
 }
 async function submitRename() {
-  await http.put(`/admin/student/${renameRow.value.id}`, { remark: renameValue.value, nickname: renameValue.value });
-  ElMessage.success('已保存');
-  renameVisible.value = false;
-  fetchStudents();
+  const name = String(renameValue.value || '').trim();
+  if (!name) return ElMessage.warning('姓名不能为空');
+  if (name === String(renameRow.value?.name || '').trim()) {
+    renameVisible.value = false;
+    return ElMessage.info('姓名没有变化');
+  }
+  try {
+    // ⚠️ 字段名必须是 name：后端 updateStudent 读的是 payload.name，
+    // 并会把它同时写进 remark（管理端列表）和 nickname（投稿/留言/小程序）。
+    // 以前这里发的是 { remark, nickname }，后端认不出来 → 接口回 200 但一个字没改。
+    await http.put(`/admin/student/${renameRow.value.id}`, { name });
+    ElMessage.success('姓名已更新，学生端同步生效');
+    renameVisible.value = false;
+    fetchStudents();
+  } catch (e) {
+    // http 拦截器对业务错误不会弹提示（只 reject），这里必须自己说人话
+    ElMessage.error(e?.message || '保存失败');
+  }
 }
 async function resetPassword(row) {
   const d = await http.put(`/admin/student/${row.id}/reset-password`);

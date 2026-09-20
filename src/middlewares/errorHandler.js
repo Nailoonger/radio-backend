@@ -16,9 +16,14 @@ function notFound(req, res) {
  */
 // eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, next) {
-  // 业务错误
+  // 业务错误（data 非空时一并带上，如 40907 的 opensAt / windowText）
   if (err instanceof ApiError) {
-    return fail(res, err.code, err.message, err.httpStatus);
+    if (err.data === undefined || err.data === null) {
+      return fail(res, err.code, err.message, err.httpStatus);
+    }
+    return res.status(err.httpStatus || 200).json({
+      code: err.code, message: err.message, data: err.data,
+    });
   }
 
   // Sequelize 校验错误

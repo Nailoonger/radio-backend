@@ -229,6 +229,18 @@ router.put('/submit/quota', adminAuth, requireAdmin, submit.setQuota);
  */
 router.post('/submit/quota/sweep', adminAuth, requireAdmin, submit.sweepQuota);
 
+/* ── v2 排期容量 / 全局候补队列 / 点歌时间窗口 ──────────────────────
+ * ⚠️ 全是字面量段，必须注册在 `/submit/:id` 之前，否则会被 :id 吃掉
+ * ───────────────────────────────────────────────────────────────── */
+/** 容量 + 候补队列 + 窗口 一体化快照 */
+router.get('/submit/capacity', adminAuth, requireAdmin, submit.capacity);
+/** 手动兜底：递补队首 → 满额清队 → 窗口截止定稿（幂等） */
+router.post('/submit/queue/sweep', adminAuth, requireAdmin, submit.sweepQueue);
+/** 点歌时间窗口：读（管理员可看，用于常驻展示） */
+router.get('/submit/window', adminAuth, requireAdmin, submit.window);
+/** 点歌时间窗口：写（仅超管 —— 普通管理员只读） */
+router.put('/submit/window', adminAuth, requireSuperAdmin, submit.saveWindow);
+
 /**
  * @swagger
  * /api/admin/submit/notice:

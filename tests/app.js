@@ -56,7 +56,42 @@ async function initTestEnv() {
   // 但 seed 不依赖 app，所以放在 buildApp 同一文件没问题
   await seedAll();
   await switchService.ensureLoaded();
+  await openSongWindowForTest();
 }
 
-module.exports = { buildApp, initTestEnv };
+/**
+ * 点歌规则 v2 的测试前置：把「点歌时间窗口」关掉（enabled=0 = 一直开放）。
+ *
+ * 为什么必须做：v2 里学生只能在窗口内点歌（默认周六 18:00 → 周日 18:00），
+ * 否则提交点歌一律 40907。用例不该依赖「跑测试时的钟点」，
+ * 也不该为了过用例去 mock 系统时间，所以统一把窗口限制关掉。
+ * 窗口判闸本身由 scripts/verify-song-queue.js 的 A 段专门覆盖。
+ *
+ * 顺带把「每人每周上限」调到不限：一批用例会连续提交十几条点歌，
+ * 默认 2 次会中途撞上限而连锁失败；上限规则另有 verify-song-submit.js 覆盖。
+ *
+ * ⚠️ 必须在 resetDB() 之后调用 —— resetDB 会清空 KV 表。
+ */
+async function openSongWindowForTest() {
+  const kv = require('../src/services/kvService');
+  const songWindow = require('../src/services/songWindowService');
+  const submitRule = require('../src/services/submitRuleService');
+  await kv.set(
+    songWindow.KV_WINDOW,
+    JSON.stringify({ ...songWindow.DEFAULT_WINDOW, enabled: 0 }),
+    '测试：不限点歌时间'
+  );
+  await submitRule.setRules({ weeklyUserLimit: 0, dupBlock: 1 });
+  songWindow.clearCache();
+  submitRule.clearCache();
+}
+
+/** 取一批可用的播出时段值（下一周周一到周五），给点歌用例当 wantBroadcastTime */
+async function nextWeekSlotValues() {
+  const broadcastSlot = require('../src/services/broadcastSlotService');
+  const slots = await broadcastSlot.getSlots();
+  return slots.list.map((s) => s.value);
+}
+
+module.exports = { buildApp, initTestEnv, openSongWindowForTest, nextWeekSlotValues };
 

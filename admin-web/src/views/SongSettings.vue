@@ -3,76 +3,79 @@
     <!-- v8：子页返回入口 -->
     <div class="back-row">
       <a class="back-link" @click="$router.push('/submit')">‹ 返回投稿 & 点歌审核</a>
-      <span class="micro">点歌设置 · 名额 / 提交规则 / 播出时段 / 两份注意事项</span>
+      <span class="micro">点歌设置 · 排期容量 / 候补队列 / 点歌时间窗口 / 提交规则 / 播出时段 / 两份注意事项</span>
     </div>
 
-    <!-- ══════════ 名额 + 提交规则（视觉稿第 1 行：双栏） ══════════ -->
+    <!-- ══════════ 排期容量与候补 + 提交规则（双栏） ══════════ -->
     <div class="cols">
-      <!-- 名额段 -->
+      <!-- 排期容量与候补（v2：日/周名额已退役，改为「每格正式位 × 格子数」+ 一条全局候补队列） -->
       <div class="sec" style="flex:1">
         <div class="sec-head">
-          <span class="sec-title">名额</span>
+          <span class="sec-title">排期容量与候补</span>
           <span class="tag tag-pass">即时生效</span>
         </div>
         <div class="card" style="padding:18px 20px">
-          <!-- 用量数据：视觉稿是双进度条；现状后端返回 4 条，加进去 -->
           <div class="quota-grid">
             <div class="quota-item">
               <div class="rowc" style="justify-content:space-between">
-                <span class="micro">今日已用</span>
+                <span class="micro">下周正式位</span>
                 <span>
-                  <b class="num quota-num">{{ snapshot?.daily?.used ?? 0 }}</b>
-                  <span class="micro">/ {{ snapshot?.daily?.limit === 0 ? '不限' : (snapshot?.daily?.limit ?? '-') }}</span>
+                  <b class="num quota-num">{{ cap.weekCapacity ?? 0 }}</b>
+                  <span class="micro"> = {{ cap.capacity ?? 0 }} × {{ gridCount }} 格</span>
                 </span>
               </div>
-              <div class="bar"><i :style="{ width: pct(snapshot?.daily) }" /></div>
             </div>
             <div class="quota-item">
               <div class="rowc" style="justify-content:space-between">
-                <span class="micro">本周已用</span>
+                <span class="micro">已占位</span>
                 <span>
-                  <b class="num quota-num">{{ snapshot?.weekly?.used ?? 0 }}</b>
-                  <span class="micro">/ {{ snapshot?.weekly?.limit === 0 ? '不限' : (snapshot?.weekly?.limit ?? '-') }}</span>
+                  <b class="num quota-num">{{ seatedTotal }}</b>
+                  <span class="micro"> / {{ cap.weekCapacity ?? 0 }}</span>
                 </span>
               </div>
-              <div class="bar"><i :style="{ width: pct(snapshot?.weekly) }" /></div>
+              <div class="bar"><i :style="{ width: pctOf(seatedTotal, cap.weekCapacity) }" /></div>
+            </div>
+            <div class="quota-item">
+              <div class="rowc" style="justify-content:space-between">
+                <span class="micro">候补队列</span>
+                <span>
+                  <b class="num quota-num">{{ queue.total ?? 0 }}</b>
+                  <span class="micro"> / {{ queue.limit ?? 0 }}<template v-if="queue.limitAuto">（自动）</template></span>
+                </span>
+              </div>
+              <div class="bar"><i :style="{ width: pctOf(queue.total, queue.limit) }" /></div>
             </div>
             <div class="quota-item quota-item-text">
-              <span class="micro">今日自动驳回</span>
-              <b class="num quota-num">{{ snapshot?.autoRejectedToday ?? 0 }}</b>
-            </div>
-            <div class="quota-item quota-item-text">
-              <span class="micro">待审（名额已满时）</span>
-              <b class="num quota-num">{{ snapshot?.pendingWhileExhausted ?? 0 }}</b>
+              <span class="micro">补位待审（最优先处理）</span>
+              <b class="num quota-num">{{ promotedCount }}</b>
             </div>
           </div>
 
-          <!-- 设置 + 手动触发自动驳回（按视觉稿：字段一行 + 按钮一行，避开挤断） -->
           <div class="quota-edit">
-            <!-- 字段行：每日 / 每周上限，flex:1 各占一半 -->
             <div class="quota-fields">
               <div class="field">
-                <label class="field-label">每日上限</label>
-                <el-input-number v-model="quotaForm.daily" :min="0" :max="999" controls-position="right" />
+                <label class="field-label">每格正式位</label>
+                <el-input-number v-model="capForm.capacity" :min="0" :max="99" controls-position="right" />
               </div>
               <div class="field">
-                <label class="field-label">每周上限</label>
-                <el-input-number v-model="quotaForm.weekly" :min="0" :max="999" controls-position="right" />
+                <label class="field-label">候补队列上限</label>
+                <el-input-number v-model="capForm.queueLimit" :min="0" :max="999" controls-position="right" />
               </div>
             </div>
-            <!-- 按钮行：保存（主操作）+ 执行一次自动驳回（次操作），右对齐，wrap 防挤断 -->
             <div class="quota-buttons">
-              <el-button type="primary" :loading="quotaSaving" @click="saveQuota" class="btn-save">
+              <el-button type="primary" :loading="capSaving" @click="saveCapacity" class="btn-save">
                 <IconCheck :size="15" class="btn-icon" />保存
               </el-button>
-              <el-button :loading="sweeping" plain @click="sweepQuota" class="btn-sweep">
-                <IconRefresh :size="15" class="btn-icon" />执行一次自动驳回
+              <el-button :loading="sweeping" plain @click="sweepQueue" class="btn-sweep">
+                <IconRefresh :size="15" class="btn-icon" />递补 + 定稿检查
               </el-button>
             </div>
           </div>
 
           <div class="micro" style="margin-top:11px;line-height:1.7">
-            填 <b>0</b> = 不限制。名额占满后，该周期剩余待审点歌由系统自动驳回，之后新提交的也立刻驳回。
+            每格正式位填 <b>0</b> = 不限；候补上限填 <b>0</b> = 自动（= 下周正式位总数）。
+            学生<b>提交即占位</b>：格子满了就进全局候补队列（先进先出，跨所有时段）；
+            <b>全部格子占满</b>时，整个候补队列由系统自动驳回（不占学生周次数）。
           </div>
         </div>
       </div>
@@ -100,9 +103,8 @@
           </div>
           <div class="kv">
             <span class="k" style="width:132px">生效范围</span>
-            <span class="micro">只算点歌（文稿不受影响）；因名额已满被系统驳回的不占个人次数</span>
+            <span class="micro">只算点歌（文稿不受影响）；候补中的歌也算占用；因满额 / 窗口截止被系统驳回的不占个人次数</span>
           </div>
-          <!-- 保存：作为卡片内最后一行，与上面几行同一节律（这段之前漏了保存入口，2026-09-19 补） -->
           <div class="kv" style="border-bottom:none">
             <span class="k" style="width:132px">保存</span>
             <span class="rowc gap13">
@@ -113,13 +115,104 @@
             </span>
           </div>
         </div>
-        <!-- v8 第 2369-2376 行：被拦下时用户看到什么 -->
+        <!-- v8：被拦下时用户看到什么（v2 的四个错误码） -->
         <div class="card" style="padding:14px 20px;margin-top:10px">
-          <div class="micro" style="line-height:1.75">
-            被拦下时用户看到的是：<br>
-            · 「本周已经有人点过《晴天》了，换一首吧」<br>
-            · 「本周点歌次数已用完（每周最多 2 次），下周再来吧」
-            <span class="tag tag-pending" style="margin-left:6px">错误码 40903</span>
+          <div class="micro" style="line-height:1.8">
+            学生提交被拦下时看到的是：<br>
+            · 「本周已经有人点过《晴天》了，换一首吧」／「本周点歌次数已用完」<span class="tag tag-pending">40903</span><br>
+            · 「这个时段已经排满了，换个时段吧」<span class="tag tag-pending">40906</span><br>
+            · 「这个时段和候补队列都满了」<span class="tag tag-pending">40904</span><br>
+            · 「现在不在点歌时间段（每周六 18:00 – 周日 18:00）」<span class="tag tag-pending">40907</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ 点歌时间窗口（v2 新增）══════════ -->
+    <div class="sec">
+      <div class="sec-head">
+        <span class="sec-title">点歌时间窗口</span>
+        <span class="rowc gap8">
+          <span class="tag" :class="auth.isSuperAdmin ? 'tag-pass' : ''">
+            {{ auth.isSuperAdmin ? '仅超管可改' : '只读 · 仅超管可改' }}
+          </span>
+          <span class="micro">窗口结束时刻 = 审核截止时刻</span>
+        </span>
+      </div>
+      <div class="card" style="padding:18px 20px">
+        <!-- 当前状态条（深色）：规则文案与时刻全部来自服务端，前端不硬编码 -->
+        <div class="tile win-tile">
+          <div class="rowc wrap" style="gap:26px;align-items:flex-start">
+            <div class="grow">
+              <div class="win-status">
+                <i class="t-dot" :class="{ idle: !win.open }"></i>
+                {{ win.enabled === false ? '点歌时间不限（窗口限制已关闭）' : (win.windowText || '—') }}
+              </div>
+              <div class="win-cd">
+                <template v-if="win.enabled === false">一直开放</template>
+                <template v-else-if="win.open">开放中 · 距截止 {{ fmtDur(winCd?.ms) }}</template>
+                <template v-else>未开放 · 距开放 {{ fmtDur(winCd?.ms) }}</template>
+              </div>
+            </div>
+            <div class="win-meta">
+              <div>本周窗口 {{ hhmm(win.start) }} → {{ hhmm(win.end) }}</div>
+              <div v-if="win.closesAt">审核截止 {{ hhmm(win.closesAt) }}</div>
+              <div v-else-if="win.opensAt">下次开放 {{ hhmm(win.opensAt) }}</div>
+            </div>
+          </div>
+          <div class="win-note">
+            {{ win.note || '窗口结束时刻 = 审核截止时刻：到点后未补位的候补与未审完的补位件会被系统自动驳回' }}
+          </div>
+        </div>
+
+        <!-- 编辑区 -->
+        <div class="win-form">
+          <div class="kv">
+            <span class="k" style="width:132px">启用窗口限制</span>
+            <span class="rowc gap13">
+              <el-switch v-model="winForm.enabled" :active-value="1" :inactive-value="0" :disabled="!auth.isSuperAdmin" />
+              <span class="micro">关掉 = 学生任何时间都能提交（容量与候补仍照常生效）</span>
+            </span>
+          </div>
+          <div class="kv">
+            <span class="k" style="width:132px">开始</span>
+            <span class="rowc gap8 wrap">
+              <el-select v-model="winForm.startDay" style="width:106px" :disabled="winDisabled">
+                <el-option v-for="d in win.allowedStartDays || []" :key="d.day" :label="d.name" :value="d.day" />
+              </el-select>
+              <el-time-select
+                v-model="winForm.startTime" start="00:00" step="00:10" end="23:50"
+                placeholder="时刻" style="width:120px" :disabled="winDisabled"
+              />
+            </span>
+          </div>
+          <div class="kv">
+            <span class="k" style="width:132px">结束</span>
+            <span class="rowc gap8 wrap">
+              <el-select v-model="winForm.endDay" style="width:106px" :disabled="winDisabled">
+                <el-option v-for="d in win.allowedEndDays || []" :key="d.day" :label="d.name" :value="d.day" />
+              </el-select>
+              <el-time-select
+                v-model="winForm.endTime" start="00:00" step="00:10" end="23:50"
+                placeholder="时刻" style="width:120px" :disabled="winDisabled"
+              />
+            </span>
+          </div>
+          <div class="kv" style="border-bottom:none">
+            <span class="k" style="width:132px">保存</span>
+            <span class="rowc gap13 wrap">
+              <el-button
+                type="primary" size="small" class="btn-save"
+                :loading="winSaving" :disabled="!auth.isSuperAdmin" @click="saveWindow"
+              >
+                <IconCheck :size="14" class="btn-icon" />保存窗口
+              </el-button>
+              <span class="micro">
+                {{ auth.isSuperAdmin
+                  ? '开始日只能周五 / 周六 / 周日，结束日只能周六 / 周日，最长 72 小时'
+                  : '只有超级管理员能修改点歌时间窗口（后端 40301 把关）' }}
+              </span>
+            </span>
           </div>
         </div>
       </div>
@@ -144,8 +237,6 @@
             </div>
             <div class="stack gap13">
               <div v-for="(t, i) in slotTimes" :key="i" class="rowc gap13 slot-edit-row">
-                <!-- v8 视觉稿第 2396/2400/2404 行用裸 input，但第二版改成 el-time-select 后体验更好：
-                     既能点选下拉也能手输。粒度 10 分钟，区间 06:00~22:30 -->
                 <el-time-select
                   v-model="t.time"
                   start="06:00" step="00:10" end="22:30"
@@ -170,15 +261,10 @@
                 <IconCheck :size="15" class="btn-icon" />发布时段
               </el-button>
             </div>
-            <!-- v8 方案 ④：每场名额上限（视觉稿没画，但后端已实现） -->
-            <div class="slot-capacity">
-              <span class="cap-label">每场名额上限</span>
-              <el-input-number v-model="slotCapacity" :min="0" :max="99" />
-              <span class="micro">0 = 不限。排满的场次在小程序端会划掉并提示「已排满」</span>
-            </div>
             <div class="micro" style="margin-top:11px;line-height:1.7">
               留空则退回解析「开播时间」设置，再退回默认三个。
-              <b>可选日期范围固定为下一周的周一到周五</b>，不在这里改。
+              <b>可选日期范围固定为下一周的周一到周五</b>，不在这里改；
+              每格能排几首在「排期容量与候补」里设（当前每格 <b>{{ cap.capacity ?? 0 }}</b> 首）。
             </div>
           </div>
 
@@ -266,7 +352,7 @@
       </div>
     </div>
 
-    <!-- ══════════ 危险区（仅超管） · 视觉稿未画，后端接口已落地所以保留 ══════════ -->
+    <!-- ══════════ 危险区（仅超管） ══════════ -->
     <div class="sec danger-sec" v-if="auth.isSuperAdmin">
       <div class="sec-head">
         <span class="sec-title danger-title">危险区</span>
@@ -280,8 +366,9 @@
           <div class="grow">
             <div class="dz-title">一键清空全部点歌数据</div>
             <div class="dz-desc">
-              删除<b>全部点歌记录</b>并清零名额计数器，<b>不可恢复</b>；文稿、注意事项确认记录、学生账号一概不动。
-              个人每周点歌次数随数据清空自然归零，本周名额重新可占。
+              删除<b>全部点歌记录</b>，<b>不可恢复</b>；文稿、注意事项确认记录、学生账号一概不动。
+              v2 起容量与候补都是<b>实时统计</b>（直接数投稿记录），没有独立的名额计数器，
+              所以清空数据 = 容量占用与候补队列自然归零，个人每周次数随之归零。
             </div>
             <div class="dz-desc muted">
               普通管理员调用此接口返回 40301；按钮对普通管理员不渲染 —— 显隐只是体验，边界在服务端。
@@ -298,9 +385,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import http from '@/utils/http';
+import dayjs from 'dayjs';
 import {
   IconCheck, IconPlus, IconRefresh, IconInfo,
 } from '@/components/icons';
@@ -308,50 +396,127 @@ import { useAuthStore } from '@/stores/auth';
 
 const auth = useAuthStore();
 
-/** 用量进度条宽度：0 或未设上限时按 0% 处理 */
-function pct(s) {
-  if (!s || !s.limit) return '0%';
-  const r = Math.min((Number(s.used) || 0) / Number(s.limit), 1);
+const hhmm = (iso) => (iso ? dayjs(iso).format('MM-DD HH:mm') : '—');
+/** 进度条宽度（数字版；0 或未设上限按 0% 处理） */
+function pctOf(used, limit) {
+  if (!limit) return '0%';
+  const r = Math.min((Number(used) || 0) / Number(limit), 1);
   return `${Math.round(r * 100)}%`;
 }
+/** 毫秒 → 「2 小时 15 分」 */
+function fmtDur(ms) {
+  if (ms === null || ms === undefined) return '—';
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d} 天 ${h} 小时`;
+  if (h > 0) return `${h} 小时 ${m} 分`;
+  if (m > 0) return `${m} 分 ${s % 60} 秒`;
+  return `${s} 秒`;
+}
 
-/* ─────────── 名额 ─────────── */
-const quotaForm = reactive({ daily: 0, weekly: 0 });
-const snapshot = ref(null);
-const quotaSaving = ref(false);
+/* ─────────── 本地时钟（窗口倒计时） ─────────── */
+const nowTs = ref(Date.now());
+let ticker = null;
+
+/* ─────────── v2：排期容量与候补 ─────────── */
+const cap = ref({ capacity: 0, weekCapacity: 0, queue: {}, window: null, finalizeAt: null });
+const queue = computed(() => cap.value.queue || {});
+const capForm = reactive({ capacity: 0, queueLimit: 0 });
+const capSaving = ref(false);
 const sweeping = ref(false);
 
-async function fetchQuota() {
-  snapshot.value = await http.get('/admin/submit/quota');
-  quotaForm.daily = snapshot.value?.daily?.limit ?? 0;
-  quotaForm.weekly = snapshot.value?.weekly?.limit ?? 0;
+/* 已占位 / 补位待审的口径只能从排期矩阵拿（/capacity 只给上限） */
+const sched = ref({ days: [], capacity: 0, weekCapacity: 0, rangeText: '' });
+const allSlots = computed(() => (sched.value.days || []).flatMap((d) => d.slots || []));
+const gridCount = computed(() => allSlots.value.length);
+const seatedTotal = computed(() => allSlots.value.reduce((n, s) => n + (s.seated || 0), 0));
+const promotedCount = computed(() => allSlots.value.reduce((n, s) => n + (s.promoted || 0), 0));
+
+async function fetchCapacity() {
+  cap.value = await http.get('/admin/submit/capacity');
+  capForm.capacity = cap.value?.capacity ?? 0;
+  capForm.queueLimit = cap.value?.queue?.limitAuto ? 0 : (cap.value?.queue?.limit ?? 0);
 }
-async function saveQuota() {
-  // 同 saveRules：清空 = undefined = 键被丢 = 后端保留旧值，必须拦住
-  const d = Number(quotaForm.daily);
-  const w = Number(quotaForm.weekly);
-  if (!Number.isFinite(d) || !Number.isFinite(w)) {
-    ElMessage.warning('请填写每日 / 每周名额（0 表示不限）');
+async function fetchSchedule() {
+  sched.value = await http.get('/admin/submit/schedule');
+}
+async function saveCapacity() {
+  // 同 saveRules：el-input-number 清空时是 undefined，键会被 JSON 丢掉 → 后端保留旧值却弹「已更新」
+  const c = Number(capForm.capacity);
+  const q = Number(capForm.queueLimit);
+  if (!Number.isFinite(c) || !Number.isFinite(q)) {
+    ElMessage.warning('请填写每格正式位与候补上限（0 分别表示不限 / 自动）');
     return;
   }
-  quotaSaving.value = true;
+  capSaving.value = true;
   try {
-    snapshot.value = await http.put('/admin/submit/quota', {
-      daily: Math.max(0, Math.floor(d)), weekly: Math.max(0, Math.floor(w)),
+    const snap = await http.put('/admin/submit/quota', {
+      capacity: Math.max(0, Math.floor(c)),
+      queueLimit: Math.max(0, Math.floor(q)),
     });
-    quotaForm.daily = snapshot.value?.daily?.limit ?? 0;
-    quotaForm.weekly = snapshot.value?.weekly?.limit ?? 0;
-    ElMessage.success('名额已更新');
-  } finally { quotaSaving.value = false; }
+    cap.value = { ...cap.value, queue: snap || cap.value.queue };
+    await Promise.all([fetchCapacity(), fetchSchedule()]);
+    ElMessage.success('容量与候补上限已更新');
+  } finally { capSaving.value = false; }
 }
-async function sweepQuota() {
+async function sweepQueue() {
   sweeping.value = true;
   try {
-    const data = await http.post('/admin/submit/quota/sweep');
-    snapshot.value = data?.snapshot || snapshot.value;
-    const rejected = (data?.daily || 0) + (data?.weekly || 0);
-    ElMessage.success(`已执行自动驳回，本轮处理 ${rejected} 条`);
+    const r = await http.post('/admin/submit/queue/sweep');
+    await Promise.all([fetchCapacity(), fetchSchedule()]);
+    ElMessage.success(
+      `已执行：递补 ${r?.promoted ?? 0} 条 · 满额清队 ${r?.closed ?? 0} 条 · 定稿清理 ${r?.weeks ?? 0} 周`,
+    );
   } finally { sweeping.value = false; }
+}
+
+/* ─────────── v2：点歌时间窗口 ─────────── */
+const win = ref({});
+const winForm = reactive({ enabled: 0, startDay: 6, startTime: '18:00', endDay: 0, endTime: '18:00' });
+const winSaving = ref(false);
+/** 非超管或未启用窗口 → 表单只读 */
+const winDisabled = computed(() => !auth.isSuperAdmin || !Number(winForm.enabled));
+
+const winCd = computed(() => {
+  const w = win.value;
+  if (w.enabled === false) return null;
+  const target = w.open ? w.closesAt : w.opensAt;
+  if (!target) return null;
+  return { ms: new Date(target).getTime() - nowTs.value };
+});
+
+function fillWinForm(d) {
+  const cfg = d?.config || {};
+  winForm.enabled = cfg.enabled === undefined ? 0 : Number(cfg.enabled);
+  winForm.startDay = Number(cfg.startDay ?? 6);
+  winForm.startTime = cfg.startTime || '18:00';
+  winForm.endDay = Number(cfg.endDay ?? 0);
+  winForm.endTime = cfg.endTime || '18:00';
+}
+async function fetchWindow() {
+  win.value = await http.get('/admin/submit/window');
+  fillWinForm(win.value);
+}
+async function saveWindow() {
+  if (Number(winForm.enabled) && (!winForm.startTime || !winForm.endTime)) {
+    ElMessage.warning('请填写开始与结束时刻（HH:mm）');
+    return;
+  }
+  winSaving.value = true;
+  try {
+    win.value = await http.put('/admin/submit/window', {
+      enabled: Number(winForm.enabled) ? 1 : 0,
+      startDay: Number(winForm.startDay),
+      startTime: winForm.startTime,
+      endDay: Number(winForm.endDay),
+      endTime: winForm.endTime,
+    });
+    fillWinForm(win.value);
+    await Promise.all([fetchCapacity(), fetchSchedule()]);
+    ElMessage.success(`点歌时间已更新：${win.value?.windowText || '—'}（窗口结束 = 审核截止）`);
+  } finally { winSaving.value = false; }
 }
 
 /* ─────────── 提交规则 ─────────── */
@@ -366,7 +531,6 @@ async function fetchRules() {
 async function saveRules() {
   // ⚠️ el-input-number 被「清空」时是 undefined：JSON.stringify 会丢掉这个键，
   // 后端就保留旧值，但页面照样弹「已更新」——管理员以为改成 0 了其实没改（2026-09-19 实际踩过）。
-  // 所以这里必须拦住：要填就填明确的数字，0 = 不限。
   const n = Number(ruleForm.weeklyUserLimit);
   if (!Number.isFinite(n) || ruleForm.weeklyUserLimit === null || ruleForm.weeklyUserLimit === undefined || ruleForm.weeklyUserLimit === '') {
     ElMessage.warning('请填写每人每周点歌次数（0 表示不限）');
@@ -377,7 +541,6 @@ async function saveRules() {
     const data = await http.put('/admin/submit/rules', {
       weeklyUserLimit: Math.max(0, Math.floor(n)), dupBlock: ruleForm.dupBlock,
     });
-    // 用服务端真正落库的值回填，页面显示的就是生效中的配置
     if (data) {
       ruleForm.weeklyUserLimit = data.weeklyUserLimit;
       ruleForm.dupBlock = data.dupBlock;
@@ -393,7 +556,6 @@ async function saveRules() {
 /* ─────────── 播出时段 ─────────── */
 const slotTimes = ref([]);
 const slotConfig = ref(null);
-const slotCapacity = ref(0);
 const slotSaving = ref(false);
 
 const SOURCE_LABEL = {
@@ -423,7 +585,6 @@ async function fetchSlots() {
   // GET 走 /admin/submit/timeslots（/submit/slots 只注册了 PUT，GET 会被 /submit/:id 吃掉）
   slotConfig.value = await http.get('/admin/submit/timeslots');
   slotTimes.value = (slotConfig.value?.times || []).map((t) => ({ time: t.time, label: t.label || '' }));
-  slotCapacity.value = slotConfig.value?.capacity ?? 0;
 }
 function addSlot() {
   slotTimes.value.push({ time: '', label: '午间' });
@@ -436,13 +597,13 @@ async function saveSlots() {
     .map((t) => ({ time: (t.time || '').trim(), label: t.label }))
     .filter((t) => t.time);
   if (!times.length) return ElMessage.warning('至少要有一个时段');
-  const cap = Number(slotCapacity.value);
-  if (!Number.isFinite(cap)) return ElMessage.warning('请填写每场名额（0 表示不限）');
   slotSaving.value = true;
   try {
-    slotConfig.value = await http.put('/admin/submit/slots', { times, capacity: Math.max(0, Math.floor(cap)) });
+    // ⚠️ 不再传 capacity —— v2 里「每格正式位」统一在「排期容量与候补」段维护，
+    //    这里传了就会变成第二个入口，两边改同一个值容易互相覆盖。
+    slotConfig.value = await http.put('/admin/submit/slots', { times });
     slotTimes.value = (slotConfig.value?.times || []).map((t) => ({ time: t.time, label: t.label || '' }));
-    slotCapacity.value = slotConfig.value?.capacity ?? 0;
+    await fetchSchedule();   // 时段变了 → 格子数变 → 下周正式位跟着变
     ElMessage.success('已发布，用户端立即生效');
   } finally { slotSaving.value = false; }
 }
@@ -480,7 +641,7 @@ const purging = ref(false);
 
 async function purgeSongs() {
   const { value } = await ElMessageBox.prompt(
-    '将删除全部点歌记录并清零名额计数器，不可恢复；文稿与注意事项确认记录不受影响。请输入 DELETE 确认。',
+    '将删除全部点歌记录，不可恢复；文稿与注意事项确认记录不受影响。请输入 DELETE 确认。',
     '清空全部点歌数据',
     {
       type: 'error',
@@ -494,15 +655,21 @@ async function purgeSongs() {
   try {
     const data = await http.delete('/admin/submit/songs', { data: { confirm: value } });
     ElMessage.success(`已清空 ${data?.deletedSongs ?? 0} 条点歌数据，文稿不受影响`);
-    await Promise.allSettled([fetchQuota(), fetchNotices()]);
+    await Promise.allSettled([fetchCapacity(), fetchSchedule(), fetchNotices()]);
   } finally { purging.value = false; }
 }
 
 onMounted(() => {
-  fetchQuota().catch(() => {});
+  fetchCapacity().catch(() => {});
+  fetchSchedule().catch(() => {});
+  fetchWindow().catch(() => {});
   fetchRules().catch(() => {});
   fetchSlots().catch(() => {});
   fetchNotices().catch(() => {});
+  ticker = setInterval(() => { nowTs.value = Date.now(); }, 1000);
+});
+onBeforeUnmount(() => {
+  if (ticker) clearInterval(ticker);
 });
 </script>
 
@@ -514,7 +681,7 @@ onMounted(() => {
 }
 
 /* v8 子页返回入口 */
-.back-row { display: flex; align-items: baseline; gap: 12px; }
+.back-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .back-link {
   font-size: var(--fs-md); font-weight: 600; color: var(--accent);
   cursor: pointer;
@@ -523,14 +690,14 @@ onMounted(() => {
 
 /* ══════════ 视觉稿通用件（来自 preview/admin-ui-v8） ══════════ */
 .sec { display: flex; flex-direction: column; gap: 13px; }
-.sec-head { display: flex; align-items: center; justify-content: space-between; gap: 13px; }
+.sec-head { display: flex; align-items: center; justify-content: space-between; gap: 13px; flex-wrap: wrap; }
 .sec-title {
   font-size: var(--fs-xl); font-weight: 600;
   letter-spacing: var(--ls-tight-sm); line-height: var(--lh-xl);
 }
 .danger-title { color: var(--red-fg); }
 
-.cols { display: flex; gap: 18px; align-items: flex-start; }
+.cols { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
 .cols > * { min-width: 0; }
 .grow { flex: 1; min-width: 0; }
 
@@ -540,6 +707,7 @@ onMounted(() => {
   border-radius: var(--r-card);
 }
 .rowc { display: flex; align-items: center; }
+.wrap { flex-wrap: wrap; }
 .stack { display: flex; flex-direction: column; }
 .gap8 { gap: 8px; }
 .gap13 { gap: 13px; }
@@ -548,7 +716,6 @@ onMounted(() => {
   display: flex;
   align-items: center;
   font-size: var(--fs-md);
-  line-height: var(--lh-md);
   padding: 13px 0;
   border-bottom: 1px solid var(--divider);
 }
@@ -606,7 +773,7 @@ onMounted(() => {
 }
 .warnline :deep(svg) { flex-shrink: 0; margin-top: 2px; }
 
-/* 视觉稿小标签：pass / danger（与 el-tag 区分，不走 Element 主题） */
+/* 视觉稿小标签：pass / danger / pending（与 el-tag 区分，不走 Element 主题） */
 .tag {
   display: inline-flex; align-items: center; height: 22px;
   padding: 0 10px;
@@ -615,19 +782,11 @@ onMounted(() => {
   letter-spacing: var(--ls-wide-sm);
   background: var(--divider);
   color: var(--muted-2);
+  margin-right: 6px;
 }
-.tag-pass {
-  background: #e6f0fa;
-  color: var(--accent);
-}
-.tag-danger {
-  background: var(--red-bg);
-  color: var(--red-fg);
-}
-.tag-pending {
-  background: var(--amber-bg);
-  color: var(--amber-fg);
-}
+.tag-pass { background: var(--acc-bg); color: var(--accent); }
+.tag-danger { background: var(--red-bg); color: var(--red-fg); }
+.tag-pending { background: var(--amber-bg); color: var(--amber-fg); }
 
 .num { font-variant-numeric: tabular-nums; }
 .micro {
@@ -636,14 +795,14 @@ onMounted(() => {
   letter-spacing: var(--ls-wide-sm);
 }
 
-/* ══════════ 名额段：用量数据 2×2 网格 ══════════ */
+/* ══════════ 排期容量段：用量 2×2 网格 ══════════ */
 .quota-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 18px 26px;
   margin-bottom: 16px;
 }
-.quota-item { display: flex; flex-direction: column; gap: 2px; }
+.quota-item { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .quota-item-text {
   display: flex; flex-direction: row; justify-content: space-between; align-items: baseline;
   gap: 8px;
@@ -653,14 +812,11 @@ onMounted(() => {
   font-weight: 600;
   color: var(--ink);
 }
-/* 名额段编辑区：字段行 + 按钮行（避免挤断） */
 .quota-edit {
   display: flex; flex-direction: column; gap: 13px;
   margin-top: 4px;
 }
-.quota-fields {
-  display: flex; gap: 18px;
-}
+.quota-fields { display: flex; gap: 18px; }
 .quota-fields > .field { flex: 1; min-width: 0; }
 .quota-fields :deep(.el-input-number) { width: 100%; }
 .quota-buttons {
@@ -669,10 +825,32 @@ onMounted(() => {
 .quota-buttons .btn-save { min-width: 96px; }
 .quota-buttons .btn-sweep { min-width: 156px; }
 
-/* ══════════ 时段段：编辑行 / 每场名额上限 ══════════ */
-.slot-edit-row {
-  align-items: center;
+/* ══════════ 点歌时间窗口 ══════════ */
+.win-tile {
+  flex-direction: column; gap: 10px;
+  padding: 16px 20px; margin-bottom: 16px;
 }
+.win-status { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: rgba(255, 255, 255, 0.84); }
+.t-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: var(--live); box-shadow: 0 0 8px rgba(255, 69, 58, 0.7);
+}
+.t-dot.idle { background: rgba(255, 255, 255, 0.34); box-shadow: none; }
+.win-cd { font-size: 22px; font-weight: 600; color: #fff; letter-spacing: var(--ls-tight-sm); margin-top: 6px; }
+.win-meta {
+  flex: none; min-width: 190px;
+  font-size: var(--fs-xs); color: rgba(255, 255, 255, 0.62);
+  line-height: 1.9; letter-spacing: var(--ls-wide-sm);
+  font-variant-numeric: tabular-nums;
+}
+.win-note {
+  font-size: var(--fs-xs); color: rgba(255, 255, 255, 0.52);
+  line-height: 1.7; letter-spacing: var(--ls-wide-sm);
+  border-top: 1px solid rgba(255, 255, 255, 0.14); padding-top: 10px;
+}
+
+/* ══════════ 时段段：编辑行 ══════════ */
+.slot-edit-row { align-items: center; }
 .slot-label-hint {
   color: var(--muted-2);
   flex: 1;
@@ -681,41 +859,20 @@ onMounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.op-delete {
-  margin-left: auto;
-  flex: none;
-}
+.op-delete { margin-left: auto; flex: none; }
 .op-delete.disabled {
   color: var(--soft);
   cursor: not-allowed;
   pointer-events: none;
 }
-/* 用户预览：日期列等宽，与时段编辑行节奏一致 */
-.slot-day-row {
-  align-items: center;
-  min-height: 28px;
-}
-.slot-day-label {
-  width: 86px;
-  flex: none;
-}
-.slot-capacity {
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--divider);
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-}
-.cap-label {
-  font-size: var(--fs-md);
-  color: var(--ink-2);
-}
+.link { font-size: var(--fs-sm); color: var(--accent); font-weight: 500; cursor: pointer; white-space: nowrap; }
+.link:hover { text-decoration: underline; }
+.slot-day-row { align-items: center; min-height: 28px; }
+.slot-day-label { width: 86px; flex: none; }
 
 /* ══════════ 危险区 ══════════ */
 .danger-sec .sec-title { color: var(--red-fg); }
-.dangerzone {
-  border-color: #f0c4c0;
-  background: linear-gradient(180deg, #fff 0%, #fff8f7 100%);
-}
+.dangerzone { border-color: #f0c4c0; }
 .danger-row { gap: 24px; align-items: flex-start; }
 .dz-title {
   font-size: var(--fs-md); font-weight: 600;
@@ -737,11 +894,8 @@ onMounted(() => {
   text-align: right;
   display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
 }
-.dz-hint {
-  font-size: var(--fs-xs);
-  color: var(--red-fg);
-}
+.dz-hint { font-size: var(--fs-xs); color: var(--red-fg); }
 
-/* 按钮：图标与文字对齐（与现状其它 view 保持一致） */
+/* 按钮：图标与文字对齐 */
 .btn-icon { margin-right: 5px; vertical-align: -2px; }
 </style>

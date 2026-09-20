@@ -1,13 +1,17 @@
 // pages/submit/submit.js
 //
-// 点歌前置三件事（2026-09 v8 方案落地）：
+// 点歌前置四件事（v8 方案落地 / 2026-09-20 点歌规则 v2）：
 //   ① 注意事项闸门：进点歌先弹「点歌注意事项」，滑到页底才能点「我已知晓」，
 //      确认调 POST /user/submit/notice/ack；服务端在提交时会再校验一次（40303 = 没确认）。
-//      注意：内容一屏放得下时按钮直接可点（服务不了「滚不动」的死角），这里用高度测量兜底。
-//   ② 播出时段只可选不手输：GET /user/submit/timeslots 下发下一周一 ~ 周五的可选时段，
-//      值是规范串「2026-09-21 午间 12:20」；自由文本后端直接拒（40001）。
-//   ③ 次数 / 名额提示：GET /user/submit/quota 给「本周还可点 N 次」与名额是否已满。
+//   ② 播出时段只可选不手输：GET /user/submit/timeslots 下发下一周一 ~ 周五的可选时段；
+//      v2 起每格带容量（capacity / seated / left / full），满了划掉不可选、还能进候补。
+//   ③ 点歌时间窗口（v2 新增）：GET /user/submit/window。状态条常驻在标题下
+//      （两行：规则 + 此刻状态与倒计时），未开放时提交按钮置灰。
+//      文案一律服务端下发，前端不硬编码星期与时刻；窗口结束 = 审核截止。
+//   ④ 次数提示：GET /user/submit/quota 给「本周还能点 N 次」（v2 无日/周名额，容量按格子算）。
 const { request } = require('../../utils/request.js');
+const { fmtIso } = require('../../utils/format.js');
+const windowBar = require('../../utils/windowBar.js');
 const app = getApp();
 
 /** 滑到页底后按钮上方的提示（不写「30 天」——ack 是按内容版本记的，不是按时间） */
@@ -16,6 +20,7 @@ const ACK_HINT = '确认后不会重复弹出；内容更新后会再提醒一�
 Page({
   data: {
     statusBarHeight: 20,
+    navBarHeight: 44,
     type: 1,                // 1=点歌 2=文稿
     songName: '',
     singer: '',
@@ -48,12 +53,22 @@ Page({
     formReady: false,
     skForm: false,
 
-    // ── 次数 / 名额 ──
-    quotaText: '',          // 「本周还可点 2 次」/「本周名额已满」
+    // ── 点歌时间窗口（v2，常驻展示） ──
+    winEnabled: false,      // 服务端是否限制了时间窗口（false = 一直开放）
+    winOpen: true,          // 此刻是否开放（默认 true：拉不到数据时不把用户锁死，服务端仍会拦）
+    winLine1: '',           // 规则行：每周六 18:00 – 周日 18:00
+    winLine2: '',           // 状态行：开放中 · 距截止 2 小时 15 分
+    winClosesAt: '',        // 本次收歌截止（MM-DD HH:mm）
+    ctaClosed: false,       // 未开放 → 提交按钮置灰
+    hintText: '',           // 按钮上方提示
+
+    // ── 次数提示 ──
+    quotaText: '',          // 「本周还能点 2 次（上限 2 次）」
     quotaBlocked: false,
   },
 
   onLoad() {
+    this.wb = windowBar.create(this);
     this.setData({
       statusBarHeight: getApp().globalData.statusBarHeight || 20,
       navBarHeight: getApp().globalData.navBarHeight || 44,
@@ -72,7 +87,10 @@ Page({
     this.prepareSong();
   },
 
-  /** 点歌侧的前置数据：次数提示 + 可选时段（不阻塞表单，静默失败） */
+  onHide() { if (this.wb) this.wb.stopTimer(); },
+  onUnload() { if (this.wb) this.wb.stopTimer(); },
+
+  /** 点歌侧的前置数据：次数提示 + 可选时段 + 时间窗口（不阻塞表单，静默失败） */
   prepareSong() {
     if (!app.globalData.token) return;
     // v8 方案 ⑤：表单骨架 —— 超过 300ms 才显示，短于 300ms 宁可空白
@@ -81,7 +99,7 @@ Page({
         if (!this.data.formReady) this.setData({ skForm: true });
       }, 300);
     }
-    Promise.allSettled([this.loadQuota(), this.loadSlots()]).then(() => {
+    Promise.allSettled([this.loadQuota(), this.loadSlots(), this.wb.load()]).then(() => {
       clearTimeout(this._skTimer);
       this._skTimer = null;
       this.setData({ formReady: true, skForm: false });
@@ -89,17 +107,28 @@ Page({
     this.ensureNotice();
   },
 
+  /** 窗口字段更新后联动底部按钮（windowBar 的钩子） */
+  onWindowChange() {
+    this.refreshCta();
+  },
+
   loadQuota() {
     return request('/user/submit/quota').then((d) => {
+      // v2：没有日/周名额了，只剩「每人每周 N 次」这一条个人限制
       const uw = d.userWeekly || {};
+      const limit = Number(uw.limit) || 0;
+      const remaining = Number(uw.remaining) || 0;
       let text = '';
       let blocked = false;
-      if (uw.limit > 0) {
-        text = uw.remaining > 0 ? '本周还可点 ' + uw.remaining + ' 次' : '本周点歌次数已用完';
-      }
-      if (d.song && d.song.exhausted) {
-        text = '本期点歌名额已满，提交将被自动驳回';
-        blocked = true;
+      if (limit > 0) {
+        if (remaining > 0) {
+          text = '本周还能点 ' + remaining + ' 次（上限 ' + limit + ' 次）';
+        } else {
+          text = '本周 ' + limit + ' 次已用完，下周再来';
+          blocked = true;
+        }
+      } else if (uw.used > 0) {
+        text = '本周已点 ' + uw.used + ' 次（不限次数）';
       }
       this.setData({ quotaText: text, quotaBlocked: blocked });
     }).catch(() => {});
@@ -229,6 +258,7 @@ Page({
             this.setData({ type: 1 });
             wx.showToast({ title: '文稿已关闭，已切换到点歌', icon: 'none' });
           }
+          this.refreshCta();
         }
       });
     }
@@ -236,6 +266,19 @@ Page({
 
   checkLogin() {
     this.setData({ loggedIn: !!app.globalData.token });
+    this.refreshCta();
+  },
+
+  /** 底部按钮区：未开放就置灰 + 换文案，同时把截止时刻讲清楚（服务端 40907 才是最终权威） */
+  refreshCta(over) {
+    const d = Object.assign({}, this.data, over || {});
+    const closed = d.type === 1 && d.winEnabled && !d.winOpen;
+    let hint = '';
+    if (!d.loggedIn) hint = '首次提交将自动登录，不收集手机号';
+    else if (closed) hint = '现在不在点歌时间段';
+    else if (d.type === 1 && d.winEnabled && d.winClosesAt) hint = '提交后即占住该时段 · 收歌截止 ' + d.winClosesAt;
+    if (this.data.hintText === hint && this.data.ctaClosed === closed) return;
+    this.setData({ ctaClosed: closed, hintText: hint });
   },
 
   switchType(e) {
@@ -246,6 +289,7 @@ Page({
       return;
     }
     this.setData({ type: t });
+    this.refreshCta({ type: t });
     if (t === 1) this.prepareSong();
   },
 
@@ -301,7 +345,7 @@ Page({
   pickSlot(e) {
     const value = e.currentTarget.dataset.value;
     const item = (this.data._slotList || []).find((s) => s.value === value);
-    // v8 方案 ④：已排满的场次不可选
+    // v8 方案 ④：已排满的场次不可选（但提交仍可进候补，见下方 doSubmit 的 queued 分支）
     if (item && item.full) {
       return wx.showToast({ title: '该场已排满，换一个时段吧', icon: 'none' });
     }
@@ -319,6 +363,7 @@ Page({
     try {
       await app.login();
       this.setData({ loggedIn: true });
+      this.refreshCta({ loggedIn: true });
       return true;
     } catch (e) {
       if (e && e.code === 40302) {
@@ -335,10 +380,34 @@ Page({
     }
   },
 
+  /** 进候补的反馈：把服务端下发的候补卡摊开讲清楚（§7.1 候补中形态） */
+  showQueuedModal(card) {
+    const lines = ['该时段名额已满，你已进入候补队列' + (card.queuePos ? '（第 ' + card.queuePos + ' 位）' : '')];
+    if (card.queuePos) {
+      lines.push('前面还有 ' + (card.aheadCount || 0) + ' 人'
+        + (card.queueLimit > 0 ? ' · 候补上限 ' + card.queueLimit + ' 人' : ''));
+    }
+    if (card.finalizeAt) lines.push(card.hint || '下周任意时段有空位时按提交先后自动补位');
+    if (card.finalizeAt) lines.push('收歌截止 ' + fmtIso(card.finalizeAt) + '，没补上会自动告诉你');
+    return new Promise((resolve) => {
+      wx.showModal({
+        title: '已进入候补队列',
+        content: lines.join('\n'),
+        showCancel: false,
+        confirmText: '知道了',
+        success: () => resolve(),
+        fail: () => resolve(),
+      });
+    });
+  },
+
   async doSubmit() {
     const { type, songName, singer, wishContent, articleTitle, articleContent, wantBroadcastTime } = this.data;
 
     if (type === 1) {
+      if (this.data.ctaClosed) {
+        return wx.showToast({ title: '现在不在点歌时间段', icon: 'none' });
+      }
       if (!songName.trim() || !singer.trim()) {
         return wx.showToast({ title: '请填写歌名和歌手', icon: 'none' });
       }
@@ -363,8 +432,13 @@ Page({
 
     this.setData({ submitting: true });
     try {
-      await request('/user/submit', 'POST', payload);
-      wx.showToast({ title: '提交成功，等待审核' });
+      const r = await request('/user/submit', 'POST', payload);
+      // v2：正式位满了会直接落库成候补（status=3），这里把候补卡讲清楚再去「我的投稿」
+      if (r && r.outcome === 'queued') {
+        await this.showQueuedModal(r.card || {});
+      } else {
+        wx.showToast({ title: '提交成功，等待审核' });
+      }
       setTimeout(() => {
         wx.switchTab({ url: '/pages/mySubmit/mySubmit' });
       }, 800);
@@ -376,9 +450,19 @@ Page({
         else wx.showToast({ title: '请先确认点歌注意事项', icon: 'none' });
         return;
       }
-      // 40302 = 模块已关闭；40902 = 名额满；40903 = 规则拦截（同曲 / 次数用完）
+      // 40907 = 窗口外（服务端最终权威，前端被绕过也拦得住）：顺手把状态条刷到最新
+      if (e && e.code === 40907) {
+        wx.showToast({ title: '现在不在点歌时间段', icon: 'none' });
+        this.wb.load();
+        return;
+      }
+      // 40302 = 模块已关闭；40903 = 规则拦截（同曲 / 次数用完）
+      // 40904 = 时段与候补队列都满；40906 = 该格已满（旧码，仍兜住）
       wx.showToast({ title: (e && e.message) || '提交失败', icon: 'none' });
-      if (e && (e.code === 40902 || e.code === 40903)) this.loadQuota();
+      if (e && [40902, 40903, 40904, 40906].indexOf(e.code) >= 0) {
+        this.loadQuota();
+        this.loadSlots();      // 容量变了，弹层里的「已排满」要跟着更新
+      }
     } finally {
       this.setData({ submitting: false });
     }

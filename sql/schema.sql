@@ -98,12 +98,15 @@ CREATE TABLE `submit` (
   `wish_content`           VARCHAR(500) DEFAULT NULL COMMENT '祝福语',
   `article_title`          VARCHAR(255) DEFAULT NULL COMMENT '文稿标题',
   `article_content`        TEXT         DEFAULT NULL COMMENT '文稿正文',
-  `want_broadcast_time`    VARCHAR(64)  DEFAULT NULL COMMENT '希望播出时段，如 2026-09-15 午间',
-  `status`                 TINYINT      NOT NULL DEFAULT 0 COMMENT '0=待审核 1=已通过 2=已驳回',
+  `want_broadcast_time`    VARCHAR(64)  DEFAULT NULL COMMENT '学生首选播出时段，如 2026-09-21 午间 12:20（意愿数据，永不被覆盖）',
+  `scheduled_slot`         VARCHAR(64)  DEFAULT NULL COMMENT '实际排期时段（候补补位后可能与首选不同；候补中为空）',
+  `queue_at`               DATETIME     DEFAULT NULL COMMENT '进入候补队列时刻（FIFO 排序键）',
+  `promoted_at`            DATETIME     DEFAULT NULL COMMENT '递补为占位状态的时刻',
+  `status`                 TINYINT      NOT NULL DEFAULT 0 COMMENT '0=待审 1=已排期 2=已驳回 3=候补中 4=已补位待审',
   `reject_reason`          VARCHAR(255) DEFAULT NULL COMMENT '驳回理由',
   `reviewer_id`            BIGINT UNSIGNED DEFAULT NULL COMMENT '审核人',
   `review_time`            DATETIME     DEFAULT NULL COMMENT '审核时间',
-  `auto_rejected`          TINYINT      NOT NULL DEFAULT 0 COMMENT '1=由系统自动驳回（点歌名额已满），0=人工处理',
+  `auto_rejected`          TINYINT      NOT NULL DEFAULT 0 COMMENT '1=系统自动驳回（满额/逾期），0=人工处理',
   `create_time`            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `update_time`            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -111,7 +114,9 @@ CREATE TABLE `submit` (
   KEY `idx_status` (`status`),
   KEY `idx_type` (`type`),
   KEY `idx_create_time` (`create_time`),
-  KEY `idx_type_status_create` (`type`, `status`, `create_time`)
+  KEY `idx_type_status_create` (`type`, `status`, `create_time`),
+  KEY `idx_sched_status` (`scheduled_slot`, `status`),
+  KEY `idx_queue` (`status`, `queue_at`, `id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='投稿与点歌';
 
 -- -----------------------------------------------------------------

@@ -68,7 +68,7 @@ docker exec -i radio-mysql mysql -uroot -proot123 radio_station < sql/migrations
 | GET | `/student/grade/:grade` | **该届明细 + 清理试算**（只读）：`canDelete` / `withSubmit` / 班级分布 |
 | DELETE | `/student/grade/:grade` | **整届清理**：`{mode?: safe\|disable\|purge, confirm?}` |
 | GET | `/student/export` | 导出 xlsx（含初始密码，已改密的行留空） |
-| PUT | `/student/:id` | 改备注 / 三元组 / 状态（改账号会迁移投稿归属） |
+| PUT | `/student/:id` | 改姓名 / 三元组 / 状态（改账号会迁移投稿归属） |
 | PUT | `/student/:id/status` | 启用 / 停用 |
 | PUT | `/student/:id/reset-password` | 重置为 `user+学号` |
 | POST | `/student/reset-password/batch` | 批量重置（必须给 `ids` 或 `grade`/`classNo`，否则拒） |
@@ -77,6 +77,29 @@ docker exec -i radio-mysql mysql -uroot -proot123 radio_station < sql/migrations
 
 ⚠️ **路由顺序**：凡含字面量段的路径（`import` / `template` / `list` / `stats` / `export` /
 `batches` / `reset-password`）必须注册在 `/student/:id` **之前**，验证脚本里有断言守着。
+
+### ⚠️ 姓名的字段名（2026-09-21 踩坑修）
+
+改姓名走 `PUT /student/:id`，**对外字段名是 `name`**（`toDto` 里也叫 `name`）：
+
+```json
+{ "name": "张三丰" }
+```
+
+服务端拿到后**必须同时写 `remark` 和 `nickname` 两列**，因为读的地方不是一个：
+
+| 读哪 | 读的列 |
+|---|---|
+| 管理端学生账号列表 | `remark`（`toDto` → `name`） |
+| 管理端投稿审核 / 留言审核 | `nickname \|\| remark`（nickname 优先） |
+| 小程序「我的」页 / `/user/me` | `nickname \|\| remark` |
+| 名册导入落库 | 两列一起写（`patch.remark = r.name` + `patch.nickname = r.name`） |
+
+- 兼容：`remark` / `nickname` 也当别名接受，避免调用方传错 key 却**静默什么都不改**（曾经
+  管理端发 `{remark, nickname}`、后端只认 `payload.name` → 接口回 200「已保存」，姓名一个字没动）。
+- 校验：空白名 → `40001`；超过 64 字 → `40001`。
+- 回归：`scripts/verify-student-account.js` 的 **G3 段**（12 项断言）守着这条链路，
+  含「学生端 `/user/me` 也要看到新名」——只写 `remark` 会在这里变红。
 
 ## 5. 导入识别规则（三段确定性规则）
 

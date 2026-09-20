@@ -129,6 +129,8 @@ button.btn-primary[disabled] {
 .slot-sheet-head { padding: 32rpx 34rpx 18rpx; flex: none; }
 .slot-sheet-title { font-size: 34rpx; font-weight: 600; color: var(--ink); letter-spacing: -0.5rpx; }
 .slot-sheet-sub { margin-top: 6rpx; font-size: 23rpx; color: var(--muted); }
+/* v2：弹层里也带一行窗口时间与此刻状态（选到一半也知道截止点） */
+.slot-sheet-win { margin-top: 8rpx; font-size: 22rpx; color: var(--accent); letter-spacing: 0.5rpx; }
 
 /* 小程序 scroll-view 必须显式给高度才会滚 —— 不能再用 max-height */
 .slot-sheet-body {

@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>菁悠广播站 · 点歌规则 v2 界面预览 v1</title>
+<style>
+  /* ═══════════════════════════════════════════════════════════════
+     这是「静态预览」不是成品页面：只验证视觉与文案，不改任何业务代码。
+     屏幕内所有 CSS 搬自 miniprogram/app.wxss + pages/submit/submit.wxss，
+     只有一处换算：rpx 是微信单位、浏览器不认（留着会让尺寸声明整条被丢弃），
+     所以按 390pt 设备折算成 px —— 1rpx = 390/750 = 0.52px，1:1 落地，不再套 scale。
+     ═══════════════════════════════════════════════════════════════ */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #fff; color: #1D1D1F;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC",
+                 "MiSans", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  }
+  .wrap { padding: 40px 36px 72px; }
+  .hd { margin-bottom: 30px; }
+  .hd h1 { margin: 0 0 8px; font-size: 24px; font-weight: 600; letter-spacing: -0.3px; }
+  .hd p { margin: 0; font-size: 13px; line-height: 1.7; color: #7A7A7A; }
+  .hd code { background: #F5F5F7; border-radius: 4px; padding: 1px 6px; font-size: 12px; color: #333; }
+  .grid { display: flex; gap: 34px; flex-wrap: wrap; align-items: flex-start; }
+  .col { width: 390px; }
+  .col-lbl { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .col-sub { font-size: 12px; color: #7A7A7A; line-height: 1.55; min-height: 54px; margin-bottom: 10px; }
+  .frame { width: 390px; height: 844px; border-radius: 36px; overflow: hidden;
+           background: #fff; box-shadow: 0 0 0 1px #E0E0E0, 0 12px 30px rgba(0,0,0,.06); position: relative; }
+  .screen { width: 390px; height: 844px; position: relative; overflow: hidden; }
+
+  /* ── 设计令牌（搬自 app.wxss page{}） ── */
+  .screen {
+    --ink:#1D1D1F; --ink-2:#333333; --muted:#7A7A7A; --soft:#C7C7CC;
+    --hairline:#E0E0E0; --divider:#F0F0F0; --parchment:#F5F5F7; --canvas:#FFFFFF;
+    --tile:#272729; --tile-2:#3A3A3C; --accent:#0066CC; --accent-on-dark:#2997FF; --live:#FF453A;
+    --amber-bg:#FEF3C7; --amber-fg:#8A6100; --green-bg:#E7F5EC; --green-fg:#1E7A46;
+    --red-bg:#FDE8E8; --red-fg:#B42318; --accent-tint:#EAF3FD;
+    --r-card:17.68px; --r-input:11.96px; --r-pill:5199.48px;
+    background: var(--canvas); color: var(--ink); font-size: 14.56px; line-height: 1.5;
+  }
+  /* ── 页面骨架 ── */
+  .screen .page { height: 844px; display: flex; flex-direction: column; background: var(--canvas); }
+  .screen .statusbar { height: 49.92px; flex: none; display: flex; align-items: center;
+                       justify-content: space-between; padding: 0 24.96px; font-size: 13.52px; font-weight: 600; }
+  .screen .navreserve { height: 20.8px; flex: none; }
+  .screen .body { flex: 1; min-height: 0; padding: 0 20.8px; display: flex; flex-direction: column; gap: 17.68px; }
+  .screen .pb-tabbar { flex: none; height: 78px; }
+
+  /* ── 文字层级 / 卡片 / 按钮 / 标签（搬自 app.wxss） ── */
+  .screen .t-page { font-size: 28.08px; font-weight: 600; letter-spacing: -0.42px; line-height: 1.25; }
+  .screen .t-section { font-size: 16.64px; font-weight: 600; letter-spacing: -0.36px; line-height: 1.35; }
+  .screen .t-strong { font-size: 15.6px; font-weight: 500; line-height: 1.4; }
+  .screen .t-body { font-size: 14.56px; line-height: 1.5; }
+  .screen .t-sub { font-size: 13px; color: var(--muted); line-height: 1.5; letter-spacing: 0.26px; }
+  .screen .t-cap { font-size: 11.96px; color: var(--muted); line-height: 1.5; letter-spacing: 0.26px; }
+  .screen .stack { display: flex; flex-direction: column; }
+  .screen .between { display: flex; align-items: center; justify-content: space-between; }
+  .screen .card { background: var(--parchment); border-radius: var(--r-card); padding: 16.64px; }
+  .screen .btn { font-size: 15.6px; border-radius: var(--r-pill); padding: 11.44px 22.88px;
+                 text-align: center; line-height: 1.2; font-weight: 600; }
+  .screen .btn-block { width: 100%; font-size: 16.64px; padding: 15.6px 0; }
+  .screen .btn-primary { background: var(--accent); color: #fff; }
+  .screen .btn-disabled { background: #B9D2EE; color: #fff; }
+  .screen .btn-ghost { background: transparent; color: var(--accent-on-dark);
+                       border: 1.04px solid var(--accent-on-dark); font-weight: 500; }
+  .screen .tag { display: inline-block; font-size: 12.48px; font-weight: 500; border-radius: var(--r-pill);
+                 padding: 4.16px 11.44px; line-height: 1.35; }
+  .screen .tag-pending { background: var(--amber-bg); color: var(--amber-fg); }
+  .screen .tag-pass { background: var(--green-bg); color: var(--green-fg); }
+  .screen .tag-reject { background: var(--red-bg); color: var(--red-fg); }
+  .screen .chip { font-size: 10.92px; font-weight: 500; color: #CCCCCC; background: var(--tile-2);
+                  border-radius: var(--r-pill); padding: 6.24px 12.48px; letter-spacing: 0.52px; }
+  .screen .segment { position: relative; display: flex; background: var(--divider);
+                     border-radius: var(--r-pill); padding: 4.16px; }
+  .screen .segment-indicator { position: absolute; top: 4.16px; bottom: 4.16px; left: 4.16px;
+                               border-radius: var(--r-pill); background: #fff; }
+  .screen .segment-item { position: relative; flex: 1; text-align: center; font-size: 14.56px;
+                          color: var(--muted); padding: 8.32px 0; border-radius: var(--r-pill); line-height: 1.2; }
+  .screen .segment-item.on { color: var(--ink); font-weight: 600; }
+  .screen .tile { background: var(--tile); border-radius: 19.76px; padding: 16.64px;
+                  display: flex; flex-direction: column; gap: 10.4px; }
+  .screen .tile-title { font-size: 26px; font-weight: 600; color: #fff; letter-spacing: -0.42px; line-height: 1.3; }
+  .screen .tile-meta { font-size: 13px; color: #CCCCCC; letter-spacing: 0.26px; line-height: 1.6; }
+  .screen .tile-chips { display: flex; gap: 8.32px; }
+  .screen .tile-actions { display: flex; gap: 10.4px; margin-top: 2.08px; }
+  .screen .form { background: var(--parchment); border-radius: var(--r-card); padding: 17.68px;
+                  display: flex; flex-direction: column; gap: 17.68px; }
+  .screen .field { display: flex; flex-direction: column; gap: 8.32px; }
+  .screen .field-label { font-size: 13px; font-weight: 500; color: var(--muted); }
+  .screen .input { background: #fff; border-radius: var(--r-input); height: 45.76px; line-height: 45.76px;
+                   padding: 0 14.56px; font-size: 14.56px; width: 100%; }
+  .screen .input-area { height: 91.52px; line-height: 1.5; padding: 12.48px 14.56px; }
+  .screen .ph { color: var(--soft); }
+  .screen .filter { font-size: 13px; font-weight: 500; border-radius: var(--r-pill);
+                    padding: 7.28px 14.56px; color: var(--muted); background: var(--divider); }
+  .screen .filter.on { color: #fff; background: var(--ink); }
+  .screen .bottom-cta { flex: none; padding: 8.32px 20.8px 14.56px; background: var(--canvas); }
+  .screen .hint { text-align: center; margin-bottom: 10.4px; font-size: 11.96px; color: var(--muted); }
+
+  /* ── 播出时段：只读行 / 弹层（搬自 submit.wxss） ── */
+  .screen .slot-row { display: flex; align-items: center; justify-content: space-between; gap: 8.32px;
+                      height: 45.76px; padding: 0 14.56px; background: var(--canvas);
+                      border: 1.04px solid var(--hairline); border-radius: 10.4px; }
+  .screen .slot-value { font-size: 14.56px; color: var(--ink); }
+  .screen .slot-value.is-ph { color: var(--soft); }
+  .screen .slot-arrow { width: 8.32px; height: 8.32px; flex: none; border-top: 2.08px solid var(--soft);
+                        border-right: 2.08px solid var(--soft); transform: rotate(45deg); }
+  .screen .slot-sub { margin-top: 5.2px; font-size: 11.44px; color: var(--muted); letter-spacing: 0.26px; }
+  .screen .slot-mask { position: absolute; left: 0; right: 0; top: 0; bottom: 0; background: rgba(29,29,31,.5);
+                       display: flex; align-items: flex-end; }
+  .screen .slot-sheet { width: 100%; height: 608px; background: var(--canvas);
+                        border-radius: 17.68px 17.68px 0 0; display: flex; flex-direction: column; }
+  .screen .slot-sheet-head { padding: 16.64px 17.68px 9.36px; flex: none; }
+  .screen .slot-sheet-title { font-size: 17.68px; font-weight: 600; letter-spacing: -0.26px; }
+  .screen .slot-sheet-sub { margin-top: 3.12px; font-size: 11.96px; color: var(--muted); }
+  .screen .slot-sheet-body { flex: 1 1 0; min-height: 0; padding: 0 17.68px 12.48px; }
+  .screen .slot-sheet-foot { flex: none; padding: 10.4px 17.68px 13.52px; border-top: 1px solid var(--divider);
+                             display: flex; align-items: baseline; gap: 6.24px; }
+  .screen .slot-foot-label { flex: none; font-size: 11.96px; color: var(--muted); letter-spacing: 0.26px; }
+  .screen .slot-foot-value { font-size: 13.52px; font-weight: 600; overflow: hidden;
+                             text-overflow: ellipsis; white-space: nowrap; }
+  .screen .slot-day { margin-top: 13.52px; }
+  .screen .slot-day-head { font-size: 12.48px; color: var(--muted); letter-spacing: 0.26px; margin-bottom: 7.28px; }
+  .screen .slot-chips { display: flex; flex-wrap: wrap; gap: 7.28px; }
+  .screen .slot-chip { flex: 1 1 auto; min-height: 35.36px; padding: 7.28px 13.52px; border-radius: var(--r-pill);
+                       background: var(--parchment); font-size: 13.52px; color: var(--ink-2);
+                       display: inline-flex; align-items: center; justify-content: center; gap: 4.16px; }
+  .screen .slot-chip.on { background: var(--ink); color: #fff; }
+  .screen .slot-chip.off { background: var(--divider); color: var(--soft); }
+  .screen .slot-chip.off .chip-t { text-decoration: line-through; }
+  .screen .slot-picked { font-size: 10.92px; color: var(--muted); letter-spacing: 0.26px; }
+  .screen .slot-chip.on .slot-picked { color: rgba(255,255,255,.7); }
+  .screen .q-dot { width: 6.24px; height: 6.24px; border-radius: 50%; background: var(--accent); flex: none; }
+  .screen .quota-hint { display: flex; align-items: center; gap: 6.24px; margin-top: 10.4px;
+                        padding: 8.32px 12.48px; background: var(--parchment); border-radius: 8.32px;
+                        font-size: 12.48px; color: var(--ink-2); }
+  .screen .quota-hint.is-blocked { color: var(--red-fg); }
+  .screen .quota-hint.is-blocked .q-dot { background: var(--red-fg); }
+
+  /* ── 底部假 tabBar（真实是小程序自定义 tabBar 组件，这里只为了看着像） ── */
+  .screen .tabbar { position: absolute; left: 0; right: 0; bottom: 0; height: 78px; background: #fff;
+                    display: flex; align-items: flex-start; padding-top: 9.36px;
+                    box-shadow: 0 -1px 0 var(--divider); }
+  .screen .tb { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4.16px;
+                font-size: 10.92px; color: var(--soft); }
+  .screen .tb.on { color: var(--accent); }
+  .screen .tb-i { width: 20.8px; height: 20.8px; border-radius: 6.24px; background: currentColor; opacity: .9; }
+
+  /* ══════════ 新增组件 ①：点歌时间窗口状态条（常驻，不可折叠） ══════════ */
+  /* 两行结构：第一行「规则」，第二行「此刻状态 + 倒计时」。
+     一行塞不下（390px 下「点歌时间：每周六 18:00 – 周日 18:00」+ 倒计时会折行、挤压），
+     而且规则是稳定的、状态是变化的，分开讲更清楚。 */
+  .screen .win-bar {
+    display: flex; align-items: flex-start; gap: 7.28px;
+    padding: 10.4px 13.52px; border-radius: 10.4px;
+    background: var(--parchment);
+  }
+  /* 开放中只换底色（平色，不是渐变）+ 圆点变强调色 */
+  .screen .win-bar.open { background: var(--accent-tint); }
+  .screen .win-dot { width: 6.24px; height: 6.24px; margin-top: 4.68px;
+                     border-radius: 50%; background: var(--soft); flex: none; }
+  .screen .win-bar.open .win-dot { background: var(--accent); }
+  .screen .win-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3.12px; }
+  .screen .win-txt { font-size: 13px; color: var(--ink-2); }
+  .screen .win-sub { font-size: 11.96px; color: var(--muted); }
+  .screen .win-bar.open .win-sub { color: var(--accent); font-weight: 600; }
+
+  /* ══════════ 新增组件 ②：候补状态卡（三形态） ══════════ */
+  .screen .qc-head { display: flex; align-items: center; gap: 8.32px; }
+  .screen .qc-hint { font-size: 11.96px; color: #CCCCCC; line-height: 1.6; letter-spacing: 0.26px; }
+  .screen .qc-fail { background: var(--parchment); border-radius: var(--r-card); padding: 16.64px;
+                     display: flex; flex-direction: column; gap: 9.36px; }
+  .screen .qc-row { display: flex; align-items: center; gap: 14.56px; padding: 13.52px 16.64px; background: var(--parchment);
+                    border-radius: var(--r-card); }
+  .screen .qc-thumb { width: 49.92px; height: 49.92px; flex: none; border-radius: 12.48px; background: var(--divider); }
+  .screen .qc-bar { height: 5.2px; border-radius: 519.48px; background: rgba(255,255,255,.18); overflow: hidden; }
+  .screen .qc-bar-fill { height: 100%; border-radius: 519.48px; background: var(--accent-on-dark); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hd">
+    <h1>点歌规则 v2 · 界面预览 v1</h1>
+    <p>
+      静态预览，<b>没有改任何业务代码</b>。尺寸与类名全部取自真实样式表
+      （<code>miniprogram/app.wxss</code> + <code>pages/submit/submit.wxss</code>；<code>rpx</code> 是微信单位、浏览器不认，已按 390pt 设备折算成 px 落地）。
+      v2 新增两件东西：<b>点歌时间窗口状态条</b>（常驻）与<b>候补状态卡</b>（三形态）。<br>
+      文案一律由服务端下发（<code>GET /user/submit/window</code> 的 windowText / opensAt / closesAt / serverNow），前端不许硬编码星期与时刻。
+    </p>
+  </div>
+
+  <div class="grid">
+
+    <!-- ═══════════ 屏 1：点歌页 · 窗口未开放 ═══════════ -->
+    <div class="col">
+      <div class="col-lbl">① 点歌页 · 未到点歌时间</div>
+      <div class="col-sub">状态条常驻在标题下；提交按钮置灰并改文案。前后端都拦：即使前端被绕过，服务端也会返回 40907。</div>
+      <div class="frame"><div class="screen">
+        <div class="page">
+          <div class="statusbar"><span>21:49</span><span>●●● ⌾ ▮</span></div>
+          <div class="navreserve"></div>
+          <div class="body">
+            <div class="stack">
+              <div class="t-page">投稿</div>
+              <div class="t-sub">点歌或文稿，被选中即可在节目中播出</div>
+            </div>
+
+            <!-- 新增 ①：窗口状态条（未开放） -->
+            <div class="win-bar">
+              <div class="win-dot"></div>
+              <div class="win-main">
+                <div class="win-txt">点歌时间：每周六 18:00 – 周日 18:00</div>
+                <div class="win-sub">未开放 · 距开放 3 小时 12 分</div>
+              </div>
+            </div>
+
+            <div class="segment">
+              <div class="segment-indicator" style="width: calc((100% - 8.32px) / 2); transform: translateX(0);"></div>
+              <div class="segment-item on">点歌</div>
+              <div class="segment-item">文稿投稿</div>
+            </div>
+
+            <div class="quota-hint"><div class="q-dot"></div><span>本周还能点 1 次（上限 2 次）</span></div>
+
+            <div class="form">
+              <div class="field"><div class="field-label">歌曲名</div><div class="input ph">请输入歌曲名</div></div>
+              <div class="field"><div class="field-label">歌手</div><div class="input ph">请输入歌手</div></div>
+              <div class="field"><div class="field-label">祝福语（选填）</div><div class="input input-area ph">想说点什么……</div></div>
+              <div class="field">
+                <div class="field-label">希望播出时段</div>
+                <div class="slot-row"><div class="slot-value is-ph">从下周一时段里选一个</div><div class="slot-arrow"></div></div>
+                <div class="slot-sub">可选范围：9/21 – 9/25（下周一到周五）</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bottom-cta">
+            <div class="hint">周六 18:00 开始点歌，先想好歌名</div>
+            <div class="btn btn-block btn-disabled">未到点歌时间</div>
+          </div>
+          <div class="pb-tabbar"></div>
+          <div class="tabbar">
+            <div class="tb on"><div class="tb-i"></div><span>投稿</span></div>
+            <div class="tb"><div class="tb-i"></div><span>节目</span></div>
+            <div class="tb"><div class="tb-i"></div><span>风采</span></div>
+            <div class="tb"><div class="tb-i"></div><span>我的</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ═══════════ 屏 2：点歌页 · 开放中 + 时段弹层 ═══════════ -->
+    <div class="col">
+      <div class="col-lbl">② 点歌页 · 开放中 / 时段弹层</div>
+      <div class="col-sub">开放中状态条换强调色淡底（平色）+ 倒计时到截止；弹层里满格划掉不可选，这就是 v2 的「格子容量」在学生端的表现。</div>
+      <div class="frame"><div class="screen">
+        <div class="page">
+          <div class="statusbar"><span>19:05</span><span>●●● ⌾ ▮</span></div>
+          <div class="navreserve"></div>
+          <div class="body">
+            <div class="stack">
+              <div class="t-page">投稿</div>
+              <div class="t-sub">点歌或文稿，被选中即可在节目中播出</div>
+            </div>
+
+            <!-- 新增 ①：窗口状态条（开放中） -->
+            <div class="win-bar open">
+              <div class="win-dot"></div>
+              <div class="win-main">
+                <div class="win-txt">点歌时间：每周六 18:00 – 周日 18:00</div>
+                <div class="win-sub">开放中 · 距截止 2 小时 15 分</div>
+              </div>
+            </div>
+
+            <div class="segment">
+              <div class="segment-indicator" style="width: calc((100% - 8.32px) / 2); transform: translateX(0);"></div>
+              <div class="segment-item on">点歌</div>
+              <div class="segment-item">文稿投稿</div>
+            </div>
+
+            <div class="quota-hint"><div class="q-dot"></div><span>本周还能点 1 次（上限 2 次）</span></div>
+
+            <div class="form">
+              <div class="field"><div class="field-label">歌曲名</div><div class="input">起风了</div></div>
+              <div class="field"><div class="field-label">歌手</div><div class="input">买辣椒也用券</div></div>
+              <div class="field"><div class="field-label">祝福语（选填）</div><div class="input input-area">毕业快乐，谢谢高三三班的所有人。</div></div>
+              <div class="field">
+                <div class="field-label">希望播出时段</div>
+                <div class="slot-row"><div class="slot-value">2026-09-22 午间 12:20</div><div class="slot-arrow"></div></div>
+                <div class="slot-sub">可选范围：9/21 – 9/25（下周一到周五）</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bottom-cta">
+            <div class="hint">提交后即占住这个时段，审核只审内容</div>
+            <div class="btn btn-block btn-primary">提交投稿</div>
+          </div>
+          <div class="pb-tabbar"></div>
+          <div class="tabbar">
+            <div class="tb on"><div class="tb-i"></div><span>投稿</span></div>
+            <div class="tb"><div class="tb-i"></div><span>节目</span></div>
+            <div class="tb"><div class="tb-i"></div><span>风采</span></div>
+            <div class="tb"><div class="tb-i"></div><span>我的</span></div>
+          </div>
+
+          <!-- 时段弹层 -->
+          <div class="slot-mask">
+            <div class="slot-sheet">
+              <div class="slot-sheet-head">
+                <div class="slot-sheet-title">选择播出时段</div>
+                <div class="slot-sheet-sub">9/21 – 9/25 · 下周一到周五</div>
+              </div>
+              <div class="slot-sheet-body">
+                <div class="slot-day">
+                  <div class="slot-day-head">周一 9/21</div>
+                  <div class="slot-chips">
+                    <div class="slot-chip"><span class="chip-t">早间 07:20</span><span class="slot-picked">已点 1</span></div>
+                    <div class="slot-chip"><span class="chip-t">午间 12:20</span><span class="slot-picked">已点 1</span></div>
+                    <div class="slot-chip off"><span class="chip-t">晚间 17:30</span><span class="slot-picked">已排满</span></div>
+                  </div>
+                </div>
+                <div class="slot-day">
+                  <div class="slot-day-head">周二 9/22</div>
+                  <div class="slot-chips">
+                    <div class="slot-chip off"><span class="chip-t">早间 07:20</span><span class="slot-picked">已排满</span></div>
+                    <div class="slot-chip on"><span class="chip-t">午间 12:20</span><span class="slot-picked">已点 1</span></div>
+                    <div class="slot-chip"><span class="chip-t">晚间 17:30</span><span class="slot-picked">已点 1</span></div>
+                  </div>
+                </div>
+                <div class="slot-day">
+                  <div class="slot-day-head">周三 9/23</div>
+                  <div class="slot-chips">
+                    <div class="slot-chip"><span class="chip-t">早间 07:20</span><span class="slot-picked">已点 1</span></div>
+                    <div class="slot-chip off"><span class="chip-t">午间 12:20</span><span class="slot-picked">已排满</span></div>
+                    <div class="slot-chip off"><span class="chip-t">晚间 17:30</span><span class="slot-picked">已排满</span></div>
+                  </div>
+                </div>
+                <div class="slot-day">
+                  <div class="slot-day-head">周四 9/24</div>
+                  <div class="slot-chips">
+                    <div class="slot-chip"><span class="chip-t">早间 07:20</span></div>
+                    <div class="slot-chip"><span class="chip-t">午间 12:20</span></div>
+                    <div class="slot-chip"><span class="chip-t">晚间 17:30</span></div>
+                  </div>
+                </div>
+              </div>
+              <div class="slot-sheet-foot">
+                <span class="slot-foot-label">已选</span>
+                <span class="slot-foot-value">2026-09-22 午间 12:20</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ═══════════ 屏 3：我的投稿 · 候补中 ═══════════ -->
+    <div class="col">
+      <div class="col-lbl">③ 我的投稿 · 候补中</div>
+      <div class="col-sub">候补是「下周任意时段有空位就按提交先后补位」，所以卡片必须提醒实际排到的时段可能和首选不同；位次实时前移。</div>
+      <div class="frame"><div class="screen">
+        <div class="page">
+          <div class="statusbar"><span>19:12</span><span>●●● ⌾ ▮</span></div>
+          <div class="navreserve"></div>
+          <div class="body">
+            <div class="stack">
+              <div class="t-page">我的投稿</div>
+              <div class="t-sub">点歌 3 条 · 文稿 1 条</div>
+            </div>
+
+            <div class="win-bar open">
+              <div class="win-dot"></div>
+              <div class="win-main">
+                <div class="win-txt">点歌时间：每周六 18:00 – 周日 18:00</div>
+                <div class="win-sub">开放中 · 距截止 2 小时 8 分</div>
+              </div>
+            </div>
+
+            <div style="display:flex; gap:8.32px;">
+              <div class="filter on">全部</div>
+              <div class="filter">点歌</div>
+              <div class="filter">文稿</div>
+            </div>
+
+            <!-- 候补卡（候补中） -->
+            <div class="tile">
+              <div class="tile-chips"><div class="chip">候补中</div></div>
+              <div class="tile-title">第 3 位</div>
+              <div class="tile-meta">前面还有 2 人 · 候补上限 15 人<br>首选时段：9/22 晚间 17:30</div>
+              <div class="qc-bar"><div class="qc-bar-fill" style="width:20%"></div></div>
+              <div class="qc-hint">下周任意时段有空位时按提交先后自动补位，实际排到的时段可能与你首选不同。周日 18:00 截止，没补上会自动告诉你。</div>
+              <div class="tile-actions"><div class="btn btn-ghost">放弃候补</div></div>
+            </div>
+
+            <!-- 普通行 -->
+            <div class="qc-row">
+              <div class="qc-thumb"></div>
+              <div class="stack" style="flex:1; min-width:0; gap:4.16px;">
+                <div class="t-strong">起风了</div>
+                <div class="t-cap">买辣椒也用券 · 9/21 早间 07:20</div>
+              </div>
+              <div class="tag tag-pending">待审核</div>
+            </div>
+          </div>
+          <div class="pb-tabbar"></div>
+          <div class="tabbar">
+            <div class="tb"><div class="tb-i"></div><span>投稿</span></div>
+            <div class="tb"><div class="tb-i"></div><span>节目</span></div>
+            <div class="tb"><div class="tb-i"></div><span>风采</span></div>
+            <div class="tb on"><div class="tb-i"></div><span>我的</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ═══════════ 屏 4：已补位 / 未补上 ═══════════ -->
+    <div class="col">
+      <div class="col-lbl">④ 候补两个终态</div>
+      <div class="col-sub">补位是被系统挪时段，必须解释清楚「为什么不是你要的那个时段」；未补上用羊皮纸卡（失败不该抢走深色主角位）。</div>
+      <div class="frame"><div class="screen">
+        <div class="page">
+          <div class="statusbar"><span>18:42</span><span>●●● ⌾ ▮</span></div>
+          <div class="navreserve"></div>
+          <div class="body">
+            <div class="stack">
+              <div class="t-page">我的投稿</div>
+              <div class="t-sub">点歌 2 条 · 文稿 0 条</div>
+            </div>
+
+            <!-- 候补卡（已补位） -->
+            <div class="tile">
+              <div class="tile-chips"><div class="chip">已补位</div></div>
+              <div class="tile-title">9/23 午间 12:20</div>
+              <div class="qc-hint">你首选的是「9/22 晚间 17:30」，该时段已满，系统把你补到了「9/23 午间 12:20」。审核通过后即安排播出。</div>
+            </div>
+
+            <!-- 候补卡（未补上） -->
+            <div class="qc-fail">
+              <div class="between">
+                <div class="t-strong">日不落</div>
+                <div class="tag tag-reject">未补上</div>
+              </div>
+              <div class="t-sub">下周排期已满额，未能补位</div>
+              <div class="t-cap">首选时段：9/22 早间 07:20 · 提交于 9/19 18:31</div>
+            </div>
+
+            <div class="card">
+              <div class="t-cap" style="line-height:1.7;">
+                下一轮点歌：<b style="color:var(--ink)">周六 18:00</b> 开始，名额按下周每个时段放，先到先得。
+              </div>
+            </div>
+          </div>
+          <div class="pb-tabbar"></div>
+          <div class="tabbar">
+            <div class="tb"><div class="tb-i"></div><span>投稿</span></div>
+            <div class="tb"><div class="tb-i"></div><span>节目</span></div>
+            <div class="tb"><div class="tb-i"></div><span>风采</span></div>
+            <div class="tb on"><div class="tb-i"></div><span>我的</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════ 说明 ═══════════ -->
+  <div style="margin-top:46px; border-top:1px solid #F0F0F0; padding-top:22px; max-width:1600px;">
+    <div style="font-size:14px; font-weight:600; margin-bottom:10px;">这一版做了什么 / 还没做什么</div>
+    <div style="font-size:13px; line-height:1.9; color:#333;">
+      <b>新增两件：</b>① 点歌时间窗口状态条（常驻在点歌页与我的投稿顶部，未开放＝羊皮纸底＋灰点＋「距开放 X」，开放中＝强调色淡底＋蓝点＋「距截止 X」）；② 候补状态卡三形态（候补中／已补位／未补上，卡片里的位次、上限、截止时间、说明文案全部来自服务端）。<br>
+      <b>借了现成的：</b>满格时段划掉不可选（v8 方案④的 <code>.slot-chip.off</code>）、深色卡当主角、唯一强调色 #0066CC、无渐变无彩色投影。<br>
+      <b>没做（等你点头再动）：</b>管理端的「排期容量 + 全局候补队列 + 窗口设置」面板预览；以及小程序 / admin-web 的业务代码。<br>
+      <b>可改的点：</b>开放中状态条要不要用强调色淡底（也可只用蓝点 + 蓝色倒计时，底一直保持羊皮纸）；候补卡要不要显示进度条（现在是位次的可视化，也可以删掉）。
+    </div>
+  </div>
+</div>
+</body>
+</html>

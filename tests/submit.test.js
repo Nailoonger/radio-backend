@@ -1,6 +1,6 @@
 'use strict';
 
-const { buildApp } = require('./app');
+const { buildApp, openSongWindowForTest, nextWeekSlotValues } = require('./app');
 const request = require('supertest');
 const {
   sequelize, resetDB, seedAdmin,
@@ -8,10 +8,16 @@ const {
 } = require('./helpers');
 
 let app;
+/** 合法的播出时段值（下一周周一到周五）。v2 起点歌必须带 wantBroadcastTime */
+let slot;
+
 beforeAll(async () => {
   app = buildApp();
   await resetDB();
   await seedAdmin();
+  // v2：点歌必须在「点歌时间窗口」内提交，且必带播出时段。用例与钟点无关，直接关掉窗口限制
+  await openSongWindowForTest();
+  [slot] = await nextWeekSlotValues();
 });
 afterAll(async () => {
   await sequelize.close();
@@ -31,9 +37,10 @@ describe('用户端：投稿', () => {
     const res = await request(app)
       .post('/api/user/submit')
       .set('Authorization', `Bearer ${userToken}`)
-      .send({ type: 1, songName: '起风了', singer: '买辣椒也用券', wishContent: '毕业快乐' });
+      .send({ type: 1, songName: '起风了', singer: '买辣椒也用券', wishContent: '毕业快乐', wantBroadcastTime: slot });
     expect(res.body.code).toBe(0);
     expect(res.body.data.id).toBeGreaterThan(0);
+    expect(res.body.data.outcome).toBe('seated');     // v2：提交即占位
     submitId = res.body.data.id;
   });
 
@@ -61,12 +68,13 @@ describe('用户端：投稿', () => {
     expect(res.body.code).toBe(40001);
   });
 
-  test('1 分钟内同 song 重复提交被拒', async () => {
+  test('本周同曲重复提交被拒', async () => {
     const res = await request(app)
       .post('/api/user/submit')
       .set('Authorization', `Bearer ${userToken}`)
-      .send({ type: 1, songName: '起风了', singer: '买辣椒也用券' });
-    expect(res.body.code).toBe(40901);
+      .send({ type: 1, songName: '起风了', singer: '买辣椒也用券', wantBroadcastTime: slot });
+    // v2：同曲一周一次由提交规则拦下 → 40903（老的通用冲突 40901 只留给 1 分钟防抖兜底）
+    expect(res.body.code).toBe(40903);
   });
 
   test('不带 token 401', async () => {
@@ -116,7 +124,7 @@ describe('管理端：审核', () => {
     const sub = await request(app)
       .post('/api/user/submit')
       .set('Authorization', `Bearer ${userToken}`)
-      .send({ type: 1, songName: '晴天', singer: '周杰伦' });
+      .send({ type: 1, songName: '晴天', singer: '周杰伦', wantBroadcastTime: slot });
     expect(sub.body.code).toBe(0);
     pendingId = sub.body.data.id;
 
@@ -141,7 +149,7 @@ describe('管理端：审核', () => {
     const sub = await request(app)
       .post('/api/user/submit')
       .set('Authorization', `Bearer ${userToken}`)
-      .send({ type: 1, songName: '搁浅', singer: '周杰伦' });
+      .send({ type: 1, songName: '搁浅', singer: '周杰伦', wantBroadcastTime: slot });
     const id = sub.body.data.id;
     const res = await request(app)
       .put(`/api/admin/submit/${id}/reject`)
@@ -154,7 +162,7 @@ describe('管理端：审核', () => {
     const sub = await request(app)
       .post('/api/user/submit')
       .set('Authorization', `Bearer ${userToken}`)
-      .send({ type: 1, songName: '夜曲', singer: '周杰伦' });
+      .send({ type: 1, songName: '夜曲', singer: '周杰伦', wantBroadcastTime: slot });
     const id = sub.body.data.id;
     const res = await request(app)
       .put(`/api/admin/submit/${id}/reject`)
@@ -171,7 +179,7 @@ describe('管理端：审核', () => {
       const sub = await request(app)
         .post('/api/user/submit')
         .set('Authorization', `Bearer ${userToken}`)
-        .send({ type: 1, songName: `批量歌曲${i}`, singer: '测试' });
+        .send({ type: 1, songName: `批量歌曲${i}`, singer: '测试', wantBroadcastTime: slot });
       ids.push(sub.body.data.id);
     }
     const res = await request(app)

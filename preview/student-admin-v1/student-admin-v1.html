@@ -1,0 +1,1556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>菁悠广播站 · 管理后台 · 学生账号模块重构方案 v1</title>
+<style>
+/* ============================================================
+   菁悠广播站 · 管理后台 · 学生账号模块「目录化」重构方案 v1
+   （静态预览，不改动任何业务代码）
+
+   设计系统完全继承 preview/admin-ui-v8（源头 miniprogram/app.wxss）：
+     1. 全局只有一个强调色 --accent，所有「可点」的东西都用它
+     2. 不用任何装饰性渐变、不用彩色投影
+     3. 深色卡 --tile 是视觉主角，其余信息一律退到羊皮纸 --parchment
+
+   本版不新增任何组件：只用 v8 已有的 .rail / .topbar / .tile / .gcard /
+   .tag / .chip / .batchbar / .dangerzone / .card。新增的只有「左侧目录树」
+   这一种排布（它是本方案的核心，但视觉上全部由既有 token 拼成）。
+   ============================================================ */
+:root{
+  --ink:#1d1d1f;
+  --ink-2:#333333;
+  --muted:#7a7a7a;
+  --muted-2:#6e6e73;
+  --soft:#c7c7cc;
+  --hairline:#e0e0e0;
+  --divider:#f0f0f0;
+  --parchment:#f5f5f7;
+  --canvas:#ffffff;
+  --tile:#272729;
+  --tile-2:#3a3a3c;
+  --accent:#0066cc;
+  --accent-dark:#2997ff;
+  --live:#ff453a;
+
+  --amber-bg:#fef3c7; --amber-fg:#8a6100;
+  --green-bg:#e7f5ec; --green-fg:#1e7a46;
+  --red-bg:#fde8e8;  --red-fg:#b42318;
+  --acc-bg:#e6f0fa;
+
+  --r-card:18px; --r-input:12px; --r-tile:20px; --r-pill:9999px;
+  --s1:4px; --s2:8px; --s3:13px; --s4:18px; --s5:26px; --s6:34px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+
+  --fs-2xs:10.5px; --lh-2xs:1.5;
+  --fs-xs:11.5px;  --lh-xs:1.5;
+  --fs-sm:12.5px;  --lh-sm:1.5;
+  --fs-md:13.5px;  --lh-md:1.5;
+  --fs-xl:17px;    --lh-xl:1.35;
+  --fs-2xl:19px;   --lh-2xl:1.3;
+  --fs-3xl:26px;   --lh-3xl:1.25;
+  --fs-num:30px;   --lh-num:1.15;
+  --lh-read:1.7;
+  --ls-tight:-.6px; --ls-tight-sm:-.4px;
+  --ls-wide:.3px;   --ls-wide-sm:.5px;
+
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","HarmonyOS Sans SC",
+         "MiSans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:#fafafc}
+body{font-family:var(--font);color:var(--ink);font-size:14px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;padding:0 0 80px}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;font-size:inherit;border:none;background:none;cursor:pointer;color:inherit}
+input,textarea,select{font-family:inherit;font-size:inherit;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+
+/* ============================================================
+   预览外壳（不属于设计稿本身）
+   ============================================================ */
+.shell{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);
+  backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid var(--hairline)}
+.shell-in{max-width:1480px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:18px}
+.shell-brand{display:flex;align-items:center;gap:11px;flex:none}
+.shell-mark{width:30px;height:30px;border-radius:9px;background:var(--ink);color:#fff;flex:none;
+  display:flex;align-items:center;justify-content:center}
+.shell-mark svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+.shell-brand b{font-size:14.5px;font-weight:600;letter-spacing:-.1px;display:block}
+.shell-brand span{font-size:11px;color:var(--muted);letter-spacing:.4px}
+.vbadge{font-size:11px;font-weight:600;letter-spacing:.6px;background:var(--ink);color:#fff;
+  border-radius:var(--r-pill);padding:3px 9px;flex:none}
+.tabs{display:flex;gap:6px;overflow-x:auto;flex:1;min-width:0;padding:2px 0}
+.tabs::-webkit-scrollbar{height:0}
+.tab{flex:none;height:28px;padding:0 10px;border-radius:var(--r-pill);font-size:12px;font-weight:500;
+  color:var(--muted);background:var(--divider);transition:background .18s,color .18s;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab.on{background:var(--ink);color:#fff;font-weight:600}
+.tab-sep{flex:none;width:1px;background:var(--hairline);margin:5px 4px}
+.zoombox{display:flex;gap:6px;flex:none;align-items:center}
+.zoombox .tab{height:27px;padding:0 11px;font-size:12px}
+.stage{max-width:1480px;margin:0 auto;padding:24px}
+.screen{display:none}
+.screen.on{display:block;animation:fadeUp .3s var(--ease) both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* 浏览器取景框 */
+.frame-outer{width:1440px;transform-origin:top left}
+.frame{width:1440px;height:900px;display:flex;flex-direction:column;background:var(--canvas);
+  border:1px solid var(--hairline);border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.09)}
+.chrome{height:40px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;
+  background:var(--parchment);border-bottom:1px solid var(--hairline)}
+.dots{display:flex;gap:7px;flex:none}
+.dots i{width:11px;height:11px;border-radius:50%;background:#dcdce0;display:block}
+.url{flex:1;max-width:560px;height:24px;border-radius:var(--r-pill);background:#fff;
+  border:1px solid var(--hairline);display:flex;align-items:center;gap:7px;padding:0 11px;
+  font-size:11.5px;color:var(--soft);font-family:var(--mono)}
+.url svg{width:12px;height:12px;flex:none;color:var(--soft);stroke:currentColor;fill:none;stroke-width:1.7}
+.url b{color:var(--ink);font-weight:600}
+.cap{font-size:12.5px;color:var(--muted);margin:12px 0 0 2px;display:flex;align-items:flex-start;
+  gap:10px;line-height:1.7;max-width:1360px}
+.cap b{color:var(--ink);font-weight:600}
+.cap .sep{color:var(--soft)}
+.cap code{font-family:var(--mono);font-size:11.5px;background:var(--parchment);border-radius:5px;
+  padding:1px 5px;color:var(--ink-2)}
+.app{flex:1;display:flex;min-height:0;position:relative}
+
+/* ============================================================
+   侧栏 / 顶栏（v8 原样）
+   ============================================================ */
+.rail{width:232px;flex:none;background:var(--canvas);border-right:1px solid var(--hairline);
+  display:flex;flex-direction:column;padding:18px 14px 14px}
+.rail-brand{display:flex;align-items:center;gap:11px;padding:0 6px 16px}
+.rail-logo{width:36px;height:36px;flex:none;border-radius:11px;background:var(--ink);color:#fff;
+  display:flex;align-items:center;justify-content:center}
+.rail-logo svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+.rail-name{font-size:var(--fs-md);font-weight:600;letter-spacing:-.2px}
+.rail-sub{font-size:var(--fs-2xs);color:var(--muted);letter-spacing:var(--ls-wide-sm);margin-top:1px}
+.rail-search{display:flex;align-items:center;gap:8px;height:34px;padding:0 11px;background:var(--parchment);
+  border-radius:10px;color:var(--soft);font-size:12.5px;margin-bottom:16px}
+.rail-search svg{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+.rail-search kbd{margin-left:auto;font-family:inherit;font-size:10.5px;color:var(--muted);
+  background:#fff;border:1px solid var(--hairline);border-radius:5px;padding:1px 5px}
+.rail-nav{flex:1;min-height:0;overflow:hidden}
+.rail-group{font-size:10.5px;font-weight:600;color:var(--soft);letter-spacing:.9px;padding:12px 8px 7px}
+.rail-group:first-child{padding-top:0}
+.rail-item{display:flex;align-items:center;gap:8px;height:38px;padding:0 11px;border-radius:11px;
+  color:var(--ink-2);font-size:var(--fs-md);margin-bottom:2px;transition:background .16s,color .16s}
+.rail-item svg{width:17px;height:17px;flex:none;color:var(--muted);transition:color .16s;
+  stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.rail-item .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rail-item:hover{background:var(--parchment)}
+.rail-item:hover svg{color:var(--ink)}
+.rail-item.on{background:var(--ink);color:#fff;font-weight:600}
+.rail-item.on svg{color:#fff}
+.rail-badge{font-style:normal;flex:none;min-width:19px;height:19px;padding:0 6px;border-radius:var(--r-pill);
+  background:var(--ink);color:#fff;font-size:10.5px;font-weight:600;
+  display:inline-flex;align-items:center;justify-content:center}
+.rail-item.on .rail-badge{background:#fff;color:var(--ink)}
+.rail-account{flex:none;display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:13px;
+  background:var(--parchment);margin-top:12px}
+.rail-avatar{width:30px;height:30px;flex:none;border-radius:50%;background:var(--ink);color:#fff;
+  font-size:12.5px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.rail-account .who{flex:1;min-width:0}
+.rail-account .nm{font-size:var(--fs-sm);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rail-account .rl{font-size:var(--fs-2xs);color:var(--muted);margin-top:1px}
+
+.work{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{height:64px;flex:none;display:flex;align-items:center;gap:18px;padding:0 26px;
+  background:var(--canvas);border-bottom:1px solid var(--hairline)}
+.tb-title{font-size:var(--fs-2xl);font-weight:600;letter-spacing:-.3px;line-height:var(--lh-2xl)}
+.tb-sub{font-size:var(--fs-sm);color:var(--muted);margin-top:2px;letter-spacing:var(--ls-wide)}
+.tbright{margin-left:auto;display:flex;align-items:center;gap:8px}
+.tb-search{display:flex;align-items:center;gap:8px;height:34px;width:220px;padding:0 12px;
+  background:var(--parchment);border-radius:10px;color:var(--soft);font-size:12.5px}
+.tb-search svg{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+.iconbtn{width:34px;height:34px;flex:none;border-radius:50%;background:var(--parchment);
+  display:flex;align-items:center;justify-content:center;color:var(--ink-2);position:relative;
+  transition:background .16s}
+.iconbtn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+.iconbtn .dot-live{position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;
+  background:var(--live);border:1.5px solid var(--canvas)}
+
+/* 画布：普通（竖排滚动） */
+.canvas{flex:1;min-height:0;overflow-y:auto;background:var(--canvas);padding:24px 26px 34px;
+  display:flex;flex-direction:column;gap:22px}
+/* ⚠️ 必须禁掉 flex 子项收缩：.canvas 是固定高度取景框里的滚动容器，
+   默认 flex-shrink:1 会把表格卡压矮（overflow:hidden 一裁，末尾几行直接消失，
+   而 scrollHeight === clientHeight，量不出来是「溢出」）。 */
+.canvas>*{flex:none}
+.canvas::-webkit-scrollbar{width:8px}
+.canvas::-webkit-scrollbar-thumb{background:#e3e3e6;border-radius:4px}
+
+/* 画布：分栏（左目录树 + 右工作区，各自滚动，外层不滚） */
+.canvas.split{padding:0;overflow:hidden;flex-direction:row;gap:0}
+/* ⚠️ .canvas>*{flex:none} 的优先级高于 .ws{flex:1}，这里必须显式覆盖，否则工作区宽度塌掉 */
+.canvas.split>.ws{flex:1;min-width:0}
+
+/* ============================================================
+   左侧目录树（本方案核心）
+   ============================================================ */
+.tree{width:222px;flex:none;background:var(--canvas);border-right:1px solid var(--hairline);
+  padding:14px 10px 18px;overflow-y:auto;display:flex;flex-direction:column}
+.tree::-webkit-scrollbar{width:6px}
+.tree::-webkit-scrollbar-thumb{background:#e8e8eb;border-radius:3px}
+.tree-head{display:flex;align-items:center;justify-content:space-between;padding:2px 8px 10px}
+.tree-head .t{font-size:var(--fs-2xs);font-weight:600;color:var(--soft);letter-spacing:.9px}
+.tnode{display:flex;align-items:center;gap:7px;height:33px;padding:0 8px;border-radius:9px;
+  color:var(--ink-2);font-size:var(--fs-md);transition:background .14s,color .14s;cursor:pointer;
+  position:relative;flex:none}
+.tnode svg{width:15px;height:15px;flex:none;color:var(--muted);stroke:currentColor;fill:none;
+  stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tnode .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tnode .cnt{flex:none;font-size:var(--fs-xs);color:var(--muted);font-variant-numeric:tabular-nums}
+.tnode:hover{background:var(--parchment)}
+.tnode:hover svg{color:var(--ink)}
+.tnode.on{background:var(--ink);color:#fff;font-weight:600}
+.tnode.on svg{color:#fff}
+.tnode.on .cnt{color:rgba(255,255,255,.72)}
+/* 年级节点上的「可毕业清理」小圆点：只有它一个用 live 红，不抢强调色 */
+.tnode .hot{width:6px;height:6px;border-radius:50%;background:var(--live);flex:none}
+.tchild{padding-left:22px}
+.tchild .tnode{height:31px;font-size:var(--fs-sm)}
+.tgroup{font-size:var(--fs-2xs);font-weight:600;color:var(--soft);letter-spacing:.9px;
+  padding:14px 8px 6px;flex:none}
+.tsep{height:1px;background:var(--divider);margin:12px 8px;flex:none}
+.tfoot{margin-top:auto;padding:12px 8px 0;border-top:1px solid var(--divider);
+  font-size:var(--fs-2xs);color:var(--muted-2);line-height:1.6;letter-spacing:var(--ls-wide)}
+
+/* ============================================================
+   右侧工作区
+   ============================================================ */
+.ws{overflow-y:auto;padding:20px 24px 30px;display:flex;flex-direction:column;gap:18px}
+.ws>*{flex:none}
+.ws::-webkit-scrollbar{width:8px}
+.ws::-webkit-scrollbar-thumb{background:#e3e3e6;border-radius:4px}
+
+/* 面包屑：目录树的位置感就靠它（配合地址栏的 query） */
+.bc{display:flex;align-items:center;gap:7px;font-size:var(--fs-sm);color:var(--muted)}
+.bc svg{width:13px;height:13px;flex:none;color:var(--soft);stroke:currentColor;fill:none;stroke-width:1.8}
+.bc a{color:var(--accent);font-weight:500}
+.bc a:hover{text-decoration:underline}
+.bc .here{color:var(--ink);font-weight:600}
+
+/* ============================================================
+   排版 / 排布
+   ============================================================ */
+.h1{font-size:var(--fs-3xl);font-weight:600;letter-spacing:var(--ls-tight);line-height:var(--lh-3xl)}
+.sec-title{font-size:var(--fs-xl);font-weight:600;letter-spacing:var(--ls-tight-sm);line-height:var(--lh-xl)}
+.link{font-size:12.5px;color:var(--accent);font-weight:500;cursor:pointer}
+.link:hover{text-decoration:underline}
+.sub{font-size:var(--fs-sm);color:var(--muted);letter-spacing:var(--ls-wide)}
+.micro{font-size:var(--fs-xs);color:var(--muted-2);letter-spacing:var(--ls-wide)}
+.strong{font-size:var(--fs-md);font-weight:500;line-height:var(--lh-md)}
+.mono{font-family:var(--mono);font-size:var(--fs-sm);color:var(--ink-2)}
+.rowc{display:flex;align-items:center}
+.between{display:flex;align-items:center;justify-content:space-between}
+.grow{flex:1;min-width:0}
+.gap8{gap:8px}.gap13{gap:13px}.gap18{gap:18px}
+.sec{display:flex;flex-direction:column;gap:13px}
+.sec-head{display:flex;align-items:center;justify-content:space-between;gap:13px}
+.cols{display:flex;gap:18px;align-items:stretch}
+.cols>*{min-width:0}
+.el{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* 卡片 */
+.card{background:var(--parchment);border-radius:var(--r-card);padding:20px}
+.card-white{background:#fff;border:1px solid var(--hairline);border-radius:var(--r-card);padding:20px}
+.kv{display:flex;font-size:var(--fs-md);line-height:var(--lh-md);padding:13px 0;
+  border-bottom:1px solid var(--divider);align-items:center}
+.kv:last-child{border-bottom:none}
+.kv .k{width:132px;flex:none;color:var(--muted);font-size:var(--fs-sm)}
+
+/* 深色卡 */
+.tile{background:var(--tile);border-radius:var(--r-tile);padding:22px 24px;
+  display:flex;flex-direction:column;gap:13px;color:#fff}
+.tile-status{display:flex;align-items:center;gap:8px;font-size:var(--fs-xs);font-weight:500;
+  color:#ccc;letter-spacing:var(--ls-wide-sm)}
+.dot-live{width:7px;height:7px;border-radius:50%;background:var(--live);flex:none}
+.tile-title{font-size:var(--fs-3xl);font-weight:600;color:#fff;letter-spacing:var(--ls-tight);line-height:var(--lh-3xl)}
+.tile-meta{font-size:var(--fs-sm);color:#ccc;letter-spacing:var(--ls-wide);line-height:1.6}
+.tile-meta b{color:#fff;font-weight:600}
+.tile-actions{display:flex;gap:8px;margin-top:4px}
+
+/* 按钮 */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 18px;
+  border-radius:var(--r-pill);font-size:var(--fs-md);font-weight:500;line-height:1;white-space:nowrap;
+  transition:background .16s,border-color .16s,opacity .16s}
+.btn svg{width:15px;height:15px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.btn-primary{background:var(--accent);color:#fff;font-weight:600}
+.btn-primary:hover{background:#0058b0}
+.btn-white{background:#fff;color:var(--accent);font-weight:600}
+.btn-quiet{background:#fff;border:1px solid var(--hairline);color:var(--ink-2)}
+.btn-quiet:hover{border-color:#cfcfd4}
+.btn-plain{background:transparent;color:var(--muted);padding:0 10px}
+.btn-plain:hover{color:var(--ink)}
+.btn-danger-quiet{background:#fff;border:1px solid var(--red-bg);color:var(--red-fg);font-weight:500}
+.btn-danger-fill{background:var(--red-fg);color:#fff;font-weight:600}
+.btn-danger-fill:hover{background:#951d13}
+.btn-sm{height:30px;padding:0 14px;font-size:var(--fs-sm)}
+
+/* 标签 / 状态 */
+.tag{display:inline-flex;align-items:center;height:23px;padding:0 10px;border-radius:var(--r-pill);
+  font-size:var(--fs-xs);font-weight:500;letter-spacing:.2px;line-height:1;white-space:nowrap}
+.tag-ok{background:var(--green-bg);color:var(--green-fg)}
+.tag-warn{background:var(--amber-bg);color:var(--amber-fg)}
+.tag-reject{background:var(--red-bg);color:var(--red-fg)}
+.tag-mute{background:#ebebee;color:var(--muted)}
+.tag-acc{background:var(--acc-bg);color:var(--accent)}
+.tag-outline{background:#fff;border:1px solid var(--hairline);color:var(--muted)}
+.chip-light{display:inline-flex;align-items:center;height:24px;padding:0 11px;border-radius:var(--r-pill);
+  background:var(--divider);color:var(--muted-2);font-size:var(--fs-xs);letter-spacing:var(--ls-wide-sm)}
+
+/* 数据来源角标 */
+.ano{display:inline-flex;align-items:center;height:19px;padding:0 7px;border-radius:var(--r-pill);
+  font-size:var(--fs-2xs);font-weight:600;letter-spacing:var(--ls-wide);vertical-align:1px;white-space:nowrap}
+.ano-ok{background:var(--green-bg);color:var(--green-fg)}
+.ano-mid{background:var(--amber-bg);color:var(--amber-fg)}
+.ano-acc{background:var(--acc-bg);color:var(--accent)}
+.ano-mute{background:#ebebee;color:var(--muted)}
+
+/* 筛选胶囊 */
+.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.filter{height:31px;padding:0 15px;border-radius:var(--r-pill);font-size:var(--fs-sm);font-weight:500;
+  color:var(--muted);background:var(--divider);transition:background .18s,color .18s}
+.filter:hover{color:var(--ink-2)}
+.filter.on{background:var(--ink);color:#fff;font-weight:600}
+.filter em{font-style:normal;opacity:.7;margin-left:4px;font-variant-numeric:tabular-nums}
+.filter.on em{opacity:.85}
+
+/* 表格 */
+.tb{width:100%;border-collapse:collapse;table-layout:fixed}
+.tb th{text-align:left;font-size:var(--fs-xs);font-weight:500;color:var(--muted);
+  letter-spacing:var(--ls-wide-sm);padding:11px 10px;border-bottom:1px solid rgba(0,0,0,.07);white-space:nowrap}
+.tb th:first-child{padding-left:18px}
+.tb th:last-child{padding-right:18px}
+.tb td{font-size:var(--fs-md);line-height:var(--lh-md);padding:12px 10px;
+  border-bottom:1px solid rgba(0,0,0,.05);vertical-align:middle;color:var(--ink-2)}
+.tb td:first-child{padding-left:18px}
+.tb td:last-child{padding-right:18px}
+.tb tbody tr:hover{background:rgba(255,255,255,.72)}
+.tb tbody tr:last-child td{border-bottom:none}
+.tb .c{text-align:center}
+.tb .r{text-align:right}
+.tb-wrap{background:var(--parchment);border-radius:var(--r-card);padding:6px 0;overflow:hidden}
+.cb{width:16px;height:16px;border-radius:5px;border:1.5px solid #d2d2d7;background:#fff;
+  display:inline-flex;align-items:center;justify-content:center;flex:none;vertical-align:middle}
+.cb.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.cb svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.rowact{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+.rowact .btn{flex:none}
+.row-invalid>td{background:#fffafa}
+
+/* 批量操作条 */
+.batchbar{position:sticky;bottom:0;align-self:center;margin-top:auto;display:flex;align-items:center;gap:10px;
+  background:#fff;color:var(--ink);border:1px solid var(--hairline);border-radius:var(--r-pill);
+  padding:8px 9px 8px 22px;box-shadow:0 10px 28px rgba(0,0,0,.10);z-index:12}
+.batchbar .cnt{font-size:var(--fs-md);font-weight:500;color:var(--ink-2);margin-right:8px}
+.batchbar .cnt b{font-size:var(--fs-xl);font-weight:600;margin:0 3px;color:var(--accent)}
+
+/* 工具栏 */
+.toolbar{display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+.toolbar .tail{margin-left:auto;display:flex;align-items:center;gap:8px}
+.search-in{display:flex;align-items:center;gap:8px;height:36px;width:230px;padding:0 14px;background:#fff;
+  border:1px solid var(--hairline);border-radius:var(--r-pill);color:var(--soft);font-size:12.5px}
+.search-in svg{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+
+/* 提示条 */
+.noteline{display:flex;gap:8px;font-size:var(--fs-sm);color:var(--ink-2);background:var(--parchment);
+  border:1px solid var(--hairline);border-radius:var(--r-card);padding:10px 16px;line-height:1.65;align-items:flex-start}
+.noteline b{color:var(--accent)}
+.noteline svg{width:15px;height:15px;flex:none;margin-top:2px;stroke:var(--muted);fill:none;
+  stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.warnline{display:flex;gap:8px;font-size:var(--fs-xs);color:var(--red-fg);background:var(--red-bg);
+  border-radius:10px;padding:9px 11px;line-height:1.6}
+.warnline svg{width:14px;height:14px;flex:none;margin-top:2px;stroke:currentColor;fill:none;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+
+/* 进度条 */
+.bar{height:6px;border-radius:var(--r-pill);background:var(--divider);overflow:hidden;margin-top:9px}
+.bar i{display:block;height:100%;border-radius:var(--r-pill);background:var(--accent)}
+.bar.ok i{background:var(--green-fg)}
+
+/* KPI 行 */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.kpis-3{grid-template-columns:repeat(3,1fr)}
+.kpi{background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-card);padding:16px 18px}
+.kpi .k{font-size:var(--fs-xs);color:var(--muted);letter-spacing:var(--ls-wide-sm)}
+.kpi .v{font-size:var(--fs-3xl);font-weight:600;color:var(--ink);letter-spacing:var(--ls-tight);
+  line-height:var(--lh-3xl);margin-top:4px}
+.kpi .d{font-size:var(--fs-sm);color:var(--muted);margin-top:3px}
+.kpi-dark{background:var(--tile);border-color:var(--tile)}
+.kpi-dark .k{color:rgba(255,255,255,.62)}
+.kpi-dark .v{color:#fff}
+.kpi-dark .d{color:rgba(255,255,255,.72)}
+
+/* 危险区 */
+.dangerzone{display:flex;align-items:center;gap:18px;background:#fff;border:1px solid var(--red-bg);
+  border-radius:var(--r-card);padding:18px 20px}
+.dangerzone .ic{width:38px;height:38px;flex:none;border-radius:11px;background:var(--red-bg);
+  color:var(--red-fg);display:flex;align-items:center;justify-content:center}
+.dangerzone .ic svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+.dangerzone .t{font-size:var(--fs-md);font-weight:600}
+.dangerzone .m{font-size:var(--fs-sm);color:var(--muted);margin-top:2px;line-height:1.65}
+.dangerzone .m b{color:var(--ink-2)}
+.sec-title.danger{color:var(--red-fg)}
+
+/* 步骤条 */
+.stepper{display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+.st-it{display:inline-flex;align-items:center;gap:8px}
+.st-no{width:23px;height:23px;border-radius:var(--r-pill);display:inline-flex;align-items:center;
+  justify-content:center;background:#ebebee;color:var(--muted);font-size:var(--fs-xs);font-weight:600;line-height:1}
+.st-no.on{background:var(--ink);color:#fff}
+
+/* 表单 */
+.field{display:flex;flex-direction:column;gap:8px}
+.input{background:#fff;border:1px solid var(--hairline);border-radius:var(--r-input);height:40px;
+  padding:0 13px;font-size:var(--fs-md);width:100%}
+.input::placeholder{color:var(--soft)}
+.hint{font-size:var(--fs-xs);color:var(--muted-2);letter-spacing:var(--ls-wide);line-height:1.65}
+.sw{width:44px;height:26px;border-radius:var(--r-pill);background:var(--soft);position:relative;flex:none}
+.sw::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.18)}
+.sw.on{background:var(--accent)}
+.sw.on::after{transform:translateX(18px)}
+
+/* ============================================================
+   方案说明（文档页）
+   ============================================================ */
+.doc{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+.doc-head{padding:6px 0 4px}
+.eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.4px;color:var(--accent)}
+.doc-head h1{font-size:34px;font-weight:600;letter-spacing:-.9px;margin:9px 0 10px}
+.doc-head p{font-size:14.5px;color:var(--ink-2);max-width:920px;line-height:1.7}
+.doc-head p b{font-weight:600;color:var(--ink)}
+.doc-card{background:#fff;border:1px solid var(--hairline);border-radius:var(--r-card);padding:22px 24px}
+.doc-card h2{font-size:15px;font-weight:600;letter-spacing:-.2px;margin-bottom:13px}
+.doc-p{font-size:13px;color:var(--ink-2);line-height:1.75}
+.doc-p+.doc-p{margin-top:9px}
+.doc-p b{color:var(--ink);font-weight:600}
+.doc-card code,.dtab code,.plist code{font-family:var(--mono);font-size:11.5px;background:var(--parchment);
+  border-radius:5px;padding:1px 5px;color:var(--ink-2)}
+.dtab{width:100%;border-collapse:collapse}
+.dtab th{text-align:left;font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.5px;
+  padding:9px 12px;border-bottom:1px solid var(--hairline);background:var(--parchment)}
+.dtab td{font-size:12.5px;padding:9px 12px;border-bottom:1px solid var(--divider);color:var(--ink-2);
+  vertical-align:top;line-height:1.65}
+.dtab tr:last-child td{border-bottom:none}
+.dtab .nt{color:var(--muted)}
+.plist{display:flex;flex-direction:column;gap:9px}
+.plist>div{display:flex;gap:12px;font-size:12.5px;line-height:1.7}
+.plist b{flex:none;width:104px;color:var(--ink);font-weight:600}
+.plist span{color:var(--ink-2);min-width:0}
+.numchip{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;flex:none;
+  border-radius:50%;background:var(--ink);color:#fff;font-size:11px;font-weight:600;line-height:1}
+.rank{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--divider)}
+.rank:last-child{border-bottom:none}
+.rank .rk{flex:none;padding-top:1px}
+.rank .rb{min-width:0}
+.rank .rt{font-size:13px;font-weight:600;color:var(--ink);line-height:1.5}
+.rank .rd{font-size:12.5px;color:var(--ink-2);line-height:1.75;margin-top:3px}
+.treefig{display:flex;gap:34px;align-items:flex-start;flex-wrap:wrap}
+.treefig .col{min-width:0}
+.treefig .h{font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.8px;margin-bottom:8px}
+.treepre{font-family:var(--mono);font-size:11.5px;line-height:1.9;color:var(--ink-2);
+  background:var(--parchment);border-radius:var(--r-input);padding:14px 16px;white-space:pre}
+.treepre i{font-style:normal;color:var(--muted)}
+.treepre s{text-decoration:none;color:var(--red-fg)}
+.treepre u{text-decoration:none;color:var(--accent);font-weight:600}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.ab{padding:15px 17px;border-radius:var(--r-input);background:var(--parchment);
+  display:flex;flex-direction:column;gap:7px}
+.ab.rec{background:var(--acc-bg)}
+.ab .t{font-size:12.5px;font-weight:600;color:var(--ink)}
+.ab .m{font-size:12px;color:var(--ink-2);line-height:1.8}
+</style>
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-grid" viewBox="0 0 20 20"><rect x="2.6" y="2.6" width="6.2" height="6.2" rx="2"/><rect x="11.2" y="2.6" width="6.2" height="6.2" rx="2"/><rect x="2.6" y="11.2" width="6.2" height="6.2" rx="2"/><rect x="11.2" y="11.2" width="6.2" height="6.2" rx="2"/></symbol>
+  <symbol id="i-list" viewBox="0 0 20 20"><path d="M7.2 5h9.4M7.2 10h9.4M7.2 15h9.4"/><circle cx="3.6" cy="5" r="1.1"/><circle cx="3.6" cy="10" r="1.1"/><circle cx="3.6" cy="15" r="1.1"/></symbol>
+  <symbol id="i-user" viewBox="0 0 20 20"><circle cx="10" cy="7" r="3.2"/><path d="M4.2 17c.7-3.2 3.1-5 5.8-5s5.1 1.8 5.8 5"/></symbol>
+  <symbol id="i-users" viewBox="0 0 20 20"><circle cx="7.4" cy="7.4" r="2.9"/><path d="M2.6 16.4c.6-2.9 2.5-4.4 4.8-4.4s4.2 1.5 4.8 4.4"/><path d="M13.2 5.1a2.7 2.7 0 0 1 0 5.2M14.4 16.4c-.2-1.7-.7-3-1.5-3.8 2.3-.4 4.3 1 4.8 3.8"/></symbol>
+  <symbol id="i-toggle" viewBox="0 0 20 20"><rect x="2.6" y="6.2" width="14.8" height="7.6" rx="3.8"/><circle cx="13.5" cy="10" r="2.5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 20 20"><path d="M10 2.8 15.8 5v5c0 3.3-2.3 6-5.8 7.2C6.5 16 4.2 13.3 4.2 10V5z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.7"/><path d="M10 2.8v2.1M10 15.1v2.1M2.8 10h2.1M15.1 10h2.1M4.9 4.9l1.5 1.5M13.6 13.6l1.5 1.5M15.1 4.9l-1.5 1.5M6.4 13.6l-1.5 1.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="8.7" cy="8.7" r="5.3"/><path d="M12.6 12.6 16.9 16.9"/></symbol>
+  <symbol id="i-check" viewBox="0 0 20 20"><path d="M4 10.6 7.9 14.5 16 6.2"/></symbol>
+  <symbol id="i-close" viewBox="0 0 20 20"><path d="M5.4 5.4l9.2 9.2M14.6 5.4l-9.2 9.2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.3"/><path d="M10 9.1v4.4M10 6.5v.2"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.3"/><path d="M10 5.9V10l2.9 1.7"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 20 20"><path d="M7.6 5.2 12.8 10l-5.2 4.8"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 20 20"><path d="M16.3 10a6.3 6.3 0 1 1-2-4.6"/><path d="M16.5 3.6v3.2h-3.2"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 20 20"><rect x="4.4" y="8.8" width="11.2" height="7.8" rx="2.4"/><path d="M7.2 8.8V6.9a2.8 2.8 0 0 1 5.6 0v1.9"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 20 20"><path d="M4.4 6.4h11.2M8 6.4V4.8h4v1.6M6 6.4l.8 9.2h6.4l.8-9.2"/></symbol>
+  <symbol id="i-radio" viewBox="0 0 20 20"><circle cx="10" cy="11" r="2.4"/><path d="M6 7.2a5.4 5.4 0 0 1 8 0M3.6 4.9a8.6 8.6 0 0 1 12.8 0"/><path d="M10 13.4v3"/></symbol>
+  <symbol id="i-star" viewBox="0 0 20 20"><path d="M10 3.4l2 4.3 4.6.6-3.4 3.2.9 4.6L10 13.9l-4.1 2.2.9-4.6L3.4 8.3l4.6-.6z"/></symbol>
+  <symbol id="i-article" viewBox="0 0 20 20"><rect x="3.6" y="2.8" width="12.8" height="14.4" rx="2.2"/><path d="M6.8 7h6.4M6.8 10.2h6.4M6.8 13.4h4"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 20 20"><rect x="3" y="4.4" width="14" height="12.4" rx="2.2"/><path d="M3 8.2h14M7 2.8v3.2M13 2.8v3.2"/></symbol>
+  <symbol id="i-mega" viewBox="0 0 20 20"><path d="M3.4 8.4v3.2l2.4.6v4h2.4v-3.4l6.4 1.8V4.4L5.8 7.8z"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 20 20"><path d="M3.4 5.2a1.8 1.8 0 0 1 1.8-1.8h9.6a1.8 1.8 0 0 1 1.8 1.8v6a1.8 1.8 0 0 1-1.8 1.8H8.2l-3.6 2.8v-2.8h-.2a1.8 1.8 0 0 1-1-1.8z"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 20 20"><path d="M2.8 6.2a1.8 1.8 0 0 1 1.8-1.8h2.9l1.6 2h6.3a1.8 1.8 0 0 1 1.8 1.8v6.4a1.8 1.8 0 0 1-1.8 1.8H4.6a1.8 1.8 0 0 1-1.8-1.8z"/></symbol>
+  <symbol id="i-folder-open" viewBox="0 0 20 20"><path d="M2.8 6.2a1.8 1.8 0 0 1 1.8-1.8h2.9l1.6 2h5.3a1.8 1.8 0 0 1 1.8 1.8v.6"/><path d="M2.8 8.8h14.4l-1.7 5.4a1.8 1.8 0 0 1-1.7 1.2H4.5a1.8 1.8 0 0 1-1.7-1.2z"/></symbol>
+  <symbol id="i-archive" viewBox="0 0 20 20"><rect x="2.9" y="3.4" width="14.2" height="3.6" rx="1.2"/><path d="M4.2 7h11.6v8.1a1.6 1.6 0 0 1-1.6 1.6H5.8a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M8.2 10.4h3.6"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 20 20"><path d="M4 12.6v2.6a1.8 1.8 0 0 0 1.8 1.8h8.4a1.8 1.8 0 0 0 1.8-1.8v-2.6"/><path d="M10 13.4V3.6M6.4 7.2 10 3.6l3.6 3.6"/></symbol>
+  <symbol id="i-batch" viewBox="0 0 20 20"><rect x="2.8" y="3.2" width="14.4" height="4.2" rx="1.4"/><rect x="2.8" y="9.4" width="14.4" height="3"/><path d="M2.8 14.6h14.4"/></symbol>
+  <symbol id="i-download" viewBox="0 0 20 20"><path d="M4 12.6v2.6a1.8 1.8 0 0 0 1.8 1.8h8.4a1.8 1.8 0 0 0 1.8-1.8v-2.6"/><path d="M10 3.6v9.8M6.4 9.8 10 13.4l3.6-3.6"/></symbol>
+  <symbol id="i-key" viewBox="0 0 20 20"><circle cx="7.4" cy="12.6" r="3.4"/><path d="M9.9 10.1 16.4 3.6M14 6.1l1.9 1.9M12.2 7.9l1.9 1.9"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 20 20"><path d="M4.6 10h10.4M11.4 6.2 15.2 10l-3.8 3.8"/></symbol>
+</svg>
+
+<div class="shell">
+  <div class="shell-in">
+    <div class="shell-brand">
+      <div class="shell-mark"><svg><use href="#i-radio"/></svg></div>
+      <div>
+        <b>管理后台 · 学生账号重构</b>
+        <span>菁悠广播站 · 静态预览</span>
+      </div>
+    </div>
+    <em class="vbadge">v1</em>
+    <div class="tabs" id="tabs">
+      <button class="tab on" data-i="0">方案说明</button>
+      <span class="tab-sep"></span>
+      <button class="tab" data-i="1">全部账号</button>
+      <button class="tab" data-i="2">年级节点</button>
+      <button class="tab" data-i="3">班级节点</button>
+      <button class="tab" data-i="4">归档回执</button>
+      <span class="tab-sep"></span>
+      <button class="tab" data-i="5">名册导入</button>
+      <button class="tab" data-i="6">导入批次</button>
+    </div>
+    <div class="zoombox">
+      <button class="tab" id="zFit">适应宽度</button>
+      <button class="tab" id="z100">100%</button>
+    </div>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+
+<!-- ══════════════════════════════════════════════════════════
+     0 · 方案说明
+     ══════════════════════════════════════════════════════════ -->
+<section class="screen on">
+  <div class="doc">
+    <div class="doc-head">
+      <div class="eyebrow">v1 · 诊断对象 admin-web/src/views/StudentAccounts.vue（1617 行）</div>
+      <h1>学生账号模块 · 目录化重构</h1>
+      <p>现在这个模块是<b>一个页面 + 4 个平级页签 + 2 个隐形页签</b>。但它管理的对象本来是四层：
+        <b>批次 → 年级 → 班级 → 账号</b>。层级被压平成「两个下拉框 + 一组页签」，
+        所以「主目录（年级）」和「子目录（班级）」混在一起，既看不出父子，也回不到上一级。
+        本方案把平级页签换成<b>一棵目录树 + 一块工作区</b>：唯一的状态源是「树上选中了哪个节点」，
+        并把位置写进 URL。设计系统完全沿用 v8，<b>不新增任何组件</b>。</p>
+    </div>
+
+    <div class="doc-card">
+      <h2>一、五条病灶（每条都能在现有代码里指出位置）</h2>
+      <div class="rank">
+        <div class="rk"><span class="numchip">1</span></div>
+        <div class="rb">
+          <div class="rt">「页签」这一个变量同时表示两件事 → 主目录和子目录打架</div>
+          <div class="rd"><code>tab</code> 既表示「我在哪个平行功能」，又表示「我在按年级里的哪一层」。
+            <code>switchTab('grades')</code> 会顺手把 <code>gradeInfo=null</code>（退回一级），
+            而 <code>openGrade()</code> 又把 <code>tab</code> 原地设回 <code>'grades'</code>。
+            结果「返回上一级」靠的不是导航，是手写的一行 <code>‹ 返回按年级总览</code>。</div>
+        </div>
+      </div>
+      <div class="rank">
+        <div class="rk"><span class="numchip">2</span></div>
+        <div class="rb">
+          <div class="rt">班级下拉的选项，取决于你「上一次打开过哪个年级详情」</div>
+          <div class="rd"><code>classOptions</code> 的来源是 <code>gradeInfo.value?.classes</code>。
+            没进过任何年级详情 → 班级下拉是空的；进过 2023 级再去查 2024 级 → 班级选项还是 2023 级的班。
+            <b>子目录挂在「上次访问痕迹」上，而不是挂在主目录上</b> —— 这是最关键的一处逻辑倒挂。</div>
+        </div>
+      </div>
+      <div class="rank">
+        <div class="rk"><span class="numchip">3</span></div>
+        <div class="rb">
+          <div class="rt">两个「隐形页签」：年级详情和清理回执</div>
+          <div class="rd">年级详情由 <code>gradeInfo</code> 非空抢渲染，清理回执走 <code>tab === 'receipt'</code> ——
+            但 <code>receipt</code> 根本不在 <code>tabs</code> 数组里，所以进到回执时<b>页签条上一个高亮都没有</b>，
+            随手点任何页签都会丢掉它。它们是第三、第四层，却被渲染在第一层的画布上。</div>
+        </div>
+      </div>
+      <div class="rank">
+        <div class="rk"><span class="numchip">4</span></div>
+        <div class="rb">
+          <div class="rt">没有位置感：刷新、后退、分享全部失效</div>
+          <div class="rd">全部层级共用一个 URL <code>/student</code>。刷新回到总览；浏览器后退不生效；
+            想把「2023 级 01 班」给同事看一眼只能口头描述。而项目里已经有先例 ——
+            点歌设置就是独立子路由 <code>submit/settings</code>。</div>
+        </div>
+      </div>
+      <div class="rank">
+        <div class="rk"><span class="numchip">5</span></div>
+        <div class="rb">
+          <div class="rt">同一个动作两套入口、两套语义</div>
+          <div class="rd">批量重置密码：工具栏弹窗走 <code>PUT /student/reset-password</code>（按年级 / 班级<b>范围</b>），
+            批量条走 <code>POST /student/reset-password/batch</code>（按<b>勾选的 ids</b>），确认文案还不一样。
+            另外「导出本届 xlsx」会偷偷改写 <code>listQuery.grade</code>；
+            导入完成回执 <code>importResult</code> 切走再回来还挂着上一次的。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="doc-card">
+      <h2>二、新逻辑：一棵树，一块工作区</h2>
+      <div class="doc-p">
+        把「平行页签」换成「父子目录」。层级一次性写死，界面上不再出现第二种选择方式：
+      </div>
+      <div class="treefig" style="margin-top:14px">
+        <div class="col">
+          <div class="h">对象层级（数据本来的样子）</div>
+          <div class="treepre">批次 <i>（一次导入动作 · 跨年级）</i>
+└ <u>年级</u>          <i>← 主目录</i>
+  └ <u>班级</u>        <i>← 子目录</i>
+    └ 学生账号      <i>← 叶子</i>
+
+横切：毕业清理 <s>（动作，挂在年级上）</s>
+      清理回执 <i>（历史，挂在年级下）</i></div>
+        </div>
+        <div class="col">
+          <div class="h">左侧目录树（唯一状态源）</div>
+          <div class="treepre">▸ 全部账号                     1,284
+▾ 在用年级
+  ▾ <u>2023 级</u>  <s>●</s>                   312   <i>← 可毕业清理</i>
+       01 班                  45
+       02 班                  44
+       …
+  ▸ 2024 级                       330
+  ▸ 2025 级                       321
+▾ 已归档
+   2022 级                 已清理
+─────────────────────────────────
+  名册导入                     <i>← 动作，进向导</i>
+  导入批次                     <i>← 动作，跨年级</i></div>
+        </div>
+      </div>
+      <div class="doc-p" style="margin-top:14px">
+        右侧工作区只由<b>当前选中的节点</b>决定，没有第二个开关。四种节点视图：
+        全部账号 / 年级节点 / 班级节点 / 归档节点；两个动作：名册导入向导、导入批次。
+        动作做完回到来的地方。
+      </div>
+    </div>
+
+    <div class="doc-card">
+      <h2>三、URL 化（位置感的来源）</h2>
+      <table class="dtab">
+        <thead><tr><th style="width:320px">地址</th><th>视图</th></tr></thead>
+        <tbody>
+          <tr><td><code>/student</code></td><td>全部账号 —— 跨届搜索、批量操作</td></tr>
+          <tr><td><code>/student?grade=2023</code></td><td>2023 级节点 —— KPI + 班级明细 + 毕业清理</td></tr>
+          <tr><td><code>/student?grade=2023&amp;class=01</code></td><td>2023 级 01 班 —— 该班账号表</td></tr>
+          <tr><td><code>/student/archive?grade=2022</code></td><td>归档节点 —— 那一届的清理回执</td></tr>
+          <tr><td><code>/student/import</code></td><td>名册导入向导（三步）</td></tr>
+          <tr><td><code>/student/batches</code></td><td>导入批次与撤销</td></tr>
+        </tbody>
+      </table>
+      <div class="doc-p" style="margin-top:12px">
+        刷新、浏览器后退、把链接发给同事 —— 三件事同时恢复。目录树上的高亮和面包屑都由 URL 反推，
+        不另存一份状态（这也顺手消掉了病灶 1）。
+      </div>
+    </div>
+
+    <div class="doc-card">
+      <h2>四、两条路线，请挑一条</h2>
+      <div class="two">
+        <div class="ab rec">
+          <div class="t">A · 目录化（本预览）</div>
+          <div class="m">
+            左侧目录树 + 右侧工作区，年级 / 班级是父子节点，唯一状态源是树上的选中项，全部 URL 化。<br>
+            <b>改动</b>：<code>StudentAccounts.vue</code> 拆成 1 个壳 + 5 个子视图；
+            <code>router/index.js</code> 加 4 条子路由。<b>后端 0 改动</b>。<br>
+            <b>解决</b>：病灶 1~5 全部。
+          </div>
+        </div>
+        <div class="ab">
+          <div class="t">B · 轻量修正（保留页签）</div>
+          <div class="m">
+            页签仍是 4 个，但年级详情与回执改为 URL 驱动（<code>?grade=</code> / <code>?view=receipt</code>），
+            页签条保持「按年级」高亮；班级下拉改成「先选年级才可用」的级联，不再读上次的详情。<br>
+            <b>改动</b>：约原文件的 1/3，不拆文件。<b>后端 0 改动</b>。<br>
+            <b>解决</b>：病灶 1 / 3 / 4 / 5；病灶 2 只是缓解 —— 年级和班级仍然是两个下拉框，平坦感还在。
+          </div>
+        </div>
+      </div>
+      <div class="doc-p" style="margin-top:14px">
+        <b>我的建议是 A。</b>问题的根子是「层级被摊平」，B 保留了摊平的前提，只能打补丁。
+        而且 A 的前端改动量并没有想象中大：现有 6 个视图的 DOM 和逻辑几乎可以整段搬进子视图组件，
+        真正新写的只有目录树和路由。
+      </div>
+    </div>
+
+    <div class="doc-card">
+      <h2>五、改动清单</h2>
+      <div class="plist">
+        <div><b>前端 · 拆</b><span><code>views/StudentAccounts.vue</code> → <code>views/student/</code> 下：
+          <code>StudentIndex.vue</code>（壳 + 路由出口）、<code>StudentTree.vue</code>（目录树组件）、
+          <code>NodeAll.vue</code>、<code>NodeGrade.vue</code>、<code>NodeClass.vue</code>、
+          <code>NodeArchive.vue</code>、<code>ImportWizard.vue</code>、<code>Batches.vue</code>。</span></div>
+        <div><b>前端 · 路由</b><span><code>router/index.js</code> 在已有的 <code>student</code> 下挂 4 条子路由，
+          与现成的 <code>submit/settings</code> 同一种写法。</span></div>
+        <div><b>前端 · 顺手修</b><span>① 班级筛选改由树提供，不再读 <code>gradeInfo</code>；
+          ② 批量重置只留一个入口，跟随当前范围（勾选 → 按 ids，未勾选 → 按节点范围），按钮文案随之变；
+          ③ 导出跟随当前节点，不再改写 <code>listQuery.grade</code>；
+          ④ 导入回执只在向导内出现，离开即清。</span></div>
+        <div><b>后端</b><span><b>0 改动。</b>现有接口刚好够：<code>/student/list?grade&amp;classNo</code>、
+          <code>/student/grades</code>、<code>/student/grade/:grade</code>、
+          <code>/student/cleanup/last?grade=</code>、<code>/student/batches</code>。
+          唯一<b>可选</b>新增：<code>GET /api/admin/student/tree</code>（一次返回年级 → 班级 → 人数整棵树），
+          否则左树要发 1 + N 次请求拼接。不加也能跑，只是年级多时请求数线性涨。</span></div>
+        <div><b>不动的</b><span>所有接口路径与权限（整块仍是 <code>requireSuperAdmin</code>）、
+          清理三模式（safe / disable / purge）、导入识别的三段规则、v8 设计系统、侧栏
+          （<code>/student</code> 前缀已能高亮，<code>MainLayout.vue</code> 一行不用改）。</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
+     1 · 全部账号
+     ══════════════════════════════════════════════════════════ -->
+<section class="screen">
+  <div class="frame-outer"><div class="frame">
+    <div class="chrome">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg><use href="#i-lock"/></svg>admin.radio.local<b>/student</b></div>
+    </div>
+    <div class="app">
+      <aside class="rail"></aside>
+      <div class="work">
+        <div class="topbar">
+          <div>
+            <div class="tb-title">学生账号</div>
+            <div class="tb-sub">4 届在校 · 1,284 个账号 · 已激活 1,106</div>
+          </div>
+          <div class="tbright">
+            <div class="tb-search"><svg><use href="#i-search"/></svg>搜索投稿 / 公告 / 用户</div>
+            <button class="iconbtn"><svg><use href="#i-refresh"/></svg></button>
+          </div>
+        </div>
+        <main class="canvas split">
+          <aside class="tree" data-sel="all"></aside>
+          <div class="ws">
+            <div class="toolbar">
+              <div class="search-in"><svg><use href="#i-search"/></svg>搜索姓名 / 账号</div>
+              <button class="filter on">全部 <em>1284</em></button>
+              <button class="filter">未激活 <em>178</em></button>
+              <button class="filter">已停用 <em>23</em></button>
+              <div class="tail">
+                <button class="btn btn-quiet btn-sm"><svg><use href="#i-download"/></svg>导出 xlsx</button>
+                <button class="btn btn-quiet btn-sm"><svg><use href="#i-key"/></svg>批量重置密码</button>
+              </div>
+            </div>
+            <div class="tb-wrap">
+              <table class="tb">
+                <colgroup>
+                  <col style="width:46px"><col style="width:126px"><col style="width:100px">
+                  <col style="width:126px"><col style="width:96px"><col style="width:96px">
+                  <col><col style="width:214px">
+                </colgroup>
+                <thead><tr>
+                  <th class="c"><span class="cb on"><svg><use href="#i-check"/></svg></span></th>
+                  <th>账号</th><th>姓名</th><th>届 · 班</th>
+                  <th class="c">状态</th><th class="c">激活</th><th>最近登录</th><th class="r">操作</th>
+                </tr></thead>
+                <tbody>
+                  <tr>
+                    <td class="c"><span class="cb on"><svg><use href="#i-check"/></svg></span></td>
+                    <td><span class="mono">20240101</span></td><td>陈以宁</td>
+                    <td><span class="micro">2024 级 · 01 班</span></td>
+                    <td class="c"><span class="tag tag-ok">启用</span></td>
+                    <td class="c"><span class="tag tag-ok">已激活</span></td>
+                    <td><span class="micro num">2026-09-20 21:14</span></td>
+                    <td><div class="rowact"><button class="btn btn-quiet btn-sm">改名</button><button class="btn btn-quiet btn-sm">重置密码</button><button class="btn btn-danger-quiet btn-sm">停用</button></div></td>
+                  </tr>
+                  <tr>
+                    <td class="c"><span class="cb on"><svg><use href="#i-check"/></svg></span></td>
+                    <td><span class="mono">20240102</span></td><td>李承泽</td>
+                    <td><span class="micro">2024 级 · 01 班</span></td>
+                    <td class="c"><span class="tag tag-ok">启用</span></td>
+                    <td class="c"><span class="tag tag-mute">未激活</span></td>
+                    <td><span class="micro">—</span></td>
+                    <td><div class="rowact"><button class="btn btn-quiet btn-sm">改名</button><button class="btn btn-quiet btn-sm">重置密码</button><button class="btn btn-danger-quiet btn-sm">停用</button></div></td>
+                  </tr>
+                  <tr>
+                    <td class="c"><span class="cb on"><svg><use href="#i-check"/></svg></span></td>
+                    <td><span class="mono">20250203</span></td><td>周晚棠</td>
+                    <td><span class="micro">2025 级 · 02 班</span></td>
+                    <td class="c"><span class="tag tag-ok">启用</span></td>
+                    <td class="c"><span class="tag tag-ok">已激活</span></td>
+                    <td><span class="micro num">2026-09-19 18:02</span></td>
+                    <td><div class="rowact"><button class="btn btn-quiet btn-sm">改名</button><button class="btn btn-quiet btn-sm">重置密码</button><button class="btn btn-danger-quiet btn-sm">停用</button></div></td>
+                  </tr>
+                  <tr>
+                    <td class="c"><span class="cb"></span></td>
+                    <td><span class="mono">20230117</span></td><td>许知野</td>
+                    <td><span class="micro">2023 级 · 01 班</span></td>
+                    <td class="c"><span class="tag tag-reject">停用</span></td>
+                    <td class="c"><span class="tag tag-ok">已激活</span></td>
+                    <td><span class="micro num">2026-06-28 09:41</span></td>
+                    <td><div class="rowact"><button class="btn btn-quiet btn-sm">改名</button><button class="btn btn-quiet btn-sm">重置密码</button><button class="btn btn-quiet btn-sm">启用</button></div></td>
+                  </tr>
+                  <tr>
+                    <td class="c"><span class="cb"></span></td>
+                    <td><span class="mono">20260412</span></td><td>郑亦舟</td>
+                    <td><span class="micro">2026 级 · 04 班</span></td>
+                    <td class="c"><span class="tag tag-ok">启用</span></td>
+                    <td class="c"><span class="tag tag-ok">已激活</span></td>
+                    <td><span class="micro num">2026-09-21 07:33</span></td>
+                    <td><div class="rowact"><button class="btn btn-quiet btn-sm">改名</button><button class="btn btn-quiet btn-sm">重置密码</button><button class="btn btn-danger-quiet btn-sm">停用</button></div></td>
+                  </tr>
+                  <tr>
+                    <td class="c"><span class="cb"></span></td>
+                    <td><span class="mono">20260501</span></td><td>孙可</td>
+                    <td><span class="micro">2026 级 · 05 班</span></td>
+                    <td class="c"><span class="tag tag-ok">启用</span></td>
+                    <td class="c"><span class="tag tag-mute">未激活</span></td>
+                    <td><span class="micro">—</span></td>
+                    <td><div class="rowact"><button class="btn btn-quiet btn-sm">改名</button><button class="btn btn-quiet btn-sm">重置密码</button><button class="btn btn-danger-quiet btn-sm">停用</button></div></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="batchbar">
+              <span class="cnt">已选 <b class="num">3</b> 条</span>
+              <span class="micro" style="margin-right:auto">删除有投稿记录的账号会改为「停用」，不会硬删</span>
+              <button class="btn btn-quiet btn-sm">重置为初始密码</button>
+              <button class="btn btn-quiet btn-sm">批量停用</button>
+              <button class="btn btn-danger-quiet btn-sm">批量删除</button>
+              <button class="btn btn-plain btn-sm">取消选择</button>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div></div>
+  <div class="cap">
+    <b>全部账号</b><span class="sep">|</span>
+    <span>左树选中「全部账号」，右侧就是跨届的账号总表。注意工具栏里<b>不再有年级 / 班级两个下拉框</b> ——
+      选届选班改由点树完成，页面上只剩「关键字 + 状态」两个真正的筛选条件。
+      批量重置密码也收敛回这里唯一一个入口，跟随当前范围：勾了人就按勾选，没勾就按当前节点。</span>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
+     2 · 年级节点
+     ══════════════════════════════════════════════════════════ -->
+<section class="screen">
+  <div class="frame-outer"><div class="frame">
+    <div class="chrome">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg><use href="#i-lock"/></svg>admin.radio.local<b>/student?grade=2023</b></div>
+    </div>
+    <div class="app">
+      <aside class="rail"></aside>
+      <div class="work">
+        <div class="topbar">
+          <div>
+            <div class="tb-title">2023 级</div>
+            <div class="tb-sub">312 个账号 · 7 个班级 · 已激活 265 · 本届可毕业清理</div>
+          </div>
+          <div class="tbright">
+            <div class="tb-search"><svg><use href="#i-search"/></svg>搜索投稿 / 公告 / 用户</div>
+            <button class="iconbtn"><svg><use href="#i-refresh"/></svg></button>
+          </div>
+        </div>
+        <main class="canvas split">
+          <aside class="tree" data-sel="g:2023"></aside>
+          <div class="ws">
+            <div class="bc">
+              <a>学生账号</a><svg><use href="#i-chev"/></svg>
+              <span class="here">2023 级</span>
+              <span class="chip-light" style="margin-left:6px">可毕业清理</span>
+            </div>
+            <div class="kpis">
+              <div class="kpi kpi-dark">
+                <div class="k">本届账号</div><div class="v num">312</div>
+                <div class="d">覆盖 7 个班级</div>
+              </div>
+              <div class="kpi">
+                <div class="k">已激活</div><div class="v num">265</div>
+                <div class="d">占 85% · 首登即算激活</div>
+              </div>
+              <div class="kpi">
+                <div class="k">未激活</div><div class="v num">47</div>
+                <div class="d">初始密码 = user + 学号</div>
+              </div>
+              <div class="kpi">
+                <div class="k">有投稿记录</div><div class="v num">37</div>
+                <div class="d">清理时改为停用，不硬删</div>
+              </div>
+            </div>
+            <div class="sec">
+              <div class="sec-head">
+                <span class="sec-title">班级明细</span>
+                <span class="micro">点班级进该班账号表 —— 子目录就在主目录里面，不再靠下拉框</span>
+              </div>
+              <div class="tb-wrap">
+                <table class="tb">
+                  <colgroup><col style="width:230px"><col><col><col><col style="width:170px"></colgroup>
+                  <thead><tr>
+                    <th>班级</th><th class="r">账号</th><th class="r">已激活</th>
+                    <th class="r">未激活</th><th class="r">有投稿记录</th><th class="r">操作</th>
+                  </tr></thead>
+                  <tbody>
+                    <tr><td><span class="strong">2023 级 01 班</span></td><td class="r num">45</td><td class="r num">38</td><td class="r num">7</td><td class="r num">6</td><td class="r"><button class="btn btn-quiet btn-sm">查看账号</button></td></tr>
+                    <tr><td><span class="strong">2023 级 02 班</span></td><td class="r num">44</td><td class="r num">37</td><td class="r num">7</td><td class="r num">5</td><td class="r"><button class="btn btn-quiet btn-sm">查看账号</button></td></tr>
+                    <tr><td><span class="strong">2023 级 03 班</span></td><td class="r num">46</td><td class="r num">41</td><td class="r num">5</td><td class="r num">8</td><td class="r"><button class="btn btn-quiet btn-sm">查看账号</button></td></tr>
+                    <tr><td><span class="strong">2023 级 04 班</span></td><td class="r num">44</td><td class="r num">36</td><td class="r num">8</td><td class="r num">4</td><td class="r"><button class="btn btn-quiet btn-sm">查看账号</button></td></tr>
+                    <tr><td><span class="strong">2023 级 05 班</span></td><td class="r num">45</td><td class="r num">39</td><td class="r num">6</td><td class="r num">7</td><td class="r"><button class="btn btn-quiet btn-sm">查看账号</button></td></tr>
+                    <tr><td><span class="strong">2023 级 06 班</span></td><td class="r num">44</td><td class="r num">38</td><td class="r num">6</td><td class="r num">4</td><td class="r"><button class="btn btn-quiet btn-sm">查看账号</button></td></tr>
+                    <tr><td><span class="strong">2023 级 07 班</span></td><td class="r num">44</td><td class="r num">36</td><td class="r num">8</td><td class="r num">3</td><td class="r"><button class="btn btn-quiet btn-sm">查看账号</button></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="sec">
+              <div class="sec-head">
+                <span class="sec-title danger">危险区</span>
+                <span class="rowc gap8">
+                  <span class="tag tag-reject">仅超级管理员</span>
+                  <span class="micro">会先弹试算，执行后登录态立即作废</span>
+                </span>
+              </div>
+              <div class="dangerzone">
+                <div class="ic"><svg><use href="#i-trash"/></svg></div>
+                <div class="grow">
+                  <div class="t">毕业清理 · 2023 级</div>
+                  <div class="m">默认规则：<b>没有投稿记录的 275 个账号真正删除</b>；
+                    有投稿记录的 <b>37 个改为「停用」</b>（审核列表里还能查到人）。删除后无法恢复，建议先导出本届名单。</div>
+                </div>
+                <button class="btn btn-quiet">导出本届 xlsx</button>
+                <button class="btn btn-danger-fill">毕业清理</button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div></div>
+  <div class="cap">
+    <b>年级节点</b><span class="sep">|</span>
+    <span>树上的「2023 级」被选中并展开，地址栏是 <code>/student?grade=2023</code> ——
+      刷新、后退、分享都能还原这一屏。原来是「隐形页签」的年级详情，现在是一等的树节点：
+      有高亮、有面包屑、有 URL。班级明细表每一行都能点进子节点，
+      <b>这就是「主目录 → 子目录」该有的样子</b>。</span>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
+     3 · 班级节点
+     ══════════════════════════════════════════════════════════ -->
+<section class="screen">
+  <div class="frame-outer"><div class="frame">
+    <div class="chrome">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg><use href="#i-lock"/></svg>admin.radio.local<b>/student?grade=2023&amp;class=01</b></div>
+    </div>
+    <div class="app">
+      <aside class="rail"></aside>
+      <div class="work">
+        <div class="topbar">
+          <div>
+            <div class="tb-title">2023 级 01 班</div>
+            <div class="tb-sub">45 个账号 · 已激活 38 · 有投稿记录 6</div>
+          </div>
+          <div class="tbright">
+            <div class="tb-search"><svg><use href="#i-search"/></svg>搜索投稿 / 公告 / 用户</div>
+            <button class="iconbtn"><svg><use href="#i-refresh"/></svg></button>
+          </div>
+        </div>
+        <main class="canvas split">
+          <aside class="tree" data-sel="c:2023:01"></aside>
+          <div class="ws">
+            <div class="bc">
+              <a>学生账号</a><svg><use href="#i-chev"/></svg>
+              <a>2023 级</a><svg><use href="#i-chev"/></svg>
+              <span class="here">01 班</span>
+              <span class="chip-light" style="margin-left:6px">范围已锁定 · 45 个账号</span>
+            </div>
+            <div class="kpis kpis-3">
+              <div class="kpi"><div class="k">本班账号</div><div class="v num">45</div>
+                <div class="d">序号 01 ~ 45</div></div>
+              <div class="kpi"><div class="k">已激活</div><div class="v num">38</div>
+                <div class="d">还有 7 人没登录过</div></div>
+              <div class="kpi"><div class="k">有投稿记录</div><div class="v num">6</div>
+                <div class="d">清理本届时会被改为停用</div></div>
+            </div>
+            <div class="toolbar">
+              <div class="search-in"><svg><use href="#i-search"/></svg>在本班内搜索姓名 / 账号</div>
+              <button class="filter on">全部 <em>45</em></button>
+              <button class="filter">未激活 <em>7</em></button>
+              <div class="tail">
+                <button class="btn btn-quiet btn-sm"><svg><use href="#i-download"/></svg>导出本班 xlsx</button>
+                <button class="btn btn-quiet btn-sm"><svg><use href="#i-key"/></svg>重置本班密码</button>
+              </div>
+            </div>
+            <div class="tb-wrap">
+              <table class="tb">
+                <colgroup>
+                  <col style="width:46px"><col style="width:126px"><col style="width:104px">
+                  <col style="width:88px"><col style="width:96px"><col style="width:96px">
+                  <col><col style="width:214px">
+                </colgroup>
+                <thead><tr>
+                  <th class="c"><span class="cb on"><svg><use href="#i-check"/></svg></span></th>
+                  <th>账号</th><th>姓名</th><th>序号</th>
+                  <th class="c">状态</th><th class="c">激活</th><th>最近登录</th><th class="r">操作</th>
+                </tr></thead>
+                <tbody>
+                  <tr>
+                    <td class="c"><span class="cb on"><svg><use href="#i-check"/></svg></span></td>
+                    <td><span class="mono">20230101</span></td><td>许知野</td>
+                    <td><span class="micro num">01 号</span></td>
+                    <td class="c"><span class="tag tag-ok">启用</span></td>
+                    <td class="c"><span class="tag tag-ok">已激活</span></td>
+                    <td><span class="micro num">2026-06-28 09:41</span></td>
+                    <td><div class="rowact"><button class="btn btn-quiet btn-sm">改名</button><button class="btn btn-quiet btn-sm">重置密码</button><button class="btn btn-danger-quiet btn-sm">停用</button></div></td>
+                  </tr>
+                  <tr>
+                    <td class="c"><span class="cb on"><svg><use href="#i-check"/></svg></span></td>
+                    <td><span class="mono">20230102</span></td><td>钱思远</td>
+                    <td><span class="micro num">02 号</span></td>
+                    <td class="c"><span class="tag tag-ok">启用</span></td>
+                    <td class="c"><span class="tag tag-ok">已激活</span></td>
+                    <td><span class="micro num">2026-07-01 20:18</span></td>
+                    <td><div class="rowact"><button class="btn btn-quiet btn-sm">改名</button><button class="btn btn-quiet btn-sm">重置密码</button><button class="btn btn-danger-quiet btn-sm">停用</button></div></td>
+                  </tr>
+                  <tr>
+                    <td class="c"><span class="cb"></span></td>
+                    <td><span class="mono">20230103</span></td><td>王砚</td>
+                    <td><span class="micro num">03 号</span></td>
+                    <td class="c"><span class="tag tag-ok">启用</span></td>
+                    <td class="c"><span class="tag tag-mute">未激活</span></td>
+                    <td><span class="micro">—</span></td>
+                    <td><div class="rowact"><button class="btn btn-quiet btn-sm">改名</button><button class="btn btn-quiet btn-sm">重置密码</button><button class="btn btn-danger-quiet btn-sm">停用</button></div></td>
+                  </tr>
+                  <tr>
+                    <td class="c"><span class="cb"></span></td>
+                    <td><span class="mono">20230104</span></td><td>冯一诺</td>
+                    <td><span class="micro num">04 号</span></td>
+                    <td class="c"><span class="tag tag-ok">启用</span></td>
+                    <td class="c"><span class="tag tag-ok">已激活</span></td>
+                    <td><span class="micro num">2026-09-11 19:26</span></td>
+                    <td><div class="rowact"><button class="btn btn-quiet btn-sm">改名</button><button class="btn btn-quiet btn-sm">重置密码</button><button class="btn btn-danger-quiet btn-sm">停用</button></div></td>
+                  </tr>
+                  <tr>
+                    <td class="c"><span class="cb"></span></td>
+                    <td><span class="mono">20230105</span></td><td>蒋屿</td>
+                    <td><span class="micro num">05 号</span></td>
+                    <td class="c"><span class="tag tag-ok">启用</span></td>
+                    <td class="c"><span class="tag tag-mute">未激活</span></td>
+                    <td><span class="micro">—</span></td>
+                    <td><div class="rowact"><button class="btn btn-quiet btn-sm">改名</button><button class="btn btn-quiet btn-sm">重置密码</button><button class="btn btn-danger-quiet btn-sm">停用</button></div></td>
+                  </tr>
+                  <tr>
+                    <td class="c"><span class="cb"></span></td>
+                    <td><span class="mono">20230106</span></td><td>沈亦白</td>
+                    <td><span class="micro num">06 号</span></td>
+                    <td class="c"><span class="tag tag-ok">启用</span></td>
+                    <td class="c"><span class="tag tag-ok">已激活</span></td>
+                    <td><span class="micro num">2026-09-18 08:52</span></td>
+                    <td><div class="rowact"><button class="btn btn-quiet btn-sm">改名</button><button class="btn btn-quiet btn-sm">重置密码</button><button class="btn btn-danger-quiet btn-sm">停用</button></div></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="batchbar">
+              <span class="cnt">已选 <b class="num">2</b> 条</span>
+              <span class="micro" style="margin-right:auto">未勾选时，下面两个按钮的文案会变成「重置本班 45 个 / 停用本班 45 个」</span>
+              <button class="btn btn-quiet btn-sm">重置为初始密码</button>
+              <button class="btn btn-quiet btn-sm">批量停用</button>
+              <button class="btn btn-danger-quiet btn-sm">批量删除</button>
+              <button class="btn btn-plain btn-sm">取消选择</button>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div></div>
+  <div class="cap">
+    <b>班级节点</b><span class="sep">|</span>
+    <span>树上高亮「01 班」，面包屑给出三级位置，地址栏是 <code>/student?grade=2023&amp;class=01</code>。
+      工具栏里的每一句文案都带「本班」—— 范围来自节点，不再来自某个下拉框，
+      所以<b>不可能出现「班级选项是上一个年级的班」这种情况</b>。批量操作条的文案也随之变，
+      覆盖当前范围的全部 45 人。</span>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
+     4 · 归档节点（清理回执）
+     ══════════════════════════════════════════════════════════ -->
+<section class="screen">
+  <div class="frame-outer"><div class="frame">
+    <div class="chrome">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg><use href="#i-lock"/></svg>admin.radio.local<b>/student/archive?grade=2022</b></div>
+    </div>
+    <div class="app">
+      <aside class="rail"></aside>
+      <div class="work">
+        <div class="topbar">
+          <div>
+            <div class="tb-title">2022 级 · 已归档</div>
+            <div class="tb-sub">2026-07-05 清理完成 · 删除 268 · 停用 41</div>
+          </div>
+          <div class="tbright">
+            <div class="tb-search"><svg><use href="#i-search"/></svg>搜索投稿 / 公告 / 用户</div>
+            <button class="iconbtn"><svg><use href="#i-refresh"/></svg></button>
+          </div>
+        </div>
+        <main class="canvas split">
+          <aside class="tree" data-sel="a:2022"></aside>
+          <div class="ws">
+            <div class="bc">
+              <a>学生账号</a><svg><use href="#i-chev"/></svg>
+              <span>已归档</span><svg><use href="#i-chev"/></svg>
+              <span class="here">2022 级</span>
+              <span class="chip-light" style="margin-left:6px">只读回执</span>
+            </div>
+            <div class="tile">
+              <div class="tile-status"><span class="dot-live"></span>归档节点 · 这一届已不在账号目录里</div>
+              <div class="between" style="align-items:flex-start;gap:16px">
+                <div>
+                  <div class="tile-title">2022 级 已清理</div>
+                  <div class="tile-meta">
+                    2026-07-05 14:20 执行 · 操作人 王老师 · 涉及 7 个班级 · 耗时 1.8 秒
+                  </div>
+                </div>
+                <div class="tile-actions">
+                  <button class="btn btn-white btn-sm"><svg><use href="#i-download"/></svg>导出清理回执</button>
+                  <button class="btn btn-quiet btn-sm" style="background:transparent;border-color:rgba(255,255,255,.35);color:#fff">查看停用的 41 个</button>
+                </div>
+              </div>
+            </div>
+            <div class="kpis">
+              <div class="kpi"><div class="k">真正删除</div><div class="v num">268</div>
+                <div class="d">账号与登录记录一并清除</div></div>
+              <div class="kpi"><div class="k">改为停用</div><div class="v num">41</div>
+                <div class="d">有投稿记录，保留归属</div></div>
+              <div class="kpi"><div class="k">登录态作废</div><div class="v num">309</div>
+                <div class="d">立即生效，不等 30 秒缓存</div></div>
+              <div class="kpi"><div class="k">不受影响</div><div class="v num">1,151</div>
+                <div class="d">其余届未被触碰</div></div>
+            </div>
+            <div class="sec">
+              <div class="sec-head">
+                <span class="sec-title">执行明细</span>
+                <span class="micro">完整记录见系统日志</span>
+              </div>
+              <div class="card">
+                <div class="kv"><span class="k">模式</span>
+                  <span class="rowc gap8"><span class="tag tag-mute">safe（默认）</span>
+                  <span class="micro">无投稿真删 / 有投稿改停用</span></span></div>
+                <div class="kv"><span class="k">停用清单</span>
+                  <span class="mono el">20220101 / 20220104 / 20220203 / 20220317 / 20220429 … 共 41 个</span></div>
+                <div class="kv"><span class="k">投稿归属</span>
+                  <span class="hint">41 个停用账号的投稿记录保留在审核列表里，作者仍能查到姓名</span></div>
+                <div class="kv"><span class="k">可否撤销</span>
+                  <span class="hint">删除部分不可恢复；停用部分可在「全部账号」里搜到并重新启用</span></div>
+              </div>
+            </div>
+            <div class="noteline">
+              <svg><use href="#i-info"/></svg>
+              <span>归档节点是<b>只读</b>的 —— 它的意义是「这一届去哪了」的记录，而不是一个空账号列表。
+                被停用的 41 个账号仍然可以用「全部账号」的关键字搜到。</span>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div></div>
+  <div class="cap">
+    <b>归档节点</b><span class="sep">|</span>
+    <span>这是原来最乱的一处：清理回执挂在 <code>tab === 'receipt'</code> 上，而 <code>receipt</code> 不在页签数组里，
+      所以进到这一屏<b>页签条一个高亮都没有</b>，随手一点就丢了。现在它是树上一个正常节点 ——
+      有高亮、有面包屑、有自己的 URL，而且语义对：已清理的年级点进去看的是回执，不是空表。</span>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
+     5 · 名册导入向导
+     ══════════════════════════════════════════════════════════ -->
+<section class="screen">
+  <div class="frame-outer"><div class="frame">
+    <div class="chrome">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg><use href="#i-lock"/></svg>admin.radio.local<b>/student/import</b></div>
+    </div>
+    <div class="app">
+      <aside class="rail"></aside>
+      <div class="work">
+        <div class="topbar">
+          <div>
+            <div class="tb-title">名册导入</div>
+            <div class="tb-sub">2026-09 高一新生名册.xlsx · 已解析 47 行 · 表头识别：第 1 行</div>
+          </div>
+          <div class="tbright">
+            <div class="tb-search"><svg><use href="#i-search"/></svg>搜索投稿 / 公告 / 用户</div>
+            <button class="iconbtn"><svg><use href="#i-refresh"/></svg></button>
+          </div>
+        </div>
+        <main class="canvas split">
+          <aside class="tree" data-sel="import"></aside>
+          <div class="ws">
+            <div class="bc">
+              <a>学生账号</a><svg><use href="#i-chev"/></svg>
+              <span class="here">名册导入</span>
+              <span class="chip-light" style="margin-left:6px">动作 · 完成后回到原节点</span>
+              <a style="margin-left:auto">重新选择文件</a>
+            </div>
+            <div class="card">
+              <div class="stepper">
+                <span class="st-it"><span class="st-no on">✓</span><span class="micro">上传表格</span></span>
+                <span class="micro">›</span>
+                <span class="st-it"><span class="st-no on">2</span><span class="strong">预览与确认</span></span>
+                <span class="micro">›</span>
+                <span class="st-it"><span class="st-no">3</span><span class="micro">完成</span></span>
+                <span class="micro" style="margin-left:auto">只解析不落库，确认后才写入</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="rowc gap18" style="flex-wrap:wrap">
+                <span class="rowc gap8"><span class="tag tag-ok">新建</span><b class="num" style="font-size:var(--fs-xl)">43</b></span>
+                <span class="rowc gap8"><span class="tag tag-warn">覆盖</span><b class="num" style="font-size:var(--fs-xl)">0</b>
+                  <span class="micro">未激活，可安全覆盖</span></span>
+                <span class="rowc gap8"><span class="tag tag-mute">受保护</span><b class="num" style="font-size:var(--fs-xl)">2</b>
+                  <span class="micro">已激活，默认跳过</span></span>
+                <span class="rowc gap8"><span class="tag tag-reject">异常</span><b class="num" style="font-size:var(--fs-xl)">2</b>
+                  <span class="micro">带原文行号，不写库</span></span>
+              </div>
+            </div>
+            <div class="tb-wrap">
+              <table class="tb">
+                <colgroup>
+                  <col style="width:90px"><col style="width:240px"><col style="width:140px">
+                  <col style="width:104px"><col>
+                </colgroup>
+                <thead><tr>
+                  <th class="c">行号</th><th>表格原内容</th><th>识别结果</th>
+                  <th class="c">结论</th><th>说明</th>
+                </tr></thead>
+                <tbody>
+                  <tr>
+                    <td class="c"><span class="mono micro">第 2 行</span></td>
+                    <td><span class="mono">2026 级 · 1 班 · 1 号 · 郑亦舟</span></td>
+                    <td><span class="mono strong">20260101</span></td>
+                    <td class="c"><span class="tag tag-ok">新建</span></td>
+                    <td><span class="micro">将创建账号，初始密码 <b>user20260101</b></span></td>
+                  </tr>
+                  <tr>
+                    <td class="c"><span class="mono micro">第 3 行</span></td>
+                    <td><span class="mono">2026 级 · 1 班 · 2 号 · 孙可</span></td>
+                    <td><span class="mono strong">20260102</span></td>
+                    <td class="c"><span class="tag tag-ok">新建</span></td>
+                    <td><span class="micro">将创建账号，初始密码 <b>user20260102</b></span></td>
+                  </tr>
+                  <tr>
+                    <td class="c"><span class="mono micro">第 4 行</span></td>
+                    <td><span class="mono">2026 级 · 2 班 · 3 号 · 周晚棠</span></td>
+                    <td><span class="mono strong">20260203</span></td>
+                    <td class="c"><span class="tag tag-ok">新建</span></td>
+                    <td><span class="micro">将创建账号，初始密码 <b>user20260203</b></span></td>
+                  </tr>
+                  <tr class="row-invalid">
+                    <td class="c"><span class="mono micro">第 5 行</span></td>
+                    <td><span class="mono">2026 级 · 1 班 · （空） · 冯一诺</span></td>
+                    <td><span class="mono">—</span></td>
+                    <td class="c"><span class="tag tag-reject">异常</span></td>
+                    <td><span class="micro" style="color:var(--red-fg)">序号缺失：这一行凑不出三元组，请回表格补齐</span></td>
+                  </tr>
+                  <tr class="row-invalid">
+                    <td class="c"><span class="mono micro">第 6 行</span></td>
+                    <td><span class="mono">2026 级 · 1 班 · 2 号 · 沈亦白</span></td>
+                    <td><span class="mono">—</span></td>
+                    <td class="c"><span class="tag tag-reject">异常</span></td>
+                    <td><span class="micro" style="color:var(--red-fg)">与第 3 行重复：同一班内的序号 02 已经出现过</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="cols">
+              <div class="card grow" style="display:flex;flex-direction:column;gap:14px">
+                <div class="rowc gap13">
+                  <span class="sw"></span>
+                  <div class="grow">
+                    <div class="strong">强制覆盖已激活</div>
+                    <div class="micro">默认关。打开后覆盖备注与三元组，<b>仍然不碰密码</b></div>
+                  </div>
+                </div>
+                <div class="rowc gap13">
+                  <span class="sw on"></span>
+                  <div class="grow">
+                    <div class="strong">严格模式</div>
+                    <div class="micro">有异常行就整批不导入（当前：<b>2 行异常，整批会被拦下</b>）</div>
+                  </div>
+                </div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:12px;min-width:0">
+                <div class="warnline">
+                  <svg><use href="#i-info"/></svg>
+                  <span>导出文件<b>含初始密码明文</b>，只用于分发给本人；已改过密码的行会留空。</span>
+                </div>
+                <div class="rowc gap8" style="justify-content:flex-end;margin-top:auto">
+                  <button class="btn btn-quiet btn-sm">取消</button>
+                  <button class="btn btn-plain btn-sm">忽略异常行继续</button>
+                  <button class="btn btn-primary">确认导入 43 行</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div></div>
+  <div class="cap">
+    <b>名册导入</b><span class="sep">|</span>
+    <span>导入是一次<b>动作</b>，不是第四个平行页签 —— 所以它接管右栏、面包屑写明「名册导入」，
+      完成后回到进来的那个节点（年级 / 班级 / 全部账号都行）。原来的两个小毛病一并修掉：
+      <code>importResult</code> 离开向导即清，不会再在切回页签时挂着上一次的回执；
+      「重新选择」也不再需要「退出页签」这个动作。</span>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
+     6 · 导入批次
+     ══════════════════════════════════════════════════════════ -->
+<section class="screen">
+  <div class="frame-outer"><div class="frame">
+    <div class="chrome">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg><use href="#i-lock"/></svg>admin.radio.local<b>/student/batches</b></div>
+    </div>
+    <div class="app">
+      <aside class="rail"></aside>
+      <div class="work">
+        <div class="topbar">
+          <div>
+            <div class="tb-title">导入批次</div>
+            <div class="tb-sub">7 个批次 · 最近一次 2026-09-14 08:32 · 新建 43 · 跳过 2</div>
+          </div>
+          <div class="tbright">
+            <div class="tb-search"><svg><use href="#i-search"/></svg>搜索投稿 / 公告 / 用户</div>
+            <button class="iconbtn"><svg><use href="#i-refresh"/></svg></button>
+          </div>
+        </div>
+        <main class="canvas split">
+          <aside class="tree" data-sel="batches"></aside>
+          <div class="ws">
+            <div class="bc">
+              <a>学生账号</a><svg><use href="#i-chev"/></svg>
+              <span class="here">导入批次</span>
+              <span class="chip-light" style="margin-left:6px">跨年级 · 与目录树并列</span>
+            </div>
+            <div class="tb-wrap">
+              <table class="tb">
+                <colgroup>
+                  <col style="width:80px"><col style="width:150px"><col>
+                  <col style="width:110px"><col style="width:78px"><col style="width:78px">
+                  <col style="width:78px"><col style="width:104px"><col style="width:110px">
+                </colgroup>
+                <thead><tr>
+                  <th>批次</th><th>时间</th><th>文件</th><th>操作人</th>
+                  <th class="r">新建</th><th class="r">更新</th><th class="r">跳过</th>
+                  <th class="c">状态</th><th class="r">操作</th>
+                </tr></thead>
+                <tbody>
+                  <tr>
+                    <td><span class="mono">#7</span></td><td><span class="micro num">2026-09-14 08:32</span></td>
+                    <td><span class="el">2026-09 高一新生名册.xlsx</span></td><td>王老师</td>
+                    <td class="r num">43</td><td class="r num">0</td><td class="r num">2</td>
+                    <td class="c"><span class="tag tag-ok">生效中</span></td>
+                    <td class="r"><button class="btn btn-quiet btn-sm">撤销</button></td>
+                  </tr>
+                  <tr>
+                    <td><span class="mono">#6</span></td><td><span class="micro num">2026-09-02 15:07</span></td>
+                    <td><span class="el">2026 级补录（转学生）.xlsx</span></td><td>王老师</td>
+                    <td class="r num">3</td><td class="r num">0</td><td class="r num">0</td>
+                    <td class="c"><span class="tag tag-ok">生效中</span></td>
+                    <td class="r"><button class="btn btn-quiet btn-sm">撤销</button></td>
+                  </tr>
+                  <tr>
+                    <td><span class="mono">#5</span></td><td><span class="micro num">2026-08-30 09:41</span></td>
+                    <td><span class="el">2025 级班级调整.xlsx</span></td><td>王老师</td>
+                    <td class="r num">0</td><td class="r num">318</td><td class="r num">12</td>
+                    <td class="c"><span class="tag tag-ok">生效中</span></td>
+                    <td class="r"><button class="btn btn-quiet btn-sm">撤销</button></td>
+                  </tr>
+                  <tr>
+                    <td><span class="mono">#4</span></td><td><span class="micro num">2026-07-05 14:02</span></td>
+                    <td><span class="el">2022 届名单（备份）.xlsx</span></td><td>王老师</td>
+                    <td class="r num">0</td><td class="r num">0</td><td class="r num">309</td>
+                    <td class="c"><span class="tag tag-mute">已撤销</span></td>
+                    <td class="r"><button class="btn btn-quiet btn-sm" style="opacity:.45">撤销</button></td>
+                  </tr>
+                  <tr>
+                    <td><span class="mono">#3</span></td><td><span class="micro num">2026-03-11 10:26</span></td>
+                    <td><span class="el">2024 级名册（修正版）.xlsx</span></td><td>李老师</td>
+                    <td class="r num">0</td><td class="r num">330</td><td class="r num">0</td>
+                    <td class="c"><span class="tag tag-ok">生效中</span></td>
+                    <td class="r"><button class="btn btn-quiet btn-sm">撤销</button></td>
+                  </tr>
+                  <tr>
+                    <td><span class="mono">#2</span></td><td><span class="micro num">2026-03-11 10:19</span></td>
+                    <td><span class="el">2024 级名册.xlsx</span></td><td>李老师</td>
+                    <td class="r num">330</td><td class="r num">0</td><td class="r num">0</td>
+                    <td class="c"><span class="tag tag-mute">已撤销</span></td>
+                    <td class="r"><button class="btn btn-quiet btn-sm" style="opacity:.45">撤销</button></td>
+                  </tr>
+                  <tr>
+                    <td><span class="mono">#1</span></td><td><span class="micro num">2025-09-06 16:44</span></td>
+                    <td><span class="el">2025 级入学名册.xlsx</span></td><td>王老师</td>
+                    <td class="r num">321</td><td class="r num">0</td><td class="r num">0</td>
+                    <td class="c"><span class="tag tag-ok">生效中</span></td>
+                    <td class="r"><button class="btn btn-quiet btn-sm">撤销</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="noteline">
+              <svg><use href="#i-info"/></svg>
+              <span><b>撤销的边界</b>：只删除<b>本次新建</b>且<b>没有投稿记录</b>的账号；
+                已经有投稿记录的账号会被改成停用（否则审核列表里就查不到人）；
+                已被学生改过密码的账号不会被撤销 —— 那说明人已经在用了。</span>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div></div>
+  <div class="cap">
+    <b>导入批次</b><span class="sep">|</span>
+    <span>批次是横跨所有年级的运维记录，所以它和「全部账号」一样挂在树的根部，
+      不放在任何一个年级下面。它也不再是一个和「按年级」并列的页签 ——
+      它是「出事了要回滚一次导入」时才进来的地方，地址是 <code>/student/batches</code>。</span>
+  </div>
+</section>
+
+</div>
+
+<script>
+(function () {
+  /* ---------- 侧栏（各屏同一份，v8 原样，只把「学生账号」设为选中） ---------- */
+  var NAV = [
+    ['group', '内容运营'],
+    ['item', 'i-grid', '数据概览', 0],
+    ['item', 'i-article', '投稿 & 点歌审核', 6],
+    ['item', 'i-cal', '栏目管理', 0],
+    ['item', 'i-mega', '公告管理', 0],
+    ['item', 'i-chat', '留言审核', 0],
+    ['group', '系统管理'],
+    ['item', 'i-users', '学生账号', 0, 1],
+    ['item', 'i-star', '风采展示', 0],
+    ['item', 'i-toggle', '模块开关', 0],
+    ['item', 'i-shield', '账号管理', 0],
+    ['item', 'i-gear', '系统设置', 0]
+  ];
+  function renderRail(host) {
+    var h = '<div class="rail-brand">'
+      + '<div class="rail-logo"><svg><use href="#i-radio"/></svg></div>'
+      + '<div><div class="rail-name">菁悠广播站</div><div class="rail-sub">管理后台</div></div>'
+      + '</div>'
+      + '<div class="rail-search"><svg><use href="#i-search"/></svg>搜索菜单<kbd>Ctrl K</kbd></div>'
+      + '<nav class="rail-nav">';
+    NAV.forEach(function (r) {
+      if (r[0] === 'group') { h += '<div class="rail-group">' + r[1] + '</div>'; return; }
+      h += '<div class="rail-item' + (r[4] ? ' on' : '') + '">'
+        + '<svg><use href="#' + r[1] + '"/></svg>'
+        + '<span class="txt">' + r[2] + '</span>'
+        + (r[3] ? '<em class="rail-badge">' + r[3] + '</em>' : '')
+        + '</div>';
+    });
+    h += '</nav>'
+      + '<div class="rail-account"><div class="rail-avatar">王</div>'
+      + '<div class="who"><div class="nm">王老师</div><div class="rl">超级管理员</div></div></div>';
+    host.innerHTML = h;
+  }
+  Array.prototype.slice.call(document.querySelectorAll('.rail')).forEach(renderRail);
+
+  /* ---------- 目录树：一处定义，各屏复用 ---------- */
+  var GRADES = [
+    { g: '2023', n: 312, open: true, hot: true, cls: [45,44,46,44,45,44,44] },
+    { g: '2024', n: 330, cls: [47,47,48,47,47,47,47] },
+    { g: '2025', n: 321, cls: [46,46,46,46,45,46,46] },
+    { g: '2026', n: 321, cls: [46,46,46,46,45,46,46] }
+  ];
+  function node(k, label, cnt, icon, sel, extra) {
+    return '<div class="tnode' + (sel ? ' on' : '') + '" data-k="' + k + '">'
+      + '<svg><use href="#' + icon + '"/></svg>'
+      + '<span class="nm">' + label + '</span>'
+      + (extra || '')
+      + (cnt ? '<span class="cnt">' + cnt + '</span>' : '')
+      + '</div>';
+  }
+  function renderTree(host) {
+    var sel = host.getAttribute('data-sel') || 'all';
+    var h = '';
+    h += '<div class="tree-head"><span class="t">账号目录</span><span class="t">4 届 · 7 班/届</span></div>';
+    h += node('all', '全部账号', '1,284', 'i-list', sel === 'all');
+    h += '<div class="tgroup">在用年级</div>';
+    GRADES.forEach(function (r) {
+      var on = sel === 'g:' + r.g;
+      h += node('g:' + r.g, r.g + ' 级', String(r.n), on ? 'i-folder-open' : 'i-folder', on,
+        r.hot ? '<span class="hot"></span>' : '');
+      if (r.open || on || sel.indexOf('c:' + r.g + ':') === 0) {
+        r.cls.forEach(function (c, i) {
+          var cc = String(i + 1);
+          if (cc.length < 2) cc = '0' + cc;
+          var con = sel === 'c:' + r.g + ':' + cc;
+          h += '<div class="tchild">' + node('c:' + r.g + ':' + cc, cc + ' 班', String(c),
+            'i-user', con) + '</div>';
+        });
+      }
+    });
+    h += '<div class="tgroup">已归档</div>';
+    h += node('a:2022', '2022 级', '已清理', 'i-archive', sel === 'a:2022');
+    h += '<div class="tsep"></div>';
+    h += node('import', '名册导入', '', 'i-upload', sel === 'import');
+    h += node('batches', '导入批次', '7', 'i-batch', sel === 'batches');
+    h += '<div class="tfoot">目录树是这一屏唯一的状态源，<br>并同步写进地址栏。</div>';
+    host.innerHTML = h;
+  }
+  Array.prototype.slice.call(document.querySelectorAll('.tree')).forEach(renderTree);
+
+  /* ---------- 预览外壳 ---------- */
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab[data-i]'));
+  var screens = Array.prototype.slice.call(document.querySelectorAll('.screen'));
+  var stage = document.getElementById('stage');
+  var fitMode = true;
+
+  function applyZoom() {
+    var outer = document.querySelector('.screen.on .frame-outer');
+    if (!outer) return;
+    if (!fitMode) { outer.style.zoom = 1; return; }
+    var avail = Math.max(320, stage.clientWidth - 48);
+    outer.style.zoom = Math.min(1, avail / 1440);
+  }
+  function show(i) {
+    screens.forEach(function (s, k) { s.classList.toggle('on', k === i); });
+    tabs.forEach(function (t) { t.classList.toggle('on', Number(t.dataset.i) === i); });
+    applyZoom();
+    window.scrollTo(0, 0);
+  }
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () { show(Number(t.dataset.i)); });
+  });
+  document.getElementById('zFit').addEventListener('click', function () { fitMode = true; applyZoom(); });
+  document.getElementById('z100').addEventListener('click', function () { fitMode = false; applyZoom(); });
+  window.addEventListener('resize', applyZoom);
+  applyZoom();
+})();
+</script>
+</body>
+</html>

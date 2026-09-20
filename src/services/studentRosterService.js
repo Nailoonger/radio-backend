@@ -849,7 +849,25 @@ async function updateStudent(id, payload = {}) {
   }
 
   const patch = { grade, classNo, seatNo };
-  if (payload.name !== undefined) patch.remark = String(payload.name).slice(0, 64);
+
+  // 姓名。对外字段名是 name（toDto 里就叫 name），库里对应 remark + nickname 两列 ——
+  // 三个 key 都接受，避免调用方传了别名却静默什么都没改（2026-09-21 修：
+  // 管理端「改名」发的是 { remark, nickname }，这里只认 payload.name，
+  // 于是接口回 200「已保存」但姓名一个字都没动）。
+  const nameInput = payload.name !== undefined
+    ? payload.name
+    : (payload.remark !== undefined ? payload.remark : payload.nickname);
+  if (nameInput !== undefined) {
+    const name = String(nameInput == null ? '' : nameInput).trim();
+    if (!name) throw new ApiError(Codes.PARAM_ERROR, '姓名不能为空');
+    if (name.length > 64) throw new ApiError(Codes.PARAM_ERROR, '姓名最长 64 个字符');
+    // ⚠️ 必须两列一起写：管理端列表读 remark，而投稿审核 / 留言审核 / 小程序「我的」页
+    // 读的是 nickname（且 `nickname || remark` 里 nickname 优先）。
+    // 只写 remark 的话，管理端变了、学生那边还是旧名 —— 名册导入那条路径就是两列一起写的。
+    patch.remark = name;
+    patch.nickname = name;
+  }
+
   if (payload.status !== undefined) patch.status = Number(payload.status) === 0 ? 0 : 1;
 
   await sequelize.transaction(async (t) => {

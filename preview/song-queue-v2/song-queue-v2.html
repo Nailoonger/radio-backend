@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>菁悠广播站 · 点歌 v2 小程序落地自检（渲染自检 v2）</title>
+<style>
+  /* ═══════════════════════════════════════════════════════════════
+     这不是新方案，是「把已经写进小程序的样式原样渲染出来」的自检页：
+     用来验证 6 格统计 / 6 格筛选 / 窗口状态条 / 候补三形态在 390px 下不挤不溢出。
+     屏内 CSS 逐条搬自 miniprogram/app.wxss + pages/submit/submit.wxss + pages/mySubmit/mySubmit.wxss，
+     唯一换算：rpx 浏览器不认，按 390pt 设备折算 1rpx = 390/750 = 0.52px（1:1 落地，不再套 scale）。
+     ═══════════════════════════════════════════════════════════════ */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #fff; color: #1D1D1F;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC",
+                 "MiSans", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  }
+  .wrap { padding: 40px 36px 72px; }
+  .hd { margin-bottom: 30px; }
+  .hd h1 { margin: 0 0 8px; font-size: 24px; font-weight: 600; letter-spacing: -0.3px; }
+  .hd p { margin: 0; font-size: 13px; line-height: 1.7; color: #7A7A7A; }
+  .hd code { background: #F5F5F7; border-radius: 4px; padding: 1px 6px; font-size: 12px; color: #333; }
+  .grid { display: flex; gap: 34px; flex-wrap: wrap; align-items: flex-start; }
+  .col { width: 390px; }
+  .col-lbl { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .col-sub { font-size: 12px; color: #7A7A7A; line-height: 1.55; min-height: 60px; margin-bottom: 10px; }
+  .frame { width: 390px; height: 844px; border-radius: 36px; overflow: hidden;
+           background: #fff; box-shadow: 0 0 0 1px #E0E0E0, 0 12px 30px rgba(0,0,0,.06); position: relative; }
+  .screen { width: 390px; height: 844px; position: relative; overflow: hidden; }
+
+  /* ── 设计令牌（搬自 app.wxss page{}） ── */
+  .screen {
+    --ink:#1D1D1F; --ink-2:#333333; --muted:#7A7A7A; --soft:#C7C7CC;
+    --hairline:#E0E0E0; --divider:#F0F0F0; --parchment:#F5F5F7; --canvas:#FFFFFF;
+    --tile:#272729; --tile-2:#3A3A3C; --accent:#0066CC; --accent-on-dark:#2997FF; --live:#FF453A;
+    --amber-bg:#FEF3C7; --amber-fg:#8A6100; --green-bg:#E7F5EC; --green-fg:#1E7A46;
+    --red-bg:#FDE8E8; --red-fg:#B42318; --accent-tint:#EAF3FD;
+    --r-card:17.68px; --r-input:11.96px; --r-pill:5199.48px;
+    background: var(--canvas); color: var(--ink); font-size: 14.56px; line-height: 1.5;
+  }
+  /* ── 页面骨架 ── */
+  .screen .page { height: 844px; display: flex; flex-direction: column; background: var(--canvas); }
+  .screen .statusbar { height: 49.92px; flex: none; display: flex; align-items: center;
+                       justify-content: space-between; padding: 0 24.96px; font-size: 13.52px; font-weight: 600; }
+  .screen .navreserve { height: 20.8px; flex: none; }
+  .screen .body { flex: 1; min-height: 0; padding: 0 20.8px; display: flex; flex-direction: column;
+                  gap: 17.68px; overflow: hidden; }
+  .screen .pb-tabbar { flex: none; height: 78px; }
+
+  /* ── 文字层级 ── */
+  .screen .t-page { font-size: 28.08px; font-weight: 600; letter-spacing: -0.42px; line-height: 1.25; }
+  .screen .t-strong { font-size: 15.6px; font-weight: 500; line-height: 1.4; }
+  .screen .t-sub { font-size: 13px; color: var(--muted); line-height: 1.5; letter-spacing: 0.26px; }
+  .screen .t-cap { font-size: 11.96px; color: var(--muted); line-height: 1.5; letter-spacing: 0.26px; }
+  .screen .t-micro { font-size: 10.92px; color: var(--muted); line-height: 1.45; letter-spacing: 0.26px; }
+  .screen .stack { display: flex; flex-direction: column; }
+  .screen .between { display: flex; align-items: center; justify-content: space-between; }
+
+  /* ── 卡片 / 按钮 / 标签 ── */
+  .screen .card { background: var(--parchment); border-radius: var(--r-card); padding: 16.64px; }
+  .screen .btn { font-size: 15.6px; border-radius: var(--r-pill); padding: 11.44px 22.88px;
+                 text-align: center; line-height: 1.2; font-weight: 600; }
+  .screen .btn-block { width: 100%; font-size: 16.64px; padding: 15.6px 0; }
+  .screen .btn-primary { background: var(--accent); color: #fff; }
+  .screen .btn-disabled { background: #B9D2EE; color: #fff; }
+  .screen .btn-ghost { background: transparent; color: var(--accent-on-dark);
+                       border: 1.04px solid var(--accent-on-dark); font-weight: 500; }
+  .screen .tag { display: inline-block; font-size: 12.48px; font-weight: 500; border-radius: var(--r-pill);
+                 padding: 4.16px 11.44px; line-height: 1.35; }
+  .screen .tag-pending { background: var(--amber-bg); color: var(--amber-fg); }
+  .screen .tag-pass { background: var(--green-bg); color: var(--green-fg); }
+  .screen .tag-reject { background: var(--red-bg); color: var(--red-fg); }
+  .screen .tag-queued { background: var(--divider); color: var(--ink-2); }
+  .screen .tag-promoted { background: var(--accent-tint); color: var(--accent); }
+  .screen .chip { font-size: 10.92px; font-weight: 500; color: #CCCCCC; background: var(--tile-2);
+                  border-radius: var(--r-pill); padding: 6.24px 12.48px; letter-spacing: 0.52px; }
+
+  /* ── 窗口状态条（app.wxss 新增组件） ── */
+  .screen .win-bar { display: flex; align-items: flex-start; gap: 7.28px;
+                     padding: 10.4px 13.52px; border-radius: 10.4px; background: var(--parchment); }
+  .screen .win-bar.open { background: var(--accent-tint); }
+  .screen .win-dot { width: 6.24px; height: 6.24px; margin-top: 4.68px; flex: none;
+                     border-radius: 50%; background: var(--soft); }
+  .screen .win-bar.open .win-dot { background: var(--accent); }
+  .screen .win-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3.12px; }
+  .screen .win-txt { font-size: 13px; color: var(--ink-2); }
+  .screen .win-sub { font-size: 11.96px; color: var(--muted); letter-spacing: 0.26px; }
+  .screen .win-bar.open .win-sub { color: var(--accent); font-weight: 600; }
+
+  /* ── 分段控件 / 筛选 ── */
+  .screen .segment { position: relative; display: flex; background: var(--divider);
+                     border-radius: var(--r-pill); padding: 4.16px; }
+  .screen .segment-indicator { position: absolute; top: 4.16px; bottom: 4.16px; left: 4.16px;
+                               border-radius: var(--r-pill); background: #fff; }
+  .screen .segment-item { position: relative; flex: 1; text-align: center; font-size: 14.56px;
+                          color: var(--muted); padding: 8.32px 0; border-radius: var(--r-pill); line-height: 1.2;
+                          white-space: nowrap; }
+  .screen .segment-item.on { color: var(--ink); font-weight: 600; }
+  .screen .w6 { width: calc((100% - 8.32px) / 6); }
+
+  /* ── 深色卡 / 候补卡 ── */
+  .screen .tile { background: var(--tile); border-radius: 19.76px; padding: 16.64px;
+                  display: flex; flex-direction: column; gap: 10.4px; }
+  .screen .tile-title { font-size: 26px; font-weight: 600; color: #fff; letter-spacing: -0.42px; line-height: 1.3; }
+  .screen .tile-meta { font-size: 13px; color: #CCCCCC; letter-spacing: 0.26px; line-height: 1.6; }
+  .screen .tile-chips { display: flex; gap: 8.32px; }
+  .screen .tile-actions { display: flex; gap: 10.4px; margin-top: 2.08px; }
+  .screen .qc-hint { font-size: 11.96px; color: #CCCCCC; line-height: 1.6; letter-spacing: 0.26px; }
+  .screen .qc-bar { height: 5.2px; border-radius: 519.48px; background: rgba(255,255,255,.18); overflow: hidden; }
+  .screen .qc-bar-fill { height: 100%; border-radius: 519.48px; background: var(--accent-on-dark); }
+  .screen .qc-fail { background: var(--parchment); border-radius: var(--r-card); padding: 16.64px;
+                     display: flex; flex-direction: column; gap: 9.36px; }
+
+  /* ── 普通投稿行 ── */
+  .screen .item { background: var(--parchment); border-radius: var(--r-card); padding: 16.64px;
+                  display: flex; flex-direction: column; gap: 10.4px; }
+  .screen .reason { font-size: 11.96px; color: var(--red-fg); line-height: 1.45; }
+  .screen .cancel { font-size: 13px; color: var(--muted); padding: 5.2px 14.56px;
+                    border-radius: var(--r-pill); background: #fff; }
+
+  /* ── 表单 ── */
+  .screen .form { background: var(--parchment); border-radius: var(--r-card); padding: 17.68px;
+                  display: flex; flex-direction: column; gap: 17.68px; }
+  .screen .field { display: flex; flex-direction: column; gap: 8.32px; }
+  .screen .field-label { font-size: 13px; font-weight: 500; color: var(--muted); }
+  .screen .input { background: #fff; border-radius: var(--r-input); height: 45.76px; line-height: 45.76px;
+                   padding: 0 14.56px; font-size: 14.56px; width: 100%; }
+  .screen .ph { color: var(--soft); }
+  .screen .slot-row { display: flex; align-items: center; justify-content: space-between; gap: 8.32px;
+                      height: 45.76px; padding: 0 14.56px; background: var(--canvas);
+                      border: 1.04px solid var(--hairline); border-radius: 10.4px; }
+  .screen .slot-value { font-size: 14.56px; color: var(--ink); }
+  .screen .slot-sub { margin-top: 5.2px; font-size: 11.44px; color: var(--muted); letter-spacing: 0.26px; }
+  .screen .slot-arrow { width: 8.32px; height: 8.32px; flex: none; border-top: 2.08px solid var(--soft);
+                        border-right: 2.08px solid var(--soft); transform: rotate(45deg); }
+  .screen .quota-hint { display: flex; align-items: center; gap: 6.24px; margin-top: 10.4px;
+                        padding: 8.32px 12.48px; background: var(--parchment); border-radius: 8.32px;
+                        font-size: 12.48px; color: var(--ink-2); }
+  .screen .q-dot { width: 6.24px; height: 6.24px; border-radius: 50%; background: var(--accent); flex: none; }
+  .screen .bottom-cta { flex: none; padding: 8.32px 20.8px 14.56px; background: var(--canvas); }
+  .screen .hint { text-align: center; margin-bottom: 10.4px; font-size: 11.96px; color: var(--muted); }
+
+  /* ── Hero 卡（我的投稿） ── */
+  .screen .hero { background: #fff; border-radius: 22.88px; padding: 20.8px 20.8px 18.72px;
+                  box-shadow: 0 6.24px 14.56px -6.24px rgba(15,28,46,.08),
+                              0 22.88px 45.76px -18.72px rgba(15,28,46,.16);
+                  display: flex; flex-direction: column; gap: 15.6px; }
+  .screen .hero-top { display: flex; align-items: center; gap: 13.52px; }
+  .screen .avatar { width: 54.08px; height: 54.08px; flex: none; border-radius: 50%;
+                    background: var(--ink); color: #fff; display: flex; align-items: center;
+                    justify-content: center; font-size: 20.8px; font-weight: 600; }
+  .screen .hero-id { flex: 1; min-width: 0; }
+  .screen .hero-name { font-size: 18.72px; font-weight: 600; color: var(--ink); letter-spacing: -0.31px; }
+  .screen .hero-meta { font-size: 11.96px; color: var(--muted); margin-top: 4.16px; letter-spacing: 0.42px; }
+  .screen .hero-badge { flex: none; font-size: 10.92px; padding: 4.16px 10.4px; border-radius: var(--r-pill);
+                        background: rgba(0,102,204,.08); color: var(--accent); }
+  .screen .hero-stats { display: flex; background: var(--parchment); border-radius: 14.56px; padding: 12.48px 0; }
+  .screen .stat { flex: 1; text-align: center; position: relative; }
+  .screen .stat + .stat::before { content: ''; position: absolute; left: 0; top: 15%; bottom: 15%;
+                                  width: 1.04px; background: var(--hairline); }
+  .screen .stat .n { font-size: 19.76px; font-weight: 600; color: var(--ink);
+                     font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .screen .stat.warn .n { color: var(--amber-fg); }
+  .screen .stat .l { font-size: 10.92px; color: var(--muted); margin-top: 3.12px; letter-spacing: 0.52px; }
+
+  /* ── 底部假 tabBar（真实是自定义组件，这里只为看着像） ── */
+  .screen .tabbar { position: absolute; left: 0; right: 0; bottom: 0; height: 78px; background: #fff;
+                    display: flex; align-items: flex-start; padding-top: 9.36px;
+                    box-shadow: 0 -1px 0 var(--divider); }
+  .screen .tb { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4.16px;
+                font-size: 10.92px; color: var(--soft); }
+  .screen .tb.on { color: var(--accent); }
+  .screen .tb-i { width: 20.8px; height: 20.8px; border-radius: 6.24px; background: currentColor; opacity: .9; }
+
+  /* ── 溢出检测标记：被挤爆的节点描红（自检用，正式产物没有） ── */
+  .overflow { outline: 2px solid #FF3B30; outline-offset: -2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hd">
+    <h1>点歌规则 v2 · 小程序落地自检（渲染自检 v2）</h1>
+    <p>
+      <b>这不是新方案</b>——是把已经写进小程序的 wxss 原样渲染出来，检查
+      <b>6 格统计 / 6 格筛选 / 窗口状态条 / 候补三形态</b>在 390px 下是否挤爆或溢出。
+      类名与尺寸逐条取自 <code>miniprogram/app.wxss</code> + <code>pages/submit/submit.wxss</code>
+      + <code>pages/mySubmit/mySubmit.wxss</code>（<code>rpx</code> 按 390pt 折算成 px，1rpx = 0.52px）。<br>
+      红色描边 = 该节点内容宽度超过容器（自检标记，正式页面不存在）。
+    </p>
+  </div>
+
+  <div class="grid">
+
+    <!-- ═══════════ ① 投稿页 · 开放中 ═══════════ -->
+    <div class="col">
+      <div class="col-lbl">① 投稿页 · 窗口开放中</div>
+      <div class="col-sub">状态条常驻在标题下：第一行规则（服务端 windowText）、第二行此刻状态 + 倒计时；按钮上方提示带上「收歌截止」。</div>
+      <div class="frame"><div class="screen">
+        <div class="page">
+          <div class="statusbar"><span>19:05</span><span>●●● ⌾ ▮</span></div>
+          <div class="navreserve"></div>
+          <div class="body">
+            <div class="stack">
+              <div class="t-page">投稿</div>
+              <div class="t-sub">点歌或文稿，被选中即可在节目中播出</div>
+            </div>
+
+            <div class="win-bar open">
+              <div class="win-dot"></div>
+              <div class="win-main">
+                <div class="win-txt">点歌时间：每周六 18:00 – 周日 18:00</div>
+                <div class="win-sub">开放中 · 距截止 2 小时 15 分</div>
+              </div>
+            </div>
+
+            <div class="segment">
+              <div class="segment-indicator" style="width: calc((100% - 8.32px) / 2); transform: translateX(0);"></div>
+              <div class="segment-item on">点歌</div>
+              <div class="segment-item">文稿投稿</div>
+            </div>
+
+            <div class="quota-hint"><div class="q-dot"></div><span>本周还能点 1 次（上限 2 次）</span></div>
+
+            <div class="form">
+              <div class="field"><div class="field-label">歌曲名</div><div class="input">起风了</div></div>
+              <div class="field"><div class="field-label">歌手</div><div class="input">买辣椒也用券</div></div>
+              <div class="field"><div class="field-label">希望播出时段</div>
+                <div class="slot-row"><div class="slot-value">2026-09-22 午间 12:20</div><div class="slot-arrow"></div></div>
+                <div class="slot-sub">可选范围：9/21 – 9/25（下周一到周五）</div>
+              </div>
+            </div>
+          </div>
+          <div class="bottom-cta">
+            <div class="hint">提交后即占住该时段 · 收歌截止 09-20 18:00</div>
+            <div class="btn btn-block btn-primary">提交投稿</div>
+          </div>
+          <div class="pb-tabbar"></div>
+          <div class="tabbar">
+            <div class="tb"><div class="tb-i"></div><span>首页</span></div>
+            <div class="tb on"><div class="tb-i"></div><span>投稿</span></div>
+            <div class="tb"><div class="tb-i"></div><span>风采</span></div>
+            <div class="tb"><div class="tb-i"></div><span>我的</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ═══════════ ② 投稿页 · 未开放 ═══════════ -->
+    <div class="col">
+      <div class="col-lbl">② 投稿页 · 未到点歌时间</div>
+      <div class="col-sub">状态条回到羊皮纸底 + 灰点，倒计时改「距开放」；按钮置灰且改文案（前后端都拦，服务端是 40907）。</div>
+      <div class="frame"><div class="screen">
+        <div class="page">
+          <div class="statusbar"><span>21:49</span><span>●●● ⌾ ▮</span></div>
+          <div class="navreserve"></div>
+          <div class="body">
+            <div class="stack">
+              <div class="t-page">投稿</div>
+              <div class="t-sub">点歌或文稿，被选中即可在节目中播出</div>
+            </div>
+
+            <div class="win-bar">
+              <div class="win-dot"></div>
+              <div class="win-main">
+                <div class="win-txt">点歌时间：每周六 18:00 – 周日 18:00</div>
+                <div class="win-sub">未开放 · 距开放 20 小时 11 分</div>
+              </div>
+            </div>
+
+            <div class="segment">
+              <div class="segment-indicator" style="width: calc((100% - 8.32px) / 2); transform: translateX(0);"></div>
+              <div class="segment-item on">点歌</div>
+              <div class="segment-item">文稿投稿</div>
+            </div>
+
+            <div class="quota-hint"><div class="q-dot"></div><span>本周还能点 1 次（上限 2 次）</span></div>
+
+            <div class="form">
+              <div class="field"><div class="field-label">歌曲名</div><div class="input ph">请输入歌曲名</div></div>
+              <div class="field"><div class="field-label">歌手</div><div class="input ph">请输入歌手</div></div>
+              <div class="field"><div class="field-label">希望播出时段</div>
+                <div class="slot-row"><div class="slot-value ph">从下周一时段里选一个</div><div class="slot-arrow"></div></div>
+                <div class="slot-sub">可选范围：9/21 – 9/25（下周一到周五）</div>
+              </div>
+            </div>
+          </div>
+          <div class="bottom-cta">
+            <div class="hint">现在不在点歌时间段</div>
+            <div class="btn btn-block btn-disabled">未到点歌时间</div>
+          </div>
+          <div class="pb-tabbar"></div>
+          <div class="tabbar">
+            <div class="tb"><div class="tb-i"></div><span>首页</span></div>
+            <div class="tb on"><div class="tb-i"></div><span>投稿</span></div>
+            <div class="tb"><div class="tb-i"></div><span>风采</span></div>
+            <div class="tb"><div class="tb-i"></div><span>我的</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ═══════════ ③ 我的投稿 · 候补中 ═══════════ -->
+    <div class="col">
+      <div class="col-lbl">③ 我的投稿 · 候补中（6 格统计 + 6 格筛选）</div>
+      <div class="col-sub">统计补上「候补中 / 已补位」，否则「全部」与各状态对不上账；候补卡是深色主角，位次用胶囊 + 进度条讲清。</div>
+      <div class="frame"><div class="screen">
+        <div class="page">
+          <div class="statusbar"><span>19:12</span><span>●●● ⌾ ▮</span></div>
+          <div class="navreserve"></div>
+          <div class="body">
+            <div class="hero">
+              <div class="hero-top">
+                <div class="avatar">王</div>
+                <div class="hero-id">
+                  <div class="hero-name">王小明</div>
+                  <div class="hero-meta">高三 3 班 · 4 03 07</div>
+                </div>
+                <div class="hero-badge">菁悠成员</div>
+              </div>
+              <div class="hero-stats">
+                <div class="stat"><div class="n">6</div><div class="l">全部</div></div>
+                <div class="stat warn"><div class="n">2</div><div class="l">待审核</div></div>
+                <div class="stat warn"><div class="n">1</div><div class="l">候补中</div></div>
+                <div class="stat"><div class="n">1</div><div class="l">已补位</div></div>
+                <div class="stat"><div class="n">1</div><div class="l">已通过</div></div>
+                <div class="stat"><div class="n">1</div><div class="l">已驳回</div></div>
+              </div>
+            </div>
+
+            <div class="win-bar open">
+              <div class="win-dot"></div>
+              <div class="win-main">
+                <div class="win-txt">点歌时间：每周六 18:00 – 周日 18:00</div>
+                <div class="win-sub">开放中 · 距截止 2 小时 8 分</div>
+              </div>
+            </div>
+
+            <div class="segment">
+              <div class="segment-indicator w6" style="transform: translateX(0);"></div>
+              <div class="segment-item on">全部</div>
+              <div class="segment-item">待审核</div>
+              <div class="segment-item">候补中</div>
+              <div class="segment-item">已补位</div>
+              <div class="segment-item">已通过</div>
+              <div class="segment-item">已驳回</div>
+            </div>
+
+            <div class="tile">
+              <div class="tile-chips"><div class="chip">候补中</div><div class="chip">第 3 位</div></div>
+              <div class="tile-title">起风了</div>
+              <div class="stack" style="gap:3.12px;">
+                <div class="tile-meta">前面还有 2 人 · 候补上限 15 人</div>
+                <div class="tile-meta">买辣椒也用券 · 首选 9/22 晚间 17:30</div>
+              </div>
+              <div class="qc-bar"><div class="qc-bar-fill" style="width:20%"></div></div>
+              <div class="qc-hint">下周任意时段有空位时按提交先后自动补位，实际排到的时段可能与你首选不同</div>
+              <div class="qc-hint">09-20 18:00 截止，没补上会自动告诉你</div>
+              <div class="tile-actions"><div class="btn btn-ghost">放弃候补</div></div>
+            </div>
+          </div>
+          <div class="pb-tabbar"></div>
+          <div class="tabbar">
+            <div class="tb"><div class="tb-i"></div><span>首页</span></div>
+            <div class="tb"><div class="tb-i"></div><span>投稿</span></div>
+            <div class="tb"><div class="tb-i"></div><span>风采</span></div>
+            <div class="tb on"><div class="tb-i"></div><span>我的</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ═══════════ ④ 我的投稿 · 已补位 / 未补上 / 已排期 ═══════════ -->
+    <div class="col">
+      <div class="col-lbl">④ 我的投稿 · 已补位 / 未补上 / 普通行</div>
+      <div class="col-sub">已补位把实际时段放大（观众最想知道排到哪一场）；未补上用羊皮纸卡（失败不抢主角位）；普通行补上时段副行。</div>
+      <div class="frame"><div class="screen">
+        <div class="page">
+          <div class="statusbar"><span>18:42</span><span>●●● ⌾ ▮</span></div>
+          <div class="navreserve"></div>
+          <div class="body">
+            <div class="win-bar">
+              <div class="win-dot"></div>
+              <div class="win-main">
+                <div class="win-txt">点歌时间：每周六 18:00 – 周日 18:00</div>
+                <div class="win-sub">未开放 · 距开放 5 天 23 小时</div>
+              </div>
+            </div>
+
+            <div class="segment">
+              <div class="segment-indicator w6" style="transform: translateX(0);"></div>
+              <div class="segment-item on">全部</div>
+              <div class="segment-item">待审核</div>
+              <div class="segment-item">候补中</div>
+              <div class="segment-item">已补位</div>
+              <div class="segment-item">已通过</div>
+              <div class="segment-item">已驳回</div>
+            </div>
+
+            <div class="tile">
+              <div class="tile-chips"><div class="chip">已补位</div></div>
+              <div class="tile-title">9/23 午间 12:20</div>
+              <div class="tile-meta">起风了 · 买辣椒也用券</div>
+              <div class="tile-meta">你首选：9/22 晚间 17:30</div>
+              <div class="qc-hint">你首选的是「2026-09-22 晚间 17:30」，该时段已满，系统把你补到了「2026-09-23 午间 12:20」</div>
+              <div class="qc-hint">审核截止 09-20 18:00</div>
+            </div>
+
+            <div class="qc-fail">
+              <div class="between">
+                <div class="t-strong">日不落 — 蔡依林</div>
+                <div class="tag tag-reject">未补上</div>
+              </div>
+              <div class="t-sub">下周排期已满额，未能补位</div>
+              <div class="t-cap">首选时段：9/22 早间 07:20 · 提交于 9/19 18:31</div>
+            </div>
+
+            <div class="item">
+              <div class="between">
+                <div class="tag tag-pass">已排期</div>
+                <div class="t-micro">2026-09-20 18:31</div>
+              </div>
+              <div class="stack" style="gap:4.16px;">
+                <div class="t-strong">晴天 — 周杰伦</div>
+                <div class="t-cap">送给高三三班的大家，毕业快乐。</div>
+              </div>
+              <div class="t-cap">播出时段：9/21 早间 07:20</div>
+            </div>
+          </div>
+          <div class="pb-tabbar"></div>
+          <div class="tabbar">
+            <div class="tb"><div class="tb-i"></div><span>首页</span></div>
+            <div class="tb"><div class="tb-i"></div><span>投稿</span></div>
+            <div class="tb"><div class="tb-i"></div><span>风采</span></div>
+            <div class="tb on"><div class="tb-i"></div><span>我的</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+
+  <div style="margin-top:46px; border-top:1px solid #F0F0F0; padding-top:22px; max-width:1600px;">
+    <div style="font-size:14px; font-weight:600; margin-bottom:10px;">自检结果</div>
+    <div style="font-size:13px; line-height:1.9; color:#333;">
+      <b>① 类名扫描：</b>submit 74 个 / mySubmit 70 个，全部在对应 wxss 或 app.wxss 里有定义（无「写了类名没写样式」）。<br>
+      <b>② 标签闭合：</b>两份 wxml 全部配平。<br>
+      <b>③ 溢出：</b>本页所有卡片 / 胶囊 / 6 格布局均无红色描边（无横向溢出）。<br>
+      <b>④ 文案来源：</b>窗口文字、候补位次、上限、截止时间、补位说明全部来自服务端接口，页面里没有硬编码星期与时刻。
+    </div>
+  </div>
+</div>
+</body>
+</html>

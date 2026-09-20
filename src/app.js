@@ -16,6 +16,7 @@ const { notFound, errorHandler } = require('./middlewares/errorHandler');
 const requestId = require('./middlewares/requestId');
 const { seedAll } = require('./utils/seed');
 const switchService = require('./services/switchService');
+const songQueueService = require('./services/songQueueService');
 const swaggerSpec = require('./docs/swagger');
 
 const userRouter = require('./routes/user');
@@ -99,6 +100,12 @@ async function start() {
       logger.info(`🔐 默认超管账号: ${config.initAdmin.username}`);
       logger.info(`=============================================`);
     });
+
+    // 点歌定稿调度器（项目里没有 cron，用进程内轻量定时器）：
+    //   每分钟检查一次 —— 过了窗口截止（默认播出周前的周日 18:00）就把
+    //   「候补未补位(3)」与「补位未审(4)」全部自动驳回，并清理跨周残留待审。
+    //   幂等靠 KV song_finalize_gate，重启/重复执行都不会误伤。
+    songQueueService.startScheduler();
   } catch (e) {
     logger.error('启动失败:', e);
     process.exit(1);

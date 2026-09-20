@@ -106,3 +106,23 @@ button.nologin-btn { margin-top: 16rpx; width: 420rpx; }
 /* ── 退出登录：白色卡里的红字行，无右箭头（它不是去别的页，是动作） ── */
 .entry-logout { justify-content: center; }
 .logout-text { font-size: 30rpx; font-weight: 500; color: var(--red-fg); letter-spacing: 0.5rpx; }
+
+/* ══════════ 候补卡（v2 三形态，docs/song-queue-v2.md §7.1） ══════════
+   候补中 / 已补位用深色卡（--tile，主角位）；未补上用羊皮纸卡（失败不该抢主角位）。
+   卡片里的位次、上限、截止、说明文案全部来自服务端，前端只排版。 */
+.qc-hint {
+  font-size: 23rpx; color: #CCCCCC; line-height: 1.6; letter-spacing: 0.5rpx;
+}
+/* 位次进度：一眼看出队列有多长（queuePos / 上限） */
+.qc-bar {
+  height: 10rpx; border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.18); overflow: hidden;
+}
+.qc-bar-fill { height: 100%; border-radius: var(--r-pill); background: var(--accent-on-dark); }
+
+.qc-fail {
+  background: var(--parchment);
+  border-radius: var(--r-card);
+  padding: 32rpx;
+  display: flex; flex-direction: column; gap: 18rpx;
+}

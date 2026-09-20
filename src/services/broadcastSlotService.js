@@ -232,6 +232,14 @@ async function isValidSlot(value, now = Date.now()) {
 /* ==================================================================== *
  * 审核即排期（用户 2026-09-19 定稿的机制）
  *
+ * ⚠️ v2（2026-09-20，docs/song-queue-v2.md）起：
+ *   · 每格的占用口径改成 **scheduled_slot（实际排期）**，不再数 want_broadcast_time；
+ *   · 容量校验、满格自动驳回、排期矩阵都搬到了 `songQueueService`
+ *     （promote / closeQueueIfFull / finalizeDueWeeks / slotUsage）；
+ *   · 本节的 scheduleMatrix() 与 sweepFullSlots() 仅为兼容保留，**新代码不要用**；
+ *   · getSlots() 里的 picked / full 是 v1 口径（数的是首选时段），
+ *     调用方请用 songQueueService.slotUsage() 覆盖，别直接信任。
+ *
  * 背景：学生投稿时 want_broadcast_time 就被锁定为「严格的下一周周一~周五」，
  * 所以每首待审点歌自带排期目标。管理员只要在本周周末把待审池清完，
  * 下一周的排期表就自动完整 —— 不需要一天天审。

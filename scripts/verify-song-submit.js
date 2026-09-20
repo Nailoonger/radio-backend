@@ -291,10 +291,18 @@ const say = (s) => detail.push(s);
       purgeRes && purgeRes.data && purgeRes.data.deletedSongs);
     check('点歌全部删除', (await Submit.count({ where: { type: 1 } })) === 0);
     check('文稿一条不动', (await Submit.count({ where: { type: 2 } })) === beforeArts, String(beforeArts));
-    check('名额计数器整表清空', (await SongQuota.count()) === 0);
-    const stAfter = await quota.status();
-    check('计数从 0 重新开始', stAfter.daily.used === 0 && stAfter.weekly.used === 0, JSON.stringify(stAfter.daily));
-    check('清空后可重新占名额', (await quota.claim()).ok === true);
+    // v2 起没有独立的名额计数器了（song_quota 退役）：容量与用量直接数 submit 行，
+    // 所以「清空数据」与「计数归零」是同一件事，物理上不可能再出现两本账。
+    const songQueue = require('../src/services/songQueueService');
+    const slotSvc2 = require('../src/services/broadcastSlotService');
+    const v0 = (await slotSvc2.getSlots(now)).list[0].value;
+    check('占用计数按 submit 行实时统计 → 清空后归零',
+      (await songQueue.countSeated(v0)) === 0 && (await songQueue.countQueued()) === 0);
+    const snapAfter = await songQueue.snapshot(now);
+    check('候补队列快照同步归零', snapAfter.total === 0 && snapAfter.full === false,
+      JSON.stringify({ total: snapAfter.total }));
+    check('清空后可立刻重新落座（没有残留计数器挡路）',
+      (await songQueue.decideSeat({ slotValue: v0 })).outcome === 'seated');
     check('个人每周次数跟着清零', (await ruleSvc.checkUserWeeklyLimit('weekly-user')).used === 0);
 
     /* ══════════ C2. 后台发布时段 ══════════ */
@@ -310,9 +318,13 @@ const say = (s) => detail.push(s);
     check('每天时段数跟着变为 3 个 → 5 天 15 个', pub.count === 15, 'count=' + pub.count);
     const slots2 = await slot.getSlots(now);
     check('新时段进入可选列表', slots2.list.some((s) => s.time === '20:00' && s.period === '晚间'), slots2.list[3].value);
-    check('按新列表校验合法值', (await slot.isValidSlot('2026-09-21 晚间 20:00', now)) === true);
-    check('旧时段的遗留值不再合法', (await slot.isValidSlot('2026-09-21 午间 12:20', now)) === true);
-    check('不在列表里的时间被拒', (await slot.isValidSlot('2026-09-21 午间 13:00', now)) === false);
+    /* ⚠️ 不要硬编码日期：目标周 = nextWeekRange(now)，周一之后会整体往后跳一周，
+       写死 '2026-09-21 …' 的断言会在跨周后集体失败。一律从 slots2.list 取真实值。 */
+    const newEven = slots2.list.find((s) => s.time === '20:00');
+    const keepNoon = slots2.list.find((s) => s.time === '12:20');
+    check('按新列表校验合法值（新加的 20:00）', (await slot.isValidSlot(newEven.value, now)) === true, newEven.value);
+    check('仍在新列表里的旧时段（12:20）继续合法', (await slot.isValidSlot(keepNoon.value, now)) === true, keepNoon.value);
+    check('不在列表里的时间被拒', (await slot.isValidSlot(`${keepNoon.date} 午间 13:00`, now)) === false, keepNoon.date);
     let slotErr = null;
     try { await slot.setSlotTimes([{ time: '25:99' }]); } catch (e) { slotErr = e; }
     check('非法格式被拒（40001）', !!slotErr && slotErr.code === 40001, slotErr && slotErr.message);

@@ -252,6 +252,14 @@ router.get('/submit/my', userAuth, submit.myList);
 router.get('/submit/quota', userAuth, submit.quota);
 
 /**
+ * 点歌时间窗口状态（v2 新增）
+ * GET /api/user/submit/window
+ * 常驻展示在点歌模块用：open / opensAt / closesAt / windowText
+ * ⚠️ 字面量段必须排在 /submit/:id 之前
+ */
+router.get('/submit/window', userAuth, submit.windowStatus);
+
+/**
  * @swagger
  * /api/user/submit/notice:
  *   get:
@@ -352,6 +360,24 @@ router.get('/submit/:id', userAuth, submit.detail);
  *       403: { description: 已审核，不可撤销 }
  */
 router.delete('/submit/:id', userAuth, submit.cancel);
+
+/**
+ * @swagger
+ * /api/user/submit/{id}/leave-queue:
+ *   post:
+ *     tags: [用户端-投稿]
+ *     summary: 放弃候补（status=3，出队并触发递补）
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: 已退出候补队列 }
+ *       403: { description: 不是候补中的记录 }
+ */
+router.post('/submit/:id/leave-queue', userAuth, submit.leaveQueue);
 
 // ============= 留言 =============
 /**

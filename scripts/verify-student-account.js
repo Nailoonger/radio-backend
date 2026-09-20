@@ -15,6 +15,7 @@
  *   F. 导出数据结构（已改密行的初始密码列必须为空）
  *   G. 统计、批次撤销、改账号迁移投稿、删除保护
  *   G2. 按年级查询、整届清理（一键删除该年级账号 · safe/disable/purge 三种模式）
+ *   G3. 单个账号改名（name → remark + nickname 两列同步、别名兼容、空名拒绝）
  *   H. 微信登录守卫 + 路由顺序
  *
  * 结果同时写到 stdout 与同目录的 verify-student-output.txt（方便在 PowerShell 里读）。
@@ -531,6 +532,71 @@ const EXPECTED_USERNAMES = [
 
     // 清理用不到的 2026 残留，避免影响后面的统计类断言
     await models.User.destroy({ where: { grade: '2026' } });
+
+    /* ══════════ G3. 单个账号维护 · 改名 ══════════ */
+    say('');
+    say('--- G3. 改名（remark + nickname 必须同时生效）---');
+
+    // 本段只关心姓名，先把 20240101 恢复到「启用 + 初始密码」，登录链路才确定
+    const rnUser = await models.User.findOne({ where: { username: '20240101' } });
+    await request(app).put(`/api/admin/student/${rnUser.id}/status`)
+      .set('Authorization', `Bearer ${adminToken}`).send({ status: 1 });
+    await request(app).put(`/api/admin/student/${rnUser.id}/reset-password`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    // 1) 只认 payload.name —— 这就是管理端「改名」真正发的字段
+    const rn = await request(app).put(`/api/admin/student/${rnUser.id}`)
+      .set('Authorization', `Bearer ${adminToken}`).send({ name: '张三丰' });
+    check('改名：PUT { name } 返回成功', rn.body.code === 0, rn.body.message);
+    check('改名：返回体 name 已是新名', rn.body.data?.name === '张三丰', rn.body.data?.name);
+
+    const rnAfter = await models.User.findOne({ where: { username: '20240101' } });
+    check('改名：remark 落库', rnAfter.remark === '张三丰', rnAfter.remark);
+    check('改名：nickname 同步落库（只写 remark 会漏掉这条）',
+      rnAfter.nickname === '张三丰', rnAfter.nickname);
+
+    // 2) 管理端列表读 remark，必须能看到新名
+    const rnList = await request(app).get('/api/admin/student/list')
+      .set('Authorization', `Bearer ${adminToken}`).query({ keyword: '张三丰' });
+    check('改名：按新名能搜到，且列表 name 是新名',
+      rnList.body.data?.total === 1 && rnList.body.data?.list?.[0]?.name === '张三丰',
+      JSON.stringify({ total: rnList.body.data?.total, name: rnList.body.data?.list?.[0]?.name }));
+
+    // 3) 学生端读 nickname，也必须同步（投稿 / 留言 / 小程序「我的」页都走这个）
+    const rnLogin = await request(app).post('/api/user/login/account')
+      .send({ username: '20240101', password: initPwdOf('20240101') });
+    const rnMe = await request(app).get('/api/user/me')
+      .set('Authorization', `Bearer ${rnLogin.body.data?.token}`);
+    check('改名：学生端 /user/me 的 nickname 是新名',
+      rnMe.body.data?.nickname === '张三丰', rnMe.body.data?.nickname);
+    check('改名：学生端 /user/me 的 name 是新名',
+      rnMe.body.data?.name === '张三丰', rnMe.body.data?.name);
+
+    // 4) 传 remark / nickname 别名也要生效（兼容旧调用方，绝不许静默 no-op）
+    await request(app).put(`/api/admin/student/${rnUser.id}`)
+      .set('Authorization', `Bearer ${adminToken}`).send({ remark: '张三' });
+    const rnAlias = await models.User.findOne({ where: { username: '20240101' } });
+    check('改名：传 remark 别名同样生效（不会再静默什么都不改）',
+      rnAlias.remark === '张三' && rnAlias.nickname === '张三',
+      JSON.stringify({ remark: rnAlias.remark, nickname: rnAlias.nickname }));
+
+    // 5) 空名 / 超长名被拒，且库里一个字不动
+    const rnEmpty = await request(app).put(`/api/admin/student/${rnUser.id}`)
+      .set('Authorization', `Bearer ${adminToken}`).send({ name: '   ' });
+    check('改名：空白名被拒（40001）', rnEmpty.body.code === 40001, rnEmpty.body.message);
+    const rnEmptyAfter = await models.User.findOne({ where: { username: '20240101' } });
+    check('改名：被拒后库里的名字没被动过', rnEmptyAfter.remark === '张三', rnEmptyAfter.remark);
+
+    const rnLong = await request(app).put(`/api/admin/student/${rnUser.id}`)
+      .set('Authorization', `Bearer ${adminToken}`).send({ name: 'x'.repeat(65) });
+    check('改名：超过 64 字被拒（40001）', rnLong.body.code === 40001, rnLong.body.message);
+
+    // 6) 只改状态时不许碰到姓名（防 patch 串字段）
+    await request(app).put(`/api/admin/student/${rnUser.id}/status`)
+      .set('Authorization', `Bearer ${adminToken}`).send({ status: 1 });
+    const rnStatAfter = await models.User.findOne({ where: { username: '20240101' } });
+    check('改名：改状态不会顺手清掉姓名',
+      rnStatAfter.remark === '张三' && rnStatAfter.nickname === '张三', rnStatAfter.remark);
 
     /* ══════════ H. 路由顺序 / 鉴权 ══════════ */
     say('');

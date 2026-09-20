@@ -1,7 +1,7 @@
 === 通过 107 项 ===
-  ok   周 key 形如 YYYY-Www  [2026-W38]
+  ok   周 key 形如 YYYY-Www  [2026-W39]
   ok   上限写入并读出  [{"daily":3,"weekly":5}]
-  ok   初始快照 daily 0/3  [{"limit":3,"used":0,"remaining":3,"exhausted":false,"periodKey":"2026-09-19"}]
+  ok   初始快照 daily 0/3  [{"limit":3,"used":0,"remaining":3,"exhausted":false,"periodKey":"2026-09-21"}]
   ok   前 3 次占位成功
   ok   第 4 次被拒（日名额已满）  [{"ok":false,"scope":"daily","limit":3,"used":3}]
   ok   日计数器 used=3  [3]
@@ -33,10 +33,10 @@
   ok   清空内容 = 停用（用户端不弹也不拦）  [v=3]
   ok   5 天 × 3 时段 = 15 个可选  [n=15]
   ok   日期都在下一周的周一到周五  [周一/周二/周三/周四/周五]
-  ok   第一天 = 下一周的周一  [2026-09-21]
-  ok   slot.value 格式规范  [2026-09-21 早间 07:20]
+  ok   第一天 = 下一周的周一  [2026-09-28]
+  ok   slot.value 格式规范  [2026-09-28 早间 07:20]
   ok   每天时段顺序为早/午/晚
-  ok   合法值通过校验  [2026-09-23 午间 12:20]
+  ok   合法值通过校验  [2026-09-30 午间 12:20]
   ok   超出下周范围的日期被拒
   ok   同周但周末被拒（若是周六）
   ok   自由文本被拒
@@ -77,17 +77,17 @@
   ok   清空成功且返回条数  [16]
   ok   点歌全部删除
   ok   文稿一条不动  [2]
-  ok   名额计数器整表清空
-  ok   计数从 0 重新开始  [{"limit":2,"used":0,"remaining":2,"exhausted":false,"periodKey":"2026-09-19"}]
-  ok   清空后可重新占名额
+  ok   占用计数按 submit 行实时统计 → 清空后归零
+  ok   候补队列快照同步归零  [{"total":0}]
+  ok   清空后可立刻重新落座（没有残留计数器挡路）
   ok   个人每周次数跟着清零
   ok   未发布时来源是台词解析  [schedule]
   ok   发布后来源变 custom 且按时间排序  [[{"time":"07:20","label":"早间"},{"time":"12:20","label":"午间"},{"time":"20:00","label":"晚间"}]]
   ok   每天时段数跟着变为 3 个 → 5 天 15 个  [count=15]
-  ok   新时段进入可选列表  [2026-09-22 早间 07:20]
-  ok   按新列表校验合法值
-  ok   旧时段的遗留值不再合法
-  ok   不在列表里的时间被拒
+  ok   新时段进入可选列表  [2026-09-29 早间 07:20]
+  ok   按新列表校验合法值（新加的 20:00）  [2026-09-28 晚间 20:00]
+  ok   仍在新列表里的旧时段（12:20）继续合法  [2026-09-28 午间 12:20]
+  ok   不在列表里的时间被拒  [2026-09-28]
   ok   非法格式被拒（40001）  [至少要有一个合法时段，格式 HH:mm，最多 6 个]
   ok   空列表被拒
   ok   超过 6 个自动截断  [n=6]
@@ -101,23 +101,23 @@
   ok   管理端已挂载 GET /submit/rules
   ok   管理端已挂载 PUT /submit/rules
   ok   管理端已挂载 DELETE /submit/songs
-  ok   DELETE /submit/songs 排在 /submit/:id 之前  [15<20]
-  ok   用户端 /submit/quota 排在 /submit/:id 之前  [6<10]
-  ok   用户端 /submit/notice 排在 /submit/:id 之前  [7<10]
-  ok   用户端 /submit/timeslots 排在 /submit/:id 之前  [9<10]
-  ok   管理端字面量路由排在 /submit/:id 之前  [5<16]
+  ok   DELETE /submit/songs 排在 /submit/:id 之前  [19<24]
+  ok   用户端 /submit/quota 排在 /submit/:id 之前  [6<11]
+  ok   用户端 /submit/notice 排在 /submit/:id 之前  [8<11]
+  ok   用户端 /submit/timeslots 排在 /submit/:id 之前  [10<11]
+  ok   管理端字面量路由排在 /submit/:id 之前  [5<20]
 
 sync ok（自动建表：submit / song_quota / notice_ack / system_setting …）
 
 --- A. 点歌名额 ---
-periodKey  day=2026-09-19  week=2026-W38
-dayRange   2026-09-18T16:00:00.000Z → 2026-09-19T16:00:00.000Z
+periodKey  day=2026-09-21  week=2026-W39
+dayRange   2026-09-20T16:00:00.000Z → 2026-09-21T16:00:00.000Z
 并发 10 次 claim（上限 2）→ 成功 2 异常 0 计数器 2
 
 --- B. 点歌注意事项 ---
 
 --- C. 播出时段（下周一到周五） ---
-范围 09-21 ~ 09-25  共 15 个时段；首个 = 周一 09-21 · 早间 07:20
+范围 09-28 ~ 10-02  共 15 个时段；首个 = 周一 09-28 · 早间 07:20
 
 --- B2. 文稿注意事项（独立一份） ---
 
