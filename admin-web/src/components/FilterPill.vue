@@ -89,13 +89,13 @@ function pick(v) {
 .fp { display: inline-flex; flex: none; }
 
 .fp-btn {
-  display: inline-flex; align-items: baseline; gap: 6px;
-  height: 32px; padding: 0 11px;
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 13px;
   border: 1px solid var(--hairline); background: var(--canvas);
   border-radius: var(--r-pill); cursor: pointer;
   font-family: inherit; font-size: var(--fs-md); color: var(--ink-2);
   transition: border-color 0.16s var(--ease), background 0.16s var(--ease), box-shadow 0.16s var(--ease);
-  max-width: 260px;
+  max-width: 280px;
 }
 .fp-btn:hover { border-color: var(--soft); background: var(--parchment); }
 .fp-btn:active { transform: scale(0.985); }
@@ -108,17 +108,17 @@ function pick(v) {
 .fp-btn.dis .fp-k { color: var(--soft); }
 .fp-v {
   font-size: var(--fs-md); font-weight: 600; color: inherit;
-  max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .fp-btn.dis .fp-v { font-weight: 400; }
-.fp-c { flex: none; color: var(--soft); align-self: center; transition: transform 0.18s var(--ease); }
+.fp-c { flex: none; color: var(--soft); transition: transform 0.18s var(--ease); }
 .fp-c.up { transform: rotate(180deg); }
 .fp-btn.on .fp-c { color: var(--accent); }
 
 /* ── 菜单 ── */
 .fp-menu { display: flex; flex-direction: column; }
 .fp-opt {
-  display: flex; align-items: baseline; gap: 8px;
+  display: flex; align-items: center; gap: 8px;
   width: 100%; padding: 8px 10px; border: none; background: transparent;
   border-radius: 9px; cursor: pointer; text-align: left;
   font-family: inherit; font-size: var(--fs-md); color: var(--ink-2);

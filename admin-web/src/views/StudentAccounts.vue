@@ -83,9 +83,29 @@
 
     <!-- ══════════ 结果表 ══════════ -->
     <el-card>
+      <!-- v6 加载骨架：块尺寸 = 真实组件（正文 12 / 标签 22 / 按钮 36），呼吸不转圈 -->
+      <div v-if="loading && !listRows.length" class="sk" aria-hidden="true">
+        <div v-for="i in 6" :key="i" class="sk-row">
+          <span class="sk-box"></span>
+          <span class="sk-line" style="width: 88px"></span>
+          <span class="sk-line" style="width: 56px"></span>
+          <span class="sk-line" style="width: 88px"></span>
+          <span class="sk-pill"></span>
+          <span class="sk-pill sk-pill--wide"></span>
+          <span class="sk-line" style="width: 104px"></span>
+          <span class="sk-ops">
+            <i class="sk-line"></i>
+            <i class="sk-btn"></i>
+            <i class="sk-btn sk-btn--sm"></i>
+          </span>
+        </div>
+      </div>
+
       <el-table
+        v-else
         ref="tableRef"
-        :data="listRows" v-loading="loading" stripe
+        :data="listRows" stripe
+        :class="{ 'is-busy': loading }"
         @selection-change="(r) => (selected = r)"
       >
         <el-table-column type="selection" width="46" />
@@ -626,7 +646,7 @@ onBeforeUnmount(() => {
   display: inline-flex; align-items: center; gap: 7px;
   flex: 1 1 150px; min-width: 128px; max-width: 220px;
   box-sizing: border-box;
-  height: 32px; padding: 0 11px;
+  height: 34px; padding: 0 11px;
   background: var(--canvas); border: 1px solid var(--hairline);
   border-radius: var(--r-pill); color: var(--soft);
   transition: border-color 0.16s var(--ease), box-shadow 0.16s var(--ease);
@@ -648,7 +668,7 @@ onBeforeUnmount(() => {
 .fs-x:hover { color: var(--ink); }
 
 .btn-ghost {
-  height: 32px; padding: 0 13px;
+  height: 34px; padding: 0 13px;
   border: 1px solid var(--hairline); background: var(--canvas);
   border-radius: var(--r-pill); cursor: pointer;
   font-family: inherit; font-size: var(--fs-md); color: var(--ink-2);
@@ -724,42 +744,60 @@ onBeforeUnmount(() => {
 
 .pager { margin-top: 14px; justify-content: flex-end; }
 
-/* ══════════ 批量条 ══════════ */
-.batchbar {
-  position: fixed; left: 232px; right: 0; bottom: 0; z-index: 40;
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 20px 16px;
-  pointer-events: none;
+/* ══════════ 加载骨架（v6 标准）：列宽与真实表格一一对应，块=真实组件尺寸 ══════════ */
+.sk { display: flex; flex-direction: column; }
+.sk-row {
+  display: grid;
+  grid-template-columns: 46px 132px 110px 120px 106px 100px 1fr 216px;
+  align-items: center;
+  height: 54px;
+  padding: 0 12px;
 }
-.batchbar > * { pointer-events: auto; }
-.batchbar::before {
-  content: ''; position: absolute; inset: 8px 20px 16px;
+.sk-row + .sk-row { border-top: 1px solid var(--divider); }
+.sk-box { width: 16px; height: 16px; border-radius: 4px; background: var(--divider); justify-self: center; }
+.sk-line { display: block; height: 12px; border-radius: 6px; background: var(--divider); }
+.sk-pill { width: 52px; height: 22px; border-radius: var(--r-pill); background: var(--divider); justify-self: center; }
+.sk-pill--wide { width: 58px; }
+.sk-ops { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.sk-ops .sk-line { width: 28px; }
+.sk-btn { display: block; width: 76px; height: 36px; border-radius: 10px; background: var(--divider); }
+.sk-btn--sm { width: 49px; }
+@keyframes sk-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.sk .sk-box, .sk .sk-line, .sk .sk-pill, .sk .sk-btn { animation: sk-breathe 1.4s ease-in-out infinite; }
+.is-busy { opacity: 0.55; pointer-events: none; }
+
+/* ══════════ 批量条：自包含圆角卡片（弹簧感的入场） ══════════ */
+.batchbar {
+  position: fixed; left: 252px; right: 20px; bottom: 16px; z-index: 40;
+  display: flex; align-items: center; gap: 10px;
   background: var(--canvas);
   border: 1px solid var(--hairline);
   border-radius: 16px;
-  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.22);
-  pointer-events: none;
+  box-shadow: 0 12px 32px -14px rgba(0, 0, 0, 0.24);
+  padding: 10px 16px;
 }
-.bb-cnt { font-size: var(--fs-md); color: var(--ink); position: relative; padding-left: 12px; }
+.bb-cnt { font-size: var(--fs-md); color: var(--ink); flex: none; }
 .bb-cnt b { font-weight: 600; }
-.bb-hint { flex: 1; min-width: 0; position: relative; }
+.bb-hint { flex: 1; min-width: 0; }
 
 .btn-quiet, .btn-plain, .btn-danger {
-  position: relative; flex: none;
-  height: 30px; padding: 0 13px;
+  flex: none;
+  height: 32px; padding: 0 14px;
   border-radius: var(--r-pill); cursor: pointer;
   font-family: inherit; font-size: var(--fs-md); white-space: nowrap;
   transition: background 0.16s var(--ease), border-color 0.16s var(--ease), color 0.16s var(--ease);
 }
 .btn-quiet { border: 1px solid var(--hairline); background: var(--canvas); color: var(--ink-2); }
 .btn-quiet:hover { border-color: var(--soft); background: var(--parchment); }
+.btn-quiet:active { transform: scale(0.985); }
 .btn-plain { border: none; background: transparent; color: var(--muted); padding: 0 6px; }
 .btn-plain:hover { color: var(--ink); }
 .btn-danger { border: 1px solid #f0c4c0; background: var(--canvas); color: var(--red-fg); }
 .btn-danger:hover { background: var(--red-bg); border-color: #e3a9a4; }
+.btn-danger:active { transform: scale(0.985); }
 .btn-quiet:disabled, .btn-danger:disabled { opacity: 0.5; cursor: default; }
 
-.bb-enter-active { transition: opacity 0.24s var(--ease), transform 0.32s cubic-bezier(0.34, 1.4, 0.64, 1); }
+.bb-enter-active { transition: opacity 0.24s var(--ease), transform 0.34s cubic-bezier(0.34, 1.4, 0.64, 1); }
 .bb-leave-active { transition: opacity 0.16s var(--ease), transform 0.2s var(--ease); }
-.bb-enter-from, .bb-leave-to { opacity: 0; transform: translateY(14px); }
+.bb-enter-from, .bb-leave-to { opacity: 0; transform: translateY(18px) scale(0.97); }
 </style>
