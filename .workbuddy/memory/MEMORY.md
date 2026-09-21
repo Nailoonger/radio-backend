@@ -62,7 +62,8 @@
 - **行内动作按「会不会改数据」分层**（2026-09-21 定）：只切视图的（筛选/查看/跳转）用强调色**文字链接**（`.link-btn` + `→`）；会改数据的（撤销/停用/删除）用**实体描边按钮**；两者间加 1px `.vsep`。别一律用胶囊。
 - **表格行 ≥2 个操作按钮时必须量 `td.scrollWidth`**：只量纵向滚动容器**量不出单元格横向溢出**（导入批次弹层操作列 104px 塞俩胶囊实需 119px，就这么漏的）。
 - 点歌时间窗口状态条（小程序）定**两行**：上规则（每周六 18:00 – 周日 18:00）下状态（开放中·距截止…）。一行版 390px 必折行。预览 `preview/song-queue-v1/`。
-- `preview/song-queue-admin-v1/`（点歌 v2 管理端适配，5 屏，**未动业务代码**）：沿用 v8，新增 `.tag-queue`(3 候补中·中性灰) / `.tag-acc`(4 已补位·强调色浅底) / `.pos-chip`。管理端「已通过」统一改「**已排期**」。
+- `preview/song-queue-admin-v1/`（点歌 v2 管理端适配，5 屏）：沿用 v8，新增 `.tag-queue`(3 候补中·中性灰) / `.tag-acc`(4 已补位·强调色浅底) / `.pos-chip`。管理端「已通过」统一改「**已排期**」。**业务代码已按它落地**（commit `9d35735`：`SubmitList.vue` 整文件重写 + `SongSettings.vue` + `StatusTag.vue` 扩 5 态 + `theme.css` 加 `--acc-bg` + 后端 `submitController` 三处）。
+- **预览的列宽不能直接当成业务表格的列宽**：预览里「状态」列给的 128px 刚好掩盖了「已补位 · 待审」胶囊（实测 97.6px）在业务表 106px 列里溢出约 12px 的问题。搬进业务表格前必须按真实列宽重算 —— 量法：静态预览与业务页共用字体栈/CSS 变量，直接在预览页 `getBoundingClientRect()` 量胶囊宽度，再对比业务 `td` 的 `clientWidth − padding`。
 - **预览页自检三件套**：**模拟点击页签后**逐屏截图（v7 栽过页签错位）+ 未定义类名扫描 + 溢出量测。配方见 skill `web-ui-screenshot-verify`。
 - 布局：flex 双栏行插卡必须带 flex 值；`.canvas>*{flex:none}` 优先级高于 `.ws{flex:1}`，须写 `.canvas.split>.ws{flex:1;min-width:0}`；固定高滚动容器内子项也要 `flex:none`，否则表格卡被压矮且 `scrollHeight===clientHeight` 量不出溢出。
 
@@ -74,6 +75,9 @@
   `{undef:[],rows:0,pills:0,...}` 这种**「全 0 但没报错」的假绿**（空白页 `document.styleSheets` 为空，类名扫描照样返回 `[]`）。
   正确做法：**分段重开会话**（一次会话只拍 ≤3 张，会话内 `open` 重来）；`shot()` 必须带**体积断言**
   （`<40000` 就标「疑似空白」）；**首个会话必出空白**（先热身拍一张丢掉再拍正片）。
+- **看到 `sed: node_modules/mysql2/lib/constants/charsets.js: No such file or directory`，先怀疑 `npm ci` 层，别动 sed**：国内镜像零星 ECONNRESET → npm 重试用尽后撞上自身 bug "Exit handler never called!" 且**以 exit 0 退出** → 「装了一半的 node_modules」被 BuildKit 当成功层缓存，错误延迟到 sed 那层才爆（`--no-cache` 重建也复现，不是脏缓存）。Dockerfile 已加固：重试放大 + **独立断言层**（`node -e` 逐个 `require.resolve` 所有 `dependencies`，比 `npm ls --all` 稳，后者被 peer 告警误判）+ sed 前后 `test -f`/`grep -q`。
+- **本机 push 之前必须先开代理**：GitHub 直连 `fatal: schannel: server closed abruptly (missing close_notify)`（`git ls-remote` 报 `Operation too slow. Less than 1000 bytes/sec`）。代理客户端是 **FlClash**；Docker Desktop 代理设置里写死了 `http://127.0.0.1:7890`，该端口没开时连 `alpine:latest` 都拉不下来（基础镜像全靠本地缓存）。
+- **用户明确表态（2026-09-21）**：别在本机折腾构建/部署，直接 commit + push，然后给他服务器上的更新步骤。本机 Docker 不是部署目标。
 
 ## 进行中
 - **登录页背景 v1（2026-09-21，等点头）**：`preview/login-bg-v1/`。形态＝**全页底图 + 品牌插画**两件套，调性 **Apple 式柔光**（另两档被否）。底图 A 柔光 / B 声波（默认 B）；插画 01 广播塔（默认）/ 02 话筒。`.miora` 画布在 `login-bg-v1.miora`。**`Login.vue` 一行未动。**
