@@ -937,6 +937,32 @@ async function resetPasswords(scope = {}) {
   return { affected: affected.count || targets.length, usernames: targets.map((u) => u.username) };
 }
 
+/**
+ * 批量改状态（启用 / 停用）
+ *
+ * 走一条 UPDATE ... WHERE id IN (...)，再统一作废登录态。
+ * 前端「批量操作范围＝筛选结果」时可能有几百个账号 —— 逐个 PUT /student/:id/status
+ * 会变成几百个请求，这里合成一次。
+ */
+async function setStatusBatch(ids, status) {
+  const list = [...new Set((Array.isArray(ids) ? ids : []).map(Number).filter(Boolean))];
+  if (!list.length) throw new ApiError(Codes.PARAM_ERROR, '请先勾选要操作的账号');
+  if (list.length > 500) throw new ApiError(Codes.PARAM_ERROR, '一次最多操作 500 个账号');
+
+  const next = Number(status) === 0 ? 0 : 1;
+  const rows = await User.findAll({
+    where: { id: { [Op.in]: list }, username: { [Op.ne]: null } },
+    attributes: ['id', 'username'],
+  });
+  if (!rows.length) throw new ApiError(Codes.NOT_FOUND, '没有匹配到学生账号');
+
+  await User.update({ status: next }, { where: { id: { [Op.in]: rows.map((r) => r.id) } } });
+  // 登录态作废：改停用后学生手里的 token 下一次请求就被踢，不用等 30 秒缓存
+  await Promise.all(rows.map((r) => accountService.invalidate(r.username)));
+
+  return { affected: rows.length, status: next, usernames: rows.map((r) => r.username) };
+}
+
 async function removeStudent(id) {
   const user = await User.findOne({ where: { id } });
   if (!user || !user.username) throw new ApiError(Codes.NOT_FOUND, '学生账号不存在');
@@ -1035,6 +1061,7 @@ module.exports = {
   exportData,
   updateStudent,
   setStatus,
+  setStatusBatch,
   resetPasswords,
   removeStudent,
   listBatches,

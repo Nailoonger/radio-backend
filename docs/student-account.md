@@ -72,6 +72,8 @@ docker exec -i radio-mysql mysql -uroot -proot123 radio_station < sql/migrations
 | PUT | `/student/:id/status` | 启用 / 停用 |
 | PUT | `/student/:id/reset-password` | 重置为 `user+学号` |
 | POST | `/student/reset-password/batch` | 批量重置（必须给 `ids` 或 `grade`/`classNo`，否则拒） |
+| POST | `/student/status/batch` | **批量启用 / 停用**：`{ids, status}`，一次最多 500（前端「范围＝筛选结果」走它） |
+| POST | `/student/delete/batch` | 批量删除：`{ids}`，一次最多 200，仅超管 |
 | DELETE | `/student/:id` | 有投稿记录时改为停用，不硬删 |
 | GET | `/student/batches`、POST `/student/batch/:id/rollback` | 批次列表与撤销 |
 

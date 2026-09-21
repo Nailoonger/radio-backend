@@ -235,6 +235,25 @@ exports.setStatus = async (req, res, next) => {
   }
 };
 
+/**
+ * 批量改状态：POST /student/status/batch  body { ids:number[], status:0|1 }
+ * 「批量操作范围＝筛选结果」时用 —— 逐个 PUT 会在几百个账号时变成几百个请求。
+ */
+exports.setStatusBatch = async (req, res, next) => {
+  try {
+    const { ids, status } = req.body || {};
+    if (status === undefined) throw new ApiError(Codes.PARAM_ERROR, '缺少 status（1=启用 0=停用）');
+    const data = await roster.setStatusBatch(ids, status);
+    const off = Number(status) === 0;
+    logger.info(
+      `[student] 批量${off ? '停用' : '启用'} ${data.affected} 个（操作人 ${req.admin?.username}）`
+    );
+    return success(res, { affected: data.affected }, `已${off ? '停用' : '启用'} ${data.affected} 个账号`);
+  } catch (e) {
+    return next(e);
+  }
+};
+
 exports.resetPassword = async (req, res, next) => {
   try {
     const data = await roster.resetPasswords({ ids: [Number(req.params.id)] });

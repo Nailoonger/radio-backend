@@ -1,0 +1,1862 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>菁悠广播站 · 学生账号 v3（Apple 式交互原型）</title>
+<style>
+/* ============================================================
+   菁悠广播站 · 管理后台 · 学生账号 v3 —— 可交互原型
+
+   依据 skill `apple-design`（WWDC《Designing Fluid Interfaces》等）重做。
+
+   ⚠️ 与项目铁律的关系（刻意保留、没有照搬的地方）：
+     · 调色板仍是 v8（唯一强调色 #0066CC / 无装饰性渐变 / 深色卡为主角）
+     · 因此**不用渐隐遮罩**做滚动边缘，改用「模糊 + 无色投影」在滚动时加深
+     · 深色卡回到主角位置：页面最重的一条信息（命中数与当前范围）做成深色材料卡
+
+   apple-design 的落地情况见「方案说明」屏。
+   ============================================================ */
+:root{
+  /* —— v8 调色板（不变） —— */
+  --ink:#1d1d1f; --ink-2:#333333; --muted:#7a7a7a; --muted-2:#6e6e73;
+  --soft:#c7c7cc; --hairline:#e0e0e0; --divider:#f0f0f0;
+  --parchment:#f5f5f7; --canvas:#ffffff; --tile:#272729; --tile-2:#3a3a3c;
+  --accent:#0066cc; --accent-dark:#2997ff; --live:#ff453a;
+  --amber-bg:#fef3c7; --amber-fg:#8a6100;
+  --green-bg:#e7f5ec; --green-fg:#1e7a46;
+  --red-bg:#fde8e8;  --red-fg:#b42318;
+  --acc-bg:#e6f0fa;
+
+  /* —— 材料（skill §12：材质层级 = 结构层最重、功能层中等、内容层最亮） —— */
+  --mat-rail:rgba(244,244,247,.62);
+  --mat-bar:rgba(255,255,255,.60);
+  --mat-float:rgba(255,255,255,.74);
+  --mat-sheet:rgba(252,252,253,.82);
+  --blur-rail:blur(36px) saturate(180%);
+  --blur-bar:blur(26px) saturate(180%);
+  --blur-float:blur(30px) saturate(180%);
+  --blur-sheet:blur(36px) saturate(180%);
+  --edge-hi:rgba(255,255,255,.65);   /* 材料顶边高光＝光落在材质上 */
+
+  /* —— 无色投影（skill §12：更大的面 = 更厚） —— */
+  --sh-1:0 1px 2px rgba(0,0,0,.05);
+  --sh-float:0 14px 40px -14px rgba(0,0,0,.26), 0 2px 8px -2px rgba(0,0,0,.10);
+  --sh-pop:0 20px 50px -22px rgba(0,0,0,.34), 0 2px 8px -2px rgba(0,0,0,.10);
+  --sh-sheet:0 48px 110px -34px rgba(0,0,0,.52), 0 10px 28px -14px rgba(0,0,0,.30);
+
+  --r-card:18px; --r-input:12px; --r-tile:20px; --r-pill:9999px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+
+  /* —— 排版（skill §15：字距随字号变，行高与字号反向） —— */
+  --fs-2xs:10.5px;  --ls-2xs:.014em;  --lh-2xs:1.5;
+  --fs-xs:11.5px;   --ls-xs:.012em;   --lh-xs:1.5;
+  --fs-sm:12.5px;   --ls-sm:.006em;   --lh-sm:1.5;
+  --fs-md:13.5px;   --ls-md:.002em;   --lh-md:1.5;
+  --fs-xl:17px;     --ls-xl:-.014em;  --lh-xl:1.35;
+  --fs-2xl:19px;    --ls-2xl:-.018em; --lh-2xl:1.3;
+  --fs-3xl:26px;    --ls-3xl:-.024em; --lh-3xl:1.2;
+  --fs-num:34px;    --lh-num:1.06;
+  --ls-cap:.08em;                     /* 全大写小标签才用 */
+  --lh-read:1.7;
+
+  --font:system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Text","HarmonyOS Sans SC",
+         "MiSans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:#f2f2f5}
+body{font-family:var(--font);color:var(--ink);font-size:14px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;padding:0 0 80px}
+button{font-family:inherit;font-size:inherit;border:none;background:none;cursor:pointer;color:inherit;
+  -webkit-tap-highlight-color:transparent}
+input,select{font-family:inherit;font-size:inherit;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.el{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;min-width:0}
+.rowc{display:flex;align-items:center;min-width:0}
+.between{display:flex;align-items:center;justify-content:space-between;gap:12px}
+
+/* ============================================================
+   预览外壳
+   ============================================================ */
+.shell{position:sticky;top:0;z-index:90;background:rgba(255,255,255,.72);
+  backdrop-filter:blur(26px) saturate(180%);-webkit-backdrop-filter:blur(26px) saturate(180%);
+  border-bottom:1px solid var(--hairline)}
+.shell-in{max-width:1520px;margin:0 auto;padding:11px 24px;display:flex;align-items:center;gap:16px}
+.shell-brand{display:flex;align-items:center;gap:11px;flex:none}
+.shell-mark{width:30px;height:30px;border-radius:9px;background:var(--ink);color:#fff;flex:none;
+  display:flex;align-items:center;justify-content:center}
+.shell-mark svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+.shell-brand b{font-size:14.5px;font-weight:600;letter-spacing:-.01em;display:block}
+.shell-brand span{font-size:11px;color:var(--muted);letter-spacing:.03em}
+.vbadge{font-size:11px;font-weight:700;letter-spacing:.06em;background:var(--ink);color:#fff;
+  border-radius:var(--r-pill);padding:3px 9px;flex:none}
+.tabs{display:flex;gap:6px;overflow-x:auto;flex:1;min-width:0}
+.tabs::-webkit-scrollbar{height:0}
+.tab{flex:none;height:28px;padding:0 11px;border-radius:var(--r-pill);font-size:12px;font-weight:500;
+  color:var(--muted);background:var(--divider);white-space:nowrap;
+  transition:transform 140ms cubic-bezier(.34,1.4,.64,1), background 180ms, color 180ms}
+.tab:hover{color:var(--ink)}
+.tab:active{transform:scale(.94)}
+.tab.on{background:var(--ink);color:#fff;font-weight:600}
+.tab-sep{flex:none;width:1px;background:var(--hairline);margin:5px 4px}
+.stage{max-width:1520px;margin:0 auto;padding:22px 24px}
+.screen{display:none}
+.screen.on{display:block;animation:fadeUp .28s var(--ease) both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.cap{font-size:12.5px;color:var(--muted);margin:12px 0 0 2px;line-height:1.7;max-width:1360px}
+.cap b{color:var(--ink);font-weight:600}
+.cap code{font-family:var(--mono);font-size:11.5px;background:#fff;border-radius:5px;padding:1px 5px;color:var(--ink-2)}
+
+.frame-outer{width:1440px;transform-origin:top left}
+.frame{width:1440px;height:900px;display:flex;flex-direction:column;background:var(--canvas);
+  border:1px solid #d8d8dd;border-radius:14px;overflow:hidden;
+  box-shadow:0 30px 80px -30px rgba(0,0,0,.28), 0 2px 8px -4px rgba(0,0,0,.12)}
+.chrome{height:38px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;
+  background:#ececed;border-bottom:1px solid #dededf}
+.dots{display:flex;gap:7px;flex:none}
+.dots i{width:11px;height:11px;border-radius:50%;background:#d4d4d8;display:block}
+.url{flex:1;max-width:680px;height:24px;border-radius:var(--r-pill);background:#fff;
+  border:1px solid #dcdcde;display:flex;align-items:center;gap:7px;padding:0 11px;
+  font-size:11.5px;color:var(--soft);font-family:var(--mono)}
+.url b{color:var(--ink);font-weight:600}
+.url svg{width:12px;height:12px;flex:none;color:var(--soft);stroke:currentColor;fill:none;stroke-width:1.7}
+
+/* ============================================================
+   应用骨架：内容滚到 chrome 底下（skill §12）
+   ============================================================ */
+.app{flex:1;min-height:0;position:relative;background:var(--canvas);isolation:isolate}
+.app-inner{position:absolute;inset:0;transform-origin:50% 38%;will-change:transform}
+
+.rail{position:absolute;left:0;top:0;bottom:0;width:232px;z-index:30;
+  background:var(--mat-rail);
+  backdrop-filter:var(--blur-rail);-webkit-backdrop-filter:var(--blur-rail);
+  display:flex;flex-direction:column;padding:16px 14px 14px}
+.rail::after{content:'';position:absolute;top:0;right:0;bottom:0;width:1px;background:rgba(0,0,0,.055)}
+.rail-brand{display:flex;align-items:center;gap:11px;padding:0 6px 15px}
+.rail-logo{width:34px;height:34px;flex:none;border-radius:10px;background:var(--ink);color:#fff;
+  display:flex;align-items:center;justify-content:center}
+.rail-logo svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+/* vibrancy：毛玻璃上的文字要更高对比 + 略重字重 + 一点点字距（skill §12） */
+.rail-name{font-size:var(--fs-md);font-weight:600;letter-spacing:-.01em}
+.rail-sub{font-size:var(--fs-2xs);color:var(--muted);letter-spacing:var(--ls-2xs);margin-top:1px}
+.rail-search{display:flex;align-items:center;gap:8px;height:32px;padding:0 11px;
+  background:rgba(255,255,255,.66);border-radius:9px;color:var(--muted);
+  font-size:var(--fs-sm);letter-spacing:var(--ls-sm);margin-bottom:14px;flex:none}
+.rail-search svg{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+.rail-search kbd{margin-left:auto;font-family:inherit;font-size:10px;color:var(--muted-2);
+  background:rgba(255,255,255,.8);border-radius:5px;padding:1px 5px;letter-spacing:0}
+.rail-nav{flex:1;min-height:0;overflow:hidden}
+.rail-group{font-size:var(--fs-2xs);font-weight:600;color:var(--muted-2);letter-spacing:var(--ls-cap);
+  padding:12px 9px 6px}
+.rail-group:first-child{padding-top:0}
+.rail-item{display:flex;align-items:center;gap:8px;height:36px;padding:0 10px;border-radius:10px;
+  color:var(--ink-2);font-size:var(--fs-md);letter-spacing:var(--ls-md);margin-bottom:1px}
+.rail-item svg{width:17px;height:17px;flex:none;color:var(--muted);stroke:currentColor;fill:none;
+  stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.rail-item .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rail-item:hover{background:rgba(255,255,255,.62)}
+.rail-item.on{background:var(--ink);color:#fff;font-weight:600}
+.rail-item.on svg{color:#fff}
+.rail-badge{font-style:normal;flex:none;min-width:19px;height:19px;padding:0 6px;border-radius:var(--r-pill);
+  background:var(--ink);color:#fff;font-size:var(--fs-2xs);font-weight:600;
+  display:inline-flex;align-items:center;justify-content:center}
+.rail-item.on .rail-badge{background:#fff;color:var(--ink)}
+.rail-account{flex:none;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;
+  background:rgba(255,255,255,.62);margin-top:12px}
+.rail-avatar{width:29px;height:29px;flex:none;border-radius:50%;background:var(--ink);color:#fff;
+  font-size:var(--fs-sm);font-weight:600;display:flex;align-items:center;justify-content:center}
+.rail-account .who{flex:1;min-width:0}
+.rail-account .nm{font-size:var(--fs-sm);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rail-account .rl{font-size:var(--fs-2xs);color:var(--muted);margin-top:1px}
+
+.mainwrap{position:absolute;left:232px;right:0;top:0;bottom:0}
+
+/* 顶栏：半透明悬浮层，内容从它下面滚过去，没有 1px 硬分隔线 */
+.appbar{position:absolute;top:0;left:0;right:0;height:62px;z-index:20;
+  display:flex;align-items:center;gap:16px;padding:0 26px;
+  background:var(--mat-bar);
+  backdrop-filter:var(--blur-bar);-webkit-backdrop-filter:var(--blur-bar);
+  transition:box-shadow 260ms var(--ease)}
+.appbar::after{content:'';position:absolute;left:0;right:0;bottom:0;height:1px;
+  background:rgba(0,0,0,.05);opacity:0;transition:opacity 260ms var(--ease)}
+/* 只在内容真的滚到它下面时才加深（skill §12：滚动边缘效果取代硬分隔线） */
+.app.is-scrolled .appbar{box-shadow:0 10px 30px -22px rgba(0,0,0,.45)}
+.app.is-scrolled .appbar::after{opacity:1}
+.ab-title{font-size:var(--fs-2xl);font-weight:600;letter-spacing:var(--ls-2xl);line-height:1.2}
+.ab-sub{font-size:var(--fs-sm);color:var(--muted);letter-spacing:var(--ls-sm);margin-top:2px}
+.ab-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+
+.scroller{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;
+  padding:80px 26px 108px;display:flex;flex-direction:column;gap:16px;scroll-behavior:auto}
+/* ⚠️ 必须禁掉 flex 子项收缩：.scroller 是固定高取景框里的滚动容器，子项默认 flex-shrink:1
+   会被压矮（深色卡 overflow:hidden 一裁，命中数和摘要直接消失），
+   而且此时 scrollHeight 会被算小，「量溢出」的自检**量不出这个压扁**。 */
+.scroller>*{flex:none}
+.scroller::-webkit-scrollbar{width:10px}
+.scroller::-webkit-scrollbar-thumb{background:rgba(0,0,0,.14);border-radius:5px;
+  border:3px solid transparent;background-clip:padding-box}
+.scroller::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.24);background-clip:padding-box}
+
+/* ============================================================
+   按钮 / 标签
+   ============================================================ */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 17px;
+  border-radius:var(--r-pill);font-size:var(--fs-md);font-weight:500;line-height:1;white-space:nowrap;
+  letter-spacing:var(--ls-md);transform:translateZ(0);
+  transition:transform 160ms cubic-bezier(.34,1.4,.64,1), background 160ms, border-color 160ms, box-shadow 160ms}
+.btn svg{width:15px;height:15px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+/* skill §1：反馈发生在**按下**的那一刻，不是松手 */
+.btn:active{transform:scale(.955)}
+.btn-primary{background:var(--accent);color:#fff;font-weight:600}
+.btn-primary:hover{background:#0058b0}
+.btn-white{background:#fff;color:var(--accent);font-weight:600}
+.btn-quiet{background:rgba(255,255,255,.86);border:1px solid var(--hairline);color:var(--ink-2)}
+.btn-quiet:hover{border-color:#cfcfd4}
+.btn-plain{background:transparent;color:var(--muted);padding:0 10px}
+.btn-plain:hover{color:var(--ink)}
+.btn-danger-quiet{background:rgba(255,255,255,.86);border:1px solid var(--red-bg);color:var(--red-fg);font-weight:500}
+.btn-danger-fill{background:var(--red-fg);color:#fff;font-weight:600}
+.btn-sm{height:31px;padding:0 14px;font-size:var(--fs-sm)}
+.btn-xs{height:27px;padding:0 11px;font-size:var(--fs-xs);letter-spacing:var(--ls-xs)}
+.btn[disabled]{opacity:.42;pointer-events:none}
+
+.link-btn{display:inline-flex;align-items:center;gap:4px;height:27px;padding:0 3px;flex:none;
+  font-size:var(--fs-xs);font-weight:600;letter-spacing:var(--ls-xs);line-height:1;color:var(--accent);
+  white-space:nowrap;transition:transform 160ms cubic-bezier(.34,1.4,.64,1)}
+.link-btn:hover{text-decoration:underline}
+.link-btn:active{transform:scale(.94)}
+.link-btn svg{width:11px;height:11px;flex:none;stroke:currentColor;fill:none;stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform 200ms var(--ease)}
+.link-btn:hover svg{transform:translateX(2px)}
+.vsep{width:1px;height:13px;background:var(--hairline);flex:none}
+
+.tag{display:inline-flex;align-items:center;height:23px;padding:0 10px;border-radius:var(--r-pill);
+  font-size:var(--fs-xs);font-weight:500;letter-spacing:var(--ls-xs);line-height:1;white-space:nowrap}
+.tag-ok{background:var(--green-bg);color:var(--green-fg)}
+.tag-warn{background:var(--amber-bg);color:var(--amber-fg)}
+.tag-reject{background:var(--red-bg);color:var(--red-fg)}
+.tag-mute{background:#ebebee;color:var(--muted)}
+.tag-acc{background:var(--acc-bg);color:var(--accent)}
+.tag-top{background:var(--ink);color:#fff}
+.tag-inv{background:rgba(255,255,255,.14);color:#fff}
+
+/* ============================================================
+   筛选条件条
+   ============================================================ */
+.filterbar{background:var(--parchment);border-radius:var(--r-card);padding:15px 17px 13px;
+  display:flex;flex-direction:column;gap:11px}
+.frow{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+/* skill §10：可点目标的命中区要比看起来大一点（±3px 垂直padding） */
+.fcond{display:flex;align-items:center;gap:9px;height:36px;padding:0 12px 0 13px;flex:none;
+  background:#fff;border:1px solid var(--hairline);border-radius:var(--r-pill);white-space:nowrap;
+  transition:transform 160ms cubic-bezier(.34,1.4,.64,1), border-color 200ms, background 200ms, box-shadow 200ms}
+.fcond:hover{border-color:#cfcfd4}
+.fcond:active{transform:scale(.965)}
+.fcond .lbl{font-size:var(--fs-xs);color:var(--muted);letter-spacing:var(--ls-xs)}
+.fcond .val{font-size:var(--fs-sm);font-weight:500;letter-spacing:var(--ls-sm);color:var(--ink)}
+.fcond .val.ph{color:var(--soft);font-weight:400}
+.fcond svg{width:12px;height:12px;color:var(--soft);stroke:currentColor;fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform 220ms var(--ease)}
+.fcond.open svg{transform:rotate(180deg)}
+.fcond.on{border-color:var(--accent);background:var(--acc-bg);box-shadow:0 0 0 3px rgba(0,102,204,.07)}
+.fcond.on .lbl{color:var(--accent);opacity:.8}
+.fcond.on .val{color:var(--accent);font-weight:600}
+.fcond.on svg{color:var(--accent)}
+.fcond.lock{background:var(--parchment);border-style:dashed;box-shadow:none}
+.fcond.lock:hover{border-color:var(--soft)}
+.fsearch{display:flex;align-items:center;gap:9px;height:36px;flex:1;min-width:250px;padding:0 14px;
+  background:#fff;border:1px solid var(--hairline);border-radius:var(--r-pill);
+  transition:border-color 200ms, box-shadow 200ms}
+.fsearch:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,102,204,.09)}
+.fsearch svg{width:14px;height:14px;flex:none;color:var(--soft);stroke:currentColor;fill:none;stroke-width:1.7}
+.fsearch input{flex:1;min-width:0;border:none;outline:none;background:transparent;
+  font-size:var(--fs-sm);letter-spacing:var(--ls-sm);color:var(--ink)}
+.fsearch input::placeholder{color:var(--soft)}
+.fsearch kbd{font-family:inherit;font-size:10px;color:var(--muted-2);background:var(--parchment);
+  border-radius:5px;padding:1px 5px}
+
+.pickedrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:26px}
+.pickedrow .pt{font-size:var(--fs-xs);color:var(--muted-2);letter-spacing:var(--ls-xs);flex:none}
+.pk{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 8px 0 11px;
+  border-radius:var(--r-pill);background:#fff;border:1px solid var(--hairline);flex:none;
+  font-size:var(--fs-xs);font-weight:500;letter-spacing:var(--ls-xs);color:var(--ink-2);
+  will-change:transform,opacity;
+  transition:transform 160ms cubic-bezier(.34,1.4,.64,1), background 200ms, border-color 200ms}
+.pk:hover{border-color:#cfcfd4}
+.pk:active{transform:scale(.94)}
+.pk b{font-weight:600;color:var(--ink)}
+.pk svg{width:10px;height:10px;color:var(--soft);stroke:currentColor;fill:none;stroke-width:2.4;
+  stroke-linecap:round;stroke-linejoin:round}
+.pk.acc{background:var(--acc-bg);border-color:transparent;color:var(--accent)}
+.pk.acc b{color:var(--accent)}
+.pk.acc svg{color:var(--accent);opacity:.72}
+.pk.acc:hover{background:#d9e8f8}
+
+/* ============================================================
+   深色材料卡（页面最重的一条信息）
+   ============================================================ */
+.hero{background:var(--tile);border-radius:var(--r-tile);padding:20px 24px;color:#fff;
+  display:flex;flex-direction:column;gap:13px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  border-top:1px solid rgba(255,255,255,.13)}
+.hero-top{display:flex;align-items:flex-start;gap:18px}
+.hero-k{font-size:var(--fs-xs);color:rgba(255,255,255,.58);letter-spacing:var(--ls-xs)}
+.hero-v{font-size:var(--fs-num);font-weight:600;letter-spacing:-.02em;line-height:var(--lh-num);
+  margin-top:2px;font-variant-numeric:tabular-nums}
+.hero-sum{font-size:var(--fs-sm);color:rgba(255,255,255,.78);letter-spacing:var(--ls-sm);
+  line-height:1.65;margin-top:4px;max-width:620px}
+.hero-sum b{color:#fff;font-weight:600}
+.hero-acts{margin-left:auto;display:flex;align-items:center;gap:8px;flex:none}
+.hero-issue{display:flex;align-items:center;gap:12px;padding-top:13px;
+  border-top:1px solid rgba(255,255,255,.12)}
+.hero-issue .ic{width:28px;height:28px;flex:none;border-radius:9px;background:rgba(255,69,58,.17);
+  color:#ff7b72;display:flex;align-items:center;justify-content:center}
+.hero-issue .ic svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.hero-issue .t{font-size:var(--fs-md);font-weight:600;letter-spacing:var(--ls-md)}
+.hero-issue .m{font-size:var(--fs-xs);color:rgba(255,255,255,.6);margin-top:2px;letter-spacing:var(--ls-xs)}
+
+/* ============================================================
+   表格
+   ============================================================ */
+.tablecard{background:var(--parchment);border-radius:var(--r-card);padding:5px 0;overflow:hidden}
+.tb{width:100%;border-collapse:collapse;table-layout:fixed}
+.tb th{text-align:left;font-size:var(--fs-xs);font-weight:500;color:var(--muted);
+  letter-spacing:var(--ls-xs);padding:11px 10px;border-bottom:1px solid rgba(0,0,0,.07);white-space:nowrap}
+.tb th:first-child{padding-left:18px}
+.tb th:last-child{padding-right:18px}
+.tb td{font-size:var(--fs-md);line-height:1.5;letter-spacing:var(--ls-md);padding:10px;
+  border-bottom:1px solid rgba(0,0,0,.045);vertical-align:middle;color:var(--ink-2)}
+.tb td:first-child{padding-left:18px}
+.tb td:last-child{padding-right:18px}
+.tb tbody tr{transition:background 160ms var(--ease)}
+.tb tbody tr:hover{background:rgba(255,255,255,.8)}
+.tb tbody tr.sel{background:rgba(0,102,204,.055)}
+.tb tbody tr:last-child td{border-bottom:none}
+.tb .c{text-align:center}
+.tb .r{text-align:right}
+.cb{width:16px;height:16px;border-radius:5px;border:1.5px solid #d2d2d7;background:#fff;
+  display:inline-flex;align-items:center;justify-content:center;flex:none;vertical-align:middle;
+  transition:transform 150ms cubic-bezier(.34,1.6,.64,1), background 160ms, border-color 160ms}
+.cb:active{transform:scale(.86)}
+.cb.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.cb.mid{background:var(--accent);border-color:var(--accent);color:#fff}
+.cb svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.rowact{display:flex;gap:9px;align-items:center;justify-content:flex-end}
+.rowact .btn{flex:none}
+.av{width:26px;height:26px;border-radius:50%;background:#fff;border:1px solid var(--hairline);
+  color:var(--ink-2);display:flex;align-items:center;justify-content:center;flex:none;
+  font-size:var(--fs-xs);font-weight:600;line-height:1}
+
+.empty{padding:46px 20px;display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center}
+.empty .ei{width:44px;height:44px;border-radius:14px;background:#ebebee;color:var(--muted);
+  display:flex;align-items:center;justify-content:center}
+.empty .ei svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round}
+.empty .et{font-size:var(--fs-md);font-weight:600;letter-spacing:var(--ls-md)}
+.empty .em{font-size:var(--fs-sm);color:var(--muted);max-width:430px;line-height:1.7;letter-spacing:var(--ls-sm)}
+
+.pager{display:flex;align-items:center;gap:5px;padding:0 4px}
+.pager .info{font-size:var(--fs-sm);color:var(--muted);letter-spacing:var(--ls-sm);margin-right:auto}
+.pg{min-width:30px;height:30px;padding:0 9px;border-radius:9px;font-size:var(--fs-sm);color:var(--muted);
+  display:inline-flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;
+  transition:transform 150ms cubic-bezier(.34,1.4,.64,1), background 160ms}
+.pg:hover{background:rgba(0,0,0,.045)}
+.pg:active{transform:scale(.9)}
+.pg.on{background:var(--ink);color:#fff;font-weight:600}
+.pg[disabled]{opacity:.35;pointer-events:none}
+
+/* ============================================================
+   浮动批量条（毛玻璃，浮在内容之上）
+   ============================================================ */
+.batchbar{position:absolute;left:50%;bottom:22px;z-index:24;
+  display:flex;align-items:center;gap:10px;
+  background:var(--mat-float);
+  backdrop-filter:var(--blur-float);-webkit-backdrop-filter:var(--blur-float);
+  border-radius:var(--r-pill);padding:8px 9px 8px 20px;
+  box-shadow:var(--sh-float);
+  will-change:transform,opacity}
+.batchbar::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  border-top:1px solid var(--edge-hi)}
+.batchbar .cnt{font-size:var(--fs-md);font-weight:500;color:var(--ink-2);letter-spacing:var(--ls-md);
+  margin-right:4px;white-space:nowrap}
+.batchbar .cnt b{font-size:var(--fs-xl);font-weight:600;color:var(--accent);margin:0 3px;
+  font-variant-numeric:tabular-nums}
+
+/* ============================================================
+   浮层：条件下拉 / 菜单（从触发点就地展开，skill §7）
+   ============================================================ */
+.pop{position:absolute;z-index:40;background:var(--mat-float);
+  backdrop-filter:var(--blur-float);-webkit-backdrop-filter:var(--blur-float);
+  border-radius:14px;padding:6px;box-shadow:var(--sh-pop);min-width:200px;
+  transform-origin:top center;will-change:transform,opacity}
+.pop::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  border-top:1px solid var(--edge-hi)}
+.pop .fh{font-size:var(--fs-2xs);font-weight:600;color:var(--muted-2);letter-spacing:var(--ls-cap);
+  padding:7px 10px 5px}
+.fopt{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:9px;
+  font-size:var(--fs-md);letter-spacing:var(--ls-md);color:var(--ink-2);width:100%;text-align:left;
+  transition:background 140ms var(--ease), transform 140ms cubic-bezier(.34,1.4,.64,1)}
+.fopt:hover{background:rgba(255,255,255,.75)}
+.fopt:active{transform:scale(.98)}
+.fopt .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fopt .ct{font-size:var(--fs-xs);color:var(--muted);font-variant-numeric:tabular-nums}
+.fopt .ck{width:14px;height:14px;flex:none;color:var(--accent);stroke:currentColor;fill:none;
+  stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.fopt.on{background:rgba(0,102,204,.1);color:var(--accent);font-weight:600}
+.fopt.on .ct{color:var(--accent);opacity:.8}
+.fopt.off{color:var(--soft);pointer-events:none}
+.pop .fsep{height:1px;background:rgba(0,0,0,.07);margin:6px 8px}
+.mi{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:9px;width:100%;
+  text-align:left;transition:background 140ms var(--ease)}
+.mi:hover{background:rgba(255,255,255,.75)}
+.mi svg{width:15px;height:15px;flex:none;margin-top:2px;color:var(--muted);stroke:currentColor;
+  fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.mi .t{font-size:var(--fs-md);color:var(--ink);font-weight:500;letter-spacing:var(--ls-md)}
+.mi .d{font-size:var(--fs-xs);color:var(--muted);margin-top:1px;letter-spacing:var(--ls-xs);line-height:1.55}
+
+/* ============================================================
+   模态：scrim 变暗 + 父层后退 + 材料「成形」（skill §12）
+   ============================================================ */
+.scrim{position:absolute;inset:0;z-index:50;background:rgba(28,28,30,.34);will-change:opacity}
+/* 弹层＝模态材料（scrim 变暗 + 父层后退 + 这块最厚的玻璃）。
+   ⚠️ 模糊半径固定在 CSS 里，**不逐帧改** —— 全屏尺寸的 backdrop-filter 每帧改半径
+   是这个页面上最贵的一件事，而「材料到场」用手感更好的 scale 0.93→1 就能表达。 */
+.sheet{position:absolute;z-index:60;left:50%;top:50%;
+  display:flex;flex-direction:column;overflow:hidden;
+  background:var(--mat-sheet);
+  backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+  border-radius:22px;box-shadow:var(--sh-sheet);
+  max-height:calc(100% - 88px);
+  transform-origin:top center}
+.sheet::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  border-top:1px solid var(--edge-hi);z-index:3}
+.sheet-grab{flex:none;padding:9px 0 5px;display:flex;justify-content:center;cursor:grab;touch-action:none}
+.sheet-grab:active{cursor:grabbing}
+.sheet-grab i{width:38px;height:5px;border-radius:3px;background:rgba(0,0,0,.16);display:block}
+.sheet-head{flex:none;display:flex;align-items:flex-start;gap:13px;padding:4px 24px 15px;
+  border-bottom:1px solid rgba(0,0,0,.07)}
+.sheet-head .ht{font-size:var(--fs-2xl);font-weight:600;letter-spacing:var(--ls-2xl)}
+.sheet-head .hs{font-size:var(--fs-sm);color:var(--muted);margin-top:3px;letter-spacing:var(--ls-sm)}
+.sheet-body{flex:1;min-height:0;overflow-y:auto;padding:18px 24px;display:flex;flex-direction:column;gap:14px}
+.sheet-body::-webkit-scrollbar{width:8px}
+.sheet-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px;
+  border:2px solid transparent;background-clip:padding-box}
+.sheet-foot{flex:none;display:flex;align-items:center;gap:12px;padding:14px 24px;
+  border-top:1px solid rgba(0,0,0,.07)}
+.xbtn{width:30px;height:30px;flex:none;border-radius:50%;background:rgba(120,120,128,.14);
+  margin-left:auto;display:flex;align-items:center;justify-content:center;color:var(--ink-2);
+  transition:transform 150ms cubic-bezier(.34,1.4,.64,1), background 160ms}
+.xbtn:hover{background:rgba(120,120,128,.22)}
+.xbtn:active{transform:scale(.9)}
+.xbtn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round}
+
+/* 卡片 / 表单 */
+.gcard{background:rgba(255,255,255,.72);border-radius:var(--r-card);padding:16px 18px}
+.kv{display:flex;font-size:var(--fs-md);line-height:1.5;padding:12px 0;align-items:center;
+  border-bottom:1px solid rgba(0,0,0,.055)}
+.kv:last-child{border-bottom:none}
+.kv .k{width:118px;flex:none;color:var(--muted);font-size:var(--fs-sm);letter-spacing:var(--ls-sm)}
+.hint{font-size:var(--fs-xs);color:var(--muted-2);letter-spacing:var(--ls-xs);line-height:1.65}
+.warnline{display:flex;gap:8px;font-size:var(--fs-sm);color:var(--red-fg);background:var(--red-bg);
+  border-radius:12px;padding:11px 13px;line-height:1.65;letter-spacing:var(--ls-sm)}
+.warnline svg{width:15px;height:15px;flex:none;margin-top:2px;stroke:currentColor;fill:none;
+  stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.noteline{display:flex;gap:8px;font-size:var(--fs-sm);color:var(--ink-2);background:rgba(255,255,255,.6);
+  border-radius:12px;padding:11px 13px;line-height:1.65;letter-spacing:var(--ls-sm)}
+.noteline svg{width:15px;height:15px;flex:none;margin-top:2px;stroke:var(--muted);fill:none;
+  stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.noteline b{color:var(--accent)}
+.sw{width:44px;height:26px;border-radius:var(--r-pill);background:var(--soft);position:relative;flex:none;
+  transition:background 220ms var(--ease)}
+.sw::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.18);
+  transition:transform 320ms cubic-bezier(.32,1.4,.5,1)}
+.sw.on{background:var(--accent)}
+.sw.on::after{transform:translateX(18px)}
+.sw:active::after{width:24px}
+.input{background:rgba(255,255,255,.92);border:1px solid var(--hairline);border-radius:var(--r-input);
+  height:40px;padding:0 13px;font-size:var(--fs-md);letter-spacing:var(--ls-md);width:100%;outline:none;
+  transition:border-color 200ms, box-shadow 200ms}
+.input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,102,204,.1)}
+
+/* ============================================================
+   Toast（轻反馈）
+   ============================================================ */
+.toasts{position:absolute;left:50%;bottom:26px;z-index:80;display:flex;flex-direction:column;
+  align-items:center;gap:8px;pointer-events:none}
+.toast{display:flex;align-items:center;gap:8px;height:38px;padding:0 17px;border-radius:var(--r-pill);
+  background:rgba(39,39,41,.86);
+  backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+  color:#fff;font-size:var(--fs-sm);font-weight:500;letter-spacing:var(--ls-sm);
+  box-shadow:var(--sh-float);will-change:transform,opacity}
+.toast svg{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round}
+
+/* ============================================================
+   方案说明（文档页）
+   ============================================================ */
+.doc{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:24px}
+.doc-head{padding:4px 0 2px}
+.eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.04em;color:var(--accent)}
+.doc-head h1{font-size:34px;font-weight:600;letter-spacing:-.028em;line-height:1.15;margin:9px 0 10px}
+.doc-head p{font-size:14.5px;color:var(--ink-2);max-width:940px;line-height:1.75}
+.doc-head p b{font-weight:600;color:var(--ink)}
+.doc-card{background:#fff;border:1px solid var(--hairline);border-radius:var(--r-card);padding:22px 24px}
+.doc-card h2{font-size:15px;font-weight:600;letter-spacing:-.012em;margin-bottom:13px}
+.doc-p{font-size:13px;color:var(--ink-2);line-height:1.8}
+.doc-p+.doc-p{margin-top:9px}
+.doc-p b{color:var(--ink);font-weight:600}
+.dtab{width:100%;border-collapse:collapse}
+.dtab th{text-align:left;font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.03em;
+  padding:9px 12px;border-bottom:1px solid var(--hairline);background:var(--parchment)}
+.dtab td{font-size:12.5px;padding:9px 12px;border-bottom:1px solid var(--divider);color:var(--ink-2);
+  vertical-align:top;line-height:1.7}
+.dtab tr:last-child td{border-bottom:none}
+.dtab .nt{color:var(--muted)}
+.doc-card code,.dtab code,.plist code,.cap code{font-family:var(--mono);font-size:11.5px;
+  background:var(--parchment);border-radius:5px;padding:1px 5px;color:var(--ink-2)}
+.rank{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--divider)}
+.rank:last-child{border-bottom:none}
+.numchip{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;flex:none;
+  border-radius:50%;background:var(--ink);color:#fff;font-size:11px;font-weight:600;line-height:1}
+.rank .rb{min-width:0}
+.rank .rk{flex:none;padding-top:1px}
+.rank .rt{font-size:13px;font-weight:600;color:var(--ink);line-height:1.5}
+.rank .rd{font-size:12.5px;color:var(--ink-2);line-height:1.8;margin-top:3px}
+.plist{display:flex;flex-direction:column;gap:9px}.plist>div{display:flex;gap:12px;font-size:12.5px;line-height:1.75}
+.plist b{flex:none;width:112px;color:var(--ink);font-weight:600}
+.plist span{color:var(--ink-2);min-width:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.ab{padding:14px 16px;border-radius:var(--r-input);background:var(--parchment);display:flex;
+  flex-direction:column;gap:7px}
+.ab.rec{background:var(--acc-bg)}
+.ab .t{font-size:12.5px;font-weight:600;color:var(--ink)}
+.ab .m{font-size:12px;color:var(--ink-2);line-height:1.8}
+
+/* ============================================================
+   skill §14：三个独立信号
+   ============================================================ */
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.01ms !important}
+  .screen.on{animation:fadeIn .18s ease both}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+}
+@media (prefers-reduced-transparency: reduce){
+  .rail{background:#f4f4f7;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .appbar{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .pop,.batchbar{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .sheet{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
+}
+@media (prefers-contrast: more){
+  .rail,.appbar,.pop,.sheet,.batchbar{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .rail::after,.appbar::after{background:rgba(0,0,0,.35)}
+  .fcond,.pk,.fsearch,.tablecard{border-color:#8e8e93}
+  .tb td,.tb th{border-bottom-color:rgba(0,0,0,.22)}
+  .hero{background:#000}
+}
+</style>
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-grid" viewBox="0 0 20 20"><rect x="2.6" y="2.6" width="6.2" height="6.2" rx="2"/><rect x="11.2" y="2.6" width="6.2" height="6.2" rx="2"/><rect x="2.6" y="11.2" width="6.2" height="6.2" rx="2"/><rect x="11.2" y="11.2" width="6.2" height="6.2" rx="2"/></symbol>
+  <symbol id="i-list" viewBox="0 0 20 20"><path d="M7.2 5h9.4M7.2 10h9.4M7.2 15h9.4"/><circle cx="3.6" cy="5" r="1.1"/><circle cx="3.6" cy="10" r="1.1"/><circle cx="3.6" cy="15" r="1.1"/></symbol>
+  <symbol id="i-user" viewBox="0 0 20 20"><circle cx="10" cy="7" r="3.2"/><path d="M4.2 17c.7-3.2 3.1-5 5.8-5s5.1 1.8 5.8 5"/></symbol>
+  <symbol id="i-users" viewBox="0 0 20 20"><circle cx="7.4" cy="7.4" r="2.9"/><path d="M2.6 16.4c.6-2.9 2.5-4.4 4.8-4.4s4.2 1.5 4.8 4.4"/><path d="M13.2 5.1a2.7 2.7 0 0 1 0 5.2M14.4 16.4c-.2-1.7-.7-3-1.5-3.8 2.3-.4 4.3 1 4.8 3.8"/></symbol>
+  <symbol id="i-toggle" viewBox="0 0 20 20"><rect x="2.6" y="6.2" width="14.8" height="7.6" rx="3.8"/><circle cx="13.5" cy="10" r="2.5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 20 20"><path d="M10 2.8 15.8 5v5c0 3.3-2.3 6-5.8 7.2C6.5 16 4.2 13.3 4.2 10V5z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.7"/><path d="M10 2.8v2.1M10 15.1v2.1M2.8 10h2.1M15.1 10h2.1M4.9 4.9l1.5 1.5M13.6 13.6l1.5 1.5M15.1 4.9l-1.5 1.5M6.4 13.6l-1.5 1.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="8.7" cy="8.7" r="5.3"/><path d="M12.6 12.6 16.9 16.9"/></symbol>
+  <symbol id="i-check" viewBox="0 0 20 20"><path d="M4 10.6 7.9 14.5 16 6.2"/></symbol>
+  <symbol id="i-close" viewBox="0 0 20 20"><path d="M5.4 5.4l9.2 9.2M14.6 5.4l-9.2 9.2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.3"/><path d="M10 9.1v4.4M10 6.5v.2"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 20 20"><path d="M7.6 5.2 12.8 10l-5.2 4.8"/></symbol>
+  <symbol id="i-chevdown" viewBox="0 0 20 20"><path d="M5.2 7.6 10 12.8l4.8-5.2"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 20 20"><path d="M16.3 10a6.3 6.3 0 1 1-2-4.6"/><path d="M16.5 3.6v3.2h-3.2"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 20 20"><rect x="4.4" y="8.8" width="11.2" height="7.8" rx="2.4"/><path d="M7.2 8.8V6.9a2.8 2.8 0 0 1 5.6 0v1.9"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 20 20"><path d="M4.4 6.4h11.2M8 6.4V4.8h4v1.6M6 6.4l.8 9.2h6.4l.8-9.2"/></symbol>
+  <symbol id="i-radio" viewBox="0 0 20 20"><circle cx="10" cy="11" r="2.4"/><path d="M6 7.2a5.4 5.4 0 0 1 8 0M3.6 4.9a8.6 8.6 0 0 1 12.8 0"/><path d="M10 13.4v3"/></symbol>
+  <symbol id="i-star" viewBox="0 0 20 20"><path d="M10 3.4l2 4.3 4.6.6-3.4 3.2.9 4.6L10 13.9l-4.1 2.2.9-4.6L3.4 8.3l4.6-.6z"/></symbol>
+  <symbol id="i-article" viewBox="0 0 20 20"><rect x="3.6" y="2.8" width="12.8" height="14.4" rx="2.2"/><path d="M6.8 7h6.4M6.8 10.2h6.4M6.8 13.4h4"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 20 20"><rect x="3" y="4.4" width="14" height="12.4" rx="2.2"/><path d="M3 8.2h14M7 2.8v3.2M13 2.8v3.2"/></symbol>
+  <symbol id="i-mega" viewBox="0 0 20 20"><path d="M3.4 8.4v3.2l2.4.6v4h2.4v-3.4l6.4 1.8V4.4L5.8 7.8z"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 20 20"><path d="M3.4 5.2a1.8 1.8 0 0 1 1.8-1.8h9.6a1.8 1.8 0 0 1 1.8 1.8v6a1.8 1.8 0 0 1-1.8 1.8H8.2l-3.6 2.8v-2.8h-.2a1.8 1.8 0 0 1-1-1.8z"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 20 20"><path d="M4 12.6v2.6a1.8 1.8 0 0 0 1.8 1.8h8.4a1.8 1.8 0 0 0 1.8-1.8v-2.6"/><path d="M10 13.4V3.6M6.4 7.2 10 3.6l3.6 3.6"/></symbol>
+  <symbol id="i-batch" viewBox="0 0 20 20"><rect x="2.8" y="3.2" width="14.4" height="4.2" rx="1.4"/><rect x="2.8" y="9.4" width="14.4" height="3"/><path d="M2.8 14.6h14.4"/></symbol>
+  <symbol id="i-download" viewBox="0 0 20 20"><path d="M4 12.6v2.6a1.8 1.8 0 0 0 1.8 1.8h8.4a1.8 1.8 0 0 0 1.8-1.8v-2.6"/><path d="M10 3.6v9.8M6.4 9.8 10 13.4l3.6-3.6"/></symbol>
+  <symbol id="i-key" viewBox="0 0 20 20"><circle cx="7.4" cy="12.6" r="3.4"/><path d="M9.9 10.1 16.4 3.6M14 6.1l1.9 1.9M12.2 7.9l1.9 1.9"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 20 20"><circle cx="4.4" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="15.6" cy="10" r="1.5"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 20 20"><path d="M4.6 10h10.4M11.4 6.2 15.2 10l-3.8 3.8"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 20 20"><path d="M3 11.2 5.2 4.4h9.6L17 11.2v4.4H3z"/><path d="M3 11.2h4l.9 2.2h4.2l.9-2.2h4"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 20 20"><path d="M12.6 3.9 16.1 7.4 7.4 16.1H3.9v-3.5z"/></symbol>
+</svg>
+
+<div class="shell">
+  <div class="shell-in">
+    <div class="shell-brand">
+      <div class="shell-mark"><svg><use href="#i-radio"/></svg></div>
+      <div><b>管理后台 · 学生账号 v3</b><span>菁悠广播站 · 交互原型（真能点）</span></div>
+    </div>
+    <em class="vbadge">v3</em>
+    <div class="tabs" id="tabs">
+      <button class="tab on" data-i="0">方案说明</button>
+      <span class="tab-sep"></span>
+      <button class="tab" data-i="1">现场原型 ▶</button>
+    </div>
+    <div class="tabs" style="flex:none;width:auto">
+      <button class="tab" id="zFit">适应宽度</button>
+      <button class="tab on" id="z100">100%</button>
+    </div>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+
+<!-- ══════════ 0 · 方案说明 ══════════ -->
+<section class="screen on">
+  <div class="doc">
+    <div class="doc-head">
+      <div class="eyebrow">v3 · 依据 skill `apple-design`（WWDC《Designing Fluid Interfaces》等）</div>
+      <h1>形态不动，换的是手感和材质</h1>
+      <p>结构<b>沿用 v2</b>（单页 + 筛选条件 —— 那是你要的），v3 改的是「怎么动、怎么分层」：
+        全部动效换成<b>弹簧</b>、反馈发生在<b>按下那一刻</b>、弹层能拖着关也能<b>拖到一半反悔</b>、
+        毛玻璃材料承担层级、排版<b>按字号分字距</b>。
+        而且这一版是<b>能真点、能拖的原型</b>，不是截图 —— skill 的原话是「一个可交互的 demo 顶一百万个静态稿」。</p>
+    </div>
+
+    <div class="doc-card">
+      <h2>一、和 v2 的差别</h2>
+      <table class="dtab">
+        <thead><tr><th style="width:150px">维度</th><th style="width:320px">v2（静态稿）</th><th>v3（交互原型）</th></tr></thead>
+        <tbody>
+          <tr><td>能不能用</td><td class="nt">8 张截图，点了没反应</td><td><b>真数据 + 真筛选</b>：条件、级联、搜索、分页、批量、弹层全部可用，改名/停用/清理真的会改数据</td></tr>
+          <tr><td>动效</td><td class="nt">CSS transition，固定时长，不可打断</td><td><b>弹簧</b>（阻尼 + 响应），任何时刻可被新输入改写目标值，不跳帧</td></tr>
+          <tr><td>反馈时机</td><td class="nt">松手才生效</td><td><b>按下即缩放</b>（<code>:active</code> + 140ms 回弹），松手才提交</td></tr>
+          <tr><td>弹层</td><td class="nt">只画了打开态</td><td>就地展开（<code>transform-origin</code> 对准触发按钮）、可<b>拖拽关闭</b>、带<b>速度交接</b>与<b>动量投影</b>、向上拖有<b>橡皮筋</b></td></tr>
+          <tr><td>层级 / 材质</td><td class="nt">整片白色 + 1px 分隔线</td><td>侧栏 = 重材料、顶栏 = 悬浮毛玻璃（内容从下面滚过去）、浮动条 = 薄材料；<b>没有渐变</b></td></tr>
+          <tr><td>排版</td><td class="nt">一套字距走天下</td><td>字距随字号变（大字负字距、小字正字距），行高与字号反向，数字全部 tabular</td></tr>
+          <tr><td>可达性</td><td class="nt">没处理</td><td><code>prefers-reduced-motion</code> / <code>-transparency</code> / <code>-contrast</code> 三个信号都接</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="doc-card">
+      <h2>二、apple-design 落地对照（可逐条在原型里验）</h2>
+      <div class="rank">
+        <div class="rk"><span class="numchip">1</span></div>
+        <div class="rb"><div class="rt">响应：把延迟砍到 0</div>
+          <div class="rd">搜索<b>不做防抖</b>，每敲一个字符同步重算（数据在内存里，没有理由等）；筛选条件点一下就生效，
+            没有「确认」这一步；按钮的按压反馈挂在 <code>:active</code> 上，不等 <code>click</code>。</div></div>
+      </div>
+      <div class="rank">
+        <div class="rk"><span class="numchip">3</span></div>
+        <div class="rb"><div class="rt">可打断：动到一半能被抓住</div>
+          <div class="rd">所有弹簧都能在飞行中被 <code>setTarget()</code> 改写，并且<b>从当前屏幕上的值</b>继续（不是从目标值重来）。
+            试法：点开一个筛选条件，在它还没展开完时点另一个 —— 第一个会平滑收回，不卡顿。</div></div>
+      </div>
+      <div class="rank">
+        <div class="rk"><span class="numchip">4</span></div>
+        <div class="rb"><div class="rt">弹簧：用阻尼 + 响应，不用时长</div>
+          <div class="rd">默认 <b>阻尼 1.0 / 响应 0.35</b>（临界阻尼、不过冲）；
+            <b>只有手势带着动量时才给 0.8</b>（弹层被甩出去的那一刻）—— 一个淡入的菜单不该过冲。</div></div>
+      </div>
+      <div class="rank">
+        <div class="rk"><span class="numchip">5·6</span></div>
+        <div class="rb"><div class="rt">速度交接 + 动量投影</div>
+          <div class="rd">拖弹层松手时，把指针的瞬时速度当作弹簧初速（无接缝），
+            并用 <code>project(v, 0.998)</code> 预测落点来决定「关掉还是弹回」—— 所以轻轻一甩就能关掉。</div></div>
+      </div>
+      <div class="rank">
+        <div class="rk"><span class="numchip">7</span></div>
+        <div class="rb"><div class="rt">空间一致性：从哪来、回哪去</div>
+          <div class="rd">条件下拉/菜单的 <code>transform-origin</code> 对准触发它的那颗胶囊；弹层进入与退出走<b>同一条路径</b>；
+            尊重抓取偏移（抓到哪就从哪拖，不会跳到中心）。</div></div>
+      </div>
+      <div class="rank">
+        <div class="rk"><span class="numchip">9</span></div>
+        <div class="rb"><div class="rt">橡皮筋：边界是软抵抗，不是硬停</div>
+          <div class="rd">弹层往上拖超出上限时，位移按 <code>rubberband()</code> 递减 —— 手感是「到头了」，不是「卡住了」。</div></div>
+      </div>
+      <div class="rank">
+        <div class="rk"><span class="numchip">12</span></div>
+        <div class="rb"><div class="rt">材质与景深</div>
+          <div class="rd">侧栏最重（结构）、顶栏次之（悬浮）、浮动条最薄（交互）；
+            弹层是「<b>模态</b>」做法：scrim 变暗 + 父层后退 3.5% + 材料以 scale 0.93→1 成形。
+            打开弹层时顶栏的滚动加深效果会自动卸掉，避免叠两层景深。</div></div>
+      </div>
+      <div class="rank">
+        <div class="rk"><span class="numchip">14</span></div>
+        <div class="rb"><div class="rt">减少动态 / 减少透明 / 加对比</div>
+          <div class="rd">三个 <code>prefers-*</code> 都接上了：减少动态时弹簧降级为 180ms 交叉淡入；
+            减少透明时毛玻璃全部变实底；加对比时补描边、深色卡转纯黑。系统设置里能直接验。</div></div>
+      </div>
+      <div class="rank">
+        <div class="rk"><span class="numchip">15</span></div>
+        <div class="rb"><div class="rt">排版：字距跟着字号走</div>
+          <div class="rd">19/26/34px 用负字距（大字反而要收紧），11.5/12.5px 用正字距（小字要放开），
+            行高与字号反向；优先系统字体（自带光学尺寸与字距表）。</div></div>
+      </div>
+      <div class="rank">
+        <div class="rk"><span class="numchip">16</span></div>
+        <div class="rb"><div class="rt">简单 ≠ 极简；确认只给真正不可逆的</div>
+          <div class="rd">日常动作（改名、重置密码、停用）<b>不弹二次确认</b>，改成底部一条 toast + 可撤销；
+            只有<b>毕业清理</b>这种真不可逆的才上「输入年级」确认。</div></div>
+      </div>
+    </div>
+
+    <div class="doc-card">
+      <h2>三、刻意<b>没有</b>照搬的地方（你的铁律优先）</h2>
+      <div class="two">
+        <div class="ab rec">
+          <div class="t">① 不用渐变做滚动边缘</div>
+          <div class="m">skill 建议「在固定 chrome 与内容交界处放一小段模糊/渐隐遮罩」。
+            但 v8 定死了<b>无装饰性渐变</b>，所以这里改用：<b>内容直接滚到毛玻璃底下</b>（本身就是最好的边缘效果）
+            ＋ 滚动时给顶栏加一层<b>无色</b>投影。功能一样，不引入渐变。</div>
+        </div>
+        <div class="ab rec">
+          <div class="t">② 强调色仍然只有一个</div>
+          <div class="m">skill 里的示例会用材质和颜色自由发挥。这里仍守 v8：<b>只有 #0066CC 一个强调色</b>，
+            材料的差异全部靠<b>透明度、模糊半径、投影深度</b>做，不靠加色。深色卡回到主角位置 —— 页面最重的一条信息就是它。</div>
+        </div>
+        <div class="ab rec">
+          <div class="t">③ 材料的模糊半径不逐帧改</div>
+          <div class="m">skill 建议让 <code>backdrop-filter</code> 的模糊半径与 scale 一起长。
+            但全屏尺寸的 <code>blur</code> 每帧改半径是这个页面上最贵的一件事，
+            收益只是「更明显一点的材料感」。这里改成<b>半径固定在 CSS 里</b>，
+            到场感由 <code>scale 0.93 → 1</code> 承担 —— 观感几乎一样，帧预算省下来给手势。</div>
+        </div>
+      </div>
+      <div class="doc-p" style="margin-top:12px">
+        另外：这一版<b>没有引入任何第三方库</b>（Motion / Framer 都没用），弹簧、投影、橡皮筋、FLIP 全部是 60 行不到的
+        <code>requestAnimationFrame</code> + 固定子步长积分，免得给这个项目加构建依赖。
+      </div>
+    </div>
+
+    <div class="doc-card">
+      <h2>四、怎么玩（原型里值得试的 8 件事）</h2>
+      <div class="plist">
+        <div><b>级联</b><span>「班级」在没选年级时是虚线禁用态，点它会告诉你要先选年级；选了年级再看它 —— 名单跟着换。</span></div>
+        <div><b>条件胶囊</b><span>选中条件后下面出现一枚可摘的胶囊，点 ✕ 摘掉它，<b>后面的胶囊会平滑挪位</b>（FLIP，不是硬跳）。</span></div>
+        <div><b>弹层拖拽</b><span>打开「名册导入」，抓住顶部的横条<b>往下拖再松手</b> —— 拖得越远 / 甩得越快就越可能关掉；
+          <b>往上拖</b>会撞到软边界。松手后如果没关掉，它会自己弹回去。</span></div>
+        <div><b>中途反悔</b><span>拖动中松手后立刻再抓住，动效会从当前位置继续，不会跳。</span></div>
+        <div><b>就地展开</b><span>点「导入批次」弹层里的任意一行「筛选这批 →」：弹层关掉，筛选条上多出一枚批次胶囊，列表已筛好。</span></div>
+        <div><b>批量跟随范围</b><span>勾选行后底部浮起一条批量条；不勾选时按钮文案是「重置<b>这 N 个</b>」，勾了就变成「选中的 N 个」。</span></div>
+        <div><b>顺手改数据</b><span>表格里点「改名」，输入新名字保存 —— 列表会立刻更新（原型内的数据）。</span></div>
+        <div><b>不可逆才确认</b><span>选中某个年级后，深色卡下方出现「整届操作」；点「毕业清理…」，得把年级名原样输入才能按下去。</span></div>
+      </div>
+      <div class="doc-p" style="margin-top:12px">
+        地址栏那一行是<b>实时</b>的：每改一个条件都会同步进去（原型里用的是 <code>#</code> 哈希，因为 <code>file://</code> 下推不了 history）。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 1 · 现场原型 ══════════ -->
+<section class="screen">
+  <div class="frame-outer" id="frameOuter">
+  <div class="frame">
+    <div class="chrome">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg><use href="#i-lock"/></svg>admin.radio.local<b id="urlPath">/student</b></div>
+    </div>
+    <div class="app" id="app">
+      <div class="app-inner" id="appInner">
+
+        <aside class="rail">
+          <div class="rail-brand">
+            <div class="rail-logo"><svg><use href="#i-radio"/></svg></div>
+            <div><div class="rail-name">菁悠广播站</div><div class="rail-sub">管理后台</div></div>
+          </div>
+          <div class="rail-search"><svg><use href="#i-search"/></svg>搜索菜单<kbd>Ctrl K</kbd></div>
+          <nav class="rail-nav">
+            <div class="rail-group">内容运营</div>
+            <div class="rail-item"><svg><use href="#i-grid"/></svg><span class="txt">数据概览</span></div>
+            <div class="rail-item"><svg><use href="#i-article"/></svg><span class="txt">投稿 &amp; 点歌审核</span><em class="rail-badge">6</em></div>
+            <div class="rail-item"><svg><use href="#i-cal"/></svg><span class="txt">栏目管理</span></div>
+            <div class="rail-item"><svg><use href="#i-mega"/></svg><span class="txt">公告管理</span></div>
+            <div class="rail-item"><svg><use href="#i-chat"/></svg><span class="txt">留言审核</span></div>
+            <div class="rail-group">系统管理</div>
+            <div class="rail-item on"><svg><use href="#i-users"/></svg><span class="txt">学生账号</span></div>
+            <div class="rail-item"><svg><use href="#i-star"/></svg><span class="txt">风采展示</span></div>
+            <div class="rail-item"><svg><use href="#i-toggle"/></svg><span class="txt">模块开关</span></div>
+            <div class="rail-item"><svg><use href="#i-shield"/></svg><span class="txt">账号管理</span></div>
+            <div class="rail-item"><svg><use href="#i-gear"/></svg><span class="txt">系统设置</span></div>
+          </nav>
+          <div class="rail-account">
+            <div class="rail-avatar">王</div>
+            <div class="who"><div class="nm">王老师</div><div class="rl">超级管理员</div></div>
+          </div>
+        </aside>
+
+        <div class="mainwrap">
+          <header class="appbar">
+            <div>
+              <div class="ab-title">学生账号</div>
+              <div class="ab-sub" id="abSub">加载中…</div>
+            </div>
+            <div class="ab-right">
+              <button class="btn btn-quiet btn-sm" id="moreBtn"><svg><use href="#i-dots"/></svg>更多操作</button>
+              <button class="btn btn-primary btn-sm" data-act="open-import"><svg><use href="#i-upload"/></svg>名册导入</button>
+            </div>
+          </header>
+          <div class="scroller" id="scroller">
+            <div class="filterbar" id="filterbar"></div>
+            <div class="hero" id="hero"></div>
+            <div id="tablecard"></div>
+            <div class="pager" id="pager"></div>
+          </div>
+          <div id="batchbarHost"></div>
+        </div>
+
+      </div>
+      <div id="popHost"></div>
+      <div id="modalHost"></div>
+      <div class="toasts" id="toasts"></div>
+    </div>
+  </div>
+  </div>
+  <div class="cap">
+    <b>现场原型</b> —— 这一屏是真能操作的：改条件、搜关键字、翻页、勾选、开弹层、拖弹层、改名、毕业清理。
+    <b>重点试三件事</b>：① 抓住弹层顶部的横条往下拖再松手（甩得快就关得掉，慢慢拖过头它会弹回去）；
+    ② 点一个筛选条件，在它还没展开完时点另一个（前一个会被打断、平滑收回，不跳帧）；
+    ③ 点掉一枚条件胶囊，看后面的胶囊怎么挪位。
+  </div>
+</section>
+
+<script>
+(function () {
+'use strict';
+
+/* ══════════════════════════════════════════════════════════════
+   0 · 可达性信号（skill §14）
+   ══════════════════════════════════════════════════════════════ */
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let K = 1;   // 取景框缩放系数（只能通过「适应宽度」改变；手势位移要除掉它）
+
+/* ══════════════════════════════════════════════════════════════
+   1 · 弹簧引擎（skill §4/§5/§6）
+
+   阻尼 damping（1.0=临界阻尼不过冲） + 响应 response（秒，不是时长）。
+   固定子步长数值积分 —— 好处是**任何时刻 setTarget() 都能改写目标，
+   而且速度 v 会被保留**，这就是「可打断 + 速度交接」的全部实现。
+   ══════════════════════════════════════════════════════════════ */
+function makeSpring(init, onUpdate, o) {
+  o = o || {};
+  let x = init, v = 0, target = init, raf = null, last = 0, running = false;
+  const zeta = o.damping == null ? 1 : o.damping;
+  const w0 = 8 / (o.response || 0.35);
+  const eps = o.eps == null ? 0.02 : o.eps;
+  const cb = onUpdate || function () {};
+  function frame(now) {
+    if (!last) last = now;
+    let dt = (now - last) / 1000; last = now;
+    if (dt > 1 / 30) dt = 1 / 30;                 // 掉帧保护：不让积分炸掉
+    const n = 8, h = dt / n;
+    for (let i = 0; i < n; i++) {
+      const a = -w0 * w0 * (x - target) - 2 * zeta * w0 * v;
+      v += a * h; x += v * h;
+    }
+    if (Math.abs(x - target) < eps && Math.abs(v) < eps * 40) {
+      x = target; v = 0; cb(x);
+      running = false; raf = null; last = 0;
+      if (o.onRest) o.onRest();
+      return;
+    }
+    cb(x);
+    raf = requestAnimationFrame(frame);
+  }
+  return {
+    set(t, vel) {                                 // ← 唯一的驱动方式：改写目标
+      target = t;
+      if (vel != null) v = vel;
+      if (!running) { running = true; last = 0; raf = requestAnimationFrame(frame); }
+    },
+    jump(t) { target = t; x = t; v = 0; cb(x); },
+    value() { return x; },
+    vel() { return v; },
+    stop() { if (raf) cancelAnimationFrame(raf); raf = null; running = false; last = 0; }
+  };
+}
+/* 减少动态时降级为 180ms 交叉过渡（skill §14：不是「没有反馈」） */
+function makeAnim(init, onUpdate, o) {
+  if (!RM) return makeSpring(init, onUpdate, o);
+  return {
+    set(t) { onUpdate(t); }, jump(t) { onUpdate(t); },
+    value() { return 0; }, vel() { return 0; }, stop() {}
+  };
+}
+
+/* skill §6：苹果的动量投影（指数衰减形式，不是物理课本的 v²/2a） */
+function project(v, d) { return (v / 1000) * d / (1 - d); }
+/* skill §9：橡皮筋 —— 越拖越沉，不是硬停 */
+function rubberband(over, dim, c) { return (over * dim * c) / (dim + c * Math.abs(over)); }
+
+/* ══════════════════════════════════════════════════════════════
+   2 · 数据（原型内存数据；确定性生成，截图才可复现）
+   ══════════════════════════════════════════════════════════════ */
+const NAMES = ['陈以宁','李承泽','周晚棠','郑亦舟','孙可','许知野','钱思远','王砚','冯一诺','蒋屿',
+  '沈亦白','白羽','秦思远','唐屿舟','范书言','吴雨桐','郑一诺','顾行舟','苏牧','温亦寒',
+  '邵时','廖清和','崔翌','韩沐','曹越','唐棠','邓一鸣','傅小满','谢之遥','罗清越',
+  '段云舒','卢见','岳知夏','万筱','闻笛','柏舟','江晚','席南','樊城','祝清'];
+const CLASSES = { '2023':[1,2,3,4], '2024':[1,2,3], '2025':[1,2], '2026':[1,2] };
+const BATCHES = [
+  { id:7, file:'2026-09 高一新生名册.xlsx',  at:'2026-09-14 08:32', by:'王老师', add:43,  upd:0,   skip:2,   revoked:false },
+  { id:6, file:'2026 级补录（转学生）.xlsx', at:'2026-09-02 15:07', by:'王老师', add:3,   upd:0,   skip:0,   revoked:false },
+  { id:5, file:'2025 级班级调整.xlsx',       at:'2026-08-30 09:41', by:'王老师', add:0,   upd:318, skip:12,  revoked:false },
+  { id:4, file:'2022 届名单（备份）.xlsx',   at:'2026-07-05 14:02', by:'王老师', add:0,   upd:0,   skip:309, revoked:true  },
+  { id:3, file:'2024 级名册（修正版）.xlsx', at:'2026-03-11 10:26', by:'李老师', add:0,   upd:330, skip:0,   revoked:false },
+  { id:2, file:'2024 级名册.xlsx',           at:'2026-03-11 10:19', by:'李老师', add:330, upd:0,   skip:0,   revoked:true  },
+  { id:1, file:'2025 级入学名册.xlsx',       at:'2025-09-06 16:44', by:'王老师', add:321, upd:0,   skip:0,   revoked:false }
+];
+const GRADE_BATCH = { '2026':7, '2025':1, '2024':3, '2023':5 };
+
+let DATA = (function build() {
+  const out = [];
+  let n = 0;
+  Object.keys(CLASSES).forEach(function (g, gi) {
+    CLASSES[g].forEach(function (c, ci) {
+      const seats = 4 + ((gi + ci) % 2);
+      for (let s = 1; s <= seats; s++) {
+        const i = out.length;
+        const name = NAMES[n++ % NAMES.length];
+        const pad = function (v) { return String(v).padStart(2, '0'); };
+        out.push({
+          id: 'a' + i,
+          username: g + pad(c) + pad(s),
+          name: name,
+          remark: i % 13 === 0 ? '转学（' + (2020 + (i % 6)) + '）' : '',
+          grade: g, classNo: pad(c), seatNo: pad(s),
+          status: i % 19 === 0 ? 0 : 1,
+          activated: i % 5 !== 0,
+          hasSubmit: i % 11 === 0,
+          batch: GRADE_BATCH[g],
+          lastLoginAt: i % 5 === 0 ? '' : ('2026-09-' + pad(1 + (i % 20)) + ' ' + pad(8 + (i % 13)) + ':' + pad((i * 7) % 60))
+        });
+      }
+    });
+  });
+  return out;
+})();
+
+/* ══════════════════════════════════════════════════════════════
+   3 · 状态与派生
+   ══════════════════════════════════════════════════════════════ */
+const S = { grade:'', classNo:'', status:'', activated:'', batch:'', q:'', page:1, size:8 };
+const SEL = new Set();
+
+function pad2(v) { return String(v).padStart(2, '0'); }
+function gradeLabel(g, c) { return g + ' 级' + (c ? ' ' + Number(c) + ' 班' : ''); }
+function bytesOf(a) {
+  return [a.name, a.username, a.remark].join(' ').toLowerCase();
+}
+/* skip 用来算「分面计数」：算某个条件自己的选项数时，把它自己排除在外 */
+function match(a, skip) {
+  if (skip !== 'grade' && S.grade && a.grade !== S.grade) return false;
+  if (skip !== 'classNo' && S.classNo && a.classNo !== S.classNo) return false;
+  if (skip !== 'status' && S.status && String(a.status) !== S.status) return false;
+  if (skip !== 'activated' && S.activated) {
+    if (S.activated === '1' ? !a.activated : a.activated) return false;
+  }
+  if (skip !== 'batch' && S.batch && String(a.batch) !== S.batch) return false;
+  if (skip !== 'q' && S.q && bytesOf(a).indexOf(S.q.toLowerCase()) < 0) return false;
+  return true;
+}
+function rows() { return DATA.filter(function (a) { return match(a, null); }); }
+function byId(id) { for (let i = 0; i < DATA.length; i++) if (DATA[i].id === id) return DATA[i]; return null; }
+
+const FILTER_DEFS = [
+  { key:'grade',     label:'年级' },
+  { key:'classNo',   label:'班级', dep:'grade' },
+  { key:'status',    label:'启用状态' },
+  { key:'activated', label:'激活状态' },
+  { key:'batch',     label:'导入批次' }
+];
+
+function optionsOf(key) {
+  const base = DATA.filter(function (a) { return match(a, key); });
+  const cnt = function (fn) { const m = {}; base.forEach(function (a) { const k = fn(a); m[k] = (m[k] || 0) + 1; }); return m; };
+  if (key === 'grade') {
+    const c = cnt(function (a) { return a.grade; });
+    return [{ v:'', t:'全部年级', c: base.length }].concat(
+      Object.keys(c).sort().map(function (g) { return { v:g, t:g + ' 级', c:c[g] }; }));
+  }
+  if (key === 'classNo') {
+    if (!S.grade) return [];
+    const c = cnt(function (a) { return a.classNo; });
+    return [{ v:'', t:'全部班级', c: base.length }].concat(
+      Array.from(new Set(base.map(function (a) { return a.classNo; }))).sort().map(function (x) {
+        return { v:x, t:Number(x) + ' 班', c:c[x] || 0 };
+      }));
+  }
+  if (key === 'status') {
+    const on = base.filter(function (a) { return a.status === 1; }).length;
+    return [{ v:'', t:'全部', c: base.length }, { v:'1', t:'启用', c:on }, { v:'0', t:'停用', c: base.length - on }];
+  }
+  if (key === 'activated') {
+    const y = base.filter(function (a) { return a.activated; }).length;
+    return [{ v:'', t:'全部', c: base.length }, { v:'1', t:'已激活', c:y }, { v:'0', t:'未激活', c: base.length - y }];
+  }
+  const c = cnt(function (a) { return a.batch; });
+  return [{ v:'', t:'全部批次', c: base.length }].concat(BATCHES.map(function (b) {
+    return { v:String(b.id), t:'#' + b.id + ' · ' + b.at.slice(5, 10), c:c[b.id] || 0, off:b.revoked };
+  }));
+}
+const labelOf = function (key, v) {
+  for (const d of optionsOf(key)) if (d.v === v) return d.t;
+  return v;
+};
+
+/* ══════════════════════════════════════════════════════════════
+   4 · DOM 引用
+   ══════════════════════════════════════════════════════════════ */
+const app = document.getElementById('app');
+const appInner = document.getElementById('appInner');
+const scroller = document.getElementById('scroller');
+const filterbar = document.getElementById('filterbar');
+const hero = document.getElementById('hero');
+const tablecard = document.getElementById('tablecard');
+const pager = document.getElementById('pager');
+const batchbarHost = document.getElementById('batchbarHost');
+const popHost = document.getElementById('popHost');
+const modalHost = document.getElementById('modalHost');
+const toasts = document.getElementById('toasts');
+const abSub = document.getElementById('abSub');
+const urlPath = document.getElementById('urlPath');
+const frameOuter = document.getElementById('frameOuter');
+
+/* ══════════════════════════════════════════════════════════════
+   5 · 渲染
+   ══════════════════════════════════════════════════════════════ */
+const esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+  return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' })[c]; }); };
+
+function activeChips() {
+  return FILTER_DEFS.filter(function (d) { return S[d.key]; })
+    .map(function (d) { return { key:d.key, text:labelOf(d.key, S[d.key]) }; })
+    .concat(S.q ? [{ key:'q', text:'“' + S.q + '”' }] : []);
+}
+
+function renderFilterbar() {
+  let h = '<div class="frow">';
+  FILTER_DEFS.forEach(function (d) {
+    if (d.key === 'classNo' && !S.grade) {
+      h += '<button class="fcond lock" data-act="filter" data-key="classNo">'
+        + '<span class="lbl">班级</span><span class="val ph">先选年级</span></button>';
+      return;
+    }
+    const on = S[d.key];
+    h += '<button class="fcond' + (on ? ' on' : '') + '" data-act="filter" data-key="' + d.key + '">'
+      + '<span class="lbl">' + d.label + '</span>'
+      + '<span class="val' + (on ? '' : ' ph') + '">' + (on ? esc(labelOf(d.key, S[d.key])) : '全部') + '</span>'
+      + '<svg><use href="#i-chevdown"/></svg></button>';
+  });
+  h += '<label class="fsearch"><svg><use href="#i-search"/></svg>'
+    + '<input id="qInput" placeholder="搜索姓名 / 账号 / 备注" value="' + esc(S.q) + '" spellcheck="false">'
+    + '<kbd>/</kbd></label>';
+  h += '<button class="btn btn-plain btn-sm" data-act="reset">重置</button>';
+  h += '</div>';
+  filterbar.innerHTML = h + '<div class="pickedrow" id="picked"></div>';
+  renderPicked();
+}
+
+/* 已选条件那行单独渲染 —— 搜索时只重绘它，输入框才不会被 innerHTML 换掉（否则每敲一个字符就丢焦点） */
+function renderPicked() {
+  const box = document.getElementById('picked');
+  if (!box) return;
+  const chips = activeChips();
+  let p = '';
+  if (!chips.length) {
+    p += '<span class="pt">未设置条件 —— 显示全部 ' + DATA.length + ' 个账号。条件会同步写进地址栏。</span>';
+  } else {
+    p += '<span class="pt">已选条件</span>';
+    chips.forEach(function (c) {
+      p += '<button class="pk acc" data-pk="' + c.key + '" data-act="chip" data-key="' + c.key + '">'
+        + '<b>' + esc(c.text) + '</b><svg><use href="#i-close"/></svg></button>';
+    });
+    p += '<button class="btn btn-plain btn-xs" data-act="reset">全部清掉</button>';
+  }
+  box.innerHTML = p;
+}
+
+function condSummary() {
+  const parts = activeChips().map(function (c) { return c.text; });
+  if (!parts.length) return '全部账号';
+  return parts.join(' / ');
+}
+
+function renderHero() {
+  const list = rows();
+  const hit = list.length;
+  const act = list.filter(function (a) { return a.activated; }).length;
+  const off = list.filter(function (a) { return a.status === 0; }).length;
+  const sub = list.filter(function (a) { return a.hasSubmit; }).length;
+
+  let h = '<div class="hero-top"><div>';
+  h += '<div class="hero-k">命中账号</div>';
+  h += '<div class="hero-v num">' + hit.toLocaleString('en-US') + '</div>';
+  h += '<div class="hero-sum"><b>' + esc(condSummary()) + '</b> —— 已激活 ' + act
+     + ' · 未激活 ' + (hit - act) + ' · 已停用 ' + off + ' · 有投稿记录 ' + sub + '</div>';
+  h += '</div><div class="hero-acts">';
+  h += '<button class="btn btn-white btn-sm" data-act="export">导出这 ' + hit + ' 条</button>';
+  h += '<button class="btn btn-quiet btn-sm" data-act="scope-reset" style="background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.22);color:#fff">重置这 ' + hit + ' 个的密码</button>';
+  h += '</div></div>';
+
+  /* 整届操作：只在选中某个年级时出现（skill §16：确认只给真正不可逆的） */
+  if (S.grade) {
+    const all = DATA.filter(function (a) { return a.grade === S.grade; });
+    const canDel = all.filter(function (a) { return !a.hasSubmit; }).length;
+    const keep = all.length - canDel;
+    h += '<div class="hero-issue"><div class="ic"><svg><use href="#i-trash"/></svg></div>'
+      + '<div><div class="t">整届操作 · ' + S.grade + ' 级</div>'
+      + '<div class="m">毕业清理按 safe 规则：没有投稿记录的 <b>' + canDel + '</b> 人真删，有投稿记录的 <b>'
+      + keep + '</b> 人改为停用。执行后这一届的登录态立即作废。</div></div>'
+      + '<span style="margin-left:auto;display:flex;gap:8px">'
+      + '<button class="btn btn-quiet btn-sm" data-act="export" style="background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.22);color:#fff">导出本届</button>'
+      + '<button class="btn btn-danger-fill btn-sm" data-act="open-purge">毕业清理…</button></span></div>';
+  }
+  hero.innerHTML = h;
+}
+
+function renderTable() {
+  const list = rows();
+  const pages = Math.max(1, Math.ceil(list.length / S.size));
+  if (S.page > pages) S.page = pages;
+  const start = (S.page - 1) * S.size;
+  const pageRows = list.slice(start, start + S.size);
+
+  let h = '';
+  if (!list.length) {
+    h = '<div class="tablecard"><div class="empty"><div class="ei"><svg><use href="#i-inbox"/></svg></div>'
+      + '<div class="et">没有符合条件的账号</div>'
+      + '<div class="em">当前条件：' + esc(condSummary()) + '。这几个条件没有交集。</div>'
+      + '<div style="display:flex;gap:8px;margin-top:4px">'
+      + (S.batch ? '<button class="btn btn-quiet btn-sm" data-act="chip" data-key="batch">清掉批次条件</button>' : '')
+      + '<button class="btn btn-plain btn-sm" data-act="reset">重置全部</button></div>'
+      + '</div></div>';
+    tablecard.innerHTML = h;
+    return;
+  }
+
+  const pageIds = pageRows.map(function (a) { return a.id; });
+  const selOnPage = pageIds.filter(function (id) { return SEL.has(id); }).length;
+
+  h += '<div class="tablecard"><table class="tb"><colgroup>'
+    + '<col style="width:46px"><col style="width:122px"><col style="width:104px"><col style="width:124px">'
+    + '<col style="width:88px"><col style="width:92px"><col style="width:116px"><col style="width:152px"><col>'
+    + '</colgroup><thead><tr>'
+    + '<th class="c"><span class="cb' + (selOnPage === pageIds.length ? ' on' : (selOnPage ? ' mid' : '')) + '" data-act="selall">'
+    + (selOnPage ? '<svg><use href="#i-check"/></svg>' : '') + '</span></th>'
+    + '<th>账号</th><th>姓名</th><th>届 · 班</th><th class="c">启用</th><th class="c">激活</th>'
+    + '<th>导入批次</th><th>最近登录</th><th class="r">操作</th></tr></thead><tbody>';
+
+  pageRows.forEach(function (a) {
+    const sel = SEL.has(a.id);
+    h += '<tr' + (sel ? ' class="sel"' : '') + '>'
+      + '<td class="c"><span class="cb' + (sel ? ' on' : '') + '" data-act="sel" data-id="' + a.id + '">'
+      + (sel ? '<svg><use href="#i-check"/></svg>' : '') + '</span></td>'
+      + '<td><span class="mono" style="font-size:12.5px">' + a.username + '</span></td>'
+      + '<td data-cell="name:' + a.id + '">'
+      + '<span class="rowc" style="gap:8px"><span class="av">' + esc(a.name.charAt(0)) + '</span>'
+      + '<span class="el">' + esc(a.name) + '</span></span></td>'
+      + '<td><span style="font-size:12px;color:var(--muted-2)">' + gradeLabel(a.grade, a.classNo) + '</span></td>'
+      + '<td class="c"><span class="tag ' + (a.status ? 'tag-ok' : 'tag-reject') + '">' + (a.status ? '启用' : '停用') + '</span></td>'
+      + '<td class="c"><span class="tag ' + (a.activated ? 'tag-ok' : 'tag-mute') + '">' + (a.activated ? '已激活' : '未激活') + '</span></td>'
+      + '<td><span class="mono" style="font-size:11.5px;color:var(--muted-2)">#' + a.batch + '</span></td>'
+      + '<td><span style="font-size:11.5px;color:var(--muted-2)" class="num">' + (a.lastLoginAt || '从未登录') + '</span></td>'
+      + '<td><div class="rowact">'
+      + '<button class="btn btn-quiet btn-xs" data-act="rename" data-id="' + a.id + '">改名</button>'
+      + '<button class="btn btn-quiet btn-xs" data-act="resetpwd" data-id="' + a.id + '">重置密码</button>'
+      + (a.status
+          ? '<button class="btn btn-danger-quiet btn-xs" data-act="toggle" data-id="' + a.id + '">停用</button>'
+          : '<button class="btn btn-quiet btn-xs" data-act="toggle" data-id="' + a.id + '">启用</button>')
+      + '</div></td></tr>';
+  });
+  h += '</tbody></table></div>';
+  tablecard.innerHTML = h;
+
+  let p = '<span class="info">显示 ' + (start + 1) + ' – ' + (start + pageRows.length)
+        + ' 条，共 ' + list.length + ' 条 · 每页 ' + S.size + ' 条</span>';
+  p += '<button class="pg" data-act="page" data-p="' + (S.page - 1) + '"' + (S.page === 1 ? ' disabled' : '') + '>‹</button>';
+  for (let i = 1; i <= pages; i++) p += '<button class="pg' + (i === S.page ? ' on' : '') + '" data-act="page" data-p="' + i + '">' + i + '</button>';
+  p += '<button class="pg" data-act="page" data-p="' + (S.page + 1) + '"' + (S.page === pages ? ' disabled' : '') + '>›</button>';
+  pager.innerHTML = p;
+}
+
+let sBar = null, sBarO = null;
+function renderBatchbar() {
+  const n = SEL.size;
+  if (!n) {
+    if (sBar) { const b = sBar; const o = sBarO; sBar = null; sBarO = null;
+      b.style.pointerEvents = 'none'; o.set(0, 0); b.__s.set(40, 0);
+      setTimeout(function () { if (b.parentNode) b.remove(); }, 520); }
+    return;
+  }
+  if (!sBar) {
+    const el = document.createElement('div');
+    el.className = 'batchbar';
+    el.style.opacity = '0';
+    batchbarHost.appendChild(el);
+    sBar = el;
+    sBarO = makeAnim(0, function (v) { el.style.opacity = Math.max(0, Math.min(1, v)); }, { response:0.28, eps:0.002 });
+    sBar.__s = makeAnim(40, function (v) { el.style.transform = 'translateX(-50%) translateY(' + v + 'px)'; }, { response:0.3 });
+    sBarO.set(1); sBar.__s.set(0);
+  }
+  const scope = rows().length;
+  sBar.innerHTML = '<span class="cnt">已选 <b class="num">' + n + '</b> 条</span>'
+    + '<span class="hint" style="margin-right:6px;white-space:nowrap">范围＝勾选的 ' + n + ' 个</span>'
+    + '<button class="btn btn-quiet btn-sm" data-act="batch-reset">重置为初始密码</button>'
+    + '<button class="btn btn-quiet btn-sm" data-act="batch-disable">批量停用</button>'
+    + '<button class="btn btn-danger-quiet btn-sm" data-act="batch-delete">批量删除</button>'
+    + '<button class="btn btn-plain btn-sm" data-act="clear-sel">取消选择</button>';
+  void scope;
+}
+
+function syncChrome() {
+  const list = rows();
+  const act = list.filter(function (a) { return a.activated; }).length;
+  abSub.textContent = activeChips().length
+    ? condSummary() + ' · 命中 ' + list.length + ' 个'
+    : '共 ' + list.length + ' 个账号 · 4 届 · 已激活 ' + act;
+  let q = [];
+  if (S.grade) q.push('grade=' + S.grade);
+  if (S.classNo) q.push('class=' + S.classNo);
+  if (S.status) q.push('status=' + S.status);
+  if (S.activated) q.push('activated=' + S.activated);
+  if (S.batch) q.push('batch=' + S.batch);
+  if (S.q) q.push('q=' + encodeURIComponent(S.q));
+  const url = '/student' + (q.length ? '?' + q.join('&') : '');
+  urlPath.textContent = url;
+  try { history.replaceState(null, '', '#' + url); } catch (e) { /* file:// 下忽略 */ }
+}
+
+function render() { renderFilterbar(); renderHero(); renderTable(); renderBatchbar(); syncChrome(); }
+/* 不动筛选条本身（保住输入框焦点），只刷新结果区 */
+function renderFast() { renderPicked(); renderHero(); renderTable(); renderBatchbar(); syncChrome(); }
+
+/* 摘掉条件胶囊时用 FLIP：先量旧位置，再渲染，再让位移为 0（skill §12 的 craft） */
+function renderWithFlip() {
+  const before = {};
+  Array.prototype.forEach.call(filterbar.querySelectorAll('.pk'), function (el) {
+    before[el.dataset.pk] = el.getBoundingClientRect().left;
+  });
+  render();
+  Array.prototype.forEach.call(filterbar.querySelectorAll('.pk'), function (el) {
+    const b = before[el.dataset.pk];
+    if (b == null) return;
+    const dx = b - el.getBoundingClientRect().left;
+    if (Math.abs(dx) < 0.5) return;
+    const s = makeAnim(dx, function (v) { el.style.transform = 'translateX(' + v + 'px)'; },
+      { damping: 1, response: 0.32, onRest: function () { el.style.transform = ''; } });
+    s.set(0);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   6 · 浮层：就地展开 + 可打断（skill §3 / §7）
+   ══════════════════════════════════════════════════════════════ */
+let POP = null;
+
+function popOut(trigger, html, o) {
+  o = o || {};
+  closePop(true);
+  const el = document.createElement('div');
+  el.className = 'pop';
+  el.style.width = (o.width || 236) + 'px';
+  el.style.opacity = '0';
+  el.innerHTML = html;
+  popHost.appendChild(el);
+
+  const aR = app.getBoundingClientRect(), tR = trigger.getBoundingClientRect();
+  const W = el.offsetWidth, H = el.offsetHeight;
+  const AW = aR.width / K, AH = aR.height / K;
+  const tL = (tR.left - aR.left) / K, tT = (tR.top - aR.top) / K;
+  const tW = tR.width / K, tB = tT + tR.height / K;
+
+  let left = tL + tW / 2 - W / 2;
+  left = Math.max(8, Math.min(left, AW - W - 8));
+  let top = tB + 8, below = true;
+  if (top + H > AH - 8) { top = Math.max(8, tT - H - 8); below = false; }
+  el.style.left = Math.round(left) + 'px';
+  el.style.top = Math.round(top) + 'px';
+
+  /* 空间一致性：展开原点对准触发它的那颗胶囊，而不是自己的中心（skill §7） */
+  const ox = Math.max(14, Math.min(W - 14, tL + tW / 2 - left));
+  el.style.transformOrigin = ox + 'px ' + (below ? '0px' : H + 'px');
+  const dir = below ? -1 : 1;
+
+  const obj = { el: el, p: 0, trigger: trigger, below: below };
+  obj.paint = function () {
+    const e = Math.max(0, Math.min(1, obj.p));
+    el.style.opacity = e;
+    el.style.transform = 'translateY(' + (dir * 6 * (1 - e)) + 'px) scale(' + (0.93 + 0.07 * e) + ')';
+  };
+  obj.sP = makeAnim(0, function (v) { obj.p = v; obj.paint(); }, { response: 0.3, eps: 0.002 });
+  POP = obj;
+  trigger.classList.add('open');
+  obj.sP.set(1);
+  return obj;
+}
+
+function closePop(immediate) {
+  const o = POP; if (!o) return;
+  POP = null;
+  o.trigger.classList.remove('open');
+  if (immediate) { o.el.remove(); return; }
+  o.sP.set(0);                                  /* 同一条路径退回去 */
+  setTimeout(function () { o.el.remove(); }, 460);
+}
+
+function filterPopHTML(key) {
+  const def = FILTER_DEFS.filter(function (d) { return d.key === key; })[0];
+  const opts = optionsOf(key);
+  let h = '<div class="fh">' + def.label + (key === 'classNo' ? ' · 属于 ' + S.grade + ' 级' : '') + '</div>';
+  opts.forEach(function (o) {
+    const on = S[key] === o.v;
+    h += '<button class="fopt' + (on ? ' on' : '') + '" data-act="pick" data-key="' + key + '" data-v="' + o.v + '">'
+      + '<span class="tx">' + esc(o.t) + '</span><span class="ct">' + o.c + '</span>'
+      + (on ? '<svg class="ck"><use href="#i-check"/></svg>' : '') + '</button>';
+  });
+  return h;
+}
+
+function moreMenuHTML() {
+  const n = rows().length;
+  return '<button class="mi" data-act="open-import"><svg><use href="#i-upload"/></svg>'
+    + '<span><span class="t">名册导入</span><span class="d">上传 xlsx，逐行预览后再写入</span></span></button>'
+    + '<button class="mi" data-act="open-batches"><svg><use href="#i-batch"/></svg>'
+    + '<span><span class="t">导入批次与撤销</span><span class="d">7 个批次 · 传错表格可一键回滚</span></span></button>'
+    + '<div class="fsep"></div>'
+    + '<button class="mi" data-act="export"><svg><use href="#i-download"/></svg>'
+    + '<span><span class="t">导出当前结果</span><span class="d">' + n + ' 条 · 含初始密码明文</span></span></button>'
+    + '<button class="mi" data-act="quick-inactive"><svg><use href="#i-clock"/></svg>'
+    + '<span><span class="t">只看未激活</span><span class="d">密码发出去了但还没登录过的人</span></span></button>';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   7 · 模态弹层：材料成形 + 拖拽关闭 + 速度交接 + 动量投影（skill §5/§6/§9/§12）
+   ══════════════════════════════════════════════════════════════ */
+const appbarEl = app.querySelector('.appbar');
+let SHEET = null;
+
+function importBody() {
+  const rowsHtml = [
+    ['第 2 行', '2026 级 · 1 班 · 1 号 · 郑亦舟', '20260101', 'ok', '新建', '初始密码 <b>user20260101</b>'],
+    ['第 3 行', '2026 级 · 1 班 · 2 号 · 孙可',   '20260102', 'ok', '新建', '初始密码 <b>user20260102</b>'],
+    ['第 4 行', '2026 级 · 2 班 · 3 号 · 周晚棠', '20260203', 'ok', '新建', '初始密码 <b>user20260203</b>'],
+    ['第 5 行', '2026 级 · 1 班 · （空） · 冯一诺', '—', 'no', '异常', '序号缺失：这一行凑不出三元组，请回表格补齐'],
+    ['第 6 行', '2026 级 · 1 班 · 2 号 · 沈亦白', '—', 'no', '异常', '与第 3 行重复：同一班内序号 02 已经出现过']
+  ];
+  let h = '<div class="gcard" style="display:flex;align-items:center;gap:12px">'
+    + '<span class="tag tag-top">第 2 步 / 共 3 步</span>'
+    + '<span style="font-size:13.5px;font-weight:600;letter-spacing:-.01em">预览与确认</span>'
+    + '<span class="hint" style="margin-left:auto">这一步只解析不落库，确认后才写入</span></div>';
+  h += '<div class="gcard" style="display:flex;gap:22px;flex-wrap:wrap">'
+    + '<span style="display:flex;align-items:center;gap:8px"><span class="tag tag-ok">新建</span><b class="num" style="font-size:17px">43</b></span>'
+    + '<span style="display:flex;align-items:center;gap:8px"><span class="tag tag-warn">覆盖</span><b class="num" style="font-size:17px">0</b><span class="hint">未激活，可安全覆盖</span></span>'
+    + '<span style="display:flex;align-items:center;gap:8px"><span class="tag tag-mute">受保护</span><b class="num" style="font-size:17px">2</b><span class="hint">已激活，默认跳过</span></span>'
+    + '<span style="display:flex;align-items:center;gap:8px"><span class="tag tag-reject">异常</span><b class="num" style="font-size:17px">2</b><span class="hint">带原文行号，不写库</span></span></div>';
+  h += '<div class="tablecard"><table class="tb"><colgroup><col style="width:84px"><col style="width:258px"><col style="width:126px"><col style="width:92px"><col></colgroup>'
+    + '<thead><tr><th>行号</th><th>表格原内容</th><th>识别结果</th><th class="c">结论</th><th>说明</th></tr></thead><tbody>';
+  rowsHtml.forEach(function (r) {
+    h += '<tr><td><span class="mono" style="font-size:11.5px;color:var(--muted-2)">' + r[0] + '</span></td>'
+      + '<td><span class="mono" style="font-size:12.5px">' + r[1] + '</span></td>'
+      + '<td><span class="mono" style="font-size:12.5px;font-weight:600">' + r[2] + '</span></td>'
+      + '<td class="c"><span class="tag ' + (r[3] === 'ok' ? 'tag-ok' : 'tag-reject') + '">' + r[4] + '</span></td>'
+      + '<td><span class="hint"' + (r[3] === 'ok' ? '' : ' style="color:var(--red-fg)"') + '>' + r[5] + '</span></td></tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<div class="gcard" style="display:flex;flex-direction:column;gap:13px">'
+    + '<div style="display:flex;align-items:center;gap:13px"><span class="sw" data-act="sw"></span>'
+    + '<div><div style="font-size:13.5px;font-weight:500">强制覆盖已激活</div>'
+    + '<div class="hint">默认关。打开后覆盖备注与三元组，<b>仍然不碰密码</b></div></div></div>'
+    + '<div style="display:flex;align-items:center;gap:13px"><span class="sw on" data-act="sw"></span>'
+    + '<div><div style="font-size:13.5px;font-weight:500">严格模式</div>'
+    + '<div class="hint">有异常行就整批不导入（当前 2 行异常，整批会被拦下）</div></div></div></div>';
+  h += '<div class="warnline"><svg><use href="#i-info"/></svg>'
+    + '<span>导出文件含初始密码明文，只用于分发给本人；已改过密码的行会留空。</span></div>';
+  return h;
+}
+
+function batchesBody() {
+  let h = '<div class="tablecard"><table class="tb"><colgroup>'
+    + '<col style="width:56px"><col style="width:136px"><col><col style="width:84px">'
+    + '<col style="width:60px"><col style="width:60px"><col style="width:60px"><col style="width:90px"><col style="width:164px">'
+    + '</colgroup><thead><tr><th>批次</th><th>时间</th><th>文件</th><th>操作人</th>'
+    + '<th class="r">新建</th><th class="r">更新</th><th class="r">跳过</th><th class="c">状态</th><th class="r">操作</th></tr></thead><tbody>';
+  BATCHES.forEach(function (b) {
+    h += '<tr><td><span class="mono" style="font-size:12.5px">#' + b.id + '</span></td>'
+      + '<td><span class="num" style="font-size:11.5px;color:var(--muted-2)">' + b.at + '</span></td>'
+      + '<td><span class="el" style="font-size:12.5px">' + esc(b.file) + '</span></td>'
+      + '<td style="font-size:12.5px">' + b.by + '</td>'
+      + '<td class="r num">' + b.add + '</td><td class="r num">' + b.upd + '</td><td class="r num">' + b.skip + '</td>'
+      + '<td class="c"><span class="tag ' + (b.revoked ? 'tag-mute' : 'tag-ok') + '">' + (b.revoked ? '已撤销' : '生效中') + '</span></td>'
+      + '<td><div class="rowact">'
+      + '<button class="link-btn" data-act="batch-filter" data-v="' + b.id + '">筛选这批<svg><use href="#i-arrow"/></svg></button>'
+      + (b.revoked ? '' : '<span class="vsep"></span><button class="btn btn-danger-quiet btn-xs" data-act="batch-revoke" data-v="' + b.id + '">撤销</button>')
+      + '</div></td></tr>';
+  });
+  h += '</tbody></table></div>'
+    + '<div class="noteline"><svg><use href="#i-info"/></svg><span><b>「筛选这批」只是把批次加进筛选条件</b>，'
+    + '不改任何数据 —— 点它等于关掉这个弹层并在筛选条上多出一枚批次胶囊。'
+    + '撤销的边界：只删本次新建且没有投稿记录的；有投稿记录的改停用；学生已经自己改过密码的不动。</span></div>';
+  return h;
+}
+
+function purgeBody() {
+  const g = S.grade;
+  const all = DATA.filter(function (a) { return a.grade === g; });
+  const canDel = all.filter(function (a) { return !a.hasSubmit; }).length;
+  const keep = all.length - canDel;
+  const classes = Array.from(new Set(all.map(function (a) { return a.classNo; }))).length;
+  let h = '<div class="warnline" style="font-size:13px;padding:12px 14px"><svg><use href="#i-trash"/></svg>'
+    + '<span><b>此操作不可恢复。</b>执行后这一届的登录态会立即作废，不等 30 秒缓存。建议先点「导出本届」留档。</span></div>';
+  h += '<div class="gcard" style="display:flex;gap:22px;flex-wrap:wrap">'
+    + '<span style="display:flex;align-items:center;gap:8px"><span class="hint">本届账号</span><b class="num" style="font-size:17px">' + all.length + '</b></span>'
+    + '<span style="display:flex;align-items:center;gap:8px"><span class="hint">将真删</span><b class="num" style="font-size:17px;color:var(--red-fg)">' + canDel + '</b></span>'
+    + '<span style="display:flex;align-items:center;gap:8px"><span class="hint">将停用</span><b class="num" style="font-size:17px;color:var(--amber-fg)">' + keep + '</b></span>'
+    + '<span style="display:flex;align-items:center;gap:8px"><span class="hint">涉及班级</span><b class="num" style="font-size:17px">' + classes + '</b></span></div>';
+  h += '<div style="display:flex;flex-direction:column;gap:9px">';
+  h += modeCard('safe', 'safe · 默认', '无投稿记录的 ' + canDel + ' 个真删；有投稿记录的 ' + keep + ' 个改为停用', true);
+  h += modeCard('disable', 'disable · 只停用', all.length + ' 个全部改为停用，一个都不删 —— 留着以后复查', false);
+  h += modeCard('purge', 'purge · 全删（危险）', all.length + ' 个全部真删，含 ' + keep + ' 个有投稿记录的人 —— 作者名会从审核列表里消失', false);
+  h += '</div>';
+  h += '<div style="display:flex;flex-direction:column;gap:8px">'
+    + '<span class="hint">输入 <b style="color:var(--ink)">' + g + '</b> 确认执行</span>'
+    + '<input class="input" id="purgeInput" placeholder="' + g + '" spellcheck="false"></div>';
+  return h;
+}
+function modeCard(v, t, d, on) {
+  return '<button class="gcard" data-act="mode" data-v="' + v + '" style="text-align:left;'
+    + 'display:flex;align-items:center;gap:11px;padding:13px 15px;'
+    + (on ? 'border:1px solid var(--accent);background:var(--acc-bg)' : 'border:1px solid transparent') + '">'
+    + '<span class="cb' + (on ? ' on' : '') + '" style="pointer-events:none">'
+    + (on ? '<svg><use href="#i-check"/></svg>' : '') + '</span>'
+    + '<span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600">' + t + '</span>'
+    + '<span class="hint">' + d + '</span></span></button>';
+}
+
+const SHEET_DEFS = {
+  import: { title:'名册导入', sub:'2026-09 高一新生名册.xlsx · 已解析 47 行 · 表头识别在第 1 行', w:920, body:importBody,
+    foot:'<span class="hint">本次会写入 43 个账号</span><span style="display:flex;gap:8px;margin-left:auto">'
+      + '<button class="btn btn-quiet btn-sm" data-act="close-sheet">取消</button>'
+      + '<button class="btn btn-plain btn-sm" data-act="import-skip">忽略异常行继续</button>'
+      + '<button class="btn btn-primary" data-act="import-ok">确认导入 43 行</button></span>' },
+  batches: { title:'导入批次', sub:'7 个批次 · 撤销只删「本次新建且没有投稿记录」的账号', w:1020, body:batchesBody,
+    foot:'<span class="hint">「筛选这批」只把批次加进筛选条件，不改任何数据 —— 描边按钮才会改数据</span>'
+      + '<button class="btn btn-quiet btn-sm" data-act="close-sheet" style="margin-left:auto">关闭</button>' },
+  purge: { title:'毕业清理 · <GRADE> 级', sub:'只处理这一届的账号，其它届一概不动', w:700, body:purgeBody,
+    foot:'<span class="hint">本次影响 <b>N</b> 个账号</span><span style="display:flex;gap:8px;margin-left:auto">'
+      + '<button class="btn btn-quiet btn-sm" data-act="export">先导出本届</button>'
+      + '<button class="btn btn-plain btn-sm" data-act="close-sheet">取消</button>'
+      + '<button class="btn btn-danger-fill" id="purgeGo" data-act="do-purge" disabled>确认清理 ' + '<GRADE>' + ' 级</button></span>' }
+};
+
+function openSheet(kind) {
+  closeSheet(true);
+  const def = SHEET_DEFS[kind];
+  if (!def) return;
+  const grade = S.grade || '';
+  const nAll = DATA.filter(function (a) { return a.grade === grade; }).length;
+
+  const scrim = document.createElement('div');
+  scrim.className = 'scrim'; scrim.style.opacity = '0';
+  scrim.addEventListener('pointerdown', function () { closeSheet(); });
+  const el = document.createElement('div');
+  el.className = 'sheet'; el.style.width = def.w + 'px'; el.style.opacity = '0';
+
+  const title = def.title.replace('<GRADE>', grade);
+  const foot = def.foot.replace(/<GRADE>/g, grade).replace('<b>N</b>', '<b>' + nAll + '</b>');
+  el.innerHTML = '<div class="sheet-grab"><i></i></div>'
+    + '<div class="sheet-head"><div style="flex:1;min-width:0">'
+    + '<div class="ht">' + title + '</div><div class="hs">' + def.sub + '</div></div>'
+    + '<button class="xbtn" data-act="close-sheet"><svg><use href="#i-close"/></svg></button></div>'
+    + '<div class="sheet-body">' + def.body() + '</div>'
+    + '<div class="sheet-foot">' + foot + '</div>';
+  modalHost.appendChild(scrim);
+  modalHost.appendChild(el);
+
+  const aR = app.getBoundingClientRect();
+  const W = el.offsetWidth, H = el.offsetHeight;
+  el.style.left = Math.round((aR.width / K - W) / 2) + 'px';
+  el.style.top = Math.round((aR.height / K - H) / 2) + 'px';
+
+  const o = { el: el, scrim: scrim, p: 0, sy: 0, kind: kind, drag: null };
+  o.paint = function () {
+    const e = Math.max(0, Math.min(1, o.p));
+    el.style.opacity = e;
+    el.style.transform = 'translateY(' + (o.sy + 18 * (1 - e)) + 'px) scale(' + (0.93 + 0.07 * e) + ')';
+    appInner.style.transform = e > 0.001 ? 'scale(' + (1 - 0.035 * e) + ')' : '';
+    scrim.style.opacity = e;
+  };
+  o.sP = makeAnim(0, function (v) { o.p = v; o.paint(); }, { response: 0.32, eps: 0.002 });
+  o.sY = makeAnim(0, function (v) { o.sy = v; o.paint(); }, { response: 0.34, eps: 0.05 });
+  SHEET = o;
+  appbarEl.style.boxShadow = 'none';            /* 有模态时卸掉滚动加深，避免叠两层景深 */
+  o.sP.set(1); o.sY.set(0);
+
+  /* —— 拖拽关闭：1:1 跟手（尊重抓取偏移）→ 松手用速度定去留 —— */
+  el.addEventListener('pointerdown', function (e) {
+    if (e.button !== 0 || e.target.closest('button')) return;
+    if (!e.target.closest('.sheet-grab,.sheet-head')) return;
+    try { el.setPointerCapture(e.pointerId); } catch (err) { /* 合成事件下没有活跃指针，忽略 */ }
+    o.sP.stop(); o.sY.stop();
+    o.drag = { y0: o.sy, start: e.clientY / K, last: e.clientY / K, t: performance.now(), v: 0 };
+  });
+  el.addEventListener('pointermove', function (e) {
+    const d = o.drag; if (!d) return;
+    const y = e.clientY / K, now = performance.now(), dt = (now - d.t) / 1000;
+    if (dt > 0.001) d.v = d.v * 0.55 + ((y - d.last) / dt) * 0.45;   /* 平滑一下速度估计 */
+    d.last = y; d.t = now;
+    let dy = y - d.start;
+    if (dy < 0) dy = -rubberband(-dy, 420, 0.55);                    /* 往上拖＝软边界 */
+    o.sy = d.y0 + dy;
+    o.paint();
+  });
+  const release = function () {
+    const d = o.drag; if (!d) return;
+    o.drag = null;
+    const vel = d.v;                                  /* px/s，向下为正 */
+    const proj = o.sy + project(vel, 0.998);          /* skill §6：预测落点再决定去留 */
+    const H2 = el.offsetHeight;
+    const dismiss = o.sy > H2 * 0.26 || vel > 620 || proj > H2 * 0.62;
+    if (dismiss) { closeSheet(false, vel); return; }
+    /* 没关掉：从当前位置弹回 0，把松手速度原样交给弹簧（skill §5，无接缝）。
+       这一次带了动量，所以允许一点点过冲（阻尼 .82）—— skill §4 的红线。 */
+    o.sY.stop();
+    o.sY = makeAnim(o.sy, function (v) { o.sy = v; o.paint(); }, { damping: 0.82, response: 0.36 });
+    o.sY.set(0, vel);
+  };
+  el.addEventListener('pointerup', release);
+  el.addEventListener('pointercancel', release);
+}
+
+function closeSheet(immediate, vel) {
+  const o = SHEET; if (!o) return;
+  SHEET = null;
+  o.drag = null;
+  if (immediate) {
+    o.el.remove(); o.scrim.remove();
+    appInner.style.transform = ''; appbarEl.style.boxShadow = '';
+    return;
+  }
+  o.sP.stop(); o.sY.stop();
+  o.sY = makeAnim(o.sy, function (v) { o.sy = v; o.paint(); }, { damping: 1, response: 0.34 });
+  o.sY.set(180, vel || 0);                       /* 沿来路往下走（skill §7：从哪来、回哪去） */
+  o.sP.set(0, (vel || 0) * 0.35);
+  setTimeout(function () {
+    o.el.remove(); o.scrim.remove();
+    appInner.style.transform = ''; appbarEl.style.boxShadow = '';
+  }, 560);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   8 · Toast（含「可撤销」：skill §16 的 forgiveness）
+   ══════════════════════════════════════════════════════════════ */
+function toast(msg, opts) {
+  opts = opts || {};
+  while (toasts.children.length > 2) toasts.firstChild.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = '<svg><use href="#' + (opts.icon || 'i-check') + '"/></svg><span>' + esc(msg) + '</span>';
+  if (opts.undo) {
+    el.style.pointerEvents = 'auto';
+    const b = document.createElement('button');
+    b.className = 'link-btn';
+    b.style.color = '#6cb6ff';
+    b.textContent = '撤销';
+    b.onclick = function () { opts.undo(); kill(0); };
+    el.appendChild(b);
+  }
+  toasts.appendChild(el);
+  const s = makeAnim(0, function (v) {
+    const e = Math.max(0, Math.min(1, v));
+    el.style.opacity = e;
+    el.style.transform = 'translateY(' + (14 * (1 - e)) + 'px)';
+  }, { response: 0.3, eps: 0.002 });
+  s.set(1);
+  const timer = setTimeout(function () { kill(); }, opts.ms || (opts.undo ? 5600 : 2600));
+  function kill() {
+    clearTimeout(timer);
+    const d = makeAnim(1, function (v) {
+      el.style.opacity = Math.max(0, v);
+      el.style.transform = 'translateY(' + (10 * (1 - v)) + 'px)';
+    }, { response: 0.26, eps: 0.002 });
+    d.set(0);
+    setTimeout(function () { el.remove(); }, 420);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   9 · 就地改名（不弹模态 —— skill §16：日常动作不要确认框）
+   ══════════════════════════════════════════════════════════════ */
+function startRename(id) {
+  const a = byId(id); if (!a) return;
+  const cell = tablecard.querySelector('[data-cell="name:' + id + '"]');
+  if (!cell) return;
+  cell.innerHTML = '<input class="input" style="height:32px;font-size:13px" value="' + esc(a.name) + '" spellcheck="false">';
+  const inp = cell.querySelector('input');
+  inp.focus(); inp.select();
+  const s = makeAnim(0, function (v) {
+    inp.style.opacity = v;
+    inp.style.transform = 'translateY(' + (-4 * (1 - v)) + 'px)';
+  }, { response: 0.26, eps: 0.002 });
+  s.set(1);
+  let done = false;
+  const commit = function (ok) {
+    if (done) return; done = true;
+    const v = inp.value.trim();
+    const old = a.name;
+    if (ok && v && v !== old) {
+      a.name = v; render();
+      toast('姓名已更新，学生端同步生效', { undo: function () { a.name = old; render(); } });
+    } else { render(); }
+  };
+  inp.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); commit(true); }
+    else if (e.key === 'Escape') { e.stopPropagation(); commit(false); }
+  });
+  inp.addEventListener('blur', function () { commit(true); });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   10 · 事件分发（一处委托，浮层/弹层都在 app 里）
+   ══════════════════════════════════════════════════════════════ */
+let purgeMode = 'safe';
+
+function setFilter(key, v) {
+  if (S[key] === v) return;
+  S[key] = v;
+  if (key === 'grade' && S.classNo) S.classNo = '';   /* 改年级 → 班级条件自动清掉（级联的唯一正确写法） */
+  S.page = 1;
+}
+function clearAll() {
+  FILTER_DEFS.forEach(function (d) { S[d.key] = ''; });
+  S.q = ''; S.page = 1;
+}
+
+app.addEventListener('click', function (e) {
+  const t = e.target.closest('[data-act]');
+  if (!t) return;
+  const act = t.dataset.act, key = t.dataset.key, id = t.dataset.id, v = t.dataset.v;
+
+  if (act === 'filter') {
+    if (POP && POP.trigger === t) { closePop(); return; }
+    if (key === 'classNo' && !S.grade) {
+      toast('「班级」依赖年级：请先选一个年级', { icon: 'i-info' });
+      return;
+    }
+    popOut(t, filterPopHTML(key), { width: key === 'batch' ? 260 : 224 });
+    return;
+  }
+  if (act === 'pick') {
+    setFilter(key, v);
+    if (POP) { POP.el.innerHTML = filterPopHTML(key); render(); } else { render(); }
+    return;
+  }
+  if (act === 'chip') {
+    if (key === 'q') { S.q = ''; render(); }
+    else { setFilter(key, ''); renderWithFlip(); }
+    return;
+  }
+  if (act === 'reset') { clearAll(); render(); return; }
+
+  if (act === 'page') { S.page = Math.max(1, Number(v || t.dataset.p)); renderTable(); return; }
+  if (act === 'sel') {
+    if (SEL.has(id)) SEL.delete(id); else SEL.add(id);
+    renderTable(); renderBatchbar(); return;
+  }
+  if (act === 'selall') {
+    const list = rows(), start = (S.page - 1) * S.size;
+    const ids = list.slice(start, start + S.size).map(function (a) { return a.id; });
+    const all = ids.every(function (x) { return SEL.has(x); });
+    ids.forEach(function (x) { if (all) SEL.delete(x); else SEL.add(x); });
+    renderTable(); renderBatchbar(); return;
+  }
+  if (act === 'clear-sel') { SEL.clear(); renderTable(); renderBatchbar(); return; }
+
+  if (act === 'rename') { startRename(id); return; }
+  if (act === 'resetpwd') {
+    const a = byId(id);
+    toast('已把 ' + a.name + ' 的密码重置为 ' + 'user' + a.username, { icon: 'i-key' });
+    return;
+  }
+  if (act === 'toggle') {
+    const a = byId(id), before = a.status;
+    a.status = before ? 0 : 1; render();
+    toast('已' + (a.status ? '启用' : '停用') + ' ' + a.name,
+      { undo: function () { a.status = before; render(); } });
+    return;
+  }
+  if (act === 'batch-disable') {
+    const ids = Array.from(SEL), before = {};
+    ids.forEach(function (x) { before[x] = byId(x).status; byId(x).status = 0; });
+    SEL.clear(); render();
+    toast('已停用 ' + ids.length + ' 个账号', { undo: function () { ids.forEach(function (x) { byId(x).status = before[x]; }); render(); } });
+    return;
+  }
+  if (act === 'batch-delete') {
+    const ids = Array.from(SEL);
+    const keep = ids.filter(function (x) { return byId(x).hasSubmit; });
+    const del = ids.filter(function (x) { return !byId(x).hasSubmit; });
+    const snapshot = DATA.slice();
+    del.forEach(function (x) { DATA = DATA.filter(function (a) { return a.id !== x; }); });
+    keep.forEach(function (x) { byId(x).status = 0; });
+    SEL.clear(); render();
+    toast('删除 ' + del.length + ' 个 · 停用 ' + keep.length + ' 个（有投稿记录的不硬删）',
+      { undo: function () { DATA = snapshot; render(); } });
+    return;
+  }
+  if (act === 'batch-reset') {
+    const n = SEL.size; SEL.clear(); render();
+    toast('已重置 ' + n + ' 个账号的密码为初始密码', { icon: 'i-key' });
+    return;
+  }
+  if (act === 'scope-reset') { toast('已重置这 ' + rows().length + ' 个账号的密码', { icon: 'i-key' }); return; }
+  if (act === 'export') { toast('已导出 ' + rows().length + ' 条（原型不真下载）', { icon: 'i-download' }); return; }
+
+  if (act === 'quick-inactive') { closePop(); setFilter('activated', '0'); render(); return; }
+  if (act === 'open-import' || t.dataset.sheet === 'import') { closePop(); openSheet('import'); return; }
+  if (act === 'open-batches') { closePop(); openSheet('batches'); return; }
+  if (act === 'open-purge') { openSheet('purge'); return; }
+  if (act === 'close-sheet') { closeSheet(); return; }
+  if (act === 'sw') { t.classList.toggle('on'); return; }
+  if (act === 'import-ok') { closeSheet(); toast('已导入 43 个账号，初始密码 user + 学号', { icon: 'i-upload' }); return; }
+  if (act === 'import-skip') { closeSheet(); toast('已忽略 2 行异常，导入 43 个账号', { icon: 'i-upload' }); return; }
+  if (act === 'mode') { purgeMode = v; SHEET.el.querySelector('.sheet-body').innerHTML = purgeBody(); return; }
+  if (act === 'batch-filter') {
+    closeSheet(); setFilter('batch', v); render();
+    toast('已按批次 #' + v + ' 筛选，' + rows().length + ' 个人');
+    return;
+  }
+  if (act === 'batch-revoke') {
+    const b = BATCHES.filter(function (x) { return String(x.id) === v; })[0];
+    b.revoked = true; SHEET.el.querySelector('.sheet-body').innerHTML = batchesBody();
+    toast('已撤销批次 #' + v, { undo: function () { b.revoked = false; if (SHEET) SHEET.el.querySelector('.sheet-body').innerHTML = batchesBody(); } });
+    return;
+  }
+  if (act === 'do-purge') {
+    const g = S.grade;
+    const all = DATA.filter(function (a) { return a.grade === g; });
+    const snapshot = DATA.slice();
+    if (purgeMode === 'purge') {
+      DATA = DATA.filter(function (a) { return a.grade !== g; });
+      closeSheet(); clearAll(); render();
+      toast('已清理 ' + g + ' 级：删除 ' + all.length + ' 个', { undo: function () { DATA = snapshot; render(); } });
+    } else if (purgeMode === 'disable') {
+      all.forEach(function (a) { a.status = 0; });
+      closeSheet(); render();
+      toast('已停用 ' + g + ' 级 ' + all.length + ' 个账号（一个都没删）', { undo: function () { DATA = snapshot; render(); } });
+    } else {
+      const del = all.filter(function (a) { return !a.hasSubmit; });
+      const keep = all.filter(function (a) { return a.hasSubmit; });
+      del.forEach(function (a) { DATA = DATA.filter(function (x) { return x.id !== a.id; }); });
+      keep.forEach(function (a) { a.status = 0; });
+      closePop(); closeSheet(); clearAll(); render();
+      toast('已清理 ' + g + ' 级：删除 ' + del.length + ' 个 · 停用 ' + keep.length + ' 个',
+        { undo: function () { DATA = snapshot; render(); } });
+    }
+    return;
+  }
+});
+
+document.getElementById('moreBtn').addEventListener('click', function (e) {
+  e.stopPropagation();
+  const t = this;
+  if (POP && POP.trigger === t) { closePop(); return; }
+  popOut(t, moreMenuHTML(), { width: 292 });
+  /* 菜单从右上方那颗按钮长出来（skill §7），不是从自己的中心 */
+  POP.el.style.transformOrigin = (POP.el.offsetWidth - 18) + 'px ' + (POP.below ? '0px' : POP.el.offsetHeight + 'px');
+});
+
+/* 输入（搜索不做防抖 —— skill §1：数据在内存里，没有理由等） */
+app.addEventListener('input', function (e) {
+  if (e.target.id === 'qInput') {
+    S.q = e.target.value.trim(); S.page = 1; renderFast();
+  } else if (e.target.id === 'purgeInput') {
+    const go = document.getElementById('purgeGo');
+    if (go) go.disabled = e.target.value.trim() !== String(S.grade);
+  }
+});
+
+/* 点空白处收起浮层 */
+document.addEventListener('pointerdown', function (e) {
+  if (!POP) return;
+  if (e.target.closest('.pop') || e.target.closest('[data-act="filter"]') || e.target.closest('#moreBtn')) return;
+  closePop();
+}, true);
+
+/* ══════════════════════════════════════════════════════════════
+   11 · 滚动加深 / 键盘 / 缩放 / 还原
+   ══════════════════════════════════════════════════════════════ */
+scroller.addEventListener('scroll', function () {
+  app.classList.toggle('is-scrolled', scroller.scrollTop > 3);
+}, { passive: true });
+
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') {
+    if (SHEET) { closeSheet(); return; }
+    if (POP) { closePop(); return; }
+    if (S.q) { S.q = ''; render(); return; }
+  }
+  if (e.key === '/' && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) {
+    e.preventDefault();
+    const inp = document.getElementById('qInput');
+    if (inp) inp.focus();
+  }
+});
+
+function applyZoom(fit) {
+  K = fit ? Math.min(1, Math.max(320, document.getElementById('stage').clientWidth - 48) / 1440) : 1;
+  frameOuter.style.transform = K === 1 ? '' : 'scale(' + K + ')';
+  frameOuter.style.width = (1440 * K) + 'px';
+  frameOuter.style.height = (900 * K) + 'px';
+  frameOuter.style.overflow = 'hidden';
+}
+document.getElementById('zFit').addEventListener('click', function () {
+  this.classList.add('on'); document.getElementById('z100').classList.remove('on'); applyZoom(true);
+});
+document.getElementById('z100').addEventListener('click', function () {
+  this.classList.add('on'); document.getElementById('zFit').classList.remove('on'); applyZoom(false);
+});
+window.addEventListener('resize', function () {
+  if (document.getElementById('zFit').classList.contains('on')) applyZoom(true);
+});
+
+function restoreFromHash() {
+  const raw = decodeURIComponent((location.hash || '').replace(/^#/, ''));
+  const i = raw.indexOf('?');
+  if (i < 0) return;
+  const map = { grade:'grade', class:'classNo', status:'status', activated:'activated', batch:'batch', q:'q' };
+  new URLSearchParams(raw.slice(i + 1)).forEach(function (v, k) {
+    if (map[k]) S[map[k]] = v;
+  });
+  if (S.classNo && !S.grade) S.classNo = '';
+}
+
+/* 预览外壳的页签 */
+(function shell() {
+  const tabs = Array.prototype.slice.call(document.querySelectorAll('.tab[data-i]'));
+  const screens = Array.prototype.slice.call(document.querySelectorAll('.screen'));
+  function show(i) {
+    screens.forEach(function (s, k) { s.classList.toggle('on', k === i); });
+    tabs.forEach(function (t) { t.classList.toggle('on', Number(t.dataset.i) === i); });
+    window.scrollTo(0, 0);
+  }
+  tabs.forEach(function (t) { t.addEventListener('click', function () { show(Number(t.dataset.i)); }); });
+})();
+
+restoreFromHash();
+render();
+
+})();
+</script>
+</body>
+</html>

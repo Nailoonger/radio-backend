@@ -598,6 +598,44 @@ const EXPECTED_USERNAMES = [
     check('改名：改状态不会顺手清掉姓名',
       rnStatAfter.remark === '张三' && rnStatAfter.nickname === '张三', rnStatAfter.remark);
 
+    /* ══════════ G4. 批量启用 / 停用（前端「范围＝筛选结果」走它） ══════════ */
+    say('');
+    say('--- G4. 批量启用 / 停用 ---');
+
+    const Op = require('sequelize').Op;
+    const batchTargets = await models.User.findAll({
+      where: { username: { [Op.ne]: null } }, order: [['id', 'ASC']], limit: 2,
+    });
+    check('批量停用：库里至少 2 个学生账号', batchTargets.length === 2, String(batchTargets.length));
+    const bIds = batchTargets.map((u) => u.id);
+
+    const off = await request(app).post('/api/admin/student/status/batch')
+      .set('Authorization', `Bearer ${adminToken}`).send({ ids: bIds, status: 0 });
+    check('批量停用：接口成功', off.body.code === 0, off.body.message);
+    check('批量停用：affected=2', off.body.data?.affected === 2, String(off.body.data?.affected));
+    const afterOff = await models.User.findAll({ where: { id: { [Op.in]: bIds } } });
+    check('批量停用：两行 status 都是 0', afterOff.every((u) => Number(u.status) === 0),
+      afterOff.map((u) => u.status).join(','));
+
+    const on = await request(app).post('/api/admin/student/status/batch')
+      .set('Authorization', `Bearer ${adminToken}`).send({ ids: bIds, status: 1 });
+    const afterOn = await models.User.findAll({ where: { id: { [Op.in]: bIds } } });
+    check('批量启用：两行 status 都回到 1', on.body.code === 0 && afterOn.every((u) => Number(u.status) === 1),
+      afterOn.map((u) => u.status).join(','));
+
+    const emptyIds = await request(app).post('/api/admin/student/status/batch')
+      .set('Authorization', `Bearer ${adminToken}`).send({ ids: [], status: 0 });
+    check('批量停用：空 ids 被拒（40001）', emptyIds.body.code === 40001, emptyIds.body.message);
+
+    const noStatus = await request(app).post('/api/admin/student/status/batch')
+      .set('Authorization', `Bearer ${adminToken}`).send({ ids: bIds });
+    check('批量停用：缺 status 被拒（40001）', noStatus.body.code === 40001, noStatus.body.message);
+
+    const tooMany = await request(app).post('/api/admin/student/status/batch')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ ids: Array.from({ length: 501 }, (_, i) => i + 1), status: 0 });
+    check('批量停用：超过 500 个被拒（40001）', tooMany.body.code === 40001, tooMany.body.message);
+
     /* ══════════ H. 路由顺序 / 鉴权 ══════════ */
     say('');
     say('--- H. 路由顺序与鉴权 ---');
@@ -607,7 +645,8 @@ const EXPECTED_USERNAMES = [
     const idxParam = paths.indexOf('/student/:id');
     const literalPaths = ['/student/import/preview', '/student/import/commit', '/student/template',
       '/student/list', '/student/stats', '/student/export', '/student/batches',
-      '/student/grades', '/student/grade/:grade'];
+      '/student/grades', '/student/grade/:grade',
+      '/student/reset-password/batch', '/student/status/batch', '/student/delete/batch'];
     check('/student/:id 已注册', idxParam > -1, String(idxParam));
     literalPaths.forEach((p) => {
       const i = paths.indexOf(p);

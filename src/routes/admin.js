@@ -1389,6 +1389,22 @@ router.post('/student/reset-password/batch', adminAuth, requireSuperAdmin, stude
 
 /**
  * @swagger
+ * /api/admin/student/status/batch:
+ *   post:
+ *     tags: [管理端-学生账号]
+ *     summary: 批量启用 / 停用学生账号
+ *     description: |
+ *       一次 UPDATE 改掉整批状态并作废登录态（逐个 PUT `/student/{id}/status` 在几百个账号时会变成几百个请求）。
+ *       管理端「批量操作范围＝筛选结果」走的就是它。一次最多 500 个。
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: 返回 affected }
+ *       400: { description: 未勾选账号 / 超过 500 个 / 缺 status }
+ */
+router.post('/student/status/batch', adminAuth, requireSuperAdmin, student.setStatusBatch);
+
+/**
+ * @swagger
  * /api/admin/student/batch/{id}/rollback:
  *   post:
  *     tags: [管理端-学生账号]
@@ -1401,6 +1417,20 @@ router.post('/student/reset-password/batch', adminAuth, requireSuperAdmin, stude
  *       200: { description: 返回 removed / keptActivated / keptWithSubmit }
  */
 router.post('/student/batch/:id/rollback', adminAuth, requireSuperAdmin, student.rollback);
+
+/**
+ * /api/admin/student/delete/batch:
+ *   post:
+ *     summary: 批量删除学生账号（仅超管）
+ *     description: |
+ *       按权限边界表「不可逆批量 = 超管」，本接口仅超管可调（requireSuperAdmin）。
+ *       逐条复用单条删除的规则：无投稿记录 → 真删；有投稿记录 → 改为「停用」。
+ *       body: { ids: number[] }，一次最多 200 个。
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: ok，data = { total, deleted, disabled, failed[] } }
+ */
+router.post('/student/delete/batch', adminAuth, requireSuperAdmin, student.removeBatch);
 
 /**
  * @swagger
@@ -1452,19 +1482,5 @@ router.put('/student/:id/reset-password', adminAuth, requireSuperAdmin, student.
  *       200: { description: ok，data.deleted 区分删了还是只停用 }
  */
 router.delete('/student/:id', adminAuth, requireSuperAdmin, student.remove);
-
-/**
- * /api/admin/student/delete/batch:
- *   post:
- *     summary: 批量删除学生账号（仅超管）
- *     description: |
- *       按权限边界表「不可逆批量 = 超管」，本接口仅超管可调（requireSuperAdmin）。
- *       逐条复用单条删除的规则：无投稿记录 → 真删；有投稿记录 → 改为「停用」。
- *       body: { ids: number[] }，一次最多 200 个。
- *     security: [{ bearerAuth: [] }]
- *     responses:
- *       200: { description: ok，data = { total, deleted, disabled, failed[] } }
- */
-router.post('/student/delete/batch', adminAuth, requireSuperAdmin, student.removeBatch);
 
 module.exports = router;

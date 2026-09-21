@@ -20,10 +20,12 @@ sync ok（自动建表：user / import_batch / submit / message / notice_ack …
 
 --- G3. 改名（remark + nickname 必须同时生效）---
 
+--- G4. 批量启用 / 停用 ---
+
 --- H. 路由顺序与鉴权 ---
 
 ------------------------------------------------------------
-通过 163 项，失败 0 项
+通过 174 项，失败 0 项
 全部通过 ✅
 
 通过的断言：
@@ -145,7 +147,7 @@ sync ok（自动建表：user / import_batch / submit / message / notice_ack …
   116. 批量重置不给范围被拒（防手滑全量）  [40001]
   117. 按班级批量重置生效  [{"affected":1,"initPasswordRule":"user + 学号"}]
   118. 年级汇总：1 个年级 / 共 7 个账号  [{"gradeCount":1,"total":7,"activated":1,"disabled":1}]
-  119. 年级卡片字段齐全（年级名 / 班级数 / 已激活 / 停用）  [{"grade":"2024","name":"2024 级","classCount":7,"total":7,"activated":1,"inactive":6,"disabled":1,"lastImportAt":"2026-09-20 16:50:48.428 +00:00"}]
+  119. 年级卡片字段齐全（年级名 / 班级数 / 已激活 / 停用）  [{"grade":"2024","name":"2024 级","classCount":7,"total":7,"activated":1,"inactive":6,"disabled":1,"lastImportAt":"2026-09-21 04:10:32.282 +00:00"}]
   120. 年级明细试算：6 个可删 / 1 个只停用  [canDelete=6 withSubmit=1]
   121. 年级明细带 7 个班的分布  [7]
   122. 试算是只读的，一行都没改
@@ -155,15 +157,15 @@ sync ok（自动建表：user / import_batch / submit / message / notice_ack …
   126. 被拒后 2024 届数据一行没动
   127. 2026 届学生可正常登录
   128. 2026 届试算：1 可删 / 1 只停用  [{"canDelete":1,"withSubmit":1}]
-  129. 一键清理 2026 届：删 1 停 1  [{"grade":"2026","name":"2026 级","mode":"safe","total":2,"deleted":1,"disabled":1,"costMs":1,"receipt":{"createTime":"2026-09-20T16:50:49.863Z","updateTime":"2026-09-20T16:50:49.863Z","id":1,"grade":"2026","gradeName":"2026 级","mode":"safe","total":2,"deleted":1,"disabled":1,"classCount":1,"untouched":7,"costMs":1,"operatorId":1,"operatorName":"teacher","disabledAccounts":[{"username":"20260101","name":"毕业甲","className":"2026 级 1 班"}],"update_time":"2026-09-20T16:50:49.863Z","create_time":"2026-09-20T16:50:49.863Z","costText":"0.0s"}}]
+  129. 一键清理 2026 届：删 1 停 1  [{"grade":"2026","name":"2026 级","mode":"safe","total":2,"deleted":1,"disabled":1,"costMs":2,"receipt":{"createTime":"2026-09-21T04:10:33.766Z","updateTime":"2026-09-21T04:10:33.766Z","id":1,"grade":"2026","gradeName":"2026 级","mode":"safe","total":2,"deleted":1,"disabled":1,"classCount":1,"untouched":7,"costMs":2,"operatorId":1,"operatorName":"teacher","disabledAccounts":[{"username":"20260101","name":"毕业甲","className":"2026 级 1 班"}],"update_time":"2026-09-21T04:10:33.766Z","create_time":"2026-09-21T04:10:33.766Z","costText":"0.0s"}}]
   130. 有投稿记录的账号只停用、仍能查到
   131. 无投稿记录的账号被真正删除
   132. 整届清理后被停用账号的 token 立刻失效（不等 30 秒缓存）  [401]
   133. 被删账号无法再登录  [40101]
   134. 清理后年级列表还留着 2026（停用账号仍在档）  [["2024","2026"]]
-  135. disable 模式：一个不删、全部停用  [{"grade":"2027","name":"2027 级","mode":"disable","total":2,"deleted":0,"disabled":2,"costMs":1,"receipt":{"createTime":"2026-09-20T16:50:49.899Z","updateTime":"2026-09-20T16:50:49.899Z","id":2,"grade":"2027","gradeName":"2027 级","mode":"disable","total":2,"deleted":0,"disabled":2,"classCount":0,"untouched":8,"costMs":1,"operatorId":1,"operatorName":"teacher","disabledAccounts":[],"update_time":"2026-09-20T16:50:49.899Z","create_time":"2026-09-20T16:50:49.899Z","costText":"0.0s"}}]
+  135. disable 模式：一个不删、全部停用  [{"grade":"2027","name":"2027 级","mode":"disable","total":2,"deleted":0,"disabled":2,"costMs":1,"receipt":{"createTime":"2026-09-21T04:10:33.803Z","updateTime":"2026-09-21T04:10:33.803Z","id":2,"grade":"2027","gradeName":"2027 级","mode":"disable","total":2,"deleted":0,"disabled":2,"classCount":0,"untouched":8,"costMs":1,"operatorId":1,"operatorName":"teacher","disabledAccounts":[],"update_time":"2026-09-21T04:10:33.803Z","create_time":"2026-09-21T04:10:33.803Z","costText":"0.0s"}}]
   136. purge 确认串写错被拒  [危险操作：要把投稿记录里的账号一并删掉，请在确认框里原样输入年级「2027」]
-  137. purge 确认串正确 → 整届清空  [{"grade":"2027","name":"2027 级","mode":"purge","total":2,"deleted":2,"disabled":0,"costMs":1,"receipt":{"createTime":"2026-09-20T16:50:49.907Z","updateTime":"2026-09-20T16:50:49.907Z","id":3,"grade":"2027","gradeName":"2027 级","mode":"purge","total":2,"deleted":2,"disabled":0,"classCount":0,"untouched":8,"costMs":1,"operatorId":1,"operatorName":"teacher","disabledAccounts":[],"update_time":"2026-09-20T16:50:49.907Z","create_time":"2026-09-20T16:50:49.907Z","costText":"0.0s"}}]
+  137. purge 确认串正确 → 整届清空  [{"grade":"2027","name":"2027 级","mode":"purge","total":2,"deleted":2,"disabled":0,"costMs":1,"receipt":{"createTime":"2026-09-21T04:10:33.811Z","updateTime":"2026-09-21T04:10:33.811Z","id":3,"grade":"2027","gradeName":"2027 级","mode":"purge","total":2,"deleted":2,"disabled":0,"classCount":0,"untouched":8,"costMs":1,"operatorId":1,"operatorName":"teacher","disabledAccounts":[],"update_time":"2026-09-21T04:10:33.811Z","create_time":"2026-09-21T04:10:33.811Z","costText":"0.0s"}}]
   138. 改名：PUT { name } 返回成功  [已保存]
   139. 改名：返回体 name 已是新名  [张三丰]
   140. 改名：remark 落库  [张三丰]
@@ -176,17 +178,28 @@ sync ok（自动建表：user / import_batch / submit / message / notice_ack …
   147. 改名：被拒后库里的名字没被动过  [张三]
   148. 改名：超过 64 字被拒（40001）  [姓名最长 64 个字符]
   149. 改名：改状态不会顺手清掉姓名  [张三]
-  150. /student/:id 已注册  [79]
-  151. 字面量路由 /student/import/preview 排在 /student/:id 之前  [index=66 param=79]
-  152. 字面量路由 /student/import/commit 排在 /student/:id 之前  [index=67 param=79]
-  153. 字面量路由 /student/template 排在 /student/:id 之前  [index=68 param=79]
-  154. 字面量路由 /student/list 排在 /student/:id 之前  [index=69 param=79]
-  155. 字面量路由 /student/stats 排在 /student/:id 之前  [index=70 param=79]
-  156. 字面量路由 /student/export 排在 /student/:id 之前  [index=71 param=79]
-  157. 字面量路由 /student/batches 排在 /student/:id 之前  [index=76 param=79]
-  158. 字面量路由 /student/grades 排在 /student/:id 之前  [index=72 param=79]
-  159. 字面量路由 /student/grade/:grade 排在 /student/:id 之前  [index=73 param=79]
-  160. 学生账号接口未登录 → 401  [401]
-  161. 拿学生 token 调管理端接口 → 401  [401]
-  162. 上传 .txt 被拒  [不支持的文件类型 .txt，仅允许 xlsx / xls / csv]
-  163. 不传文件被拒  [请选择要导入的表格文件（字段名 file）]
+  150. 批量停用：库里至少 2 个学生账号  [2]
+  151. 批量停用：接口成功  [已停用 2 个账号]
+  152. 批量停用：affected=2  [2]
+  153. 批量停用：两行 status 都是 0  [0,0]
+  154. 批量启用：两行 status 都回到 1  [1,1]
+  155. 批量停用：空 ids 被拒（40001）  [请先勾选要操作的账号]
+  156. 批量停用：缺 status 被拒（40001）  [缺少 status（1=启用 0=停用）]
+  157. 批量停用：超过 500 个被拒（40001）  [一次最多操作 500 个账号]
+  158. /student/:id 已注册  [81]
+  159. 字面量路由 /student/import/preview 排在 /student/:id 之前  [index=66 param=81]
+  160. 字面量路由 /student/import/commit 排在 /student/:id 之前  [index=67 param=81]
+  161. 字面量路由 /student/template 排在 /student/:id 之前  [index=68 param=81]
+  162. 字面量路由 /student/list 排在 /student/:id 之前  [index=69 param=81]
+  163. 字面量路由 /student/stats 排在 /student/:id 之前  [index=70 param=81]
+  164. 字面量路由 /student/export 排在 /student/:id 之前  [index=71 param=81]
+  165. 字面量路由 /student/batches 排在 /student/:id 之前  [index=76 param=81]
+  166. 字面量路由 /student/grades 排在 /student/:id 之前  [index=72 param=81]
+  167. 字面量路由 /student/grade/:grade 排在 /student/:id 之前  [index=73 param=81]
+  168. 字面量路由 /student/reset-password/batch 排在 /student/:id 之前  [index=77 param=81]
+  169. 字面量路由 /student/status/batch 排在 /student/:id 之前  [index=78 param=81]
+  170. 字面量路由 /student/delete/batch 排在 /student/:id 之前  [index=80 param=81]
+  171. 学生账号接口未登录 → 401  [401]
+  172. 拿学生 token 调管理端接口 → 401  [401]
+  173. 上传 .txt 被拒  [不支持的文件类型 .txt，仅允许 xlsx / xls / csv]
+  174. 不传文件被拒  [请选择要导入的表格文件（字段名 file）]
