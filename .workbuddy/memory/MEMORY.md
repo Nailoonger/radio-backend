@@ -6,6 +6,7 @@
 - **UI/视觉需求先出静态 HTML 预览（标 v1/v2…），点头前不写业务代码。** 版本只增不删：只新增 `preview/<主题>-v<N>/`，渲染图 `shots/`。
 - 需求被否 / 含糊先问清形态再动手，宁可多问一句（v1 目录树被否过）。
 - 用户表态（2026-09-21）：**别在本机构建/部署，直接 commit + push，再给服务器更新步骤**。本机 Docker 不是部署目标。
+- git 提交身份（2026-09-21 修正）：仓库级曾写死 `dev@jingyou.local`（GitHub 不计入贡献图），已 unset 回落到全局 `Nailoonger <1493586497@qq.com>`——新提交别再写仓库级 user.email/name。
 
 ## 部署
 - 源码改动必须 `docker compose build <svc>` + `up -d --force-recreate <svc>`；restart 不换镜像。admin-web 改 views：`npm run build` → `build admin-web` → `up -d --force-recreate --no-deps admin-web`。
