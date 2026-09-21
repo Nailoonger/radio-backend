@@ -82,53 +82,9 @@
         </div>
 
         <!-- 页头右上角动作容器：页面级按钮（如学生账号的「更多操作/名册导入」）
-             用 Teleport 从各页面塞进来；其他页面此容器为空，不占位置 -->
+             用 Teleport 从各页面塞进来；其他页面此容器为空，不占位置。
+             v8 定稿：顶栏不放全局搜索（筛选条自带搜索），右侧就只有页面动作组 -->
         <div id="ph-actions" class="header-actions"></div>
-
-        <div class="header-right">
-          <!-- 全局搜索：投稿 / 公告 / 学生账号（v8 顶栏那颗搜索框） -->
-          <div class="gsearch" :class="{ on: searchOpen }">
-            <IconSearch :size="15" />
-            <input
-              v-model="searchKey"
-              placeholder="搜索投稿 / 公告 / 用户"
-              @input="onSearchInput"
-              @focus="searchOpen = true"
-              @blur="closeSearchSoon"
-              @keyup.enter="runSearch"
-            />
-            <span class="kbd">Enter</span>
-
-            <div class="gsearch-pop" v-if="searchOpen && searchKey.trim()">
-              <div class="gs-group" v-if="results.submit.length">
-                <div class="gs-t">投稿</div>
-                <div class="gs-item" v-for="r in results.submit" :key="'s' + r.id" @mousedown.prevent="goSubmit(r)">
-                  <span class="gs-strong">{{ r.type === 1 ? r.songName : r.articleTitle }}</span>
-                  <span class="micro">{{ r.nickname || '' }}</span>
-                </div>
-              </div>
-              <div class="gs-group" v-if="results.notice.length">
-                <div class="gs-t">公告</div>
-                <div class="gs-item" v-for="r in results.notice" :key="'n' + r.id" @mousedown.prevent="goNotice(r)">
-                  <span class="gs-strong">{{ r.title }}</span>
-                </div>
-              </div>
-              <div class="gs-group" v-if="results.student.length">
-                <div class="gs-t">学生账号</div>
-                <div class="gs-item" v-for="r in results.student" :key="'u' + r.id" @mousedown.prevent="goStudent(r)">
-                  <span class="gs-strong">{{ r.nickname || r.username }}</span>
-                  <span class="micro mono">{{ r.username }}</span>
-                </div>
-              </div>
-              <div class="gs-empty" v-if="searching">搜索中…</div>
-              <div class="gs-empty" v-else-if="!hasSearchResult">没有匹配的结果</div>
-            </div>
-          </div>
-
-          <button class="icon-btn" title="刷新当前页" @click="doRefresh">
-            <IconRefresh :size="16" />
-          </button>
-        </div>
       </el-header>
 
       <el-main class="main">
@@ -154,7 +110,7 @@
 </template>
 
 <script setup>
-import { computed, ref, reactive, onMounted, onBeforeUnmount } from 'vue';
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -162,60 +118,16 @@ import http from '@/utils/http';
 import {
   IconTrend, IconArticle, IconCalendar, IconMegaphone, IconChat,
   IconStar, IconSwitch, IconUsers, IconSettings, IconMusic, IconUserPlus,
-  IconSearch, IconClose, IconChevronDown, IconRefresh,
+  IconSearch, IconClose, IconChevronDown,
 } from '@/components/icons';
-import { pageHeader, triggerRefresh } from '@/utils/pageHeader';
+import { pageHeader } from '@/utils/pageHeader';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 
-/* ---------------- 顶栏：副标题 / 全局搜索 / 刷新 ---------------- */
-const searchOpen = ref(false);
-const searchKey = ref('');
-const searching = ref(false);
-const results = reactive({ submit: [], notice: [], student: [] });
-let searchTimer = null;
-
-const hasSearchResult = computed(() => results.submit.length + results.notice.length + results.student.length > 0);
-
-function closeSearchSoon() { setTimeout(() => { searchOpen.value = false; }, 160); }
-
-/** 输入即搜（300ms 防抖），命中三类数据各取前 4 条 */
-function onSearchInput() {
-  clearTimeout(searchTimer);
-  const kw = searchKey.value.trim();
-  if (!kw) {
-    results.submit = []; results.notice = []; results.student = [];
-    return;
-  }
-  searching.value = true;
-  searchTimer = setTimeout(async () => {
-    try {
-      const [s, n, u] = await Promise.all([
-        http.get('/admin/submit/list', { params: { page: 1, pageSize: 4, keyword: kw } }).catch(() => ({ list: [] })),
-        http.get('/admin/notice/list', { params: { page: 1, pageSize: 4, keyword: kw } }).catch(() => ({ list: [] })),
-        http.get('/admin/student/list', { params: { page: 1, pageSize: 4, keyword: kw } }).catch(() => ({ list: [] })),
-      ]);
-      results.submit = s.list || [];
-      results.notice = n.list || [];
-      results.student = u.list || [];
-    } finally { searching.value = false; }
-  }, 300);
-}
-
-function runSearch() {
-  const kw = searchKey.value.trim();
-  if (!kw) return;
-  searchOpen.value = false;
-  router.push({ path: '/submit', query: { keyword: kw } });
-}
-
-function goSubmit(r) { searchOpen.value = false; router.push({ path: '/submit', query: { keyword: r.type === 1 ? r.songName : r.articleTitle } }); }
-function goNotice(r) { searchOpen.value = false; router.push({ path: '/notice', query: { keyword: r.title } }); }
-function goStudent(r) { searchOpen.value = false; router.push({ path: '/student', query: { keyword: r.username } }); }
-
-function doRefresh() { triggerRefresh(); }
+/* ---------------- 顶栏：副标题 ----------------
+   v8 定稿：顶栏撤掉全局搜索（筛选条自带搜索）和刷新按钮，右侧只留页面动作组 */
 
 const avatar = computed(() => (auth.admin?.nickname || auth.admin?.username || '管').charAt(0).toUpperCase());
 
@@ -511,7 +423,7 @@ onBeforeUnmount(() => {
 .nav::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.35); border-radius: 3px; }
 
 /* ══════════════════════════════════════════════════════════
-   顶栏（v8：白底 + 细分隔线，标题/副标题在左，搜索/刷新在右）
+   顶栏（v8：白底 + 细分隔线，标题/副标题在左，页面动作组在最右）
    ══════════════════════════════════════════════════════════ */
 .header {
   background: var(--canvas);
@@ -520,63 +432,11 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid var(--hairline);
   box-shadow: none;
 }
-/* v8 顶栏：标题 + 副标题 在左，页头动作组 + 全局搜索 + 刷新 在右 */
+/* v8 顶栏：标题 + 副标题 在左，页面动作组（#ph-actions）顶到最右；不放全局搜索/刷新 */
 .header-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .header-sub { font-size: var(--fs-sm); color: var(--muted); letter-spacing: var(--ls-wide); }
 .header-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
-.header-right { margin-left: 12px; display: flex; align-items: center; gap: 12px; }
 
-.gsearch {
-  position: relative;
-  display: flex; align-items: center; gap: 8px;
-  height: 36px; width: 258px; padding: 0 12px;
-  background: var(--parchment);
-  border: 1px solid transparent;
-  border-radius: var(--r-pill);
-  color: var(--soft);
-}
-.gsearch.on { background: var(--canvas); border-color: var(--accent); }
-.gsearch input {
-  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
-  font-family: inherit; font-size: var(--fs-sm); color: var(--ink);
-}
-.gsearch input::placeholder { color: var(--soft); }
-.gsearch .kbd {
-  font-size: var(--fs-2xs); color: var(--muted);
-  background: var(--canvas); border: 1px solid var(--hairline);
-  border-radius: 6px; padding: 1px 6px;
-}
-.gsearch-pop {
-  position: absolute; top: 42px; left: 0; right: 0; z-index: 30;
-  background: var(--canvas);
-  border: 1px solid var(--hairline);
-  border-radius: 14px;
-  box-shadow: 0 18px 44px -20px rgba(0, 0, 0, 0.32);
-  padding: 8px;
-  max-height: 60vh; overflow: auto;
-}
-.gs-group + .gs-group { border-top: 1px solid var(--divider); margin-top: 6px; padding-top: 6px; }
-.gs-t { font-size: var(--fs-xs); color: var(--muted-2); padding: 4px 8px; letter-spacing: var(--ls-wide-sm); }
-.gs-item {
-  display: flex; align-items: baseline; gap: 8px;
-  padding: 7px 8px; border-radius: 8px; cursor: pointer;
-}
-.gs-item:hover { background: var(--parchment); }
-.gs-strong {
-  font-size: var(--fs-md); color: var(--ink);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px;
-}
-.gs-empty { font-size: var(--fs-sm); color: var(--muted); padding: 10px 8px; text-align: center; }
-.mono { font-family: var(--mono); }
-
-.icon-btn {
-  width: 36px; height: 36px; flex: none;
-  display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid var(--hairline); background: var(--canvas);
-  border-radius: var(--r-pill); cursor: pointer; color: var(--ink-2);
-  transition: border-color 0.16s var(--ease), background 0.16s var(--ease);
-}
-.icon-btn:hover { border-color: var(--soft); background: var(--parchment); }
 .header-title { color: var(--ink); font-size: var(--fs-xl); letter-spacing: var(--ls-tight-sm); }
 .brand-bar { background: var(--ink); }
 /* v8：内容区底色是 --canvas（纯白 #ffffff），不是羊皮纸灰；

@@ -56,6 +56,7 @@
 - ⚠️ 时序坑：`reload()` 必须 `await fetchStudents()` 之后再 `syncHeader()` —— 顶栏「命中 N 个」用 listTotal，不等数据回来就刷会显示旧 total。
 - ⚠️ 造数坑：sequelize bulkCreate 传下划线属性名（`class_no`/`pwd_changed_at`）被**静默丢弃**（模型是驼峰+field 映射）——造数属性名必须跟模型驼峰走。
 - 页头动作组（2026-09-21，用户指定）：「更多操作/名册导入」在**页头右上角**、不在条件条里；机制＝MainLayout `.header-actions`(#ph-actions，空时不占位) + 页面 `<Teleport v-if="phReady" to="#ph-actions">`。⚠️ **直接整页加载时布局子树在 detached DOM 上，Teleport 目标查不到会静默丢内容——必须 onMounted+nextTick 后再挂**（SPA 站内跳转测不出这 bug）；条件条行尾只留「重置」。
+- **顶栏 v8 定稿（2026-09-21）：没有全局搜索、没有刷新按钮**（筛选条自带搜索栏，用户嫌顶栏搜索冗余直接下线）；右侧只有页面动作组；`triggerRefresh`/`setRefreshHandler` 机制保留但无入口。学生账号副标题＝`共 N 个账号 · X 届 · 已激活 M`。
 
 ## UI 规范
 - 骨架尺寸＝真实组件（头像40/标题15/正文12/标签22/按钮36）。v8 `.tag`(23px)/`.ano`(19px) 见 admin-ui-v8.html 201/397 行；`ano-new`=红=「需后端新增」。

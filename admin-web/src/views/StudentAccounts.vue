@@ -488,11 +488,12 @@ function syncRoute() {
 }
 
 function syncHeader() {
+  const act = summary.value ? ` · 已激活 ${summary.value.activated}` : '';
   setPageHeader({
     title: '学生账号',
     subtitle: chips.value.length
       ? `${condSummary.value} · 命中 ${listTotal.value} 个`
-      : `共 ${listTotal.value} 个账号 · ${gradeList.value.length || '—'} 届`,
+      : `共 ${listTotal.value} 个账号 · ${gradeList.value.length || '—'} 届${act}`,
   });
 }
 
