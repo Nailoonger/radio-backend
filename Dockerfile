@@ -11,6 +11,11 @@ RUN addgroup -S app && adduser -S app -G app
 
 # 先拷依赖清单、装依赖（利用层缓存），再拷源码
 COPY package*.json ./
+# ⚠️ sqlite3 的预编译二进制默认从 GitHub Releases 下载，国内云服务器普遍超时
+#    （超时后回退 node-gyp，而 node:20-alpine 没有 python/make/g++，直接炸）。
+#    指到 npmmirror 的二进制镜像：mirror 布局 = {mirror}/v{version}/{文件名}，
+#    实测有 sqlite3-v5.1.7-napi-v6-linuxmusl-x64.tar.gz（musl = alpine）。
+ENV npm_config_sqlite3_binary_host_mirror=https://registry.npmmirror.com/-/binary/sqlite3
 # ⚠️ 国内镜像会零星 ECONNRESET（2026-09-21 实测）。npm 默认重试 3 次用尽后，会撞上它自身的
 #    "Exit handler never called!" bug —— 关键是这个 bug **以 exit 0 退出**，
 #    于是「装了一半的 node_modules」被 BuildKit 当成功层缓存下来，

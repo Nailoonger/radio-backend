@@ -31,9 +31,11 @@
     "multer": "^2.4.0",
     "mysql2": "^3.24.4",
     "sequelize": "^6.37.5",
-    "sqlite3": "^5.1.7",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
+  },
+  "optionalDependencies": {
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
     "jest": "^30.5.1",
