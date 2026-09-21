@@ -30,6 +30,7 @@
 - 限制器/计数器：计数放库；占位用一条带条件 UPDATE；周期行靠 UNIQUE 兜并发；失败只对「表不存在」降级为不限。
 - multer 中文文件名 latin1→utf8 修正已在 `uploadExcel.js`，新上传点都要带。
 - 路由顺序：字面量段（`/submit/quota`）在参数路由（`/submit/:id`）之前。
+- ⚠️ **toast.push({icon: X}) 的图标必须确认已 import**：v3 三处重置密码 toast 引用 `IconKey` 却漏导入，成功路径炸成「IconKey is not defined」红 toast（密码其实重置成功了），被用户当成「重置不了」。排查口诀：接口 curl 全通 → 坏在前端交互；hook XHR + 看 toast 文案。
 - 验证脚本（SQLite 内存库，跑完读同目录 `*-output.txt`；改相关代码先跑）：`verify-song-queue.js`(89)、`verify-song-submit.js`(107)、`verify-student-account.js`(174，含 G3 改名/G4 批量停用)。
 - **新开关不进 seed.js**（switch.test 断言恰好 4 条）：走 `switchService.KNOWN_SWITCHES` + 管理端列表补默认行；缺行视为 on。
 

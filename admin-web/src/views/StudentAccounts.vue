@@ -318,7 +318,7 @@ import { useAuthStore } from '@/stores/auth';
 import { setPageHeader, clearPageHeader, setRefreshHandler, clearRefreshHandler } from '@/utils/pageHeader';
 import {
   IconSearch, IconUpload, IconClose, IconCheck, IconDots,
-  IconDownload, IconClock, IconInbox, IconTrash,
+  IconDownload, IconClock, IconInbox, IconTrash, IconKey,
 } from '@/components/icons';
 import EmptyState from '@/components/EmptyState.vue';
 import FilterPill from '@/components/FilterPill.vue';
