@@ -31,3 +31,6 @@ export { default as IconEyeOff } from './IconEyeOff.vue';
 export { default as IconRefresh } from './IconRefresh.vue';
 export { default as IconChevronDown } from './IconChevronDown.vue';
 export { default as IconInbox } from './IconInbox.vue';
+export { default as IconDots } from './IconDots.vue';
+export { default as IconDownload } from './IconDownload.vue';
+export { default as IconKey } from './IconKey.vue';

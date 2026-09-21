@@ -530,7 +530,32 @@ async function listStudents(q = {}) {
     limit: pageSize,
   });
 
-  return { list: rows.map(toDto), total: count, page, pageSize };
+  // v3 深色 hero 的摘要数字：与列表**同一个 where** 的全量聚合（不是当页），口径与
+  // analyzeGrade 一致（有投稿记录 = username 出现在 submit.openid）。聚合失败不挡列表。
+  let summary = null;
+  try {
+    const t = Submit.getTableName();
+    const submitTable = typeof t === 'string' ? t : (t.tableName || 'submit');
+    const [agg] = await User.findAll({
+      where,
+      attributes: [
+        [fn('SUM', literal('CASE WHEN pwd_changed_at IS NULL THEN 0 ELSE 1 END')), 'activated'],
+        [fn('SUM', literal('CASE WHEN status = 0 THEN 1 ELSE 0 END')), 'disabled'],
+        [fn('SUM', literal(`CASE WHEN username IN (SELECT openid FROM ${submitTable}) THEN 1 ELSE 0 END`)), 'withSubmit'],
+      ],
+      raw: true,
+    });
+    summary = {
+      total: count,
+      activated: Number(agg?.activated) || 0,
+      disabled: Number(agg?.disabled) || 0,
+      withSubmit: Number(agg?.withSubmit) || 0,
+    };
+  } catch (e) {
+    summary = null;
+  }
+
+  return { list: rows.map(toDto), total: count, page, pageSize, summary };
 }
 
 /** 按年级 + 班级汇总：总数 / 已激活 / 未激活 */

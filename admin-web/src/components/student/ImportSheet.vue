@@ -23,60 +23,64 @@
       <input ref="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden @change="onPick" />
     </template>
 
-    <!-- ② 预览与确认 -->
+    <!-- ② 预览与确认（自绘细线表，v3） -->
     <template v-else-if="preview">
-      <div class="sum-bar">
-        <span class="sum-it"><el-tag size="small" effect="light" type="success">新建</el-tag><b class="num">{{ preview.summary.new || 0 }}</b></span>
-        <span class="sum-it"><el-tag size="small" effect="light" type="warning">覆盖</el-tag><b class="num">{{ preview.summary.update || 0 }}</b><span class="micro">未激活，可安全覆盖</span></span>
-        <span class="sum-it"><el-tag size="small" effect="light" type="info">受保护</el-tag><b class="num">{{ preview.summary.active || 0 }}</b><span class="micro">已激活，默认跳过</span></span>
-        <span class="sum-it"><el-tag size="small" effect="light" type="danger">异常</el-tag><b class="num">{{ preview.summary.invalid || 0 }}</b><span class="micro">带原文行号，不写库</span></span>
+      <div class="gcard sum-bar">
+        <span class="sum-it"><span class="tag tag-ok">新建</span><b class="num">{{ preview.summary.new || 0 }}</b></span>
+        <span class="sum-it"><span class="tag tag-warn">覆盖</span><b class="num">{{ preview.summary.update || 0 }}</b><span class="hint">未激活，可安全覆盖</span></span>
+        <span class="sum-it"><span class="tag tag-mute">受保护</span><b class="num">{{ preview.summary.active || 0 }}</b><span class="hint">已激活，默认跳过</span></span>
+        <span class="sum-it"><span class="tag tag-reject">异常</span><b class="num">{{ preview.summary.invalid || 0 }}</b><span class="hint">带原文行号，不写库</span></span>
       </div>
 
-      <el-table :data="rows" max-height="380" :row-class-name="rowClass" class="imp-table">
-        <el-table-column label="行号" width="84" align="center">
-          <template #default="{ row }"><span class="mono">第 {{ row.rowNo }} 行</span></template>
-        </el-table-column>
-        <el-table-column label="表格原内容" min-width="200">
-          <template #default="{ row }"><span class="mono">{{ rawText(row) }}</span></template>
-        </el-table-column>
-        <el-table-column label="识别结果" width="132">
-          <template #default="{ row }"><span class="mono" :class="{ strong: row.username }">{{ row.username || '—' }}</span></template>
-        </el-table-column>
-        <el-table-column label="结论" width="96" align="center">
-          <template #default="{ row }">
-            <el-tag size="small" effect="light" :type="CONCL[row.state]?.type || 'info'">{{ CONCL[row.state]?.text || row.state }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="说明" min-width="280">
-          <template #default="{ row }">
-            <span class="micro" :class="{ 'im-err': row.state === 'invalid' }" v-html="explain(row)"></span>
-          </template>
-        </el-table-column>
-        <template #empty>
-          <EmptyState variant="content" title="没有解析到数据行" description="表头下面全是空行？回表格补上再传" />
-        </template>
-      </el-table>
+      <div class="tablecard">
+        <table class="tb">
+          <colgroup>
+            <col style="width: 84px" /><col style="width: 240px" /><col style="width: 126px" />
+            <col style="width: 92px" /><col />
+          </colgroup>
+          <thead>
+            <tr><th>行号</th><th>表格原内容</th><th>识别结果</th><th class="c">结论</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in rows" :key="row.rowNo" :class="{ 'row-invalid': row.state === 'invalid' }">
+              <td><span class="mono dim">第 {{ row.rowNo }} 行</span></td>
+              <td><span class="mono">{{ rawText(row) }}</span></td>
+              <td><span class="mono strong">{{ row.username || '—' }}</span></td>
+              <td class="c">
+                <span class="tag" :class="CONCL[row.state]?.cls || 'tag-mute'">{{ CONCL[row.state]?.text || row.state }}</span>
+              </td>
+              <td>
+                <span class="hint" :class="{ 'im-err': row.state === 'invalid' }" v-html="explain(row)"></span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <EmptyState
+          v-if="!rows.length"
+          variant="content" title="没有解析到数据行" description="表头下面全是空行？回表格补上再传"
+        />
+      </div>
 
-      <div class="imp-sw">
+      <div class="gcard imp-sw">
         <div class="sw-row">
-          <el-switch v-model="impForce" @change="repreview" />
+          <button type="button" class="sw" :class="{ on: impForce }" @click="toggleForce" />
           <div class="sw-txt">
             <div class="sw-name">强制覆盖已激活</div>
-            <div class="micro">默认关。打开后覆盖备注与三元组，<b>仍然不碰密码</b></div>
+            <div class="hint">默认关。打开后覆盖备注与三元组，<b>仍然不碰密码</b></div>
           </div>
         </div>
         <div class="sw-row">
-          <el-switch v-model="impStrict" />
+          <button type="button" class="sw" :class="{ on: impStrict }" @click="impStrict = !impStrict" />
           <div class="sw-txt">
             <div class="sw-name">严格模式</div>
-            <div class="micro">有异常行就整批不导入（当前：<b>{{ preview.summary.invalid || 0 }} 行异常{{ preview.summary.invalid ? '，整批会被拦下' : '' }}</b>）</div>
+            <div class="hint">有异常行就整批不导入（当前：<b>{{ preview.summary.invalid || 0 }} 行异常{{ preview.summary.invalid ? '，整批会被拦下' : '' }}</b>）</div>
           </div>
         </div>
       </div>
 
-      <div class="im-warn">
+      <div class="warnline">
         <IconInfo :size="15" />
-        <span>导出文件<b>含初始密码明文</b>，只用于分发给本人；已改过密码的行会留空。</span>
+        <span>导出文件含初始密码明文，只用于分发给本人；已改过密码的行会留空。</span>
       </div>
     </template>
 
@@ -99,12 +103,12 @@
 
     <template #footer>
       <template v-if="!preview && !result">
-        <span class="micro">只解析不落库，确认后才写入</span>
+        <span class="hint">只解析不落库，确认后才写入</span>
         <el-button class="ml" @click="inner = false">关闭</el-button>
       </template>
 
       <template v-else-if="preview">
-        <span class="micro">待写入 {{ importableCount }} 行 · {{ preview.filename }}</span>
+        <span class="hint">待写入 {{ importableCount }} 行 · {{ preview.filename }}</span>
         <el-button class="ml" @click="resetImport">重新选择</el-button>
         <el-button v-if="preview.summary.invalid" link type="primary" :disabled="importing" @click="confirmImport(false)">
           忽略异常行继续
@@ -115,7 +119,7 @@
       </template>
 
       <template v-else>
-        <span class="micro">导入完成</span>
+        <span class="hint">导入完成</span>
         <el-button class="ml" @click="resetImport">再导一份</el-button>
         <el-button type="primary" @click="inner = false">完成</el-button>
       </template>
@@ -156,10 +160,10 @@ const lastFile = ref(null);
 const rows = computed(() => preview.value?.rows || []);
 
 const CONCL = {
-  new: { text: '新建', type: 'success' },
-  update: { text: '覆盖', type: 'warning' },
-  active: { text: '受保护', type: 'info' },
-  invalid: { text: '异常', type: 'danger' },
+  new: { text: '新建', cls: 'tag-ok' },
+  update: { text: '覆盖', cls: 'tag-warn' },
+  active: { text: '受保护', cls: 'tag-mute' },
+  invalid: { text: '异常', cls: 'tag-reject' },
 };
 
 const importableCount = computed(
@@ -189,8 +193,6 @@ function explain(row) {
   return row.error || '—';
 }
 
-const rowClass = ({ row }) => (row.state === 'invalid' ? 'row-invalid' : '');
-
 function resetImport() {
   preview.value = null;
   result.value = null;
@@ -208,6 +210,10 @@ async function onDrop(e) {
 }
 
 /** 「强制覆盖已激活」会影响 new/update/active 的判定 —— 切换后用同一文件重新 preview */
+async function toggleForce() {
+  impForce.value = !impForce.value;
+  await repreview();
+}
 async function repreview() {
   if (lastFile.value) await doPreview(lastFile.value);
 }
@@ -264,6 +270,8 @@ async function downloadTemplate() {
 .ii-l { flex: 1; min-width: 0; }
 .ii-list { margin: 8px 0 0; padding-left: 18px; color: var(--ink-2); font-size: var(--fs-md); line-height: 1.85; }
 .mono { font-family: var(--mono); }
+.dim { font-size: 11.5px; color: var(--muted-2); }
+.strong { font-weight: 600; color: var(--ink); }
 
 .dz {
   display: flex; flex-direction: column; align-items: center; gap: 8px;
@@ -275,28 +283,80 @@ async function downloadTemplate() {
 .dz:hover { border-color: var(--accent); background: var(--acc-bg); color: var(--accent); }
 .dz-t { font-size: var(--fs-xl); font-weight: 600; color: var(--ink); letter-spacing: var(--ls-tight-sm); }
 
-.sum-bar { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 14px; }
+/* ── 自绘细线表（v3 .tablecard/.tb） ── */
+.gcard {
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: var(--r-card);
+  padding: 14px 16px;
+}
+.sum-bar { display: flex; flex-wrap: wrap; gap: 18px; }
 .sum-it { display: inline-flex; align-items: center; gap: 7px; font-size: var(--fs-md); }
 .sum-it b { font-size: var(--fs-xl); font-weight: 600; }
+.hint { font-size: var(--fs-xs); color: var(--muted-2); letter-spacing: var(--ls-wide-sm); line-height: 1.65; }
+.hint b { color: var(--ink); }
 
-.imp-table { border: 1px solid var(--divider); border-radius: 12px; overflow: hidden; }
-.imp-table :deep(.row-invalid) { background: #fef7f7; }
+.tablecard {
+  background: var(--parchment);
+  border-radius: var(--r-card);
+  padding: 5px 0;
+  max-height: 420px;
+  overflow-y: auto;
+}
+.tb { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.tb th {
+  text-align: left; font-size: var(--fs-xs); font-weight: 500; color: var(--muted);
+  letter-spacing: var(--ls-wide-sm); padding: 11px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07); white-space: nowrap;
+  position: sticky; top: 0; background: var(--parchment); z-index: 1;
+}
+.tb td {
+  font-size: var(--fs-md); line-height: 1.5; padding: 10px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.045); vertical-align: middle; color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.tb tr:last-child td { border-bottom: none; }
+.tb .c { text-align: center; }
+.row-invalid td { background: #fdf4f4; }
 .im-err { color: var(--red-fg); }
-.strong { font-weight: 600; color: var(--ink); }
 
-.imp-sw {
-  display: flex; flex-wrap: wrap; gap: 12px 32px;
-  margin-top: 14px; padding: 14px 16px;
-  background: var(--parchment); border-radius: 14px;
+.tag {
+  display: inline-flex; align-items: center; height: 23px; padding: 0 10px;
+  border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 500;
+  letter-spacing: var(--ls-wide-sm); line-height: 1; white-space: nowrap;
 }
-.sw-row { display: flex; align-items: flex-start; gap: 10px; min-width: 280px; }
+.tag-ok { background: var(--green-bg); color: var(--green-fg); }
+.tag-warn { background: var(--amber-bg); color: var(--amber-fg); }
+.tag-reject { background: var(--red-bg); color: var(--red-fg); }
+.tag-mute { background: #ebebee; color: var(--muted); }
+
+/* ── 自绘开关（44×26 胶囊，弹簧滑块） ── */
+.imp-sw { display: flex; flex-wrap: wrap; gap: 12px 32px; margin-top: 2px; }
+.sw-row { display: flex; align-items: flex-start; gap: 12px; min-width: 280px; }
+.sw {
+  width: 44px; height: 26px; flex: none;
+  border: none; border-radius: var(--r-pill); cursor: pointer; padding: 0;
+  background: var(--soft); position: relative;
+  transition: background 0.22s var(--ease);
+}
+.sw::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  transition: transform 0.32s cubic-bezier(0.32, 1.4, 0.5, 1);
+}
+.sw:active::after { width: 24px; }
+.sw.on { background: var(--accent); }
+.sw.on::after { transform: translateX(18px); }
 .sw-name { font-size: var(--fs-md); font-weight: 600; color: var(--ink); }
-.sw-txt .micro { display: block; margin-top: 2px; line-height: 1.6; }
+.sw-txt .hint { display: block; margin-top: 2px; }
+.sw-txt .hint b { color: var(--ink); }
 
-.im-warn {
-  display: flex; align-items: center; gap: 7px;
-  margin-top: 12px; font-size: var(--fs-sm); color: var(--amber-fg);
+.warnline {
+  display: flex; gap: 8px; align-items: flex-start;
+  font-size: var(--fs-sm); color: var(--red-fg); background: var(--red-bg);
+  border-radius: 12px; padding: 11px 13px; line-height: 1.65; letter-spacing: var(--ls-wide);
 }
+.warnline :deep(svg) { flex: none; margin-top: 2px; }
 
 .rcpt { display: flex; flex-direction: column; gap: 14px; }
 .rc-nums { display: flex; gap: 26px; padding: 18px 20px; background: var(--tile); border-radius: 16px; }
@@ -304,6 +364,7 @@ async function downloadTemplate() {
 .rc-n span { font-size: var(--fs-3xl); font-weight: 600; color: #fff; line-height: 1; letter-spacing: var(--ls-tight); }
 .rc-n em { font-style: normal; font-size: var(--fs-xs); color: rgba(255, 255, 255, 0.62); letter-spacing: var(--ls-wide-sm); }
 .rc-note { font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.75; }
+.rc-note b { color: var(--ink); }
 
 .ml { margin-left: auto; }
 </style>

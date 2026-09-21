@@ -102,9 +102,9 @@
   ok   管理端已挂载 PUT /submit/rules
   ok   管理端已挂载 DELETE /submit/songs
   ok   DELETE /submit/songs 排在 /submit/:id 之前  [19<24]
-  ok   用户端 /submit/quota 排在 /submit/:id 之前  [6<11]
-  ok   用户端 /submit/notice 排在 /submit/:id 之前  [8<11]
-  ok   用户端 /submit/timeslots 排在 /submit/:id 之前  [10<11]
+  ok   用户端 /submit/quota 排在 /submit/:id 之前  [6<12]
+  ok   用户端 /submit/notice 排在 /submit/:id 之前  [9<12]
+  ok   用户端 /submit/timeslots 排在 /submit/:id 之前  [11<12]
   ok   管理端字面量路由排在 /submit/:id 之前  [5<20]
 
 sync ok（自动建表：submit / song_quota / notice_ack / system_setting …）

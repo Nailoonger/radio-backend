@@ -1,47 +1,59 @@
 <template>
-  <SlideSheet v-model="inner" title="导入批次" subtitle="选一个批次加进筛选条件，或撤销它" width="900">
-    <el-table :data="rows" v-loading="loading" stripe class="bt-table">
-      <el-table-column label="批次" width="76">
-        <template #default="{ row }"><span class="mono">#{{ row.id }}</span></template>
-      </el-table-column>
-      <el-table-column label="时间" width="150">
-        <template #default="{ row }"><span class="c-time">{{ fmt(row.createTime) }}</span></template>
-      </el-table-column>
-      <el-table-column label="文件" prop="filename" min-width="190" show-overflow-tooltip />
-      <el-table-column label="操作人" prop="operator" width="100" />
-      <el-table-column label="新建" prop="created" width="72" align="right" />
-      <el-table-column label="更新" prop="updated" width="72" align="right" />
-      <el-table-column label="跳过" prop="skipped" width="72" align="right" />
-      <el-table-column label="操作" width="152" align="right">
-        <template #default="{ row }">
-          <div class="rowact">
-            <button type="button" class="link-btn" @click="emit('filter', row.id)">
-              筛选这批<em>→</em>
-            </button>
-            <template v-if="!rolledBack.has(row.id)">
-              <span class="vsep"></span>
-              <button type="button" class="btn-danger-quiet" :disabled="busy === row.id" @click="rollback(row)">
-                {{ busy === row.id ? '撤销中' : '撤销' }}
-              </button>
-            </template>
-            <span v-else class="tag-quiet">本次已撤销</span>
-          </div>
-        </template>
-      </el-table-column>
-      <template #empty>
-        <EmptyState variant="content" title="还没有导入批次" description="用「名册导入」上传一份名册，这里会记录每次导入" />
-      </template>
-    </el-table>
+  <SlideSheet v-model="inner" title="导入批次" subtitle="选一个批次加进筛选条件，或撤销它" width="960">
+    <div class="tablecard">
+      <table v-if="rows.length" class="tb">
+        <colgroup>
+          <col style="width: 64px" /><col style="width: 136px" /><col />
+          <col style="width: 84px" /><col style="width: 60px" /><col style="width: 60px" />
+          <col style="width: 60px" /><col style="width: 158px" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>批次</th><th>时间</th><th>文件</th><th>操作人</th>
+            <th class="r">新建</th><th class="r">更新</th><th class="r">跳过</th><th class="r">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in rows" :key="row.id">
+            <td><span class="mono">#{{ row.id }}</span></td>
+            <td><span class="dim num">{{ fmt(row.createTime) }}</span></td>
+            <td><span class="el" :title="row.filename">{{ row.filename }}</span></td>
+            <td>{{ row.operator || '—' }}</td>
+            <td class="r num">{{ row.created }}</td>
+            <td class="r num">{{ row.updated }}</td>
+            <td class="r num">{{ row.skipped }}</td>
+            <td>
+              <div class="rowact">
+                <button type="button" class="link-btn" @click="emit('filter', row.id)">
+                  筛选这批<em>→</em>
+                </button>
+                <template v-if="!rolledBack.has(row.id)">
+                  <span class="vsep"></span>
+                  <button type="button" class="rx rx-danger" :disabled="busy === row.id" @click="rollback(row)">
+                    {{ busy === row.id ? '撤销中' : '撤销' }}
+                  </button>
+                </template>
+                <span v-else class="tag tag-mute">本次已撤销</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-else-if="loading" class="bt-loading">读取批次中…</div>
+      <EmptyState
+        v-else
+        variant="content" title="还没有导入批次" description="用「名册导入」上传一份名册，这里会记录每次导入"
+      />
+    </div>
 
-    <div class="note">
-      <b>撤销的边界</b>：只删除<b>本次新建</b>且<b>没有投稿记录</b>的账号；
-      已经有投稿记录的账号会被改成停用（否则审核列表里就查不到人）；
-      已被学生改过密码的账号不会被撤销 —— 那说明人已经在用了。
-      <span class="micro">批次记录本身会保留，刷新页面后仍会列出（库里没有「已撤销」这一列，不编造状态）。</span>
+    <div class="noteline">
+      <IconInfo :size="15" />
+      <span><b>「筛选这批」只是把批次加进筛选条件</b>，不改任何数据 —— 点它等于关掉这个弹层并在筛选条上多出一枚批次胶囊。
+        撤销的边界：只删<b>本次新建</b>且<b>没有投稿记录</b>的账号；有投稿记录的改停用；学生已经自己改过密码的不动。</span>
     </div>
 
     <template #footer>
-      <span class="micro">蓝色文字只把 <code>?batch=</code> 加进筛选条件，不改任何数据；描边按钮才会改数据。</span>
+      <span class="hint">蓝色文字只把 <code>?batch=</code> 加进筛选条件，不改任何数据；描边按钮才会改数据</span>
       <el-button class="ml" @click="inner = false">关闭</el-button>
     </template>
   </SlideSheet>
@@ -63,6 +75,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import dayjs from 'dayjs';
 import SlideSheet from '@/components/SlideSheet.vue';
 import EmptyState from '@/components/EmptyState.vue';
+import { IconInfo } from '@/components/icons';
 import http from '@/utils/http';
 
 const props = defineProps({ modelValue: { type: Boolean, default: false } });
@@ -118,41 +131,81 @@ watch(inner, (v) => { if (v) load(); });
 
 <style scoped>
 .mono { font-family: var(--mono); }
-.c-time { font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
+.dim { font-size: 11.5px; color: var(--muted-2); }
+.el { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+
+/* ── 自绘细线表（v3 .tablecard/.tb） ── */
+.tablecard {
+  background: var(--parchment);
+  border-radius: var(--r-card);
+  padding: 5px 0;
+  max-height: 460px;
+  overflow-y: auto;
+}
+.tb { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.tb th {
+  text-align: left; font-size: var(--fs-xs); font-weight: 500; color: var(--muted);
+  letter-spacing: var(--ls-wide-sm); padding: 11px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07); white-space: nowrap;
+  position: sticky; top: 0; background: var(--parchment); z-index: 1;
+}
+.tb td {
+  font-size: var(--fs-md); line-height: 1.5; padding: 10px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.045); vertical-align: middle; color: var(--ink-2);
+}
+.tb tr:last-child td { border-bottom: none; }
+.tb .r { text-align: right; }
+.bt-loading { padding: 40px; text-align: center; font-size: var(--fs-sm); color: var(--muted); }
+
+.tag {
+  display: inline-flex; align-items: center; height: 23px; padding: 0 10px;
+  border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 500;
+  letter-spacing: var(--ls-wide-sm); line-height: 1; white-space: nowrap;
+}
+.tag-mute { background: #ebebee; color: var(--muted); }
 
 /* 行内动作按「会不会改数据」分层：只切视图＝文字链接；会改数据＝实体描边按钮 */
 .rowact { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-right: 2px; }
 .link-btn {
   border: none; background: transparent; cursor: pointer; padding: 0;
-  font-family: inherit; font-size: var(--fs-md); font-weight: 500;
-  color: var(--accent); display: inline-flex; align-items: center; gap: 3px;
-  white-space: nowrap; flex: none;
+  font-family: inherit; font-size: var(--fs-xs); font-weight: 600;
+  color: var(--accent); display: inline-flex; align-items: center; gap: 4px;
+  white-space: nowrap; flex: none; height: 27px;
 }
 .link-btn em { font-style: normal; transition: transform 0.18s var(--ease); }
 .link-btn:hover { text-decoration: underline; }
 .link-btn:hover em { transform: translateX(2px); }
 .vsep { width: 1px; height: 14px; background: var(--hairline); flex: none; }
-.btn-danger-quiet {
-  flex: none;
-  height: 26px; padding: 0 11px;
-  border: 1px solid #f0c4c0; background: var(--canvas);
+.rx {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 27px; padding: 0 11px; flex: none;
+  border: 1px solid var(--hairline); background: var(--canvas);
   border-radius: var(--r-pill); cursor: pointer;
-  font-family: inherit; font-size: var(--fs-md); color: var(--red-fg);
-  white-space: nowrap;
-  transition: background 0.16s var(--ease), border-color 0.16s var(--ease);
+  font-family: inherit; font-size: var(--fs-xs); font-weight: 500; color: var(--ink-2); white-space: nowrap;
+  transition: border-color 0.16s var(--ease), background 0.16s var(--ease), transform 0.16s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
-.btn-danger-quiet:hover { background: var(--red-bg); border-color: #e3a9a4; }
-.btn-danger-quiet:disabled { opacity: 0.5; cursor: default; }
-.tag-quiet {
-  font-size: var(--fs-xs); color: var(--muted-2);
-  background: var(--divider); border-radius: var(--r-pill); padding: 3px 9px; flex: none;
-}
+.rx:hover { border-color: #cfcfd4; }
+.rx:active { transform: scale(0.94); }
+.rx:disabled { opacity: 0.5; cursor: default; }
+.rx-danger { border-color: var(--red-bg); color: var(--red-fg); }
+.rx-danger:hover { background: var(--red-bg); border-color: #f0c4c0; }
 
-.note {
-  margin-top: 14px; padding: 13px 16px;
-  background: var(--parchment); border-radius: 14px;
-  font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.75;
+.noteline {
+  margin-top: 14px;
+  display: flex; gap: 8px; align-items: flex-start;
+  font-size: var(--fs-sm); color: var(--ink-2); background: rgba(255, 255, 255, 0.6);
+  border-radius: 12px; padding: 11px 13px; line-height: 1.65; letter-spacing: var(--ls-wide);
 }
-.note .micro { display: block; margin-top: 5px; }
+.noteline :deep(svg) { flex: none; margin-top: 2px; color: var(--muted); }
+.noteline b { color: var(--accent); }
+.noteline code {
+  font-family: var(--mono); font-size: 11.5px;
+  background: var(--parchment); border-radius: 5px; padding: 1px 5px;
+}
+.hint { font-size: var(--fs-xs); color: var(--muted-2); letter-spacing: var(--ls-wide-sm); }
+.hint code {
+  font-family: var(--mono); font-size: 11.5px;
+  background: var(--parchment); border-radius: 5px; padding: 1px 5px;
+}
 .ml { margin-left: auto; }
 </style>

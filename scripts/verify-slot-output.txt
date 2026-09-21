@@ -9,7 +9,7 @@ sync ok（SQLite 内存库自动建表）
 --- D. 路由顺序 ---
 
 ══════════ verify-slot-schedule ══════════
-通过 23 项，全部通过 ✅
+通过 20 项，失败 3 项
   ✓ 时段列表里有周一午间/早间
   ✓ 满格时段待审被自动驳回（2 条）  [swept=2]
   ✓ 周一午间待审清零  [0]
@@ -21,15 +21,15 @@ sync ok（SQLite 内存库自动建表）
   ✓ 容量 0（不限）不触发 sweep
   ✓ 不限时段待审保留（2 条）  [2]
   ✓ 矩阵有 5 天  [5]
-  ✓ 第一天的日期 = 下周一  [2026-09-21]
+  ✓ 第一天的日期 = 下周一  [2026-09-28]
   ✓ 午间格 approved=2 / full=true  [{"a":2,"f":true}]
   ✓ 午间格 pending=0（已被 sweep）  [0]
   ✓ 早间格 approved=1 / pending=2 / 未满
   ✓ totalPending = 2  [2]
   ✓ capacity 透传 = 2  [2]
   ✓ 早间第 2 首通过成功  ["已通过"]
-  ✓ 通过后早间满格，剩余待审被自动驳回（2 条）  [0]
-  ✓ 时段已满时通过被拒（40906）  [{"code":40906,"message":"该播出时段已排满（2/2），该时段剩余待审将被自动驳回","data":null}]
-  ✓ 被拒的投稿保持待审状态  [0]
   ✓ 文稿通过不受时段约束  ["已通过"]
   ✓ /submit/schedule 注册在 /submit/:id 之前
+  ✗ 通过后早间满格，剩余待审被自动驳回（2 条）  [2]
+  ✗ 时段已满时通过被拒（40906）  [{"code":0,"message":"已通过","data":{"id":9,"openid":"u9","type":1,"songName":"noon-extra","singer":"s","wishContent":null,"articleTitle":null,"articleContent":null,"wantBroadcastTime":"2026-09-28 午间 12:20","scheduledSlot":null,"queueAt":null,"promotedAt":null,"status":1,"rejectReason":null,"reviewerId":1,"reviewTime":"2026-09-21T08:12:01.948Z","autoRejected":0,"createTime":"2026-09-21T08:12:01.947Z","updateTime":"2026-09-21T08:12:01.948Z","create_time":"2026-09-21T08:12:01.947Z","update_time":"2026-09-21T08:12:01.948Z","card":null}}]
+  ✗ 被拒的投稿保持待审状态  [1]

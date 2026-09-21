@@ -97,9 +97,9 @@
   ok   管理端 GET /submit/window 排在 /submit/:id 之前  [10<20]
   ok   管理端 PUT /submit/window 排在 /submit/:id 之前  [11<20]
   ok   管理端 GET /submit/schedule 排在 /submit/:id 之前  [16<20]
-  ok   用户端 GET /submit/window 排在 /submit/:id 之前  [7<11]
-  ok   用户端 GET /submit/quota 排在 /submit/:id 之前  [6<11]
-  ok   用户端 GET /submit/timeslots 排在 /submit/:id 之前  [10<11]
+  ok   用户端 GET /submit/window 排在 /submit/:id 之前  [7<12]
+  ok   用户端 GET /submit/quota 排在 /submit/:id 之前  [6<12]
+  ok   用户端 GET /submit/timeslots 排在 /submit/:id 之前  [11<12]
 
 sync ok（自动建表：submit / system_setting …）
 目标周 2026-09-28 ~ 2026-10-02，格子 15 个，首格 2026-09-28 早间 07:20

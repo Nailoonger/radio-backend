@@ -48,7 +48,12 @@
 
       <div v-if="mode === 'purge'" class="pg-confirm">
         <div class="pi-label">请输入年级「{{ info.grade }}」以确认</div>
-        <el-input v-model="purgeConfirm" :placeholder="String(info.grade)" />
+        <input
+          v-model="purgeConfirm"
+          class="pg-input"
+          :placeholder="String(info.grade)"
+          spellcheck="false"
+        />
         <div class="micro">输入不一致时下面的按钮保持不可点</div>
       </div>
     </template>
@@ -200,7 +205,15 @@ watch(inner, (v) => { if (v) load(); });
 }
 .pg-warn--hard { background: var(--red-bg); color: var(--red-fg); }
 
-.pg-confirm { margin-top: 14px; }
-.pi-label { font-size: var(--fs-md); font-weight: 600; color: var(--ink); margin-bottom: 7px; }
+.pg-confirm { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.pg-input {
+  height: 40px; padding: 0 13px;
+  background: var(--canvas); border: 1px solid var(--hairline);
+  border-radius: var(--r-input); outline: none; box-sizing: border-box;
+  font-family: inherit; font-size: var(--fs-md); color: var(--ink); width: 100%;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.pg-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1); }
+.pi-label { font-size: var(--fs-md); font-weight: 600; color: var(--ink); }
 .ml { margin-left: auto; }
 </style>
