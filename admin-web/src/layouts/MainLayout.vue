@@ -81,6 +81,10 @@
           <div class="header-sub" v-if="pageHeader.subtitle">{{ pageHeader.subtitle }}</div>
         </div>
 
+        <!-- 页头右上角动作容器：页面级按钮（如学生账号的「更多操作/名册导入」）
+             用 Teleport 从各页面塞进来；其他页面此容器为空，不占位置 -->
+        <div id="ph-actions" class="header-actions"></div>
+
         <div class="header-right">
           <!-- 全局搜索：投稿 / 公告 / 学生账号（v8 顶栏那颗搜索框） -->
           <div class="gsearch" :class="{ on: searchOpen }">
@@ -516,10 +520,11 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid var(--hairline);
   box-shadow: none;
 }
-/* v8 顶栏：标题 + 副标题 在左，全局搜索 + 刷新 在右 */
+/* v8 顶栏：标题 + 副标题 在左，页头动作组 + 全局搜索 + 刷新 在右 */
 .header-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .header-sub { font-size: var(--fs-sm); color: var(--muted); letter-spacing: var(--ls-wide); }
-.header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.header-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
+.header-right { margin-left: 12px; display: flex; align-items: center; gap: 12px; }
 
 .gsearch {
   position: relative;

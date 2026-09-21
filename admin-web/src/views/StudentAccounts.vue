@@ -1,5 +1,15 @@
 <template>
   <div class="stu">
+    <!-- ══════════ 页头右上角动作组（Teleport 到 MainLayout 顶栏 #ph-actions） ══════════ -->
+    <Teleport v-if="phReady" to="#ph-actions">
+      <button ref="moreBtnRef" type="button" class="btn-ghost" @click="moreOpen = true">
+        <IconDots :size="15" class="btn-ico" />更多操作
+      </button>
+      <button type="button" class="btn-main" @click="importOpen = true">
+        <IconUpload :size="15" class="btn-ico" />名册导入
+      </button>
+    </Teleport>
+
     <!-- ══════════ 筛选条件条 ══════════ -->
     <div class="fbar">
       <FilterPill
@@ -41,12 +51,6 @@
 
       <div class="fbar-right">
         <button type="button" class="freset" :disabled="busy" @click="clearAll">重置</button>
-        <button ref="moreBtnRef" type="button" class="btn-ghost" @click="moreOpen = true">
-          <IconDots :size="15" class="btn-ico" />更多操作
-        </button>
-        <button type="button" class="btn-main" @click="importOpen = true">
-          <IconUpload :size="15" class="btn-ico" />名册导入
-        </button>
       </div>
     </div>
 
@@ -837,10 +841,15 @@ async function refreshPage() {
   syncHeader();
 }
 
+/* 页头动作组的 Teleport 容器在 MainLayout 里：直接整页刷新时布局子树
+   还在 detached DOM 上，容器查不到会被静默丢掉 —— 等 mount 完成一拍再挂 */
+const phReady = ref(false);
+
 onMounted(async () => {
   fromRoute();
   setRefreshHandler(refreshPage);
   document.addEventListener('keydown', onKeydown);
+  nextTick(() => { phReady.value = true; });
   await refreshPage();
 });
 
