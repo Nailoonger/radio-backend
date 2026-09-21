@@ -11,13 +11,30 @@ RUN addgroup -S app && adduser -S app -G app
 
 # 先拷依赖清单、装依赖（利用层缓存），再拷源码
 COPY package*.json ./
-RUN npm ci --omit=dev --registry=https://mirrors.cloud.tencent.com/npm/
+# ⚠️ 国内镜像会零星 ECONNRESET（2026-09-21 实测）。npm 默认重试 3 次用尽后，会撞上它自身的
+#    "Exit handler never called!" bug —— 关键是这个 bug **以 exit 0 退出**，
+#    于是「装了一半的 node_modules」被 BuildKit 当成功层缓存下来，
+#    要到下一层 sed mysql2 才炸（报错指向 sed，根因其实在这里，极易误判）。
+#    重试次数与退避放大以扛住零星 reset；上限收在 60s/次，免得坏网络下无限拖。
+RUN npm ci --omit=dev --no-audit --no-fund \
+       --registry=https://mirrors.cloud.tencent.com/npm/ \
+       --fetch-retries=5 --fetch-retry-mintimeout=10000 --fetch-retry-maxtimeout=60000 \
+       --fetch-timeout=300000
+
+# 断言依赖真的装全了 —— npm ci 崩溃时 exit 0，只能自己查。
+# 用 node 逐个 require.resolve（不用 npm ls --all：它会被 peer 依赖告警误判成失败）。
+RUN node -e "const p=require('./package.json');const d=Object.keys(p.dependencies||{});const miss=d.filter(m=>{try{require.resolve(m);return false}catch(e){return true}});if(miss.length){console.error('[FATAL] 缺失生产依赖: '+miss.join(', '));process.exit(1)}console.log('[ok] 生产依赖全部就位: '+d.length+' 个')"
 COPY . .
 
 # 永久 patch mysql2 charsets.js：UTF8_GENERAL_CI (33) → UTF8MB4_GENERAL_CI (45)
 # 解决 mysql2 v3 + Sequelize 6 的 latin1 bug（写入中文变 EFBFBD）
-RUN sed -i 's/exports\.UTF8_GENERAL_CI = 33;/exports.UTF8_GENERAL_CI = 45;/' \
-       node_modules/mysql2/lib/constants/charsets.js
+# test -f 先行：文件不存在 = 上一层依赖装残了（见上），报明确的错；
+# grep -q 收尾：断言补丁真的落上了 —— 哪天 mysql2 换了写法，宁可构建失败也别带着 latin1 bug 上线。
+RUN test -f node_modules/mysql2/lib/constants/charsets.js \
+    && sed -i 's/exports\.UTF8_GENERAL_CI = 33;/exports.UTF8_GENERAL_CI = 45;/' \
+         node_modules/mysql2/lib/constants/charsets.js \
+    && grep -q 'exports.UTF8_GENERAL_CI = 45;' node_modules/mysql2/lib/constants/charsets.js \
+    && echo "✅ mysql2 charsets 已 patch（UTF8_GENERAL_CI=45）"
 
 # 数据/上传目录可写
 RUN mkdir -p /app/data /app/uploads \

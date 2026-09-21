@@ -158,7 +158,11 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="106" align="center">
+        <!-- ⚠️ 列宽 124 是量出来的，别改回 106：
+             v2 的 4 号状态胶囊文案是「已补位 · 待审」，实测 97.6px（fs-xs + padding 0 10px + letter-spacing .5px）；
+             106px 列减去 td 左右各 10px padding 只剩 86px → 胶囊溢出 ~12px 被裁。
+             124px 列留 104px 可用，刚好放得下（其余三字胶囊 55px，不受影响）。 -->
+        <el-table-column label="状态" width="124" align="center">
           <template #default="{ row }">
             <StatusTag :status="row.status" :label="statusLabel(row)" />
           </template>
