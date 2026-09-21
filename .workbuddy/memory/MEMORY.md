@@ -28,7 +28,8 @@
 - **限制器/计数器**：计数放库；占位只用一条带条件 UPDATE（判定写进 WHERE）；周期行靠 UNIQUE 兜并发首建；失败兜底只对「表不存在」降级为不限，其它异常上抛。
 - **multer 中文文件名**：latin1→utf8 修正已在 `src/middlewares/uploadExcel.js`，新上传点都要带。
 - **路由顺序**：字面量段（`/submit/quota`）必须注册在参数路由（`/submit/:id`）之前。
-- **验证脚本**（SQLite 内存库，无需 MySQL/Docker，跑完读同目录 `*-output.txt`；改相关代码先跑）：`verify-song-queue.js`(89)、`verify-song-submit.js`(107)、`verify-student-account.js`(**163**，含 G3 改名段)。
+- **验证脚本**（SQLite 内存库，无需 MySQL/Docker，跑完读同目录 `*-output.txt`；改相关代码先跑）：`verify-song-queue.js`(89)、`verify-song-submit.js`(107)、`verify-student-account.js`(**174**，含 G3 改名段 + G4 批量停用段)。
+- **服务器部署路径**：`~/radio`（ubuntu 用户）。改了模型字段后老库会炸 `ER_KEY_COLUMN_DOES_NOT_EXITS`（sync 建索引排在补列前）→ 跑 `docker compose exec radio-backend node scripts/db-repair.js`（幂等补列补索引，已演练）再 `restart`。sqlite3 预编译二进制走 `npm_config_sqlite3_binary_host_mirror=https://registry.npmmirror.com/-/binary/sqlite3`（GitHub 直连超时），且已挪到 optionalDependencies（生产 MySQL 用不到）。
 - **测试基线**：`npx jest` 56 条里 15 条失败，全是「风采/member」已删未清（member.test.js 14 + switch.test.js 1，40401）。别当新回归。
 - **不要往 seed.js 加开关**（switch.test 断言恰好 4 条）：新开关走 `switchService.KNOWN_SWITCHES` + 管理端列表补默认行。
 
@@ -51,10 +52,13 @@
 - **头像机制（用户定死）：全站头像=姓名首字圆形，用户不可换**。`user.avatar` 恒空串。别再引入头像上传 / image 分支。
 - ⚠️ **最致命一处**：`classOptions` 取自 `gradeInfo.value?.classes` —— **班级下拉选项取决于上次打开过哪个年级详情**（即用户口中的「子目录和主目录混淆」）。别再走这条路。
 
-## 学生账号管理端 UI
+## 学生账号管理端 UI（**已落地业务代码**，2026-09-21）
 - `preview/student-admin-v1/` **已废**（左目录树 + 右工作区），2026-09-21 00:39 被当场否掉：「我要的是可筛选条件不要这样的」。**不要树形目录 / 层级下钻。**
-- `preview/student-admin-v2/`（现行，8 屏，`shots/v2-*.png`）：**单页 + 筛选条件**，无页签无树无子路由。顶栏 → 筛选条件条 → 结果头 → 表 → 分页。条件序「年级 → 班级 → 启用状态 → 激活状态 → 导入批次 → 关键字」；**班级级联于年级**（未选年级则禁用写「先选年级」，改年级自动清班级）；已选条件汇总成可摘胶囊行；**批量操作范围＝筛选结果**；**整届操作（导出本届 / 毕业清理）只在选中年级时出现**；导入/批次/毕业清理＝三个页内弹层；条件全写 query。后端 0 改动，**业务代码未动**。
-- `preview/student-admin-v3/`（用户点名用 `apple-design` skill 做的，15 张图 `shots/v3-*.png`）：**形态同 v2 + Apple 式做法**，交付物是**真能操作的原型**（50 条内存数据，筛选/级联/搜索/分页/批量/弹层全可用，改名与清理真改数据、带可撤销 toast）。自研弹簧引擎 `makeSpring(init,onUpdate,{damping,response})`（`ω0=8/response`；**任何时刻 `set()` 可改写目标并保留速度 v ＝「可打断」的全部实现**）；动量投影 `project(v,.998)` + 橡皮筋 `rubberband` + 松手速度当弹簧初速；材料层级 侧栏>顶栏>浮动条>弹层（投影全部无色，`transform-origin` 对准触发按钮）；模态＝scrim + 父层 `scale(.965)` 后退；字距随字号变；三个 `prefers-*` 全接。**刻意没照搬**：不用渐变做滚动边缘（守 v8）、强调色仍只有 #0066CC、材料模糊半径不逐帧改。**业务代码仍未动。**
+- `preview/student-admin-v2/`（8 屏，`shots/v2-*.png`）：**单页 + 筛选条件**，无页签无树无子路由。条件序「年级 → 班级 → 启用状态 → 激活状态 → 导入批次 → 关键字」；**班级级联于年级**（未选年级禁用写「先选年级」，改年级自动清班级）；已选条件可摘胶囊；**批量操作范围＝筛选结果**；**整届操作只在选中年级时出现**；导入/批次/毕业清理＝三个页内弹层。
+- `preview/student-admin-v3/`（apple-design skill 做的可交互原型，15 图 `shots/v3-*.png`）：弹簧引擎（`ω0=8/response`，`set()` 改目标保留速度＝可打断）+ 动量投影 + 橡皮筋 + 模态=scrim+父层后退。**刻意没照搬 skill**：不用渐变做滚动边缘、强调色仍只有 #0066CC、模糊半径不逐帧改（全屏 backdrop-filter 每帧改半径会压崩渲染进程）。
+- **业务代码已按 v2/v3 落地**：`views/StudentAccounts.vue` 整文件重写（条件条→胶囊→深色 hero→表→分页→批量条，条件全同步 `/student?grade=&class=&status=&activated=&batch=&q=&page=&size=`，**班级选项只取当前选中年级的详情**）；新组件 `utils/spring.js`、`components/PopMenu.vue`、`components/FilterPill.vue`、`components/SlideSheet.vue`、`components/student/{ImportSheet,BatchesSheet,PurgeSheet}.vue`。真机图 `preview/student-admin-v3/shots-real/r*.png`。
+- 后端补了 `POST /admin/student/status/batch`（批量启用/停用，上限 500）；`/student/delete/batch` 挪到 `/student/:id` 之前。verify **174 项全绿**（G4=批量停用 8 条）。
+- 旧页的批次「状态」列（已撤销/生效中）是假的：`import_batch` 表没有 `rolledBackAt`，永远显示生效中。新版不显示这列。
 
 ## UI 规范
 - 加载骨架标准在 `preview/admin-ui-v6`：骨架尺寸=真实组件（头像 40/标题 15/正文 12/标签 22/按钮 36）。
@@ -65,6 +69,8 @@
 - `preview/song-queue-admin-v1/`（点歌 v2 管理端适配，5 屏）：沿用 v8，新增 `.tag-queue`(3 候补中·中性灰) / `.tag-acc`(4 已补位·强调色浅底) / `.pos-chip`。管理端「已通过」统一改「**已排期**」。**业务代码已按它落地**（commit `9d35735`：`SubmitList.vue` 整文件重写 + `SongSettings.vue` + `StatusTag.vue` 扩 5 态 + `theme.css` 加 `--acc-bg` + 后端 `submitController` 三处）。
 - **预览的列宽不能直接当成业务表格的列宽**：预览里「状态」列给的 128px 刚好掩盖了「已补位 · 待审」胶囊（实测 97.6px）在业务表 106px 列里溢出约 12px 的问题。搬进业务表格前必须按真实列宽重算 —— 量法：静态预览与业务页共用字体栈/CSS 变量，直接在预览页 `getBoundingClientRect()` 量胶囊宽度，再对比业务 `td` 的 `clientWidth − padding`。
 - **预览页自检三件套**：**模拟点击页签后**逐屏截图（v7 栽过页签错位）+ 未定义类名扫描 + 溢出量测。配方见 skill `web-ui-screenshot-verify`。
+- **本机自定义控件的 `box-sizing` 是 content-box**：`.fsearch` 给 `max-width:220px` 实测 244（220+padding22+border2），筛选条因此 1440 折行。凡自己写的带 padding 又限宽的元素，补 `box-sizing:border-box`。量法：`getComputedStyle().maxWidth` 与 `getBoundingClientRect().width` 对不上就是它。
+- **本机不开 Docker 也能整链路真机验证**：后端默认 SQLite —— `DB_STORAGE=./data/_shot.db` 跑 `npm run db:init` + 临时 seed 脚本造数，`node src/app.js` 起 3000；admin-web `vite dev` 起 5173（**路由是 `createWebHistory`，URL 是 `/student` 不是 `/#/student`**）；登录态直接 `localStorage.setItem('admin_token', token)` + `admin_info`（`role:0`）再 reload 即可进超管页。验证完删临时库。
 - 布局：flex 双栏行插卡必须带 flex 值；`.canvas>*{flex:none}` 优先级高于 `.ws{flex:1}`，须写 `.canvas.split>.ws{flex:1;min-width:0}`；固定高滚动容器内子项也要 `flex:none`，否则表格卡被压矮且 `scrollHeight===clientHeight` 量不出溢出。
 
 ## 工具环境坑（本机实测）
@@ -79,7 +85,9 @@
 - **本机 push 之前必须先开代理**：GitHub 直连 `fatal: schannel: server closed abruptly (missing close_notify)`（`git ls-remote` 报 `Operation too slow. Less than 1000 bytes/sec`）。代理客户端是 **FlClash**；Docker Desktop 代理设置里写死了 `http://127.0.0.1:7890`，该端口没开时连 `alpine:latest` 都拉不下来（基础镜像全靠本地缓存）。
 - **用户明确表态（2026-09-21）**：别在本机折腾构建/部署，直接 commit + push，然后给他服务器上的更新步骤。本机 Docker 不是部署目标。
 
-## 进行中
-- **登录页背景 v1（2026-09-21，等点头）**：`preview/login-bg-v1/`。形态＝**全页底图 + 品牌插画**两件套，调性 **Apple 式柔光**（另两档被否）。底图 A 柔光 / B 声波（默认 B）；插画 01 广播塔（默认）/ 02 话筒。`.miora` 画布在 `login-bg-v1.miora`。**`Login.vue` 一行未动。**
-  - 复用点：AI 白底线稿 → 必须转真 alpha（`_make_alpha.py`，公式 `alpha=1-min(RGB)/255` 反预乘 + bbox 裁剪 + 色相推 210°）；`mix-blend-mode:multiply` 在 `.login-page`（有 z-index）里**无效**，会露出白方块。
-  - 复用点：agent-browser **`set viewport` 必须在 `open` 之前**；CLI `click` 对带属性选择器的选择器会报 Element not found，改用 `eval` 里 `.click()`；长会话会崩，审计另起 `--session`。
+## 已废弃（别再捡回来）
+- **登录页背景 v1（2026-09-21，11:51 用户要求全删）**：`preview/login-bg-v1/`、`login-bg-v1.miora`、`login-bg-v1_assets/` **已全部删除**。原本形态＝**全页底图 + 品牌插画**（AI 生成图），调性 Apple 式柔光。
+  - ❌ 用户看完否掉：「这次你所有的产出都删了，不要」。**别再默认走「AI 生成底图 + AI 生成插画」这条路做登录页**——下次先问到底要什么。
+  - ✅ **登录页（`Login.vue`）全程没动过**，至今仍是陛下的 v4 分栏版：330 品牌区（内联 SVG 广播塔） + 400 玻璃卡 + 对角渐变底 `linear-gradient(135deg,#e1ecf8,#fbfdfe)`。要动登录页先按这条基线来。
+  - 保留沉淀：技能 `png-white-to-alpha`（白底图转真透明 PNG，公式 `alpha=1-min(RGB)/255` 反预乘 + bbox 裁剪 + 色相推 210°）—— **因为 `mix-blend-mode:multiply` 在带 z-index 的祖先里会失效**（露出白方块）。
+  - 保留沉淀：agent-browser **`set viewport` 必须在 `open` 之前**；CLI `click` 不支持带属性选择器的选择器（改用 `eval` 里 `.click()`）；长会话会崩，审计另起 `--session`。已写进 skill `web-ui-screenshot-verify`。
