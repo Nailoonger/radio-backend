@@ -20,8 +20,8 @@
               <div class="rowc" style="justify-content:space-between">
                 <span class="micro">下周正式位</span>
                 <span>
-                  <b class="num quota-num">{{ cap.weekCapacity ?? 0 }}</b>
-                  <span class="micro"> = {{ cap.capacity ?? 0 }} × {{ gridCount }} 格</span>
+                  <b class="num quota-num">{{ capUnlimited ? '不限' : (cap.weekCapacity ?? 0) }}</b>
+                  <span class="micro">{{ capUnlimited ? ` 每格不限 × ${gridCount} 格` : ` = ${cap.capacity ?? 0} × ${gridCount} 格` }}</span>
                 </span>
               </div>
             </div>
@@ -30,17 +30,17 @@
                 <span class="micro">已占位</span>
                 <span>
                   <b class="num quota-num">{{ seatedTotal }}</b>
-                  <span class="micro"> / {{ cap.weekCapacity ?? 0 }}</span>
+                  <span class="micro"> / {{ capUnlimited ? '不限' : (cap.weekCapacity ?? 0) }}</span>
                 </span>
               </div>
-              <div class="bar"><i :style="{ width: pctOf(seatedTotal, cap.weekCapacity) }" /></div>
+              <div v-if="!capUnlimited" class="bar"><i :style="{ width: pctOf(seatedTotal, cap.weekCapacity) }" /></div>
             </div>
             <div class="quota-item">
               <div class="rowc" style="justify-content:space-between">
                 <span class="micro">候补队列</span>
                 <span>
                   <b class="num quota-num">{{ queue.total ?? 0 }}</b>
-                  <span class="micro"> / {{ queue.limit ?? 0 }}<template v-if="queue.limitAuto">（自动）</template></span>
+                  <span class="micro"> / {{ queueUnlimited ? '不限' : (queue.limit ?? 0) }}<template v-if="queue.limitAuto">（自动）</template></span>
                 </span>
               </div>
               <div class="bar"><i :style="{ width: pctOf(queue.total, queue.limit) }" /></div>
@@ -264,7 +264,7 @@
             <div class="micro" style="margin-top:11px;line-height:1.7">
               留空则退回解析「开播时间」设置，再退回默认三个。
               <b>可选日期范围固定为下一周的周一到周五</b>，不在这里改；
-              每格能排几首在「排期容量与候补」里设（当前每格 <b>{{ cap.capacity ?? 0 }}</b> 首）。
+              每格能排几首在「排期容量与候补」里设（当前每格 <b>{{ cap.capacity || '不限' }}</b> 首）。
             </div>
           </div>
 
@@ -424,6 +424,10 @@ let ticker = null;
 const cap = ref({ capacity: 0, weekCapacity: 0, queue: {}, window: null, finalizeAt: null });
 const queue = computed(() => cap.value.queue || {});
 const capForm = reactive({ capacity: 0, queueLimit: 0 });
+/** 每格正式位 0 = 不限（songQueueService.weekCapacity 的口径）——别照字面显示成 0 */
+const capUnlimited = computed(() => !Number(cap.value.capacity));
+/** 候补自动上限 = 正式位总数；正式位不限时队列同样不限 */
+const queueUnlimited = computed(() => !!queue.value.limitAuto && capUnlimited.value);
 const capSaving = ref(false);
 const sweeping = ref(false);
 

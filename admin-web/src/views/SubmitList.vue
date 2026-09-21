@@ -21,20 +21,20 @@
 
       <div class="tile-metric">
         <div class="k">下周正式位</div>
-        <div class="v num">{{ cap.weekCapacity || 0 }}</div>
-        <div class="d">每格 <b>{{ cap.capacity || 0 }}</b> 个 × {{ gridCount }} 格<br>（周一~周五 × {{ perDaySlots }} 个时段）</div>
+        <div class="v num">{{ capUnlimited ? '不限' : (cap.weekCapacity || 0) }}</div>
+        <div class="d"><template v-if="capUnlimited">每格<b>不限</b> × {{ gridCount }} 格</template><template v-else>每格 <b>{{ cap.capacity || 0 }}</b> 个 × {{ gridCount }} 格</template><br>（周一~周五 × {{ perDaySlots }} 个时段）</div>
       </div>
 
       <div class="tile-metric">
         <div class="k">已占位</div>
-        <div class="v num">{{ seatedTotal }}<em>/{{ cap.weekCapacity || 0 }}</em></div>
+        <div class="v num">{{ seatedTotal }}<em v-if="capUnlimited">/不限</em><em v-else>/{{ cap.weekCapacity || 0 }}</em></div>
         <div class="d">已排 <b>{{ approvedCount }}</b> · 待审 <b>{{ pendingCount }}</b> · 补位待审 <b>{{ promotedCount }}</b></div>
       </div>
 
       <div class="tile-metric">
         <div class="k">候补队列</div>
-        <div class="v num">{{ queue.total || 0 }}<em>/{{ queue.limit || 0 }}</em></div>
-        <div class="d">{{ queue.limitAuto ? '上限自动（= 正式位总数）' : '上限已手动设置' }}<br><template v-if="queue.headWaitMinutes != null">队首已等待 <b>{{ fmtWait(queue.headWaitMinutes) }}</b></template><template v-else>队列目前是空的</template></div>
+        <div class="v num">{{ queue.total || 0 }}<em v-if="queueUnlimited">/不限</em><em v-else>/{{ queue.limit || 0 }}</em></div>
+        <div class="d">{{ queueUnlimited ? '上限自动（正式位不限 → 队列不限）' : (queue.limitAuto ? '上限自动（= 正式位总数）' : '上限已手动设置') }}<br><template v-if="queue.headWaitMinutes != null">队首已等待 <b>{{ fmtWait(queue.headWaitMinutes) }}</b></template><template v-else>队列目前是空的</template></div>
       </div>
     </div>
 
@@ -48,7 +48,7 @@
         <span class="rowc gap8">
           <span class="tag tag-outline">下周排期</span>
           <span class="micro">
-            <template v-if="schedule.rangeText">{{ schedule.rangeText }} · </template>还有 <b>{{ freeCount }}</b> 个空格
+            <template v-if="schedule.rangeText">{{ schedule.rangeText }} · </template><template v-if="capUnlimited">空格不限 · 候补只受队列上限约束</template><template v-else>还有 <b>{{ freeCount }}</b> 个空格</template>
           </span>
           <a class="link" @click="openSchedule">看排期矩阵 ›</a>
         </span>
@@ -547,12 +547,12 @@
           <div class="tile-metric"><div class="k">待审</div><div class="v num">{{ pendingCount }}</div><div class="d">已占位，等人工审</div></div>
           <div class="tile-metric"><div class="k">补位待审</div><div class="v num">{{ promotedCount }}</div><div class="d">候补递补上来 · 定稿前必须审完</div></div>
           <div class="tile-metric"><div class="k">已排期</div><div class="v num">{{ approvedCount }}</div><div class="d">已通过、正式播出</div></div>
-          <div class="tile-metric"><div class="k">空位</div><div class="v num">{{ freeCount }}</div><div class="d">候补会自动递补进来</div></div>
+          <div class="tile-metric"><div class="k">空位</div><div class="v num">{{ capUnlimited ? '不限' : freeCount }}</div><div class="d">候补会自动递补进来</div></div>
         </div>
       </div>
 
       <div class="sched-range micro">
-        <template v-if="schedule.rangeText">{{ schedule.weekStart }} ~ {{ schedule.weekEnd }}（{{ schedule.rangeText }}） · </template>每格正式位 {{ schedule.capacity || 0 }}
+        <template v-if="schedule.rangeText">{{ schedule.weekStart }} ~ {{ schedule.weekEnd }}（{{ schedule.rangeText }}） · </template>每格正式位 {{ schedule.capacity || '不限' }}
         <span style="margin-left:6px">已占位 = 已排 + 待审 + 补位待审（全部按实际排期 <code>scheduled_slot</code> 统计）</span>
       </div>
 
@@ -721,6 +721,11 @@ const seatedTotal = computed(() => allSlots.value.reduce((n, s) => n + (s.seated
 const pendingCount = computed(() => allSlots.value.reduce((n, s) => n + (s.pending || 0), 0));
 const promotedCount = computed(() => allSlots.value.reduce((n, s) => n + (s.promoted || 0), 0));
 const approvedCount = computed(() => Math.max(seatedTotal.value - pendingCount.value - promotedCount.value, 0));
+/** 每格正式位 0 = 不限（songQueueService.weekCapacity 的口径）；摘要条 / 提醒行 / 矩阵头都按这个显示，
+ *  否则会照字面把「不限」显示成 0，看起来像没有容量（2026-09-21 真机验收抓到）。 */
+const capUnlimited = computed(() => !Number(cap.value.capacity));
+/** 候补自动上限 = 正式位总数；正式位不限时队列同样不限（别照字面显示 1/0） */
+const queueUnlimited = computed(() => !!queue.value.limitAuto && capUnlimited.value);
 const freeCount = computed(() => Math.max((cap.value.weekCapacity || 0) - seatedTotal.value, 0));
 
 /** 从矩阵里取某一格的实时占用 */
