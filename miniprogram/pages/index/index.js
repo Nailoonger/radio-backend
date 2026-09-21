@@ -13,6 +13,7 @@ Page({
     currentProgram: null,  // 正在直播
     weekly: [],            // 本周节目单
     notices: [],           // 公告
+    schedule: { visible: false, rangeText: '', days: [], hasAny: false },  // 本周点歌排期
     loading: true,
   },
 
@@ -59,16 +60,34 @@ Page({
       request('/user/program/current').catch(() => null),
       request('/user/program/weekly').catch(() => ({ list: [] })),
       request('/user/notice/list?pageSize=5').catch(() => ({ list: [] })),
-    ]).then(([current, weekly, noticePage]) => {
+      request('/user/submit/week').catch(() => null),
+    ]).then(([current, weekly, noticePage, sched]) => {
       this.setData({
         currentProgram: current,
         weekly: weekly.list || [],
         notices: noticePage.list || [],
+        schedule: this.fmtSchedule(sched),
         loading: false,
       });
       // 数据就绪：启动动画可以退场了（里面会补足最短停留时长）
       this.dismissLaunch();
     });
+  },
+
+  /** 本周点歌排期：只显示有歌的日子（今天保留，哪怕是空的）；
+   *  visible=false（后台关了开关）→ 整个区块不渲染 */
+  fmtSchedule(sched) {
+    const none = { visible: false, rangeText: '', days: [], hasAny: false };
+    if (!sched || !sched.visible) return none;
+    const days = (sched.days || [])
+      .filter((d) => (d.songs && d.songs.length) || d.isToday)
+      .map((d) => ({ ...d, empty: !d.songs || !d.songs.length }));
+    return {
+      visible: true,
+      rangeText: sched.rangeText || '',
+      days,
+      hasAny: days.some((d) => !d.empty),
+    };
   },
 
   /** 数据先到就立刻退场，数据后到就停在声波律动态（本身是加载态） */

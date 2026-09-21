@@ -76,6 +76,7 @@ async function ensureLoaded() {
  */
 const KNOWN_SWITCHES = [
   { key: 'account_login_required', value: 'on', desc: '强制学号登录' },
+  { key: 'home_song_schedule', value: 'on', desc: '小程序首页展示本周点歌排期' },
 ];
 
 /**

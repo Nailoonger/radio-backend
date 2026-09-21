@@ -50,6 +50,40 @@
       </view>
     </view>
 
+    <!-- 本周点歌排期（后台开关 home_song_schedule 服务端把关，关 → visible=false 整块不渲染） -->
+    <view class="section" wx:if="{{schedule.visible}}">
+      <view class="section-head">
+        <text class="t-section">本周点歌排期</text>
+        <text class="t-range">{{schedule.rangeText}}</text>
+      </view>
+      <view class="card-flush" wx:if="{{schedule.hasAny}}">
+        <block wx:for="{{schedule.days}}" wx:key="date" wx:for-item="day">
+          <view class="sched-day-wrap {{day.isToday ? 'sched-today' : ''}}">
+            <view class="sched-day-head">
+              <text class="sched-day-name">{{day.weekday}}</text>
+              <text class="sched-day-date">{{day.monthDay}}</text>
+              <view class="tag-today" wx:if="{{day.isToday}}">今天</view>
+            </view>
+            <view class="sched-row" wx:for="{{day.songs}}" wx:key="index" wx:for-item="song">
+              <view class="sched-when">
+                <text class="sched-time">{{song.time}}</text>
+                <text class="sched-period">{{song.period}}</text>
+              </view>
+              <view class="grow sched-song">{{song.title}}</view>
+            </view>
+            <view class="sched-none" wx:if="{{day.empty}}">今日暂无点歌</view>
+          </view>
+        </block>
+        <view class="sched-foot">排期每周日 18:00 定稿 · 由广播站审核排定</view>
+      </view>
+      <view class="card-flush" wx:else>
+        <view class="empty sched-empty">
+          <view>本周排期尚未发布</view>
+          <view class="sched-empty-sub">广播站每周日 18:00 定稿后在此展示</view>
+        </view>
+      </view>
+    </view>
+
     <!-- 本周节目单 -->
     <view class="section">
       <view class="section-head">

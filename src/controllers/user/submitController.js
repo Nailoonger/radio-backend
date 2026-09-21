@@ -278,6 +278,26 @@ exports.windowStatus = async (req, res, next) => {
 };
 
 /**
+ * 本周点歌排期（小程序首页展示用，2026-09-21）
+ * GET /api/user/submit/week
+ *
+ * · 开关 `home_song_schedule` 在这里把关：off → `{ visible:false }`，数据根本不出门；
+ * · 只回 status=1（已排期）的歌名 + 时段，**不带点歌人信息**（v2 预览定稿）；
+ * · 路由是公开的（与 /program/current 一致，首页未登录也要能看），必须注册在 /submit/:id 之前。
+ */
+exports.weekSchedule = async (req, res, next) => {
+  try {
+    if (!switchService.isEnabled('home_song_schedule')) {
+      return success(res, { visible: false, rangeText: '', days: [] });
+    }
+    const data = await broadcastSlot.currentWeekSchedule();
+    return success(res, { visible: true, ...data });
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/**
  * 点歌名额 / 候补队列 / 时间窗口 一站式状态（投稿页提前提示用）
  * GET /api/user/submit/quota
  * v2：不再有日/周名额；容量按「下周排期格子」算

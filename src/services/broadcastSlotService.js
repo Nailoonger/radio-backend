@@ -372,6 +372,81 @@ async function sweepFullSlots(now = Date.now()) {
   }
 }
 
+/**
+ * 本周（当前播出周）周一~周五的「已排期」点歌视图 —— 小程序首页展示用（2026-09-21）
+ *
+ * 口径：
+ *   · 只算 status=1（已排期）且 scheduled_slot 落在本周格子里的点歌；
+ *     待审 / 候补 / 驳回一律不上首页。
+ *   · **不带点歌人信息**（学生姓名 / 班级不下发，v2 预览定稿）。
+ *   · 开关 home_song_schedule 由调用方（user/submitController.weekSchedule）把关，
+ *     这里只管数据。
+ *
+ * @returns {Promise<{rangeText:string, days:Array<{date,weekday,monthDay,isToday,songs:Array<{time,period,title}>}>}>}
+ */
+async function currentWeekSchedule(now = Date.now()) {
+  const periods = await getPeriods();
+  const { start } = bj.weekRange(now);          // 本周一 00:00（北京）
+  const todayKey = bj.dayKey(now);
+  const days = [];
+  const values = [];
+
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(start.getTime() + i * bj.DAY_MS);
+    const dateStr = bj.ymd(bj.shifted(d.getTime()));
+    const wd = bj.WEEKDAY_CN[bj.weekdayOf(d.getTime())];
+    const md = dateStr.slice(5);
+    days.push({
+      date: dateStr,
+      weekday: '周' + wd,
+      monthDay: md,
+      isToday: dateStr === todayKey,
+      slots: periods.map((p) => slotValue(dateStr, p.period, p.time)),
+    });
+    days[days.length - 1].slots.forEach((v) => values.push(v));
+  }
+
+  // fail-open：读路径，查询失败按「无排期」展示，不影响首页其它内容
+  const songsBySlot = {};
+  try {
+    const { Submit } = require('../models');
+    const { Op } = require('sequelize');
+    const rows = await Submit.findAll({
+      where: { type: 1, status: 1, scheduledSlot: { [Op.in]: values } },
+      attributes: ['scheduledSlot', 'songName'],
+      order: [['id', 'ASC']],
+      raw: true,
+    });
+    rows.forEach((r) => {
+      if (!r.scheduledSlot || !r.songName) return;
+      (songsBySlot[r.scheduledSlot] = songsBySlot[r.scheduledSlot] || []).push(r.songName);
+    });
+  } catch (e) {
+    console.warn(`[broadcastSlot] currentWeekSchedule 查询失败：${e.message}`);
+  }
+
+  const out = days.map((day) => {
+    const songs = [];
+    day.slots.forEach((value) => {
+      const parts = value.split(' ');           // `2026-09-21 午间 12:20` → [日期, 时段, 时刻]
+      (songsBySlot[value] || []).forEach((title) => {
+        songs.push({ time: parts[2], period: parts[1], title });
+      });
+    });
+    return {
+      date: day.date,
+      weekday: day.weekday,
+      monthDay: day.monthDay,
+      isToday: day.isToday,
+      songs,
+    };
+  });
+
+  const first = days[0];
+  const last = days[days.length - 1];
+  return { rangeText: first && last ? `${first.monthDay} ~ ${last.monthDay}` : '', days: out };
+}
+
 module.exports = {
   KV_SCHEDULE,
   KV_SLOT_TIMES,
@@ -390,4 +465,5 @@ module.exports = {
   SLOT_FULL_REASON,
   scheduleMatrix,
   sweepFullSlots,
+  currentWeekSchedule,
 };

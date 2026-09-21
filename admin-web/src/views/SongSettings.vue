@@ -218,6 +218,33 @@
       </div>
     </div>
 
+    <!-- ══════════ 小程序首页（仅超管，2026-09-21） ══════════ -->
+    <div class="sec" v-if="auth.isSuperAdmin">
+      <div class="sec-head">
+        <span class="sec-title">小程序首页</span>
+        <span class="rowc gap8">
+          <span class="tag tag-pass">即时生效</span>
+          <span class="micro">模块开关 home_song_schedule · 缺行视为开</span>
+        </span>
+      </div>
+      <div class="card" style="padding:8px 20px">
+        <div class="kv" style="border-bottom:none">
+          <span class="k" style="width:132px">展示本周点歌排期</span>
+          <span class="rowc gap13">
+            <el-switch
+              v-model="homeScheduleOn"
+              :disabled="homeScheduleSaving"
+              @change="toggleHomeSchedule"
+            />
+            <span class="micro">
+              开：小程序首页展示「本周点歌排期」（只显示已排期的歌名，<b>不含点歌人信息</b>）；
+              关：区块整体不渲染，接口不下发数据
+            </span>
+          </span>
+        </div>
+      </div>
+    </div>
+
     <!-- ══════════ 播出时段 ══════════ -->
     <div class="sec">
       <div class="sec-head">
@@ -663,6 +690,29 @@ async function purgeSongs() {
   } finally { purging.value = false; }
 }
 
+/* ─────────── 小程序首页：本周点歌排期开关（home_song_schedule） ─────────── */
+const homeScheduleOn = ref(true);
+const homeScheduleSaving = ref(false);
+
+async function fetchHomeScheduleSwitch() {
+  const data = await http.get('/admin/switch/list');
+  const row = (data?.list || []).find((s) => s.key === 'home_song_schedule');
+  homeScheduleOn.value = !row || row.value !== 'off';   // 缺行视为开（与后端 isEnabled 同口径）
+}
+
+async function toggleHomeSchedule(v) {
+  homeScheduleSaving.value = true;
+  try {
+    await http.put('/admin/switch/home_song_schedule', { value: v ? 'on' : 'off' });
+    ElMessage.success(v ? '已开启：小程序首页展示本周点歌排期' : '已关闭：小程序首页不再展示本周点歌排期');
+  } catch (e) {
+    homeScheduleOn.value = !v;   // http 拦截器对业务错误只 reject 不弹，这里自己回滚 + 提示
+    ElMessage.error(e.message || '保存失败，请重试');
+  } finally {
+    homeScheduleSaving.value = false;
+  }
+}
+
 onMounted(() => {
   fetchCapacity().catch(() => {});
   fetchSchedule().catch(() => {});
@@ -670,6 +720,7 @@ onMounted(() => {
   fetchRules().catch(() => {});
   fetchSlots().catch(() => {});
   fetchNotices().catch(() => {});
+  fetchHomeScheduleSwitch().catch(() => {});
   ticker = setInterval(() => { nowTs.value = Date.now(); }, 1000);
 });
 onBeforeUnmount(() => {

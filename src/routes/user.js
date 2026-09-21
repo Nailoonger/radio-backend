@@ -260,6 +260,15 @@ router.get('/submit/quota', userAuth, submit.quota);
 router.get('/submit/window', userAuth, submit.windowStatus);
 
 /**
+ * 本周点歌排期（小程序首页展示用，2026-09-21）
+ * GET /api/user/submit/week
+ * 公开接口（与 /program/current 一致，首页未登录也要能看）；
+ * 开关 home_song_schedule 服务端把关，off 时 visible=false 且不下发数据。
+ * ⚠️ 字面量段必须排在 /submit/:id 之前
+ */
+router.get('/submit/week', submit.weekSchedule);
+
+/**
  * @swagger
  * /api/user/submit/notice:
  *   get:

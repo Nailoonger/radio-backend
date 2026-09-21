@@ -1,0 +1,16 @@
+=== 通过 15 项 ===
+ok   开关缺行视为 on
+ok   rangeText 是本周一~周五  ["09-21 ~ 09-25"]
+ok   5 天  [5]
+ok   第一天是周一  [{"date":"2026-09-21","weekday":"周一","monthDay":"09-21","isToday":true,"songs":[{"time":"07:20","period":"早间","title":"《晴天》"},{"time":"12:20","period":"午间","title":"《起风了》"}]}]
+ok   恰好一天标 isToday  [1]
+ok   周一有《晴天》+《起风了》  [["《晴天》","《起风了》"]]
+ok   周五有《夜空中最亮的星》  [["《夜空中最亮的星》"]]
+ok   下周的歌不出现  [["《晴天》","《起风了》","《夜空中最亮的星》"]]
+ok   待审/候补/驳回都不出现  [["《晴天》","《起风了》","《夜空中最亮的星》"]]
+ok   文稿不出现  [["《晴天》","《起风了》","《夜空中最亮的星》"]]
+ok   song 形状 = time/period/title  [{"time":"07:20","period":"早间","title":"《晴天》"}]
+ok   payload 无 openid/name/remark 字段  [null]
+ok   控制器 on：visible=true 且带 days  [true]
+ok   控制器 off：visible=false 且 days 空  [{"visible":false,"rangeText":"","days":[]}]
+ok   控制器再开：visible=true  [true]

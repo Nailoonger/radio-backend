@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小程序首页 · 本周点歌排期 v1</title>
+<style>
+/* ============ 页面骨架（非小程序部分） ============ */
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#ECECF0; color:#1D1D1F;
+  font-family:-apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC",
+              "MiSans", "Noto Sans SC", "Source Han Sans SC", "Helvetica Neue",
+              "Microsoft YaHei", sans-serif;
+  padding:28px 32px 60px;
+}
+.pv-head { display:flex; align-items:baseline; gap:14px; margin-bottom:6px; }
+.pv-title { font-size:22px; font-weight:600; letter-spacing:-0.3px; }
+.pv-ver { font-size:12px; font-weight:600; color:#0066CC; background:#EAF3FD; border-radius:999px; padding:3px 10px; }
+.pv-sub { font-size:13px; color:#7A7A7A; margin-bottom:24px; }
+.pv-grid { display:flex; flex-wrap:wrap; gap:28px; align-items:flex-start; }
+.pv-cell { display:flex; flex-direction:column; gap:10px; }
+.pv-cell-label { font-size:13px; font-weight:600; color:#1D1D1F; display:flex; align-items:center; gap:8px; }
+.pv-cell-label .mini { font-size:12px; font-weight:500; color:#7A7A7A; }
+.pv-note { max-width:360px; font-size:12px; line-height:1.6; color:#7A7A7A; background:#fff; border-radius:12px; padding:12px 14px; }
+.pv-note b { color:#1D1D1F; }
+.tag-new { font-size:10.5px; font-weight:600; color:#B42318; background:#FDE8E8; border-radius:999px; padding:2px 8px; }
+
+/* ============ 手机框（rpx→px 已折算，1rpx=0.52px） ============ */
+.phone {
+  width:390px; height:800px; flex:none;
+  background:#FFFFFF; border-radius:36px; overflow:hidden; position:relative;
+  border:1px solid #D8D8DC; box-shadow:0 1px 3px rgba(0,0,0,.06);
+  display:flex; flex-direction:column;
+}
+.statusbar { height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 24px; font-size:13px; font-weight:600; }
+.sb-icons { display:flex; gap:5px; align-items:center; }
+.sb-batt { width:20px; height:10px; border:1.2px solid #1D1D1F; border-radius:3px; position:relative; }
+.sb-batt::after { content:''; position:absolute; inset:1.5px; right:4px; background:#1D1D1F; border-radius:1px; }
+.navreserve { height:46px; flex:none; }
+
+.body { flex:1; min-height:0; padding:0 20.8px; display:flex; flex-direction:column; gap:17.7px; overflow:hidden; }
+
+/* 品牌头部 */
+.between { display:flex; align-items:center; justify-content:space-between; }
+.brand-head { display:flex; align-items:center; gap:14.6px; }
+.brand-logo { width:45.8px; height:45.8px; flex:none; border-radius:14px; background:#272729; color:#fff; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:600; }
+.stack { display:flex; flex-direction:column; }
+.brand-name { font-size:21.8px; font-weight:600; letter-spacing:-0.3px; line-height:1.25; }
+.brand-slogan { font-size:13px; color:#7A7A7A; margin-top:3px; letter-spacing:1px; }
+.icon-btn { width:41.6px; height:41.6px; flex:none; border-radius:999px; background:#F5F5F7; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:3px; }
+.i-dot { width:3.6px; height:3.6px; border-radius:999px; background:#1D1D1F; }
+.i-stem { width:3.6px; height:12.5px; border-radius:2px; background:#1D1D1F; }
+
+/* 深色直播卡 */
+.tile { background:#272729; border-radius:19.8px; padding:16.6px; display:flex; flex-direction:column; gap:10.4px; flex:none; }
+.tile-status { display:flex; align-items:center; gap:8.3px; font-size:12px; font-weight:500; color:#CCCCCC; }
+.dot-live { width:7.3px; height:7.3px; flex:none; border-radius:999px; background:#FF453A; }
+.dot-off { background:#8E8E93; }
+.tile-title { font-size:26px; font-weight:600; color:#fff; letter-spacing:-0.4px; line-height:1.3; }
+.tile-meta { font-size:13px; color:#CCCCCC; letter-spacing:0.3px; }
+.tile-actions { display:flex; gap:10.4px; margin-top:2px; }
+.btn { font-size:15.6px; border-radius:999px; padding:11.4px 22.9px; text-align:center; line-height:1.2; border:none; font-weight:500; }
+.btn-on-tile { background:#fff; color:#0066CC; font-weight:600; }
+.btn-ghost { background:transparent; color:#2997FF; border:1px solid #2997FF; }
+
+/* 区块 */
+.section { display:flex; flex-direction:column; flex:none; min-height:0; }
+.section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12.5px; }
+.t-section { font-size:16.6px; font-weight:600; letter-spacing:-0.4px; }
+.t-link { font-size:13px; color:#0066CC; }
+.t-range { font-size:12px; color:#7A7A7A; letter-spacing:0.3px; }
+
+/* 列表卡 */
+.card-flush { background:#F5F5F7; border-radius:17.7px; padding:4.2px 0; overflow:hidden; }
+.card-row { display:flex; align-items:center; gap:14.6px; padding:9.4px 16.6px; }
+.row-time { flex:none; min-width:78px; font-size:13.5px; font-weight:600; color:#1D1D1F; font-variant-numeric:tabular-nums; }
+.grow { flex:1; min-width:0; }
+.t-strong { font-size:15.6px; font-weight:500; line-height:1.4; }
+.t-cap { font-size:12px; color:#7A7A7A; line-height:1.5; letter-spacing:0.3px; }
+.chev-r { width:9.4px; height:9.4px; flex:none; border-top:2px solid #C7C7CC; border-right:2px solid #C7C7CC; transform:rotate(45deg); }
+.tag-top { display:inline-block; font-size:10.5px; font-weight:500; background:#1D1D1F; color:#fff; border-radius:999px; padding:2.6px 8px; flex:none; }
+.empty { padding:36px 20.8px; text-align:center; color:#C7C7CC; font-size:13.5px; }
+.empty .sub { font-size:11.5px; margin-top:5px; color:#D8D8DC; }
+
+/* ★ 新区块：本周点歌排期 */
+.sched-day { padding:12.5px 16.6px 3px; display:flex; align-items:center; gap:8px; }
+.sched-day-name { font-size:13px; font-weight:600; color:#1D1D1F; }
+.sched-day-date { font-size:11.5px; color:#7A7A7A; font-variant-numeric:tabular-nums; }
+.sched-row { display:flex; align-items:center; gap:14.6px; padding:8.3px 16.6px; border-top:1px solid #ECECEF; }
+.sched-day + .sched-row { border-top:none; }
+.sched-when { flex:none; width:78px; display:flex; flex-direction:column; }
+.sched-time { font-size:13.5px; font-weight:600; color:#1D1D1F; font-variant-numeric:tabular-nums; line-height:1.3; }
+.sched-period { font-size:10.5px; color:#7A7A7A; letter-spacing:0.5px; }
+.sched-song { font-size:15.6px; font-weight:500; color:#1D1D1F; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sched-by { font-size:12px; color:#7A7A7A; margin-top:1.5px; }
+.sched-today { background:#EAF3FD; border-radius:12px; margin:0 8px; padding:1px 0; }
+.sched-today .sched-day { padding-top:10px; }
+.sched-foot { padding:8px 16.6px 10px; text-align:center; font-size:10.5px; color:#C7C7CC; letter-spacing:0.5px; }
+.sched-empty-today { font-size:12px; color:#C7C7CC; padding:2px 16.6px 10px; }
+
+/* tabBar */
+.tabbar { flex:none; height:76px; border-top:1px solid #E0E0E0; background:#fff; display:flex; padding-bottom:22px; }
+.tab { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; font-size:10.5px; color:#7A7A7A; }
+.tab.on { color:#0066CC; font-weight:600; }
+.tab-ic { width:20px; height:20px; border-radius:6px; background:#C7C7CC; }
+.tab.on .tab-ic { background:#0066CC; }
+
+/* ============ 管理端面板（v8 语言） ============ */
+.admin { width:520px; flex:none; background:#F5F5F7; border:1px solid #D8D8DC; border-radius:16px; overflow:hidden; }
+.admin-top { background:#fff; border-bottom:1px solid #E0E0E0; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; }
+.admin-top .crumb { font-size:13px; color:#7A7A7A; }
+.admin-top .crumb b { color:#1D1D1F; font-weight:600; }
+.admin-body { padding:20px; display:flex; flex-direction:column; gap:16px; }
+.acard { background:#fff; border-radius:14px; border:1px solid #ECECEF; padding:18px 20px; }
+.acard-title { font-size:15px; font-weight:600; display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+.acard-sub { font-size:12px; color:#7A7A7A; margin-bottom:12px; }
+.arow { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:11px 0; border-top:1px solid #F0F0F0; }
+.arow:first-of-type { border-top:none; }
+.arow-label { font-size:13.5px; color:#1D1D1F; }
+.arow-desc { font-size:12px; color:#7A7A7A; margin-top:2px; line-height:1.5; }
+.arow-value { font-size:13px; color:#333; font-variant-numeric:tabular-nums; }
+.arow-new { background:#F7FBFF; border:1px solid #D6E8FA; border-radius:10px; padding:12px 14px; margin-top:12px; }
+.ano-new { font-size:10.5px; font-weight:600; color:#B42318; background:#FDE8E8; border-radius:999px; padding:2px 8px; flex:none; }
+/* iOS 开关 */
+.sw { width:44px; height:26px; flex:none; border-radius:999px; background:#0066CC; position:relative; }
+.sw::after { content:''; position:absolute; top:2px; right:2px; width:22px; height:22px; border-radius:999px; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.2); }
+.sw.off { background:#D8D8DC; }
+.sw.off::after { right:auto; left:2px; }
+
+/* ============ 底部说明 ============ */
+.pv-notes { margin-top:32px; display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px; max-width:1200px; }
+.pn { background:#fff; border-radius:14px; padding:18px 20px; }
+.pn h3 { font-size:14px; font-weight:600; margin-bottom:8px; }
+.pn p { font-size:12.5px; line-height:1.7; color:#555; }
+.pn p b { color:#1D1D1F; }
+.pn code { font-size:11.5px; background:#F5F5F7; border-radius:4px; padding:1px 5px; color:#0066CC; }
+.pn ol { margin:6px 0 0 18px; font-size:12.5px; line-height:1.9; color:#555; }
+</style>
+</head>
+<body>
+
+<div class="pv-head">
+  <div class="pv-title">小程序首页 · 本周点歌排期</div>
+  <div class="pv-ver">v1</div>
+</div>
+<div class="pv-sub">2026-09-21 · 静态预览，未动任何业务代码 · 4 屏：开/关两态 + 空态 + 管理端开关</div>
+
+<div class="pv-grid">
+
+  <!-- ═══════════ 屏1：开 · 有排期 ═══════════ -->
+  <div class="pv-cell">
+    <div class="pv-cell-label">① 开关开 · 本周有排期 <span class="mini">新增区块插在直播卡下</span></div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="sb-icons"><span class="sb-batt"></span></span></div>
+      <div class="navreserve"></div>
+      <div class="body">
+        <div class="between">
+          <div class="brand-head">
+            <div class="brand-logo">菁</div>
+            <div class="stack">
+              <div class="brand-name">菁悠广播站</div>
+              <div class="brand-slogan">菁菁校园情，悠悠广播声</div>
+            </div>
+          </div>
+          <div class="icon-btn"><div class="stack" style="align-items:center;gap:3px;"><div class="i-dot"></div><div class="i-stem"></div></div></div>
+        </div>
+
+        <div class="tile">
+          <div class="tile-status"><div class="dot-live"></div><span>正在直播·07:20</span></div>
+          <div class="tile-title">校园晨报</div>
+          <div class="tile-meta">主持人 王小雨</div>
+          <div class="tile-actions">
+            <div class="btn btn-on-tile">我要投稿</div>
+            <div class="btn btn-ghost">查看节目</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <span class="t-section">本周点歌排期</span>
+            <span class="t-range">09-21 ~ 09-25</span>
+          </div>
+          <div class="card-flush">
+            <div class="sched-today">
+              <div class="sched-day"><span class="sched-day-name">周一</span><span class="sched-day-date">09-21</span><span class="tag-top">今天</span></div>
+              <div class="sched-row">
+                <div class="sched-when"><span class="sched-time">07:20</span><span class="sched-period">早间</span></div>
+                <div class="grow">
+                  <div class="sched-song">《晴天》</div>
+                  <div class="sched-by">高二(3)班 · 林晓</div>
+                </div>
+              </div>
+              <div class="sched-row">
+                <div class="sched-when"><span class="sched-time">12:20</span><span class="sched-period">午间</span></div>
+                <div class="grow">
+                  <div class="sched-song">《起风了》</div>
+                  <div class="sched-by">初三(1)班 · 陈默</div>
+                </div>
+              </div>
+            </div>
+            <div class="sched-day"><span class="sched-day-name">周三</span><span class="sched-day-date">09-23</span></div>
+            <div class="sched-row">
+              <div class="sched-when"><span class="sched-time">17:30</span><span class="sched-period">晚间</span></div>
+              <div class="grow">
+                <div class="sched-song">《夜空中最亮的星》</div>
+                <div class="sched-by">高一(5)班 · 苏叶</div>
+              </div>
+            </div>
+            <div class="sched-foot">排期每周日 18:00 定稿 · 由广播站审核排定</div>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab on"><div class="tab-ic"></div>首页</div>
+        <div class="tab"><div class="tab-ic"></div>投稿</div>
+        <div class="tab"><div class="tab-ic"></div>我的</div>
+      </div>
+    </div>
+    <div class="pv-note">只显示<b>有排期的日子</b>，按「今天 → 周几」自然排序；今天的组用<b>强调色浅底</b>抬出来并挂「今天」黑标。底部一行小字说明定稿节奏，学生不用猜为什么有的日子没有。</div>
+  </div>
+
+  <!-- ═══════════ 屏2：开 · 空态 ═══════════ -->
+  <div class="pv-cell">
+    <div class="pv-cell-label">② 开关开 · 本周排期还没定稿 <span class="mini">空态</span></div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="sb-icons"><span class="sb-batt"></span></span></div>
+      <div class="navreserve"></div>
+      <div class="body">
+        <div class="between">
+          <div class="brand-head">
+            <div class="brand-logo">菁</div>
+            <div class="stack">
+              <div class="brand-name">菁悠广播站</div>
+              <div class="brand-slogan">菁菁校园情，悠悠广播声</div>
+            </div>
+          </div>
+          <div class="icon-btn"><div class="stack" style="align-items:center;gap:3px;"><div class="i-dot"></div><div class="i-stem"></div></div></div>
+        </div>
+
+        <div class="tile">
+          <div class="tile-status"><div class="dot-live dot-off"></div><span>暂无直播</span></div>
+          <div class="tile-title">点歌或投稿，被选中即可播出</div>
+          <div class="tile-actions">
+            <div class="btn btn-on-tile">立即投稿</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <span class="t-section">本周点歌排期</span>
+            <span class="t-range">09-21 ~ 09-25</span>
+          </div>
+          <div class="card-flush">
+            <div class="empty">本周排期尚未发布<div class="sub">广播站每周日 18:00 定稿后在此展示</div></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <span class="t-section">本周节目单</span>
+            <span class="t-link">查看全部</span>
+          </div>
+          <div class="card-flush">
+            <div class="card-row">
+              <span class="row-time">07:20</span>
+              <div class="stack grow"><span class="t-strong">校园晨报</span><span class="t-cap">主持人 王小雨</span></div>
+              <div class="chev-r"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab on"><div class="tab-ic"></div>首页</div>
+        <div class="tab"><div class="tab-ic"></div>投稿</div>
+        <div class="tab"><div class="tab-ic"></div>我的</div>
+      </div>
+    </div>
+    <div class="pv-note">空态不藏区块（学生知道「有这个东西，只是还没定稿」），文案顺手把<b>周日 18:00 定稿</b>的规则再讲一遍。</div>
+  </div>
+
+  <!-- ═══════════ 屏3：关 ═══════════ -->
+  <div class="pv-cell">
+    <div class="pv-cell-label">③ 开关关 · 区块整体消失 <span class="mini">回到现状</span></div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="sb-icons"><span class="sb-batt"></span></span></div>
+      <div class="navreserve"></div>
+      <div class="body">
+        <div class="between">
+          <div class="brand-head">
+            <div class="brand-logo">菁</div>
+            <div class="stack">
+              <div class="brand-name">菁悠广播站</div>
+              <div class="brand-slogan">菁菁校园情，悠悠广播声</div>
+            </div>
+          </div>
+          <div class="icon-btn"><div class="stack" style="align-items:center;gap:3px;"><div class="i-dot"></div><div class="i-stem"></div></div></div>
+        </div>
+
+        <div class="tile">
+          <div class="tile-status"><div class="dot-live"></div><span>正在直播·07:20</span></div>
+          <div class="tile-title">校园晨报</div>
+          <div class="tile-meta">主持人 王小雨</div>
+          <div class="tile-actions">
+            <div class="btn btn-on-tile">我要投稿</div>
+            <div class="btn btn-ghost">查看节目</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <span class="t-section">本周节目单</span>
+            <span class="t-link">查看全部</span>
+          </div>
+          <div class="card-flush">
+            <div class="card-row">
+              <span class="row-time">07:20</span>
+              <div class="stack grow"><span class="t-strong">校园晨报</span><span class="t-cap">主持人 王小雨</span></div>
+              <div class="chev-r"></div>
+            </div>
+            <div class="card-row">
+              <span class="row-time">12:20</span>
+              <div class="stack grow"><span class="t-strong">午间音乐</span><span class="t-cap">主持人 未定</span></div>
+              <div class="chev-r"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab on"><div class="tab-ic"></div>首页</div>
+        <div class="tab"><div class="tab-ic"></div>投稿</div>
+        <div class="tab"><div class="tab-ic"></div>我的</div>
+      </div>
+    </div>
+    <div class="pv-note">开关由<b>服务端把关</b>：关闭时接口直接不下发排期数据（不是前端藏 DOM），学生抓包也看不到。</div>
+  </div>
+
+  <!-- ═══════════ 屏4：管理端开关 ═══════════ -->
+  <div class="pv-cell">
+    <div class="pv-cell-label">④ 管理端 · 点歌设置里加开关 <span class="mini">song-queue-admin 风格</span></div>
+    <div class="admin">
+      <div class="admin-top"><span class="crumb">广播站管理 &nbsp;›&nbsp; 点歌管理 &nbsp;›&nbsp; <b>点歌设置</b></span></div>
+      <div class="admin-body">
+        <div class="acard">
+          <div class="acard-title">点歌设置</div>
+          <div class="acard-sub">现有项保持不动，仅新增最后一行</div>
+          <div class="arow">
+            <div><div class="arow-label">可选播出时段</div><div class="arow-desc">07:20 / 12:20 / 17:30（早间·午间·晚间）</div></div>
+            <span class="arow-value">3 个时段</span>
+          </div>
+          <div class="arow">
+            <div><div class="arow-label">每格正式位</div><div class="arow-desc">每个播出时段可排的点歌数</div></div>
+            <span class="arow-value">1</span>
+          </div>
+          <div class="arow">
+            <div><div class="arow-label">全局候补队列</div><div class="arow-desc">0 = 自动（下周正式位总数）</div></div>
+            <span class="arow-value">自动</span>
+          </div>
+          <div class="arow">
+            <div><div class="arow-label">投稿时间窗口</div><div class="arow-desc">每周六 18:00 – 周日 18:00（仅超管可改）</div></div>
+            <span class="arow-value">开放中</span>
+          </div>
+          <div class="arow-new">
+            <div class="arow" style="border-top:none;padding:0;">
+              <div>
+                <div class="arow-label" style="display:flex;align-items:center;gap:8px;">小程序首页展示本周点歌排期 <span class="ano-new">新增</span></div>
+                <div class="arow-desc">关闭后小程序首页不出现「本周点歌排期」区块；排期数据保留，重新打开即恢复展示</div>
+              </div>
+              <div class="sw"></div>
+            </div>
+          </div>
+        </div>
+        <div class="pv-note" style="max-width:none;">开关 key：<b><span style="color:#0066CC">home_song_schedule</span></b>（缺行视为开）。按既定约定走 <b>switchService.KNOWN_SWITCHES</b> 注册 + 管理端开关列表补默认行，不碰 seed.js。默认值：<b>开</b>。</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════ 实现口径 ═══════════ -->
+<div class="pv-notes">
+  <div class="pn">
+    <h3>数据从哪来</h3>
+    <p>新增用户端接口 <code>GET /user/submit/week</code>：取<b>本周周一~周五</b>、<code>status=1</code>（已排期）的点歌，按 <code>scheduled_slot</code> 归到「日期 × 时段」。时段文案沿用 <code>song_slot_times</code>。首页 <code>index.js</code> 现有的三路并发请求里加一路即可。</p>
+  </div>
+  <div class="pn">
+    <h3>「本周」怎么算</h3>
+    <p>现有 <code>broadcastSlotService.getSlots()</code> 锚定的是<b>下一周</b>（投稿视角）。展示需要本周锚点：在 bjTime 里加一个「当前周范围」或在 getSlots 上加参数，<b>全程走 bjTime</b>，不碰裸 dayjs。</p>
+  </div>
+  <div class="pn">
+    <h3>待陛下定夺（点头即动工）</h3>
+    <ol>
+      <li>区块位置：现在放在<b>直播卡下面、节目单上面</b>，可以挪；</li>
+      <li>点歌人显示到<b>班级 + 姓名</b>，嫌细可以只留姓名或全隐；</li>
+      <li>无歌的日子<b>整组不显示</b>（只留今天组，哪怕是空的）——也可以改成五天全列。</li>
+    </ol>
+  </div>
+  <div class="pn">
+    <h3>边界</h3>
+    <p>开关在服务端生效：关 → 接口返回 <code>{ visible:false }</code>，前端整块不渲染；候补/待审/驳回<b>一律不上首页</b>，只展示已排期；周六播完最后一格后本周自然清空，走屏②空态。</p>
+  </div>
+</div>
+
+</body>
+</html>

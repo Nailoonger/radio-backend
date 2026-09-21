@@ -42,3 +42,87 @@
 /* 行按下反馈 */
 .row-hover { background: rgba(0, 0, 0, 0.035); }
 .pressed { opacity: 0.72; }
+
+/* ══════════ 本周点歌排期（2026-09-21，preview/home-song-schedule-v2 落地） ══════════ */
+/* 日期区间（区块标题右侧） */
+.t-range {
+  font-size: 23rpx;
+  color: var(--muted);
+  letter-spacing: 0.5rpx;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 一天一组；「今天」整组抬到强调色浅底上（圆角内嵌在卡里） */
+.sched-day-wrap { padding: 0 0 4rpx; }
+.sched-today {
+  background: var(--accent-tint);
+  border-radius: 24rpx;
+  margin: 8rpx 16rpx 0;
+}
+.sched-day-head {
+  display: flex;
+  align-items: center;
+  gap: 15rpx;
+  padding: 24rpx 32rpx 6rpx;
+}
+.sched-day-name { font-size: 25rpx; font-weight: 600; color: var(--ink); }
+.sched-day-date {
+  font-size: 22rpx;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+/* 「今天」小黑标（与置顶标签同一语言，尺寸更小一号） */
+.tag-today {
+  font-size: 20rpx;
+  font-weight: 500;
+  background: var(--ink);
+  color: #fff;
+  border-radius: var(--r-pill);
+  padding: 5rpx 15rpx;
+  line-height: 1.35;
+}
+
+/* 排期行：左侧时间列（时刻 + 时段上下两行），右侧歌名 */
+.sched-row {
+  display: flex;
+  align-items: center;
+  gap: 28rpx;
+  padding: 14rpx 32rpx;
+  border-top: 1rpx solid var(--divider);
+}
+.sched-today .sched-row { border-top-color: rgba(0, 102, 204, 0.10); }
+.sched-when { flex: none; width: 150rpx; display: flex; flex-direction: column; }
+.sched-time {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+.sched-period { font-size: 20rpx; color: var(--muted); letter-spacing: 1rpx; }
+.sched-song {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 今天组里一天还没歌的小字 */
+.sched-none {
+  font-size: 23rpx;
+  color: var(--soft);
+  padding: 4rpx 32rpx 20rpx;
+}
+/* 卡底定稿说明 */
+.sched-foot {
+  padding: 12rpx 32rpx 19rpx;
+  text-align: center;
+  font-size: 20rpx;
+  color: var(--soft);
+  letter-spacing: 1rpx;
+}
+/* 空态（定稿前） */
+.sched-empty { padding: 69rpx 40rpx; }
+.sched-empty-sub { font-size: 22rpx; color: var(--soft); margin-top: 10rpx; }
