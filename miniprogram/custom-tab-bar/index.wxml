@@ -10,13 +10,14 @@
       class="tab {{selected === index ? 'on' : ''}}"
       data-index="{{index}}"
       bindtap="switchTab"
-      hover-class="none"
+      hover-class="tab-press"
+      hover-start-time="0"
+      hover-stay-time="120"
     >
-      <image
-        class="tab-icon"
-        src="{{selected === index ? item.iconOn : item.icon}}"
-        mode="aspectFit"
-      />
+      <view class="tab-icon-wrap">
+        <image class="tab-icon" src="{{item.icon}}" mode="aspectFit" />
+        <image class="tab-icon tab-icon-on {{selected === index ? 'show' : ''}}" src="{{item.iconOn}}" mode="aspectFit" />
+      </view>
       <text class="tab-label">{{item.text}}</text>
     </view>
   </view>

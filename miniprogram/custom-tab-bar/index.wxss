@@ -56,7 +56,10 @@
   width: calc((100% - 16rpx) / 4);
   border-radius: 52rpx;
   background: #1D1D1F;
-  transition: transform 360ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 160ms ease;
+  /* 320ms 近似临界阻尼弹簧（damping 1.0 / response 0.32s）：前快后缓、无回弹。
+   * 依旧只动 transform，配合 v9 契约的「起点瞬移 → 渲染回调内滑向终点」不变 */
+  transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 160ms ease;
+  will-change: transform;
 }
 
 /* 首次落位前隐藏：实例初渲染时 selected 恒为 0（初始值不可信），
@@ -83,9 +86,36 @@
   border-radius: 52rpx;
 }
 
-.tab-icon {
+/* 图标容器：按压反馈的缩放作用层 */
+.tab-icon-wrap {
+  position: relative;
   width: 40rpx;
   height: 40rpx;
+  transition: transform 120ms ease-out;
+}
+
+/* 常态图标与选中图标叠放，用透明度交叉淡入——
+ * 替代原来的 src 切换：瞬时不翻面，也消除 iconOn 首次点击才加载的闪白 */
+.tab-icon {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40rpx;
+  height: 40rpx;
+}
+
+.tab-icon-on {
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.tab-icon-on.show {
+  opacity: 1;
+}
+
+/* 按下即反馈：touch-down 触发（hover-start-time=0），不等松手 */
+.tab-press .tab-icon-wrap {
+  transform: scale(0.9);
 }
 
 .tab-label {
@@ -94,6 +124,7 @@
   line-height: 1;
   letter-spacing: 1rpx;
   color: #7A7A7A;
+  transition: color 200ms ease;
 }
 
 .tab.on .tab-label {
