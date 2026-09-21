@@ -12,7 +12,7 @@
             <li>名册姓名即学生的显示名（全站不收集头像）</li>
           </ul>
         </div>
-        <el-button @click="downloadTemplate">下载模板</el-button>
+        <button type="button" class="pf-btn pf-plain ii-tpl" @click="downloadTemplate">下载模板</button>
       </div>
 
       <div class="dz" @click="fileInput?.click()" @dragover.prevent @drop.prevent="onDrop">
@@ -104,24 +104,24 @@
     <template #footer>
       <template v-if="!preview && !result">
         <span class="hint">只解析不落库，确认后才写入</span>
-        <el-button class="ml" @click="inner = false">关闭</el-button>
+        <button type="button" class="pf-btn pf-plain ml" @click="inner = false">关闭</button>
       </template>
 
       <template v-else-if="preview">
         <span class="hint">待写入 {{ importableCount }} 行 · {{ preview.filename }}</span>
-        <el-button class="ml" @click="resetImport">重新选择</el-button>
-        <el-button v-if="preview.summary.invalid" link type="primary" :disabled="importing" @click="confirmImport(false)">
+        <button type="button" class="pf-btn pf-plain ml" :disabled="importing" @click="resetImport">重新选择</button>
+        <button v-if="preview.summary.invalid" type="button" class="pf-link" :disabled="importing" @click="confirmImport(false)">
           忽略异常行继续
-        </el-button>
-        <el-button type="primary" :loading="importing" @click="confirmImport(true)">
+        </button>
+        <button type="button" class="pf-btn pf-primary" :disabled="importing" @click="confirmImport(true)">
           确认导入 {{ importableCount }} 行
-        </el-button>
+        </button>
       </template>
 
       <template v-else>
         <span class="hint">导入完成</span>
-        <el-button class="ml" @click="resetImport">再导一份</el-button>
-        <el-button type="primary" @click="inner = false">完成</el-button>
+        <button type="button" class="pf-btn pf-plain ml" @click="resetImport">再导一份</button>
+        <button type="button" class="pf-btn pf-primary" @click="inner = false">完成</button>
       </template>
     </template>
   </SlideSheet>
@@ -367,4 +367,24 @@ async function downloadTemplate() {
 .rc-note b { color: var(--ink); }
 
 .ml { margin-left: auto; }
+
+/* footer / 顶部自绘按钮（替换 el-button：EP 的 primary 是渐变，违反唯一强调色铁律） */
+.ii-tpl { flex: none; }
+.pf-btn {
+  height: 34px; padding: 0 14px; border-radius: 980px; cursor: pointer; font-family: inherit;
+  font-size: var(--fs-sm); font-weight: 500; border: 1px solid transparent;
+  transition: background 0.16s var(--ease), border-color 0.16s var(--ease), transform 0.16s var(--ease);
+}
+.pf-btn:active { transform: scale(0.96); }
+.pf-btn:disabled { opacity: 0.45; pointer-events: none; }
+.pf-plain { background: var(--canvas); border-color: var(--hairline); color: var(--ink-2); }
+.pf-plain:hover { border-color: var(--soft); color: var(--ink); }
+.pf-primary { background: var(--accent); color: #fff; font-weight: 600; }
+.pf-primary:hover { filter: brightness(1.08); }
+.pf-link {
+  border: none; background: transparent; cursor: pointer; font-family: inherit;
+  font-size: var(--fs-sm); font-weight: 500; color: var(--accent); padding: 0 6px;
+}
+.pf-link:hover { text-decoration: underline; }
+.pf-link:disabled { opacity: 0.45; pointer-events: none; }
 </style>

@@ -40,6 +40,7 @@
       </div>
 
       <div class="fbar-right">
+        <button type="button" class="freset" :disabled="busy" @click="clearAll">重置</button>
         <button ref="moreBtnRef" type="button" class="btn-ghost" @click="moreOpen = true">
           <IconDots :size="15" class="btn-ico" />更多操作
         </button>
@@ -80,7 +81,6 @@
         <b>{{ c.text }}</b>
         <IconClose :size="11" />
       </button>
-      <button :key="'__all'" type="button" class="pk-clear" @click="clearAll">全部清掉</button>
     </TransitionGroup>
     <div v-else class="picked picked-empty">
       <span class="pk-lead">未设置条件 —— 显示全部 {{ listTotal }} 个账号。条件会同步写进地址栏。</span>
@@ -279,7 +279,7 @@
       @filter="(id) => { q.batchId = id; batchesOpen = false; }"
       @done="afterWrite"
     />
-    <PurgeSheet v-model="purgeOpen" :grade="q.grade" @done="afterWrite" />
+    <PurgeSheet v-model="purgeOpen" :grade="q.grade" @done="afterWrite" @export="exportGrade" />
 
     <!-- ══════════ 轻反馈（可撤销） ══════════ -->
     <ToastHost ref="toastRef" />
@@ -865,6 +865,14 @@ onBeforeUnmount(() => {
   background: var(--parchment); border-radius: var(--r-card);
 }
 .fbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
+.freset {
+  border: none; background: transparent; cursor: pointer; font-family: inherit;
+  font-size: var(--fs-sm); color: var(--muted); padding: 6px 8px; border-radius: 8px;
+  transition: color 0.16s var(--ease), background 0.16s var(--ease);
+}
+.freset:hover { color: var(--ink); background: var(--parchment); }
+.freset:active { transform: scale(0.95); }
+.freset:disabled { opacity: 0.45; pointer-events: none; }
 
 .fsearch {
   display: inline-flex; align-items: center; gap: 8px;
@@ -962,12 +970,6 @@ onBeforeUnmount(() => {
 .pk:hover { background: #d9e8f8; }
 .pk:active { transform: scale(0.94); }
 .pk b { font-weight: 600; }
-.pk-clear {
-  border: none; background: transparent; cursor: pointer;
-  font-family: inherit; font-size: var(--fs-sm); color: var(--muted);
-  padding: 0 4px; text-decoration: underline;
-}
-.pk-clear:hover { color: var(--ink); }
 .chip-move { transition: transform 0.26s cubic-bezier(0.34, 1.4, 0.64, 1); }
 .chip-enter-active { transition: opacity 0.2s var(--ease), transform 0.26s cubic-bezier(0.34, 1.4, 0.64, 1); }
 .chip-leave-active { transition: opacity 0.16s var(--ease), transform 0.16s var(--ease); position: absolute; }

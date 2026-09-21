@@ -1,125 +1,114 @@
 <template>
   <SlideSheet
     v-model="inner"
-    :title="`毕业清理 · ${info?.name || (grade + ' 级')}`"
-    :subtitle="info ? `试算已完成 · 共 ${info.total} 个账号 · 这一步之后不可撤销` : '读取试算中…'"
-    width="720"
+    :title="`毕业清理 · ${info?.grade || grade || ''} 级`"
+    :subtitle="info ? '只处理这一届的账号，其它届一概不动' : '读取试算中…'"
+    width="700"
   >
     <template v-if="info">
+      <!-- 顶部红警示条（常驻，原型 warnline） -->
+      <div class="pg-warnline">
+        <IconTrash :size="15" />
+        <span><b>此操作不可恢复。</b>执行后这一届的登录态会立即作废，不等 30 秒缓存。建议先点「导出本届」留档。</span>
+      </div>
+
+      <!-- 统计条（横排一组数字，不放大卡） -->
       <div class="pg-stats">
-        <div class="pg-stat pg-stat--danger">
-          <span class="num">{{ info.canDelete }}</span><em>将删除</em><i>没有投稿记录</i>
-        </div>
-        <div class="pg-stat">
-          <span class="num">{{ info.withSubmit }}</span><em>将停用</em><i>有投稿记录，保留记录</i>
-        </div>
-        <div class="pg-stat">
-          <span class="num">{{ info.classCount }}</span><em>涉及班级</em><i>整届 {{ info.total }} 个账号</i>
-        </div>
+        <span class="pg-kv"><span class="pk-hint">本届账号</span><b class="num">{{ info.total }}</b></span>
+        <span class="pg-kv"><span class="pk-hint">将真删</span><b class="num pg-red">{{ info.canDelete }}</b></span>
+        <span class="pg-kv"><span class="pk-hint">将停用</span><b class="num pg-amber">{{ info.withSubmit }}</b></span>
+        <span class="pg-kv"><span class="pk-hint">涉及班级</span><b class="num">{{ info.classCount }}</b></span>
       </div>
 
-      <div class="pg-rows">
-        <div class="dr"><span class="dr-k">删除</span><span class="dr-v">{{ info.canDelete }} 个账号从库里彻底移除：账号、密码、登录次数、最近登录时间一起没。这 {{ info.canDelete }} 人再也登不进来。</span></div>
-        <div class="dr"><span class="dr-k">停用</span><span class="dr-v">{{ info.withSubmit }} 个账号改为「停用」。他们的投稿记录还在账号上，审核列表里能看到，不会变成一串指向空账号的记录。</span></div>
-        <div class="dr"><span class="dr-k">登录态</span><span class="dr-v">执行后立即失效，学生手里的 token 下一次请求就被踢，不用等 30 秒缓存。</span></div>
-        <div class="dr"><span class="dr-k">建议</span><span class="dr-v">先点「导出本届 xlsx」留一份名单再清理。已改密的学生导不出密码（哈希不可逆），这是正常的。</span></div>
-      </div>
-
-      <!-- 模式 -->
-      <div class="pg-sec">选一种做法</div>
+      <!-- 三种做法（单选，带勾选圆钮，原型 modeCard） -->
       <div class="pg-modes">
         <button
-          v-for="m in MODES" :key="m.k" type="button"
+          v-for="m in modeCards" :key="m.k" type="button"
           class="pg-mode" :class="{ on: mode === m.k }"
           @click="mode = m.k"
         >
-          <span class="pm-n">{{ m.name }}</span>
-          <span class="pm-d">{{ m.desc }}</span>
+          <span class="pm-cb" :class="{ on: mode === m.k }" aria-hidden="true">
+            <IconCheck v-if="mode === m.k" :size="11" :stroke-width="3" />
+          </span>
+          <span class="pm-txt">
+            <span class="pm-n">{{ m.t }}</span>
+            <span class="pm-d">{{ m.d }}</span>
+          </span>
         </button>
       </div>
 
-      <div v-if="mode === 'safe'" class="pg-warn">
-        ⚠️ 如果只是想让他们登不进来、档案还没整理完，选上面「只停用，不删除」—— 那个动作以后还能撤回。
-      </div>
-      <div v-if="mode === 'purge'" class="pg-warn pg-warn--hard">
-        ⚠️ 这一版会把有投稿记录的 {{ info.withSubmit }} 个账号也一起删掉。后台审核列表里对应的投稿还在，
-        但作者会显示成「已注销账号」—— 投稿内容不去，归属没了。
-      </div>
-
-      <div v-if="mode === 'purge'" class="pg-confirm">
-        <div class="pi-label">请输入年级「{{ info.grade }}」以确认</div>
+      <!-- 统一确认：手打年级（原型：所有做法都要输入年级才能按下去） -->
+      <div class="pg-confirm">
+        <span class="pk-hint">输入 <b class="pg-strong">{{ info.grade }}</b> 确认执行</span>
         <input
           v-model="purgeConfirm"
           class="pg-input"
           :placeholder="String(info.grade)"
           spellcheck="false"
         />
-        <div class="micro">输入不一致时下面的按钮保持不可点</div>
       </div>
     </template>
 
     <template #footer>
-      <span class="micro">由 {{ operator }} 执行 · 会写入操作日志</span>
-      <el-button class="ml" @click="inner = false">取消</el-button>
-      <el-button
-        :type="mode === 'purge' ? 'danger' : 'primary'"
-        :disabled="armed === false"
-        :loading="busy"
-        @click="run"
-      >{{ runText }}</el-button>
+      <span class="pk-hint">本次影响 <b class="pg-strong">{{ info?.total ?? '—' }}</b> 个账号</span>
+      <span class="pf-acts">
+        <button type="button" class="pf-btn pf-quiet" :disabled="busy" @click="emit('export')">先导出本届</button>
+        <button type="button" class="pf-btn pf-plain" :disabled="busy" @click="inner = false">取消</button>
+        <button type="button" class="pf-btn pf-danger" :disabled="!armed || busy" @click="run">
+          确认清理 {{ info?.grade || grade }} 级
+        </button>
+      </span>
     </template>
   </SlideSheet>
 </template>
 
 <script setup>
 /**
- * 毕业清理（页内弹层）
+ * 毕业清理（页内弹层）—— 形态 = preview/student-admin-v3 的 purge 屏（用户拍板的标准）
  *
- * 只清理**已经毕业的那一届**，所以必须先在筛选条件里选定年级才会出现入口。
- * 三种模式与后端一致：safe（无投稿真删、有投稿转停用）/ disable（只停用）/ purge（全删，需手打年级）。
+ * 结构：红警示条 → 一行统计（本届/将真删/将停用/涉及班级）→ 三种做法单选（safe/disable/purge）
+ *   → 手打年级确认（**所有做法都要输入**，原型 753 行：「得把年级名原样输入才能按下去」）
+ * footer：本次影响 N 个账号 ｜ 先导出本届（emit('export')，父组件 exportGrade）· 取消 · 确认清理 N 级（实心红）
+ *
+ * 与后端一致的三种模式：safe（无投稿真删、有投稿转停用）/ disable（只停用）/ purge（全删 + confirm）。
  */
 import { ref, computed, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import SlideSheet from '@/components/SlideSheet.vue';
-import { useAuthStore } from '@/stores/auth';
+import { IconTrash, IconCheck } from '@/components/icons';
 import http from '@/utils/http';
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   grade: { type: [String, Number], default: '' },
 });
-const emit = defineEmits(['update:modelValue', 'done']);
-
-const auth = useAuthStore();
-const operator = computed(() => auth.admin?.nickname || auth.admin?.username || '管理员');
+const emit = defineEmits(['update:modelValue', 'done', 'export']);
 
 const inner = computed({
   get: () => props.modelValue,
   set: (v) => emit('update:modelValue', v),
 });
 
-const MODES = [
-  { k: 'safe', name: '按规则清理', desc: '没有投稿记录的真删；有投稿记录的改为停用（默认）' },
-  { k: 'disable', name: '只停用，不删除', desc: '整届都不删，只把登录关掉；以后还能撤回' },
-  { k: 'purge', name: '连投稿记录一起删', desc: '整届全部移除，需手打年级二次确认，不可撤销' },
-];
-
 const info = ref(null);
 const mode = ref('safe');
 const purgeConfirm = ref('');
 const busy = ref(false);
 
-const armed = computed(() => {
-  if (!info.value) return false;
-  if (mode.value !== 'purge') return true;
-  return purgeConfirm.value.trim() === String(info.value.grade);
+/** 三张模式卡的文案 = 原型逐字（数字嵌在描述里，随试算变） */
+const modeCards = computed(() => {
+  const i = info.value;
+  if (!i) return [];
+  return [
+    { k: 'safe', t: 'safe · 默认', d: `无投稿记录的 ${i.canDelete} 个真删；有投稿记录的 ${i.withSubmit} 个改为停用` },
+    { k: 'disable', t: 'disable · 只停用', d: `${i.total} 个全部改为停用，一个都不删 —— 留着以后复查` },
+    { k: 'purge', t: 'purge · 全删（危险）', d: `${i.total} 个全部真删，含 ${i.withSubmit} 个有投稿记录的人 —— 作者名会从审核列表里消失` },
+  ];
 });
 
-const runText = computed(() => {
-  const n = info.value?.total || 0;
-  if (mode.value === 'disable') return `只停用 ${n} 个账号`;
-  if (mode.value === 'purge') return `确认删除 ${n} 个账号`;
-  return `删除 ${info.value?.canDelete || 0} 个账号`;
+/** 原型式统一确认：手打年级原样输入才可执行（safe/disable/purge 一视同仁） */
+const armed = computed(() => {
+  if (!info.value) return false;
+  return purgeConfirm.value.trim() === String(info.value.grade);
 });
 
 async function load() {
@@ -135,7 +124,7 @@ async function load() {
 }
 
 async function run() {
-  if (!info.value || armed.value === false) return;
+  if (!info.value || !armed.value || busy.value) return;
   busy.value = true;
   try {
     const payload = mode.value === 'purge'
@@ -160,51 +149,51 @@ watch(inner, (v) => { if (v) load(); });
 </script>
 
 <style scoped>
-.pg-stats { display: flex; gap: 12px; margin-bottom: 16px; }
-.pg-stat {
-  flex: 1; min-width: 0;
-  padding: 14px 16px; border-radius: 16px;
+/* 红警示条（常驻） */
+.pg-warnline {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 12px 14px; border-radius: 12px; margin-bottom: 12px;
+  background: var(--red-bg); color: var(--red-fg);
+  font-size: var(--fs-sm); line-height: 1.7;
+}
+.pg-warnline svg { flex: none; margin-top: 3px; }
+
+/* 统计条：一行四组「hint + 数字」 */
+.pg-stats {
+  display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+  padding: 12px 15px; border-radius: 12px; margin-bottom: 12px;
   background: var(--parchment);
-  display: flex; flex-direction: column; gap: 3px;
 }
-.pg-stat--danger { background: var(--tile); }
-.pg-stat span { font-size: var(--fs-3xl); font-weight: 600; line-height: 1; letter-spacing: var(--ls-tight); }
-.pg-stat em { font-style: normal; font-size: var(--fs-md); font-weight: 600; color: var(--ink); }
-.pg-stat i { font-style: normal; font-size: var(--fs-xs); color: var(--muted-2); letter-spacing: var(--ls-wide-sm); }
-.pg-stat--danger span { color: #fff; }
-.pg-stat--danger em { color: #fff; }
-.pg-stat--danger i { color: rgba(255, 255, 255, 0.62); }
+.pg-kv { display: flex; align-items: center; gap: 8px; }
+.pk-hint { font-size: var(--fs-xs); color: var(--muted-2); letter-spacing: var(--ls-wide-sm); }
+.pg-stats b { font-size: 17px; font-weight: 600; }
+.pg-red { color: var(--red-fg); }
+.pg-amber { color: var(--amber-fg); }
+.pg-strong { color: var(--ink); font-weight: 600; }
 
-.pg-rows { display: flex; flex-direction: column; gap: 10px; }
-.dr { display: flex; gap: 10px; font-size: var(--fs-md); line-height: 1.7; }
-.dr-k { flex: none; width: 44px; color: var(--muted-2); font-size: var(--fs-sm); padding-top: 2px; }
-.dr-v { color: var(--ink-2); }
-
-.pg-sec {
-  margin: 18px 0 8px; font-size: var(--fs-xs); font-weight: 600;
-  color: var(--muted-2); letter-spacing: var(--ls-wide-sm);
-}
-.pg-modes { display: flex; flex-direction: column; gap: 8px; }
+/* 模式单选卡：勾选圆钮 + 标题/描述 */
+.pg-modes { display: flex; flex-direction: column; gap: 9px; }
 .pg-mode {
-  display: flex; flex-direction: column; gap: 3px; text-align: left;
-  padding: 11px 14px; border-radius: 14px; cursor: pointer;
+  display: flex; align-items: center; gap: 11px; text-align: left;
+  padding: 13px 15px; border-radius: 12px; cursor: pointer; font-family: inherit;
   border: 1px solid var(--hairline); background: var(--canvas);
-  font-family: inherit;
   transition: border-color 0.16s var(--ease), background 0.16s var(--ease);
 }
 .pg-mode:hover { border-color: var(--soft); }
 .pg-mode.on { border-color: var(--accent); background: var(--acc-bg); }
+.pm-cb {
+  flex: none; width: 20px; height: 20px; border-radius: 50%;
+  border: 1.5px solid var(--hairline); background: var(--canvas);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; transition: background 0.16s var(--ease), border-color 0.16s var(--ease);
+}
+.pm-cb.on { background: var(--accent); border-color: var(--accent); }
+.pm-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .pm-n { font-size: var(--fs-md); font-weight: 600; color: var(--ink); }
 .pg-mode.on .pm-n { color: var(--accent); }
 .pm-d { font-size: var(--fs-sm); color: var(--muted); line-height: 1.6; }
 
-.pg-warn {
-  margin-top: 12px; padding: 11px 14px; border-radius: 12px;
-  background: var(--amber-bg); color: var(--amber-fg);
-  font-size: var(--fs-sm); line-height: 1.7;
-}
-.pg-warn--hard { background: var(--red-bg); color: var(--red-fg); }
-
+/* 手打年级确认 */
 .pg-confirm { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 .pg-input {
   height: 40px; padding: 0 13px;
@@ -214,6 +203,20 @@ watch(inner, (v) => { if (v) load(); });
   transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
 }
 .pg-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1); }
-.pi-label { font-size: var(--fs-md); font-weight: 600; color: var(--ink); }
-.ml { margin-left: auto; }
+
+/* footer：自绘按钮（原型 btn-quiet / btn-plain / btn-danger-fill） */
+.pf-acts { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.pf-btn {
+  height: 34px; padding: 0 14px; border-radius: 980px; cursor: pointer; font-family: inherit;
+  font-size: var(--fs-sm); font-weight: 500; border: 1px solid transparent;
+  transition: background 0.16s var(--ease), border-color 0.16s var(--ease), transform 0.16s var(--ease);
+}
+.pf-btn:active { transform: scale(0.96); }
+.pf-btn:disabled { opacity: 0.45; pointer-events: none; }
+.pf-quiet { background: var(--parchment); color: var(--ink-2); }
+.pf-quiet:hover { background: var(--hairline); }
+.pf-plain { background: var(--canvas); border-color: var(--hairline); color: var(--ink-2); }
+.pf-plain:hover { border-color: var(--soft); color: var(--ink); }
+.pf-danger { background: var(--red-fg); color: #fff; font-weight: 600; }
+.pf-danger:hover { filter: brightness(1.06); }
 </style>

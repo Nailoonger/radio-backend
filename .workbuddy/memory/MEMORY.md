@@ -52,6 +52,9 @@
 ## 学生账号管理端（已落地）
 - v1（目录树）已废：**不要树形/层级下钻**，要单页+筛选条件。v2 形态＝条件条（年级→班级→启用→激活→批次→关键字，班级级联于年级）+ 胶囊 + 批量范围＝筛选结果 + 整届操作只在选中年级时出现。业务代码＝`views/StudentAccounts.vue` + `components/student/*Sheet` + `utils/spring.js` 等。
 - 后端 `POST /admin/student/status/batch`（上限 500）；`/student/delete/batch` 在 `/student/:id` 之前。
+- v3 交互已落地（Apple 式，2026-09-21）：hero 带 **summary 摘要**（listStudents 聚合：已激活/停用/有投稿，失败降级 null）；ToastHost 可撤销轻反馈；批量删除/毕业清理保留确认（真删不可逆）。
+- ⚠️ 时序坑：`reload()` 必须 `await fetchStudents()` 之后再 `syncHeader()` —— 顶栏「命中 N 个」用 listTotal，不等数据回来就刷会显示旧 total。
+- ⚠️ 造数坑：sequelize bulkCreate 传下划线属性名（`class_no`/`pwd_changed_at`）被**静默丢弃**（模型是驼峰+field 映射）——造数属性名必须跟模型驼峰走。
 
 ## UI 规范
 - 骨架尺寸＝真实组件（头像40/标题15/正文12/标签22/按钮36）。v8 `.tag`(23px)/`.ano`(19px) 见 admin-ui-v8.html 201/397 行；`ano-new`=红=「需后端新增」。

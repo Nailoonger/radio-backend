@@ -106,6 +106,9 @@ function recede(op) {
 /* ── 拖拽 ── */
 function onDown(e) {
   if (e.button != null && e.button !== 0) return;
+  // ⚠️ 按在关闭钮上：绝不能 setPointerCapture —— 捕获后 click 的 target 会变成 header，
+  // × 的 click 事件永远不触发（线上真实点击失效的根因；程序化 .click() 不经过 hit-testing 所以测不出来）。
+  if (e.target && e.target.closest && e.target.closest('.ss-x')) return;
   const el = sheetRef.value;
   if (!el) return;
   drag = { startY: e.clientY, lastY: e.clientY, lastT: performance.now(), v: 0, h: el.offsetHeight, id: e.pointerId };

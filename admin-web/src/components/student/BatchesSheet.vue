@@ -54,7 +54,7 @@
 
     <template #footer>
       <span class="hint">蓝色文字只把 <code>?batch=</code> 加进筛选条件，不改任何数据；描边按钮才会改数据</span>
-      <el-button class="ml" @click="inner = false">关闭</el-button>
+      <button type="button" class="bt-close" @click="inner = false">关闭</button>
     </template>
   </SlideSheet>
 </template>
@@ -208,4 +208,11 @@ watch(inner, (v) => { if (v) load(); });
   background: var(--parchment); border-radius: 5px; padding: 1px 5px;
 }
 .ml { margin-left: auto; }
+.bt-close {
+  margin-left: auto; height: 32px; padding: 0 14px; border-radius: 980px; cursor: pointer; font-family: inherit;
+  font-size: var(--fs-sm); background: var(--canvas); border: 1px solid var(--hairline); color: var(--ink-2);
+  transition: border-color 0.16s var(--ease), color 0.16s var(--ease), transform 0.16s var(--ease);
+}
+.bt-close:hover { border-color: var(--soft); color: var(--ink); }
+.bt-close:active { transform: scale(0.96); }
 </style>
