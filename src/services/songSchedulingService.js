@@ -209,6 +209,34 @@ function deriveWeekStatus(week, now) {
   return WEEK_STATUS.REVIEW;
 }
 
+/** 锚点已冻结的周状态：排期一旦生成（或锁定/取消），时间锚点不再跟随配置改动 */
+const ANCHOR_FROZEN_STATUS = [WEEK_STATUS.SCHEDULING, WEEK_STATUS.LOCKED, WEEK_STATUS.CANCELLED];
+
+/**
+ * 把周行的时间锚点对齐到当前 KV 配置。
+ *
+ * ⚠️ 为什么必须刷新：学生端能不能提交看的是 `songWindowService.status()`（**实时读配置**），
+ * 而周状态推进、`canCrossSlot()` 闸门、`sweep()` 的锁定时刻看的是**周行快照**。
+ * 不刷新的话，管理员改完窗口会出现「学生已经能按新窗口提交了，但这一周的
+ * 锁定时刻/审核截止还是旧的」这种自相矛盾的状态。
+ * 已进入排期（SCHEDULING 及以上）的周不动 —— 那时锚点已被用作调度依据。
+ */
+async function refreshAnchors(week, weekStartMs, now, transaction) {
+  if (ANCHOR_FROZEN_STATUS.includes(week.status)) return week;
+  const a = await anchorOf(weekStartMs, now);
+  const ms = (v) => (v ? +new Date(v) : null);
+  const keys = ['applicationStartAt', 'applicationEndAt', 'reviewStartAt', 'scheduleLockAt', 'reviewEndAt'];
+  if (keys.every((k) => ms(week[k]) === +a[k])) return week;
+  logger.info(`[songSchedule] 周 ${week.weekStartDate} 时间锚点跟随配置刷新`);
+  return week.update({
+    applicationStartAt: a.applicationStartAt,
+    applicationEndAt: a.applicationEndAt,
+    reviewStartAt: a.reviewStartAt,
+    scheduleLockAt: a.scheduleLockAt,
+    reviewEndAt: a.reviewEndAt,
+  }, { transaction });
+}
+
 /**
  * 取（必要时创建）某个播出周的排期行。
  * 懒创建：不需要管理员先「创建下周排期」，第一次有人提到这一周就自动建。
@@ -228,6 +256,8 @@ async function ensureWeek(weekStartMs, { now = Date.now(), createdBy = null, tra
       week = await WeeklySchedule.findOne({ where: { weekStartDate: dateStr }, transaction });
       if (!week) throw e;
     }
+  } else {
+    week = await refreshAnchors(week, weekStartMs, now, transaction);
   }
   const next = deriveWeekStatus(week, now);
   if (next !== week.status) week = await week.update({ status: next }, { transaction });

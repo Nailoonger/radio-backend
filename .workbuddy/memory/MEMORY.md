@@ -56,6 +56,10 @@
 - **收歌截止 ≠ 审核截止**：`application_end_at` 只停止收歌；`schedule_lock_at = review_end_at = 审核截止`
   （KV `reviewDay`/`reviewTime`；**null = 未配置 → 退回「收歌结束 + `song_lock_offset_minutes`」**，
   窗口关闭时退回播出周周一 00:00）。前端**别再用 `lockAt − applicationEndAt` 反算偏移**，`weekView` 已下发 `reviewEndAt`。
+- ⚠️ **周行锚点会跟着配置刷新**（`ensureWeek → refreshAnchors`）：学生端窗口＝**实时读 KV**，
+  周状态/闸门/锁定时刻＝**周行快照**，两者必须一致，否则改完配置会自相矛盾。
+  `DRAFT/APPLICATION/REVIEW` 的周行重新对齐配置（值相同不写库）；
+  **`SCHEDULING/LOCKED/CANCELLED` 冻结**，不再被配置改动改写。
 - 保留不变：每人每周 2 次、同曲一周去重。
 - 有意偏离协议：不建 `schedule_slots` 表（格子由 `broadcastSlotService` 派生）；容量仍是全局 KV；`song_queue_limit` 废弃。
 - 前端已落地（commit `9b07026`）：两端都按派生 `status`；**已排期 = Σ 各格 seated**；文稿 `schedule` 恒 UNASSIGNED → 派生 status 也是 6，文案按 `type===2` 覆盖成「已通过」。

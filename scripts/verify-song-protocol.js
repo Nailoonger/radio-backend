@@ -704,6 +704,29 @@ const DAY = 24 * 60 * 60 * 1000;
     const stQ = await win.status(now);
     check('status 也带 reviewAt（学生端窗口条可用）', !!stQ.reviewAt, stQ.reviewAt);
 
+    // ⑪ 配置改动后：未进入排期的周行锚点要跟着刷新
+    //    （学生端能不能提交＝实时读配置；周状态/闸门/锁定时刻＝周行快照。两者不一致会自相矛盾）
+    await win.setConfig({ enabled: 1, startDay: 1, startTime: '00:00', endDay: 0, endTime: '09:00', reviewDay: 0, reviewTime: '10:00' }, null);
+    const reCfg = await win.getConfig(now);
+    const reRng = await win.anchorRangeAt(reCfg, now);
+    const reWeek = await sched.ensureWeek(weekStartMsQ, { now });
+    check('配置改动后：已有周行「收歌截止」自动刷新',
+      +new Date(reWeek.applicationEndAt) === reRng.end.getTime(),
+      `${fmt(+new Date(reWeek.applicationEndAt))}（期望 ${fmt(reRng.end.getTime())}）`);
+    check('配置改动后：已有周行「锁定时刻」跟着改成新审核截止',
+      +new Date(reWeek.scheduleLockAt) === reRng.reviewAt.getTime(),
+      `${fmt(+new Date(reWeek.scheduleLockAt))}（期望 ${fmt(reRng.reviewAt.getTime())}）`);
+
+    // ⑫ 已进入排期（SCHEDULING 及以上）的周行锚点冻结，不再被配置改动改写
+    await reWeek.update({ status: 'SCHEDULING' });
+    await win.setConfig({ enabled: 1, startDay: 2, startTime: '06:00', endDay: 0, endTime: '20:00', reviewDay: 0, reviewTime: '23:00' }, null);
+    const frozenWeek = await sched.ensureWeek(weekStartMsQ, { now });
+    check('已排期(SCHEDULING)的周行锚点冻结，不被新配置改写',
+      frozenWeek.status === 'SCHEDULING'
+      && +new Date(frozenWeek.applicationEndAt) === reRng.end.getTime()
+      && +new Date(frozenWeek.scheduleLockAt) === reRng.reviewAt.getTime(),
+      `${frozenWeek.status} / ${fmt(+new Date(frozenWeek.applicationEndAt))}`);
+
     await win.setConfig(win.DEFAULT_WINDOW, null);
 
     /* ══════════ 汇总 ══════════ */

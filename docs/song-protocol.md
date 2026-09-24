@@ -108,6 +108,14 @@ DRAFT ──发布──> APPLICATION ──申请截止──> REVIEW ──已
 - `DRAFT/APPLICATION/REVIEW` 由时间自动推进；`SCHEDULING / LOCKED / CANCELLED` 是**写动作**的结果，
   不会被时间反向覆盖（`ensureWeek` 不覆盖 `LOCKED`）。
 
+- ⚠️ **锚点跟着配置刷新**：学生端能不能提交看的是 `songWindowService.status()`（**实时读 KV**），
+  而周状态推进、`canCrossSlot()` 闸门、`sweep()` 的锁定时刻看的是**周行快照**。
+  所以 `ensureWeek()` 在周行已存在且状态为 `DRAFT/APPLICATION/REVIEW` 时，
+  会把 `application_*` / `review_*` / `schedule_lock_at` **重新对齐当前 KV 配置**
+  （值相同则不写库）。已进入 `SCHEDULING / LOCKED / CANCELLED` 的周**冻结**，
+  不再被配置改动改写 —— 那时锚点已被用作调度依据。
+  没有这条会出现「学生已经能按新窗口提交了，但这一周的锁定时刻还是旧的」这种自相矛盾的状态。
+
 ---
 
 ## 3. 完整流程与算法
