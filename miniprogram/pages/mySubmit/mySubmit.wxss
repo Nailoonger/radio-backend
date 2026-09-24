@@ -47,6 +47,15 @@
 .stat .n { font-size: 38rpx; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.2; }
 .stat.warn .n { color: var(--amber-fg); }
 .stat .l { font-size: 21rpx; color: var(--muted); margin-top: 6rpx; letter-spacing: 1rpx; }
+/* 三桶口径说明：桶从 6 个减到 3 个之后必须写清「待审核」装了什么，
+   否则被驳回 / 已取消的躺在里面会被当成故障。负 margin 抵消 hero 的 gap，让它贴住统计格。 */
+.hero-note {
+  font-size: 21rpx;
+  color: var(--muted);
+  letter-spacing: 0.5rpx;
+  line-height: 1.5;
+  margin-top: -12rpx;
+}
 
 /* ---- 未登录：同款白色浮卡当焦点（与 Hero 一致的海拔） ---- */
 .nologin {

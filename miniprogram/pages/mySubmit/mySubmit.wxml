@@ -16,7 +16,8 @@
     </block>
 
     <block wx:else>
-      <!-- 用户 Hero 卡（L1：白卡大投影，全页唯一焦点；六格统计 = 我的进度） -->
+      <!-- 用户 Hero 卡（L1：白卡大投影，全页唯一焦点）
+           三格统计 = 全部 / 待审核 / 已播出，三桶互斥穷尽（7 + 3 = 10） -->
       <view class="hero">
         <view class="hero-top">
           <view class="avatar">{{nicknameInitial}}</view>
@@ -26,18 +27,16 @@
           </view>
           <view class="hero-badge">菁悠成员</view>
         </view>
-        <!-- v2：候补中 / 已补位 也要看得见，否则「全部」与各状态对不上账 -->
         <view class="hero-stats">
           <view class="stat"><view class="n">{{stats.all}}</view><view class="l">全部</view></view>
           <view class="stat warn"><view class="n">{{stats.pending}}</view><view class="l">待审核</view></view>
-          <view class="stat warn"><view class="n">{{stats.queued}}</view><view class="l">候补中</view></view>
-          <view class="stat"><view class="n">{{stats.promoted}}</view><view class="l">已补位</view></view>
-          <view class="stat"><view class="n">{{stats.passed}}</view><view class="l">已通过</view></view>
-          <view class="stat"><view class="n">{{stats.rejected}}</view><view class="l">已驳回</view></view>
+          <view class="stat"><view class="n">{{stats.played}}</view><view class="l">已播出</view></view>
         </view>
+        <!-- 桶少到三个之后必须写清「待审核」到底装了什么，否则被驳回的躺在里面会被当成故障 -->
+        <view class="hero-note">「待审核」= 还没播出（含待排期、候补中、已驳回等）</view>
       </view>
 
-      <!-- 点歌时间窗口状态条（v2，常驻；文案服务端下发，前端不硬编码星期与时刻） -->
+      <!-- 点歌时间窗口状态条（常驻；文案服务端下发，前端不硬编码星期与时刻） -->
       <view class="win-bar {{winOpen ? 'open' : ''}}" wx:if="{{winEnabled}}">
         <view class="win-dot"></view>
         <view class="win-main">
@@ -46,18 +45,15 @@
         </view>
       </view>
 
-      <!-- 状态筛选（v2 五态全带上） -->
+      <!-- 三格筛选（协议版：全部 / 待审核 / 已播出） -->
       <view class="segment">
-        <view class="segment-indicator" style="width: calc((100% - 16rpx) / 6); transform: translateX({{statusIndex * 100}}%);"></view>
+        <view class="segment-indicator" style="width: calc((100% - 16rpx) / 3); transform: translateX({{statusIndex * 100}}%);"></view>
         <view class="segment-item {{statusFilter === '' ? 'on' : ''}}" data-status="" bindtap="switchFilter" hover-class="none">全部</view>
-        <view class="segment-item {{statusFilter === '0' ? 'on' : ''}}" data-status="0" bindtap="switchFilter" hover-class="none">待审核</view>
-        <view class="segment-item {{statusFilter === '3' ? 'on' : ''}}" data-status="3" bindtap="switchFilter" hover-class="none">候补中</view>
-        <view class="segment-item {{statusFilter === '4' ? 'on' : ''}}" data-status="4" bindtap="switchFilter" hover-class="none">已补位</view>
-        <view class="segment-item {{statusFilter === '1' ? 'on' : ''}}" data-status="1" bindtap="switchFilter" hover-class="none">已通过</view>
-        <view class="segment-item {{statusFilter === '2' ? 'on' : ''}}" data-status="2" bindtap="switchFilter" hover-class="none">已驳回</view>
+        <view class="segment-item {{statusFilter === 'pending' ? 'on' : ''}}" data-status="pending" bindtap="switchFilter" hover-class="none">待审核</view>
+        <view class="segment-item {{statusFilter === 'played' ? 'on' : ''}}" data-status="played" bindtap="switchFilter" hover-class="none">已播出</view>
       </view>
 
-      <!-- v8 方案 ⑥：列表骨架（张数 = 上一次条数，最多 5 张；不铺满整屏） -->
+      <!-- 列表骨架（张数 = 上一次条数，最多 5 张；不铺满整屏） -->
       <block wx:if="{{skList}}">
         <view class="item sk-item" wx:for="{{[1,2,3,4,5]}}" wx:key="*this" wx:if="{{index < skCount}}">
           <view class="between">
@@ -71,12 +67,12 @@
 
       <view class="loading" wx:if="{{loading && !skList}}">加载中……</view>
 
-      <view class="empty" wx:if="{{!list.length && !loading}}">暂无投稿记录</view>
+      <view class="empty" wx:if="{{!list.length && !loading}}">这里还没有投稿记录</view>
 
-      <!-- 投稿条目：候补中 / 已补位 → 深色状态卡；未补上 → 羊皮纸卡；其余 → 普通行 -->
+      <!-- 投稿条目：候补中 / 已排期 → 深色状态卡（主角）；未排上 / 已驳回 → 羊皮纸卡；其余 → 普通行 -->
       <block wx:for="{{list}}" wx:key="id">
 
-        <!-- ① 候补中（深色卡当主角：位次 + 前面几人 + 上限 + 首选 + 截止） -->
+        <!-- ① 候补中（深色卡当主角：位次 + 前面几人 + 首选 + 是否接受调剂 + 锁定时刻） -->
         <view class="tile" wx:if="{{item.qv.kind === 'waiting'}}">
           <view class="tile-chips">
             <view class="chip" wx:for="{{item.qv.chips}}" wx:key="*this" wx:for-item="cp">{{cp}}</view>
@@ -86,9 +82,6 @@
             <view class="tile-meta">{{item.qv.meta1}}</view>
             <view class="tile-meta" wx:if="{{item.qv.meta2}}">{{item.qv.meta2}}</view>
           </view>
-          <view class="qc-bar" wx:if="{{item.qv.barPct}}">
-            <view class="qc-bar-fill" style="width: {{item.qv.barPct}}%;"></view>
-          </view>
           <view class="qc-hint" wx:if="{{item.qv.hint}}">{{item.qv.hint}}</view>
           <view class="qc-hint" wx:if="{{item.qv.deadline}}">{{item.qv.deadline}}</view>
           <view class="tile-actions">
@@ -96,29 +89,31 @@
           </view>
         </view>
 
-        <!-- ② 已补位（标题放实际时段：观众看的就是「排到哪一场了」） -->
-        <view class="tile" wx:elif="{{item.qv.kind === 'promoted'}}">
+        <!-- ② 已排期（标题放实际时段：学生最想知道的就是「排到哪一场」；
+             被调剂过的把「首选 → 实际」都写出来，否则学生会以为排错了） -->
+        <view class="tile" wx:elif="{{item.qv.kind === 'scheduled'}}">
           <view class="tile-chips">
             <view class="chip" wx:for="{{item.qv.chips}}" wx:key="*this" wx:for-item="cp">{{cp}}</view>
           </view>
           <view class="tile-title">{{item.qv.title}}</view>
-          <view class="tile-meta" wx:if="{{item.qv.meta1}}">{{item.qv.meta1}}</view>
-          <view class="tile-meta" wx:if="{{item.qv.meta2}}">{{item.qv.meta2}}</view>
+          <view class="stack" style="gap: 6rpx;">
+            <view class="tile-meta" wx:if="{{item.qv.meta1}}">{{item.qv.meta1}}</view>
+            <view class="tile-meta" wx:if="{{item.qv.meta2}}">{{item.qv.meta2}}</view>
+          </view>
           <view class="qc-hint" wx:if="{{item.qv.hint}}">{{item.qv.hint}}</view>
-          <view class="qc-hint" wx:if="{{item.qv.deadline}}">{{item.qv.deadline}}</view>
         </view>
 
-        <!-- ③ 未补上（失败不抢主角位，用羊皮纸卡） -->
+        <!-- ③ 未排上 / 已驳回（失败不抢主角位，用羊皮纸卡；红胶囊区分系统驳与人工驳） -->
         <view class="qc-fail" wx:elif="{{item.qv.kind === 'failed'}}">
           <view class="between">
             <text class="t-strong">{{item.qv.title}}</text>
-            <text class="tag tag-reject">未补上</text>
+            <text class="tag tag-reject">{{item.qv.tagText}}</text>
           </view>
           <view class="t-sub">{{item.qv.reason}}</view>
           <view class="t-cap" wx:if="{{item.qv.footText}}">{{item.qv.footText}}</view>
         </view>
 
-        <!-- ④ 普通行 -->
+        <!-- ④ 普通行（待审核 / 待排期 / 已播放 / 已取消） -->
         <view class="item" wx:else>
           <view class="between">
             <text class="tag {{item.statusClass}}">{{item.statusText}}</text>
@@ -132,21 +127,18 @@
             <view class="t-cap clamp-2" wx:if="{{item.type === 2 && item.articleContent}}">{{item.articleContent}}</view>
           </view>
 
-          <!-- v2：点歌带上时段（已排期看实际排期，其余看学生首选） -->
-          <view class="t-cap" wx:if="{{item.slotText}}">
-            {{item.status === 1 ? '播出时段' : '希望时段'}}：{{item.slotText}}
-          </view>
+          <!-- 点歌才有时段：已排期/已播放看实际排期，其余看学生首选 -->
+          <view class="t-cap" wx:if="{{item.slotText}}">{{item.slotLabel}}：{{item.slotText}}</view>
 
           <view class="reason" wx:if="{{item.rejectReason}}">驳回原因：{{item.rejectReason}}</view>
+
+          <view class="t-cap" wx:if="{{item.status === 7}}">已撤销，位子已让给别人</view>
 
           <view class="between" wx:if="{{item.status === 0}}" style="justify-content: flex-end;">
             <view class="cancel" data-id="{{item.id}}" bindtap="cancel" hover-class="pressed">撤销</view>
           </view>
         </view>
       </block>
-
-      <view class="loading" wx:if="{{list.length < total}}">加载中……</view>
-      <view class="t-micro footnote" wx:elif="{{finished && list.length}}">没有更多了</view>
 
       <!-- 入口 -->
       <view class="entries">

@@ -195,6 +195,21 @@ button.btn-block,
 /* v2 第 5 态「已补位 · 待审」：占着位、还没人审，是唯一需要管理员尽快动手的状态，给强调色浅底 */
 .tag-promoted { background: var(--accent-tint); color: var(--accent); }
 
+/* ══════════ 协议版新增的 3 个状态胶囊（docs/song-protocol.md）══════════
+ * 派生 status 从 5 个扩到 8 个（4 保留为 v2 遗留），这里只补缺的三种：
+ *   6 已通过 · 待排期 —— 审核过了、等系统排位（与 .tag-promoted 同色，但语义收敛成「等排期」）
+ *   5 已播放         —— 正常播完，历史态，填灰不抢眼
+ *   7 已取消         —— 学生自己撤的，用描边避免在列表里看着像成功
+ * 描边款补了 padding 差额（2rpx 边框 vs 基础款无边框），保证三种胶囊视觉等高。 */
+.tag-acc     { background: var(--accent-tint); color: var(--accent); }
+.tag-mute    { background: var(--divider);     color: var(--muted); }
+.tag-outline {
+  background: #fff;
+  border: 2rpx solid var(--hairline);
+  color: var(--muted);
+  padding: 6rpx 20rpx;
+}
+
 /* ============ 点歌时间窗口状态条（v2，常驻；投稿页与我的投稿页共用） ============
  * 两行结构：第一行是「规则」（每周六 18:00 – 周日 18:00，稳定不变），
  * 第二行是「此刻状态 + 倒计时」（变化，开放中走强调色）。

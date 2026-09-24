@@ -3,111 +3,172 @@
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
   <view class="navreserve" style="height: {{navBarHeight}}px"></view>
 
-  <view class="body">
-
-    <!-- 页面标题 -->
-    <view class="stack">
-      <view class="t-page">投稿</view>
-      <view class="t-sub">点歌或文稿，被选中即可在节目中播出</view>
-    </view>
-
-    <!-- 点歌时间窗口状态条（v2，常驻不可折叠）：第一行规则、第二行此刻状态与倒计时 -->
-    <!-- 文案全部由服务端下发（GET /user/submit/window），前端不硬编码星期与时刻 -->
-    <view class="win-bar {{winOpen ? 'open' : ''}}" wx:if="{{type === 1 && winEnabled}}">
-      <view class="win-dot"></view>
-      <view class="win-main">
-        <view class="win-txt">点歌时间：{{winLine1}}</view>
-        <view class="win-sub">{{winLine2}}</view>
-      </view>
-    </view>
-
-    <!-- 点歌 / 文稿 切换 -->
-    <view class="segment">
-      <view class="segment-indicator" style="width: calc((100% - 16rpx) / 2); transform: translateX({{(type - 1) * 100}}%);"></view>
-      <view
-        class="segment-item {{type === 1 ? 'on' : ''}} {{switches.submit_song === 'off' ? 'is-off' : ''}}"
-        data-type="1"
-        bindtap="switchType"
-        hover-class="none"
-      >点歌{{switches.submit_song === 'off' ? '（已关闭）' : ''}}</view>
-      <view
-        class="segment-item {{type === 2 ? 'on' : ''}} {{switches.submit_article === 'off' ? 'is-off' : ''}}"
-        data-type="2"
-        bindtap="switchType"
-        hover-class="none"
-      >文稿投稿{{switches.submit_article === 'off' ? '（已关闭）' : ''}}</view>
-    </view>
-
-    <!-- 点歌侧提示：本周还能点 N 次 / 已用完 -->
-    <view class="quota-hint {{quotaBlocked ? 'is-blocked' : ''}}" wx:if="{{type === 1 && quotaText}}">
-      <view class="quota-dot"></view>
-      <text>{{quotaText}}</text>
-    </view>
-
-    <!-- 表单卡：点歌 / 文稿 共用一张卡，「希望播出时间」也在卡内 -->
-    <!-- v8 方案 ⑤：表单骨架（尺寸=真实组件：标签 15 / 输入 44 / 正文 44 / 按钮 46） -->
-    <view class="form" wx:if="{{skForm}}">
-      <view class="field"><view class="sk sk-label"></view><view class="sk sk-input"></view></view>
-      <view class="field"><view class="sk sk-label"></view><view class="sk sk-input"></view></view>
-      <view class="field"><view class="sk sk-label"></view><view class="sk sk-area"></view></view>
-      <view class="field"><view class="sk sk-label"></view><view class="sk sk-input"></view></view>
-    </view>
-
-    <view class="form" wx:else>
-      <block wx:if="{{type === 1}}">
-        <view class="field">
-          <view class="field-label">歌曲名</view>
-          <input class="input" placeholder="请输入歌曲名" placeholder-class="ph"
-                 value="{{songName}}" bindinput="inputSongName" />
+  <!-- ══════════ 提交成功回执（协议版新增）══════════
+       协议版提交只进审核队列、不当场占位，所以必须在这里把「接下来会发生什么」
+       讲清楚，否则学生会反复刷新等「已排期」。 -->
+  <block wx:if="{{receipt}}">
+    <view class="body">
+      <view class="receipt">
+        <view class="rc-mark">✓</view>
+        <view class="stack" style="gap: 12rpx;">
+          <view class="rc-title">已提交，进入审核</view>
+          <view class="rc-song">{{receipt.song}}</view>
         </view>
-        <view class="field">
-          <view class="field-label">歌手</view>
-          <input class="input" placeholder="请输入歌手" placeholder-class="ph"
-                 value="{{singer}}" bindinput="inputSinger" />
-        </view>
-        <view class="field">
-          <view class="field-label">祝福语（选填）</view>
-          <textarea class="input input-area" placeholder="想说点什么……" placeholder-class="ph"
-                    maxlength="500" value="{{wishContent}}" bindinput="inputWish" />
-        </view>
-      </block>
 
-      <block wx:if="{{type === 2}}">
-        <view class="field">
-          <view class="field-label">标题</view>
-          <input class="input" placeholder="文稿标题" placeholder-class="ph"
-                 value="{{articleTitle}}" bindinput="inputArticleTitle" />
-        </view>
-        <view class="field">
-          <view class="field-label">正文</view>
-          <textarea class="input input-area input-area-lg" placeholder="尽情创作吧" placeholder-class="ph"
-                    maxlength="5000" value="{{articleContent}}" bindinput="inputArticleContent" />
-        </view>
-      </block>
-
-      <!-- 播出时段：只读行 + 箭头 = 一眼看出是「选」不是「填」 -->
-      <view class="field">
-        <view class="field-label">希望播出时段{{type === 1 ? '' : '（选填）'}}</view>
-        <view class="slot-row" hover-class="pressed" bindtap="openSlots">
-          <view class="slot-value {{slotLabel ? '' : 'is-ph'}}">
-            {{slotLabel || '从下周一时段里选一个'}}
+        <view class="steps">
+          <view class="step on">
+            <view class="step-rail"><view class="step-dot"></view><view class="step-line"></view></view>
+            <view class="step-main">
+              <view class="step-t on">已提交</view>
+              <view class="step-d">{{receipt.at}}{{receipt.leftText ? ' · ' + receipt.leftText : ''}}</view>
+            </view>
           </view>
-          <view class="slot-arrow"></view>
+          <view class="step">
+            <view class="step-rail"><view class="step-dot"></view><view class="step-line"></view></view>
+            <view class="step-main">
+              <view class="step-t">等待审核</view>
+              <view class="step-d" wx:if="{{receipt.auditAt}}">审核截止 {{receipt.auditAt}}（点歌窗口关闭时）。通过后进入排期。</view>
+              <view class="step-d" wx:else>审核通过后进入排期，按「首选时段 + 提交时间先后」分配正式位。</view>
+            </view>
+          </view>
+          <view class="step">
+            <view class="step-rail"><view class="step-dot"></view></view>
+            <view class="step-main">
+              <view class="step-t">统一排期</view>
+              <view class="step-d">按「首选时段 + 提交时间先后」分配正式位；首选排满会自动候补。{{receipt.allowReschedule ? '你已勾选接受调剂，有空位时可能被调到别的时段。' : '你没勾选接受调剂，只有首选时段有空位才排得上。'}}</view>
+            </view>
+          </view>
         </view>
-        <view class="slot-sub" wx:if="{{slotRangeText}}">可选范围：{{slotRangeText}}（下周一到周五）</view>
       </view>
+
+      <view class="t-cap receipt-foot">{{receipt.lockText}}</view>
     </view>
 
-  </view>
+    <view class="bottom-cta">
+      <button class="btn btn-primary btn-block" hover-class="pressed" bindtap="goMySubmit">查看我的投稿</button>
+    </view>
+  </block>
 
-  <!-- 底部固定操作 -->
-  <view class="bottom-cta">
-    <view class="t-cap hint" wx:if="{{hintText}}">{{hintText}}</view>
-    <button class="btn btn-primary btn-block" hover-class="pressed"
-            bindtap="doSubmit" disabled="{{submitting || ctaClosed}}">
-      {{submitting ? '提交中……' : (ctaClosed ? '未到点歌时间' : '提交投稿')}}
-    </button>
-  </view>
+  <!-- ══════════ 表单态 ══════════ -->
+  <block wx:else>
+    <view class="body">
+
+      <!-- 页面标题 -->
+      <view class="stack">
+        <view class="t-page">投稿</view>
+        <view class="t-sub">点歌或文稿，被选中即可在节目中播出</view>
+      </view>
+
+      <!-- 点歌时间窗口状态条（常驻不可折叠）：第一行规则、第二行此刻状态与倒计时 -->
+      <!-- 文案全部由服务端下发（GET /user/submit/window），前端不硬编码星期与时刻 -->
+      <view class="win-bar {{winOpen ? 'open' : ''}}" wx:if="{{type === 1 && winEnabled}}">
+        <view class="win-dot"></view>
+        <view class="win-main">
+          <view class="win-txt">点歌时间：{{winLine1}}</view>
+          <view class="win-sub">{{winLine2}}</view>
+        </view>
+      </view>
+
+      <!-- 点歌 / 文稿 切换 -->
+      <view class="segment">
+        <view class="segment-indicator" style="width: calc((100% - 16rpx) / 2); transform: translateX({{(type - 1) * 100}}%);"></view>
+        <view
+          class="segment-item {{type === 1 ? 'on' : ''}} {{switches.submit_song === 'off' ? 'is-off' : ''}}"
+          data-type="1"
+          bindtap="switchType"
+          hover-class="none"
+        >点歌{{switches.submit_song === 'off' ? '（已关闭）' : ''}}</view>
+        <view
+          class="segment-item {{type === 2 ? 'on' : ''}} {{switches.submit_article === 'off' ? 'is-off' : ''}}"
+          data-type="2"
+          bindtap="switchType"
+          hover-class="none"
+        >文稿投稿{{switches.submit_article === 'off' ? '（已关闭）' : ''}}</view>
+      </view>
+
+      <!-- 点歌侧提示：本周还能点 N 次 / 已用完 -->
+      <view class="quota-hint {{quotaBlocked ? 'is-blocked' : ''}}" wx:if="{{type === 1 && quotaText}}">
+        <view class="quota-dot"></view>
+        <text>{{quotaText}}</text>
+      </view>
+
+      <!-- 表单卡：点歌 / 文稿 共用一张卡，「希望播出时间」也在卡内 -->
+      <!-- 表单骨架（尺寸=真实组件：标签 15 / 输入 44 / 正文 44 / 按钮 46） -->
+      <view class="form" wx:if="{{skForm}}">
+        <view class="field"><view class="sk sk-label"></view><view class="sk sk-input"></view></view>
+        <view class="field"><view class="sk sk-label"></view><view class="sk sk-input"></view></view>
+        <view class="field"><view class="sk sk-label"></view><view class="sk sk-area"></view></view>
+        <view class="field"><view class="sk sk-label"></view><view class="sk sk-input"></view></view>
+      </view>
+
+      <view class="form" wx:else>
+        <block wx:if="{{type === 1}}">
+          <view class="field">
+            <view class="field-label">歌曲名</view>
+            <input class="input" placeholder="请输入歌曲名" placeholder-class="ph"
+                   value="{{songName}}" bindinput="inputSongName" />
+          </view>
+          <view class="field">
+            <view class="field-label">歌手</view>
+            <input class="input" placeholder="请输入歌手" placeholder-class="ph"
+                   value="{{singer}}" bindinput="inputSinger" />
+          </view>
+          <view class="field">
+            <view class="field-label">祝福语（选填）</view>
+            <textarea class="input input-area" placeholder="想说点什么……" placeholder-class="ph"
+                      maxlength="500" value="{{wishContent}}" bindinput="inputWish" />
+          </view>
+        </block>
+
+        <block wx:if="{{type === 2}}">
+          <view class="field">
+            <view class="field-label">标题</view>
+            <input class="input" placeholder="文稿标题" placeholder-class="ph"
+                   value="{{articleTitle}}" bindinput="inputArticleTitle" />
+          </view>
+          <view class="field">
+            <view class="field-label">正文</view>
+            <textarea class="input input-area input-area-lg" placeholder="尽情创作吧" placeholder-class="ph"
+                      maxlength="5000" value="{{articleContent}}" bindinput="inputArticleContent" />
+          </view>
+        </block>
+
+        <!-- 播出时段：只读行 + 箭头 = 一眼看出是「选」不是「填」 -->
+        <view class="field">
+          <view class="field-label">希望播出时段{{type === 1 ? '' : '（选填）'}}</view>
+          <view class="slot-row" hover-class="pressed" bindtap="openSlots">
+            <view class="slot-value {{slotLabel ? '' : 'is-ph'}}">
+              {{slotLabel || '从下周一时段里选一个'}}
+            </view>
+            <view class="slot-arrow"></view>
+          </view>
+          <view class="slot-sub" wx:if="{{slotRangeText}}">可选范围：{{slotRangeText}}（下周一到周五）</view>
+        </view>
+
+        <!-- 接受调剂（协议版 allow_reschedule）：首选排满时能不能被调到别的时段，学生自己定。
+             不勾也不会掉队 —— 只是只剩「首选时段恰好有空位」这一条路。 -->
+        <view class="switch-row" wx:if="{{type === 1}}">
+          <view class="switch-main">
+            <view class="switch-lbl">接受调剂</view>
+            <view class="switch-desc">首选时段排满时，允许系统把你调到别的时段；关掉就只有首选时段有空位才排得上</view>
+          </view>
+          <view class="switch {{allowReschedule ? 'on' : ''}}" bindtap="toggleReschedule">
+            <view class="switch-knob"></view>
+          </view>
+        </view>
+      </view>
+
+    </view>
+
+    <!-- 底部固定操作 -->
+    <view class="bottom-cta">
+      <view class="t-cap hint" wx:if="{{hintText}}">{{hintText}}</view>
+      <button class="btn btn-primary btn-block" hover-class="pressed"
+              bindtap="doSubmit" disabled="{{submitting || ctaClosed}}">
+        {{submitting ? '提交中……' : (ctaClosed ? '未到点歌时间' : '提交投稿')}}
+      </button>
+    </view>
+  </block>
 
   <view class="pb-tabbar"></view>
 </view>
@@ -122,7 +183,7 @@
       </view>
     </view>
 
-    <!-- v1 方案①：阅读进度条（初始 = 首屏可见比例，滑到页底走满 100%） -->
+    <!-- 阅读进度条（初始 = 首屏可见比例，滑到页底走满 100%） -->
     <view class="ntc-progress" wx:if="{{!noticeReadDone}}">
       <view class="ntc-progress-fill" style="width: {{noticeProgress}}%;"></view>
     </view>
@@ -154,7 +215,7 @@
     <view class="slot-sheet-head">
       <view class="slot-sheet-title">选择播出时段</view>
       <view class="slot-sheet-sub" wx:if="{{slotRangeText}}">{{slotRangeText}} · 下周一到周五</view>
-      <!-- v2：选到一半也得知道截止点 -->
+      <!-- 选到一半也得知道截止点 -->
       <view class="slot-sheet-win" wx:if="{{winEnabled}}">点歌时间：{{winLine1}} · {{winLine2}}</view>
     </view>
     <scroll-view class="slot-sheet-body" scroll-y>

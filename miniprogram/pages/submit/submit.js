@@ -10,7 +10,7 @@
 //      文案一律服务端下发，前端不硬编码星期与时刻；窗口结束 = 审核截止。
 //   ④ 次数提示：GET /user/submit/quota 给「本周还能点 N 次」（v2 无日/周名额，容量按格子算）。
 const { request } = require('../../utils/request.js');
-const { fmtIso } = require('../../utils/format.js');
+const { fmtIso, fmtDate } = require('../../utils/format.js');
 const windowBar = require('../../utils/windowBar.js');
 const app = getApp();
 
@@ -65,6 +65,11 @@ Page({
     // ── 次数提示 ──
     quotaText: '',          // 「本周还能点 2 次（上限 2 次）」
     quotaBlocked: false,
+
+    // ── 协议版新增（docs/song-protocol.md）──
+    // 提交不再「即占住时段」：首选排满时能不能被调到别的时段，由学生自己勾这一项决定
+    allowReschedule: true,  // 服务端字段 allow_reschedule，默认开
+    receipt: null,          // 提交成功回执；非空 = 整页切到回执视图
   },
 
   onLoad() {
@@ -276,7 +281,9 @@ Page({
     let hint = '';
     if (!d.loggedIn) hint = '首次提交将自动登录，不收集手机号';
     else if (closed) hint = '现在不在点歌时间段';
-    else if (d.type === 1 && d.winEnabled && d.winClosesAt) hint = '提交后即占住该时段 · 收歌截止 ' + d.winClosesAt;
+    // ⚠️ 协议版口径：提交只进审核队列，**不占位**。
+    //    v2 那句「提交后即占住该时段」会让学生以为已经排上了，是最容易误解的一处。
+    else if (d.type === 1 && d.winEnabled && d.winClosesAt) hint = '提交后进入审核，通过后统一排期';
     if (this.data.hintText === hint && this.data.ctaClosed === closed) return;
     this.setData({ ctaClosed: closed, hintText: hint });
   },
@@ -428,20 +435,29 @@ Page({
       articleTitle: type === 2 ? articleTitle : undefined,
       articleContent: type === 2 ? articleContent : undefined,
       wantBroadcastTime,
+      // 协议版：点歌才带这一项（服务端 allow_reschedule，缺省视为 1）
+      ...(type === 1 ? { allowReschedule: this.data.allowReschedule ? 1 : 0 } : {}),
     };
 
     this.setData({ submitting: true });
     try {
       const r = await request('/user/submit', 'POST', payload);
-      // v2：正式位满了会直接落库成候补（status=3），这里把候补卡讲清楚再去「我的投稿」
+      // v2 遗留：正式位满了会直接落库成候补（status=3）。协议版提交时不判容量、
+      // 一律进审核队列，这条分支不会再走到 —— 保留只为兜住旧服务端。
       if (r && r.outcome === 'queued') {
         await this.showQueuedModal(r.card || {});
+        setTimeout(() => {
+          wx.switchTab({ url: '/pages/mySubmit/mySubmit' });
+        }, 800);
+      } else if (type === 1) {
+        // 协议版：提交只进审核队列，不给回执的话学生会反复刷新等「已排期」
+        this.showReceipt(r);
       } else {
         wx.showToast({ title: '提交成功，等待审核' });
+        setTimeout(() => {
+          wx.switchTab({ url: '/pages/mySubmit/mySubmit' });
+        }, 800);
       }
-      setTimeout(() => {
-        wx.switchTab({ url: '/pages/mySubmit/mySubmit' });
-      }, 800);
     } catch (e) {
       // 40303 = 注意事项未确认：当场把闸门弹出来
       if (e && e.code === 40303) {
@@ -466,5 +482,41 @@ Page({
     } finally {
       this.setData({ submitting: false });
     }
+  },
+
+  /** 接受调剂开关（协议版 allow_reschedule，默认开） */
+  toggleReschedule() {
+    this.setData({ allowReschedule: !this.data.allowReschedule });
+  },
+
+  /**
+   * 提交成功回执（协议版新增）
+   * 讲清三步：已提交 → 等待审核 → 统一排期，并点明「最晚什么时候有结果」。
+   * 锁定时刻不硬编码（服务端可配 song_lock_offset_minutes），取这条投稿的 card.lockAt；
+   * 取不到就退回「播出周周一前」这种相对说法，不编一个假时刻给学生。
+   */
+  showReceipt(r) {
+    const card = (r && r.card) || {};
+    // 提交前的 quotaText 形如「本周还能点 2 次（上限 2 次）」，本地 -1 即提交后的剩余
+    const m = String(this.data.quotaText || '').match(/还能点\s*(\d+)/);
+    const left = m ? Number(m[1]) - 1 : null;
+    const lockAt = card.lockAt ? fmtIso(card.lockAt) : '';
+    this.setData({
+      receipt: {
+        song: [this.data.songName, this.data.singer].filter(Boolean).join(' — '),
+        at: fmtDate(Date.now()).slice(5, 16), // MM-DD HH:mm
+        leftText: left !== null && left >= 0 ? '本周还剩 ' + left + ' 次点歌机会' : '',
+        auditAt: this.data.winClosesAt,
+        lockText: (lockAt ? '排期结果最晚在 ' + lockAt + '（播出周周一）' : '排期结果最晚在播出周周一')
+          + '前确定，届时可在「我的投稿」看到。',
+        allowReschedule: this.data.allowReschedule,
+      },
+    });
+    this.loadQuota(); // 顺手把剩余次数刷到最新，回「表单」时看到的也是准的
+    if (wx.pageScrollTo) wx.pageScrollTo({ scrollTop: 0, duration: 0 });
+  },
+
+  goMySubmit() {
+    wx.switchTab({ url: '/pages/mySubmit/mySubmit' });
   },
 });
