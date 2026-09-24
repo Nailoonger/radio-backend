@@ -17,6 +17,7 @@
 - ⚠️ 手工迁移 SQL 里的 `ALTER TABLE ... ADD COLUMN` 在 MySQL **不幂等**（重跑 1060 ER_DUP_FIELDNAME 并中断后续语句）。线上固定顺序＝ 备份 → `build` → `run --rm radio-backend node scripts/db-repair.js` 补列 → `up -d --force-recreate radio-backend` 建表 → 只跑幂等的回填 UPDATE → 调兜底 `POST /api/admin/submit/queue/sweep`。
 - 迁移/回填前先备份：`set -a; . ./.env; set +a` 拿变量，再 `docker exec radio-mysql mysqldump -uroot -p"$DB_PASSWORD" "$DB_NAME" > ~/db-backup/<name>-$(date +%F-%H%M).sql`。
 - ⚠️ `mysql` / `mysqldump` 带 `-p<密码>` **必定**打印 `[Warning] Using a password on the command line interface can be insecure.`（走 stderr，**无害、不是错误**，陛下会以为失败了来问）。给陛下的服务器命令一律改用环境变量传密码：`docker exec -e MYSQL_PWD="$DB_PASSWORD" -i radio-mysql mysql -uroot "$DB_NAME"`（`mysqldump` 同法，`-e` 必须在镜像名之前）。
+- ⚠️ 服务器上执行 SQL **别用中文别名 / 中文标识符**：`docker exec … -e "SELECT COUNT(*) AS 总数 …"` 经 shell→docker 参数传递后中文变乱码，报 `ERROR 1064 … near '��数'`。别名一律 ASCII（`total` / `n`），多行 SQL 用 `<<'SQL'` heredoc 走 stdin 而不是 `-e`。
 
 ## 本机环境坑
 - **Bash 工具可用性不稳**（早前常 exit 127；2026-09-24 实测可用，能跑管道/heredoc/`git`）。Bash 可用时优先用它；走 PowerShell 时 stdout 不回显，必须 `| Out-File -Encoding utf8` 落盘再 Read（别用 `*>`）。node 中文乱码 → 脚本自己 `fs.writeFileSync(...,'utf8')`。
