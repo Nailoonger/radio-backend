@@ -28,7 +28,15 @@
 - **给陛下的命令要按终端分方言**（2026-09-24）：陛下多在自己开 PowerShell 里跑，那里 `curl` 是 `Invoke-WebRequest` 的别名，`-x/-o/-w` 会报 `ParameterBindingException`（缺少 SessionVariable）。探端口用 `Test-NetConnection -ComputerName 127.0.0.1 -Port 7890`；确需真 curl 就写 `curl.exe`，且输出黑洞是 `NUL` 不是 `/dev/null`；带 `=`/`:` 的 git 参数（`-c http.proxy=…`）要加引号。
 - ⚠️ **命令块绝不跨机器混排**（2026-09-24 踩过）：我把「本机 push」和「服务器 pull/build/up」写进同一个代码块、注释还挂在行尾，陛下整段复制到服务器终端 → `git push` 报 `ERROR: The key you are authenticating with has been marked as read only.`（**服务器 deploy key 是只读的，这是正常设计，不是故障**）。必须拆成两个独立代码块，首行明确写「本机」「服务器」，注释另起一行，绝不放行尾。
 - **push 这步只能交给用户**（2026-09-24 实测）：我这边 shell 走 WorkBuddy 自带 PortableGit（`~/.workbuddy/binaries/PortableGit/versions/<v>/`），它的 `credential.helper=helper-selector` 是宿主注入的、不在 PATH，非交互 shell 取不到 token → `could not read Username for 'https://github.com'`。也没有 `gh`。所以我的职责边界＝**改完 + 本地 commit + 给用户 push 与服务器更新步骤**，别在 push 上死磕。
-- git push 前先开代理（FlClash 127.0.0.1:7890）。代理没起时 git 的报错是 `Failed to connect to 127.0.0.1:7890`（**不是**网络不通，别看错方向）；代理起来后端口探测 `echo > /dev/tcp/127.0.0.1/7890` 会通。
+- git push 前先开代理（FlClash 装在 `D:\FlClash`；配置在 `AppData\Roaming\com.follow\蜂窝加速器\config.yaml`，`mixed-port: 7890`、`tun.enable: false`）。
+  ⚠️ **`FlClashCore.exe` 进程在跑 ≠ 代理在跑**（2026-09-25 实测）：内核可能只监听 `1053`（DNS），7890 完全不监听＝零出网通道，
+  此时 push 报 `Recv failure: Connection was reset`。**自检一行**（git bash）：
+  `node -e "const s=require('net').connect({host:'127.0.0.1',port:7890});s.setTimeout(800);s.on('connect',()=>{console.log('OPEN');s.destroy()});s.on('error',()=>console.log('CLOSED'))"`
+  ⚠️ **别用裸 TCP 判断「能不能 push」**：`github.com:443` 的 TCP 握手是通的（~130ms）但 TLS 会挂死（curl 15s 超时 / HTTP 000），
+  「端口连得上」≠「能 push」。宿主还会注入一个死代理 `https_proxy=127.0.0.1:54757`。
+- **已给 git 配了仅 github 生效的代理**（2026-09-25）：`http.https://github.com.proxy = http://127.0.0.1:7890`。
+  副作用是**代理没开时会明确报 `Failed to connect to 127.0.0.1 port 7890`** —— 看到它就是「代理没启动」，不是网络不通。
+  撤销：`git config --global --unset http.https://github.com.proxy`。
 - **预览自检三件套**：模拟点击页签后逐屏截图 + 未定义类名扫描 + 溢出量测（表格 ≥2 个操作按钮量 `td.scrollWidth`）。配方在 skill `web-ui-screenshot-verify`。
 - **改前端后先跑两个源码自检（秒级，比截图便宜）**：`node scripts/check-vue-bindings.js`（编译 SFC 反查 `_ctx.` 未声明引用 —— **构建不报错、运行时只渲染空白**）、`node scripts/check-wxml-classes.js`（WXML 类名定义 + 标签配平 + 胶囊样式覆盖）。写完自检脚本**必须故意注入一个错误**确认它抓得到，别信假绿（这轮在脚本本身上栽了 3 次）。
 - **admin-web 构建撞 `[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED]`** 是本机钩子在拦 vite 清 `dist`，不是代码问题。先 `node -e "require('fs').rmSync('admin-web/dist',{recursive:true,force:true})"` 再 build。注意 `✓ N modules transformed` 已在报错之前打出 —— **编译其实全过**，别当成构建失败。
