@@ -209,9 +209,12 @@ exports.list = async (req, res, next) => {
     if (or.length) where[Op.or] = or;
 
     const offset = (parseInt(page, 10) - 1) * parseInt(pageSize, 10);
+    // 审核台按「先提交先审」：提交时间升序，管理员从上往下审 = 公平的排队顺序。
+    // 次级键 id 升序：create_time 只到秒，同一秒提交的多条（高峰期很常见）靠自增 id 兜，
+    // 否则分页在跨页边界会出现重复/漏项。
     const { rows, count } = await Submit.findAndCountAll({
       where,
-      order: [['create_time', 'DESC']],
+      order: [['create_time', 'ASC'], ['id', 'ASC']],
       offset,
       limit: parseInt(pageSize, 10),
     });
