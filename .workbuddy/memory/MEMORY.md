@@ -41,6 +41,8 @@
 - ⚠️ **toast.push({icon: X}) 的图标必须确认已 import**：v3 三处重置密码 toast 引用 `IconKey` 却漏导入，成功路径炸成「IconKey is not defined」红 toast（密码其实重置成功了），被用户当成「重置不了」。排查口诀：接口 curl 全通 → 坏在前端交互；hook XHR + 看 toast 文案。
 - 验证脚本（SQLite 内存库，跑完读同目录 `*-output.txt`；改相关代码先跑）：`verify-song-queue.js`(89)、`verify-song-submit.js`(107)、`verify-student-account.js`(174，含 G3 改名/G4 批量停用)。
 - **新开关不进 seed.js**（switch.test 断言恰好 4 条）：走 `switchService.KNOWN_SWITCHES` + 管理端列表补默认行；缺行视为 on。
+- ⚠️ **建表不要用物理外键**（2026-09-24 线上踩过）：Sequelize 的 `hasMany` / `belongsTo` **默认会建 FK**，而 MySQL 要求「引用列与被引用列类型完全一致」—— `submit.id` 是 `BIGINT UNSIGNED`、日志表的 `requestId` 是 `INTEGER`，于是 `sync()` 抛 `ERROR 3780` 中断：**先建的表留下、后面的表没建、进程退出 → nginx 502**（现象极具误导性）。关联一律显式写 `constraints: false`，引用完整性交给应用层。
+- ⚠️ **「本地 SQLite 跑通」证明不了 MySQL 能建表**：SQLite 不校验外键列类型、不认 UNSIGNED，本地 `sync()` 全绿也照样在线上炸。涉及建表 / 类型 / 索引的改动，判据必须是 MySQL 实测。
 
 ## 点歌体系（⚠️ 现行＝协议版；2026-09-24 又收到《V1 规格》PDF → 对照 `docs/song-protocol-vs-v1-spec.md`）
 - **⛔ 权限铁律（V1 规格 PDF 的增量）**：普通管理员（REVIEWER）**只能** 查看申请 / 通过 / 驳回 / 看排期候补；
