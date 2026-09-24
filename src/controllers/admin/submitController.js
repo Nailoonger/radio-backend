@@ -15,8 +15,9 @@
  * 排期（协议 §16~§20）：
  * GET    /api/admin/submit/schedule        下周排期矩阵（三维）+ 候补队列 + 锁定时刻
  * GET    /api/admin/submit/week            目标周的排期状态与时间锚点
- * POST   /api/admin/submit/schedule/run    执行第一轮排期 + 全局调剂
- * POST   /api/admin/submit/schedule/lock   正式锁定（最后调度 + 无位自动驳回）
+ * POST   /api/admin/submit/schedule/preview 模拟排期（只算不写库，仅超管）
+ * POST   /api/admin/submit/schedule/run    执行第一轮排期 + 全局调剂（仅超管）
+ * POST   /api/admin/submit/schedule/lock   正式锁定（最后调度 + 无位自动驳回，仅超管）
  * POST   /api/admin/submit/:id/assign      人工指定时段
  * PUT    /api/admin/submit/:id/played      标记已播放 / 取消
  * GET    /api/admin/submit/capacity        容量与候补快照
@@ -55,6 +56,32 @@ function withStatus(o) { return { ...o, ...S.statusView(o) }; }
 function weekMsOf(submit) {
   const ws = sched.weekStartOfRow(submit);
   return ws ? ws.getTime() : null;
+}
+
+/**
+ * 《V1 规格》第 11 节：**锁定之后的周不允许人工改动**。
+ *
+ * 锁定 = 这一周的排期已定稿对外公布，再改就会跟学生看到的不一致。
+ * 系统自己的动作（`lockWeek` 的最后调度、`markPlayed` 标记播放）不走这里，不受影响。
+ *
+ * @param {number|null} ms 播出周周一 00:00；null = 不适用（文稿 / 推不出周）
+ */
+async function assertWeekNotLocked(ms, label = '这一周') {
+  if (ms === null || ms === undefined) return null;
+  const week = await sched.ensureWeek(ms, { now: Date.now() });
+  if (week.status === sched.WEEK_STATUS.LOCKED) {
+    throw new ApiError(
+      Codes.PARAM_ERROR,
+      `${label}的排期已锁定（${week.weekStartDate} 当周），不能再改动`
+    );
+  }
+  return week;
+}
+
+/** 按记录反推归属周后校验（文稿不参与排期，不受锁定约束） */
+async function assertWeekOpen(submit) {
+  if (Number(submit.type) !== 1) return null;
+  return assertWeekNotLocked(weekMsOf(submit), '这条点歌所属周');
 }
 
 /** 审核动作之后让这一周的排期与候补重新对齐（幂等） */
@@ -345,6 +372,7 @@ exports.approve = async (req, res, next) => {
   try {
     const submit = await Submit.findByPk(req.params.id);
     if (!submit) throw new ApiError(Codes.NOT_FOUND, '投稿不存在');
+    await assertWeekOpen(submit);                 // 已锁定的周不允许再审批
 
     const result = await approveOne(submit, req.admin.id);
     let fresh = result.submit;
@@ -382,6 +410,7 @@ exports.reject = async (req, res, next) => {
     }
     const submit = await Submit.findByPk(req.params.id);
     if (!submit) throw new ApiError(Codes.NOT_FOUND, '投稿不存在');
+    await assertWeekOpen(submit);                 // 已锁定的周不允许再驳回
 
     const { submit: fresh, wasSeated } = await rejectOne(submit, req.admin.id, reason);
 
@@ -397,6 +426,7 @@ exports.remove = async (req, res, next) => {
   try {
     const submit = await Submit.findByPk(req.params.id);
     if (!submit) throw new ApiError(Codes.NOT_FOUND, '投稿不存在');
+    await assertWeekOpen(submit);                 // 已锁定的周不允许再删（会破坏已公布的排期）
     const wasSeated = Number(submit.type) === 1 && sched.isSeated(submit);
     const ms = Number(submit.type) === 1 ? weekMsOf(submit) : null;
     await submit.destroy();
@@ -419,6 +449,7 @@ exports.revoke = async (req, res, next) => {
   try {
     const submit = await Submit.findByPk(req.params.id);
     if (!submit) throw new ApiError(Codes.NOT_FOUND, '投稿不存在');
+    await assertWeekOpen(submit);                 // 已锁定的周不允许撤销
     const review = Number(submit.reviewStatus) || 0;
     if (review === S.REVIEW.PENDING) {
       throw new ApiError(Codes.PARAM_ERROR, '这条还是待审状态，无需撤销');
@@ -477,6 +508,7 @@ exports.batch = async (req, res, next) => {
       const submit = await Submit.findByPk(id);
       if (!submit) { skipped.push(id); continue; }
       try {
+        await assertWeekOpen(submit);            // 已锁定的周整条跳过（记 skipped，不报错中断）
         if (action === 'approve') {
           const r = await approveOne(submit, req.admin.id);
           if (r.changed) affected += 1; else skipped.push(id);
@@ -635,7 +667,7 @@ exports.week = async (req, res, next) => {
   }
 };
 
-/** 执行第一轮排期 + 全局调剂（管理端「执行调度」按钮） */
+/** 执行第一轮排期 + 全局调剂（管理端「执行调度」按钮，超管） */
 exports.runSchedule = async (req, res, next) => {
   try {
     const now = Date.now();
@@ -643,17 +675,118 @@ exports.runSchedule = async (req, res, next) => {
     const ms = body.weekStart
       ? new Date(`${body.weekStart}T00:00:00+08:00`).getTime()
       : await targetWeekMs(now);
+    await assertWeekNotLocked(ms, '这一周');    // 锁定后不允许重跑排期
+
+    // 超管手动执行 = 完整调度，**显式**放开跨时段调剂：
+    // 自动路径要等收歌截止才跨时段，手动执行是管理员的明确意图，不受该闸门限制。
     const a = await sched.initialAllocate(ms, { now, operatorId: req.admin.id });
-    const b = await sched.reschedule(ms, { now, operatorId: req.admin.id });
+    const b = await sched.reschedule(ms, { now, operatorId: req.admin.id, crossSlot: true });
     const week = await sched.ensureWeek(ms, { now });
     return success(res, {
       week: sched.weekView(week, now),
+      crossSlot: b.crossSlot,
       assigned: a.assigned,
       waiting: a.waiting,
       promoted: b.promoted,
       rescheduled: b.rescheduled,
       stillWaiting: b.left,
     }, `排期完成：落座 ${a.assigned} 条、进候补 ${a.waiting} 条、递补 ${b.promoted + b.rescheduled} 条`);
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/**
+ * 模拟排期（只算不写库）——《V1 规格》要求的 preview。
+ *
+ * 超管点「执行排期」前先看一眼：谁落座、谁原位递补、谁被跨时段调剂、谁锁定后会被自动驳回。
+ * 算法出问题时**不污染正式数据** —— 这正是 V1 特意要求它的原因。
+ *
+ * body: { weekStart?, crossSlot? }
+ *   crossSlot 省略 = 按「收歌是否已截止」自动判断（与自动路径一致）；
+ *   传 true 可预览「如果现在放开跨时段会怎样」。
+ */
+exports.previewSchedule = async (req, res, next) => {
+  try {
+    const now = Date.now();
+    const body = req.body || {};
+    const ms = body.weekStart
+      ? new Date(`${body.weekStart}T00:00:00+08:00`).getTime()
+      : await targetWeekMs(now);
+    const week = await sched.ensureWeek(ms, { now });
+    const values = await sched.slotValuesOfWeek(ms);
+    const capacity = await sched.getCapacity();
+    const counters = await sched.countSeatedBySlot(values);
+    const crossSlot = body.crossSlot === undefined || body.crossSlot === null
+      ? null                                  // null = 交给算法按收歌截止时间判断
+      : !!body.crossSlot;
+
+    const a = await sched.initialAllocate(ms, { now, dryRun: true });
+    const b = await sched.reschedule(ms, { now, dryRun: true, crossSlot });
+
+    // dryRun 不写库 → 「模拟后各格占用」只能从动作清单自己推
+    const after = { ...counters };
+    [...a.actions, ...b.actions].forEach((x) => {
+      if (x.to) after[x.to] = (after[x.to] || 0) + 1;
+    });
+
+    const actions = [...a.actions, ...b.actions];
+    const ids = [...new Set(actions.map((x) => x.id))];
+    const rows = ids.length
+      ? await Submit.findAll({
+          where: { id: { [Op.in]: ids } },
+          attributes: ['id', 'songName', 'singer', 'wantBroadcastTime', 'createTime'],
+          raw: true,
+        })
+      : [];
+    const byId = new Map(rows.map((r) => [Number(r.id), r]));
+
+    const detail = (x) => {
+      const r = byId.get(Number(x.id)) || {};
+      return {
+        id: x.id,
+        songName: r.songName || x.songName || '',
+        singer: r.singer || '',
+        submittedAt: r.createTime || null,
+        want: x.want || r.wantBroadcastTime || '',
+        to: x.to || null,
+        cost: x.cost === undefined ? null : x.cost,   // 成本表档位（0/10/20/30/50）
+      };
+    };
+
+    const assign = a.actions.filter((x) => x.action === 'ASSIGN').map(detail);
+    const promote = b.actions.filter((x) => x.action === 'PROMOTE').map(detail);
+    const rescheduled = b.actions.filter((x) => x.action === 'RESCHEDULE').map(detail);
+    const waiting = [
+      ...a.actions.filter((x) => x.action === 'WAITING'),
+      ...b.actions.filter((x) => x.action === 'WAITING'),
+    ].map(detail);
+
+    return success(res, {
+      dryRun: true,
+      week: sched.weekView(week, now),
+      crossSlot: b.crossSlot,
+      crossSlotReason: b.crossSlot
+        ? '收歌已截止（或手动指定），允许跨时段调剂'
+        : '收歌未截止，只做原位递补 —— 别处的空位要留给首选那一格的原申请者',
+      slots: values.map((v) => ({
+        value: v,
+        seated: counters[v] || 0,
+        after: after[v] || 0,
+        capacity,
+        full: capacity > 0 && (after[v] || 0) >= capacity,
+      })),
+      // waiting = 现在仍排不上的人；到了锁定时刻他们会被 AUTO_REJECTED
+      plan: { assign, promote, rescheduled, waiting },
+      summary: {
+        assigned: a.assigned,
+        waiting: a.waiting,
+        promoted: b.promoted,
+        rescheduled: b.rescheduled,
+        stillWaiting: b.left,
+        autoRejectedIfLocked: waiting.length,
+      },
+    }, `模拟排期（未写库）：落座 ${a.assigned}、原位递补 ${b.promoted}、跨时段调剂 ${b.rescheduled}、仍候补 ${waiting.length}`);
   } catch (e) {
     return next(e);
   }
@@ -691,6 +824,9 @@ exports.assign = async (req, res, next) => {
     const submit = await Submit.findByPk(req.params.id);
     if (!submit) throw new ApiError(Codes.NOT_FOUND, '投稿不存在');
     if (Number(submit.type) !== 1) throw new ApiError(Codes.PARAM_ERROR, '只能对点歌做排期调整');
+    // 原归属周 与 目标时段所属周 都不能是已锁定的周
+    await assertWeekOpen(submit);
+    await assertWeekNotLocked(sched.weekStartOfValue(String(slot))?.getTime(), '目标时段所属周');
 
     try {
       const r = await sched.manualAssign(submit, String(slot), {
@@ -716,6 +852,7 @@ exports.played = async (req, res, next) => {
   try {
     const submit = await Submit.findByPk(req.params.id);
     if (!submit) throw new ApiError(Codes.NOT_FOUND, '投稿不存在');
+    await assertWeekOpen(submit);                 // 已锁定的周不允许人工改播放标记
     const played = (req.body || {}).played === undefined ? true : !!(req.body || {}).played;
     const r = await sched.setPlayed(submit, played, { operatorId: req.admin.id });
     return success(res, withStatus(r.row.toJSON()), played ? '已标记为已播放' : '已取消播放标记');
@@ -758,12 +895,21 @@ exports.setQuota = async (req, res, next) => {
       await broadcastSlot.setCapacity(capacity);
     }
     await broadcastSlot.clearCache();
-    // 改容量后立刻重跑排期（可能多出位置 / 少掉位置），行为符合直觉
+    // 改容量后立刻重跑排期（可能多出位置 / 少掉位置），行为符合直觉。
+    // ⚠️ 已锁定的周不重算 —— 那是定稿数据，改容量不该反悔它。
     const now = Date.now();
     const ms = await targetWeekMs(now);
-    await sched.initialAllocate(ms, { now, operatorId: req.admin.id }).catch(() => null);
-    await sched.runAllocators(ms, { now, operatorId: req.admin.id }).catch(() => null);
-    return success(res, await songQueue.snapshot(now), '每格容量已更新，排期已重算');
+    const wk = await sched.ensureWeek(ms, { now });
+    const locked = wk.status === sched.WEEK_STATUS.LOCKED;
+    if (!locked) {
+      await sched.initialAllocate(ms, { now, operatorId: req.admin.id }).catch(() => null);
+      await sched.runAllocators(ms, { now, operatorId: req.admin.id }).catch(() => null);
+    }
+    return success(
+      res,
+      await songQueue.snapshot(now),
+      locked ? '每格容量已更新（该周已锁定，排期未重算）' : '每格容量已更新，排期已重算'
+    );
   } catch (e) {
     return next(e);
   }
@@ -903,4 +1049,4 @@ exports.purgeSongs = async (req, res, next) => {
   }
 };
 
-exports._internals = { approveOne, rejectOne, runWeekSchedule, targetWeekMs };
+exports._internals = { approveOne, rejectOne, runWeekSchedule, targetWeekMs, assertWeekOpen, assertWeekNotLocked };

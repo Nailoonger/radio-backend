@@ -34,6 +34,7 @@ const bj = require('../utils/bjTime');
 const kv = require('./kvService');
 const slotSvc = require('./broadcastSlotService');
 const songWindow = require('./songWindowService');
+const costCalc = require('./songRescheduleCost');
 const S = require('./songStatusService');
 const logger = require('../utils/logger');
 
@@ -297,11 +298,11 @@ async function logAssignment(requestId, fromSlot, toSlot, type, reason, operator
  * 幂等：候选条件带 scheduleStatus = UNASSIGNED，重复跑只命中更少行。
  * @returns {Promise<{assigned:number, waiting:number, weeks:number}>}
  */
-async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = null, transaction } = {}) {
+async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = null, transaction, dryRun = false } = {}) {
   const week = await ensureWeek(weekStartMs, { now, transaction });
   const values = await slotValuesOfWeek(weekStartMs);
   const capacity = await getCapacity();
-  const res = { weekId: week.id, assigned: 0, waiting: 0 };
+  const res = { weekId: week.id, assigned: 0, waiting: 0, actions: [] };
 
   const counters = await countSeatedBySlot(values);
 
@@ -322,27 +323,38 @@ async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = nul
 
     for (const row of candidates) {
       if (left > 0) {
-        const r = await S.applyChange(row, {
-          scheduleStatus: S.SCHEDULE.APPROVED,
-          scheduledSlot: value,
-          assignedAt: new Date(now),
-        }, { transaction, operatorId, operatorName: operatorId ? 'ADMIN' : 'SYSTEM', reason: S.SYSTEM_REASON.initial });
-        if (r.logs.length) await logAssignment(row.id, null, value, ASSIGN.INITIAL, ASSIGN_REASON.INITIAL, operatorId, transaction);
+        if (dryRun) {
+          res.actions.push({ action: 'ASSIGN', id: row.id, songName: row.songName, want: value, to: value, cost: 0 });
+        } else {
+          const r = await S.applyChange(row, {
+            scheduleStatus: S.SCHEDULE.APPROVED,
+            scheduledSlot: value,
+            assignedAt: new Date(now),
+          }, { transaction, operatorId, operatorName: operatorId ? 'ADMIN' : 'SYSTEM', reason: S.SYSTEM_REASON.initial });
+          if (r.logs.length) await logAssignment(row.id, null, value, ASSIGN.INITIAL, ASSIGN_REASON.INITIAL, operatorId, transaction);
+        }
         res.assigned += 1;
         if (left !== Infinity) left -= 1;
       } else {
-        const r = await S.applyChange(row, { scheduleStatus: S.SCHEDULE.WAITING }, {
-          transaction, operatorId, operatorName: 'SYSTEM', reason: 'ORIGINAL_SLOT_FULL',
-        });
-        if (r.logs.length) res.waiting += 1;
+        if (dryRun) {
+          res.actions.push({ action: 'WAITING', id: row.id, songName: row.songName, want: value, to: null, cost: null });
+          res.waiting += 1;
+        } else {
+          const r = await S.applyChange(row, { scheduleStatus: S.SCHEDULE.WAITING }, {
+            transaction, operatorId, operatorName: 'SYSTEM', reason: 'ORIGINAL_SLOT_FULL',
+          });
+          if (r.logs.length) res.waiting += 1;
+        }
       }
     }
   }
 
-  if (week.status !== WEEK_STATUS.LOCKED && week.status !== WEEK_STATUS.CANCELLED) {
-    await week.update({ status: WEEK_STATUS.SCHEDULING }, { transaction });
+  if (!dryRun) {
+    if (week.status !== WEEK_STATUS.LOCKED && week.status !== WEEK_STATUS.CANCELLED) {
+      await week.update({ status: WEEK_STATUS.SCHEDULING }, { transaction });
+    }
+    logger.info(`[songSchedule] 第一轮排期 周${week.weekStartDate}：落座 ${res.assigned}、候补 ${res.waiting}`);
   }
-  logger.info(`[songSchedule] 第一轮排期 周${week.weekStartDate}：落座 ${res.assigned}、候补 ${res.waiting}`);
   return res;
 }
 
@@ -350,20 +362,46 @@ async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = nul
  * ② 全局调剂 RescheduleAllocator
  * ------------------------------------------------------------------ */
 /**
+ * 收歌是否已截止 —— 决定这一周能不能**跨时段**调剂。
+ *
+ * ⚠️ 这是「保证每个时段原先申请者的排期」的关键闸门。
+ *   收歌窗口内（`applicationEndAt` 之前）还有新申请在进来、还有人没审完，
+ *   此时周内任何一个空位都**可能**属于某个「首选那一格」的原申请者。
+ *   若此刻就把候补的人跨时段排过去，等那个人审完就没位置了 ——
+ *   而且被挪走的人已变成 APPROVED，再也回不到首选格。
+ *   → 收歌截止前只允许**原位递补**，截止后才放开跨时段。
+ *
+ * `lockWeek()`（锁定前最后调度）与超管手动「执行排期」显式传 `crossSlot: true`，
+ * 不受这个闸门限制。
+ */
+function canCrossSlot(week, now = Date.now()) {
+  const end = week && week.applicationEndAt ? +new Date(week.applicationEndAt) : 0;
+  return end > 0 && now >= end;
+}
+
+/**
  * 协议 §17：执行全局调剂
  *   1. 获取所有空位
- *   2. 候选 = 审核通过 + WAITING + 允许调剂（不允许调剂的只接受首选）
+ *   2. 候选 = 审核通过 + WAITING
  *   3. 排序：可接受位置少的优先 → 提交时间早的优先 → 距原时段近的优先
  *   4. 分配并写 assignment_logs
  *
- * 「距原时段近」= 在周内时段序列里的下标距离（周一午间 vs 周二午间 距离 3=一天三个时段）。
+ * 「距原时段近」用《V1 规格》第 10 节的**成本表**（`songRescheduleCost`）：
+ *   同一天其他时段 10 / 前后一天相同时段 20 / 前后一天其他时段 30 / 更远日期 50。
+ *
+ * @param {object}  [opts]
+ * @param {boolean} [opts.crossSlot] true=允许跨时段，false=只做原位递补，
+ *                                   null / 省略 = 按「收歌是否已截止」自动判断
+ * @param {boolean} [opts.dryRun]    只算不写库（模拟排期预览），动作清单在 actions 里
+ * @returns {Promise<{weekId, promoted, rescheduled, left, crossSlot, actions}>}
  */
-async function reschedule(weekStartMs, { now = Date.now(), operatorId = null, transaction } = {}) {
+async function reschedule(weekStartMs, { now = Date.now(), operatorId = null, transaction, crossSlot = null, dryRun = false } = {}) {
   const week = await ensureWeek(weekStartMs, { now, transaction });
   const values = await slotValuesOfWeek(weekStartMs);
   const capacity = await getCapacity();
   const indexOf = new Map(values.map((v, i) => [v, i]));
-  const res = { weekId: week.id, promoted: 0, rescheduled: 0, left: 0 };
+  const allowCross = crossSlot === null ? canCrossSlot(week, now) : !!crossSlot;
+  const res = { weekId: week.id, promoted: 0, rescheduled: 0, left: 0, crossSlot: allowCross, actions: [] };
 
   const counters = await countSeatedBySlot(values);
   const free = new Set(
@@ -382,54 +420,83 @@ async function reschedule(weekStartMs, { now = Date.now(), operatorId = null, tr
   });
   if (!candidates.length) return res;
 
-  // 排序键（用当前 free 快照算；分配过程中 free 会变小，但顺序一次定死，避免不可复现）
-  const decorated = candidates.map((row) => {
+  /**
+   * 这一行**可接受**的落点（每次重算，因为 free 在循环里会变小）：
+   *   允许跨时段 且 本人接受调剂 → 周内所有空位
+   *   否则                       → 只有「首选格还空着」这一个选项（原位递补）
+   */
+  const acceptableOf = (row) => {
     const want = row.wantBroadcastTime;
     const allow = Number(row.allowReschedule) !== 0;
-    const acceptable = allow ? [...free] : (free.has(want) ? [want] : []);
-    const dist = (v) => Math.abs((indexOf.get(v) ?? 999) - (indexOf.get(want) ?? 999));
-    const distance = acceptable.length ? Math.min(...acceptable.map(dist)) : 999;
-    return { row, want, allow, acceptableCount: acceptable.length, distance, at: +new Date(row.createTime || 0) };
+    if (allow && allowCross) return [...free];
+    return free.has(want) ? [want] : [];
+  };
+
+  // 排序键用当前 free 快照算；分配过程中 free 会变小，但顺序一次定死，避免不可复现
+  const decorated = candidates.map((row) => {
+    const want = row.wantBroadcastTime;
+    const acceptable = acceptableOf(row);
+    const best = acceptable.length
+      ? acceptable.reduce((m, v) => Math.min(m, costCalc.costBetween(want, v)), Infinity)
+      : Infinity;
+    return {
+      row,
+      want,
+      acceptableCount: acceptable.length,
+      cost: best,
+      at: +new Date(row.createTime || 0),
+    };
   });
   decorated.sort((a, b) => {
-    if (a.acceptableCount !== b.acceptableCount) return a.acceptableCount - b.acceptableCount;  // 可接受位少 → 先安排
+    if (a.acceptableCount !== b.acceptableCount) return a.acceptableCount - b.acceptableCount; // 可接受位少 → 先安排
     if (a.at !== b.at) return a.at - b.at;                                                      // 提交早 → 先安排
-    if (a.distance !== b.distance) return a.distance - b.distance;                              // 离原时段近 → 先安排
+    const c = costCalc.compareCost(a.cost, b.cost);
+    if (c) return c;                                                                            // 离原时段近 → 先安排
     return Number(a.row.id) - Number(b.row.id);
   });
 
   for (const item of decorated) {
-    const { row, want, allow } = item;
-    const options = allow ? [...free] : (free.has(want) ? [want] : []);
-    if (!options.length) { res.left += 1; continue; }
+    const { row, want } = item;
+    const options = acceptableOf(row);
+    if (!options.length) {
+      res.left += 1;
+      if (dryRun) res.actions.push({ action: 'WAITING', id: row.id, songName: row.songName, want, to: null, cost: null });
+      continue;
+    }
 
-    options.sort((a, b) => {
-      const da = Math.abs((indexOf.get(a) ?? 999) - (indexOf.get(want) ?? 999));
-      const db = Math.abs((indexOf.get(b) ?? 999) - (indexOf.get(want) ?? 999));
-      if (da !== db) return da - db;            // 首选优先（距离 0）
-      return (indexOf.get(a) ?? 999) - (indexOf.get(b) ?? 999);
-    });
-    const target = options[0];
+    const target = costCalc.pickBest(options, want, indexOf);
+    const isSame = target === want;
 
-    const r = await S.applyChange(row, {
-      scheduleStatus: S.SCHEDULE.APPROVED,
-      scheduledSlot: target,
-      assignedAt: new Date(now),
-    }, {
-      transaction,
-      operatorId,
-      operatorName: operatorId ? 'ADMIN' : 'SYSTEM',
-      reason: target === want ? S.SYSTEM_REASON.rescheduleOk : ASSIGN_REASON.originalFull,
-    });
-    if (!r.logs.length) continue;              // 并发被别人改过 → 跳过
+    if (dryRun) {
+      res.actions.push({
+        action: isSame ? 'PROMOTE' : 'RESCHEDULE',
+        id: row.id,
+        songName: row.songName,
+        want,
+        to: target,
+        cost: costCalc.describeCost(want, target).cost,
+      });
+    } else {
+      const r = await S.applyChange(row, {
+        scheduleStatus: S.SCHEDULE.APPROVED,
+        scheduledSlot: target,
+        assignedAt: new Date(now),
+      }, {
+        transaction,
+        operatorId,
+        operatorName: operatorId ? 'ADMIN' : 'SYSTEM',
+        reason: isSame ? S.SYSTEM_REASON.rescheduleOk : ASSIGN_REASON.originalFull,
+      });
+      if (!r.logs.length) continue;              // 并发被别人改过 → 跳过
 
-    await logAssignment(
-      row.id, want, target,
-      target === want ? ASSIGN.PROMOTED : ASSIGN.RESCHEDULED,
-      target === want ? S.SYSTEM_REASON.rescheduleOk : ASSIGN_REASON.originalFull,
-      operatorId, transaction
-    );
-    if (target === want) res.promoted += 1; else res.rescheduled += 1;
+      await logAssignment(
+        row.id, want, target,
+        isSame ? ASSIGN.PROMOTED : ASSIGN.RESCHEDULED,
+        isSame ? S.SYSTEM_REASON.rescheduleOk : ASSIGN_REASON.originalFull,
+        operatorId, transaction
+      );
+    }
+    if (isSame) res.promoted += 1; else res.rescheduled += 1;
 
     if (capacity > 0) {
       counters[target] = (counters[target] || 0) + 1;
@@ -437,8 +504,8 @@ async function reschedule(weekStartMs, { now = Date.now(), operatorId = null, tr
     }
   }
 
-  if (res.promoted || res.rescheduled) {
-    logger.info(`[songSchedule] 调剂 周${week.weekStartDate}：原位递补 ${res.promoted}、跨时段调剂 ${res.rescheduled}、仍未安排 ${res.left}`);
+  if (!dryRun && (res.promoted || res.rescheduled)) {
+    logger.info(`[songSchedule] 调剂 周${week.weekStartDate}${allowCross ? '' : '（收歌未截止·仅原位递补）'}：原位递补 ${res.promoted}、跨时段调剂 ${res.rescheduled}、仍未安排 ${res.left}`);
   }
   return res;
 }
@@ -481,8 +548,9 @@ async function lockWeek(weekStartMs, { now = Date.now(), operatorId = null, forc
   }
 
   // 最后一次调度：把还能塞进空位的人都塞进去
+  // 锁定时**显式**放开跨时段 —— 到了这一步收歌早已截止，不可能再有新申请者
   await initialAllocate(weekStartMs, { now, operatorId });
-  const alloc = await reschedule(weekStartMs, { now, operatorId });
+  const alloc = await reschedule(weekStartMs, { now, operatorId, crossSlot: true });
 
   // 剩下仍是 WAITING 的 → AUTO_REJECTED
   const values = await slotValuesOfWeek(weekStartMs);
@@ -656,6 +724,8 @@ async function sweep({ now = Date.now(), operatorId = null } = {}) {
 
 /** 候选池 / 候补队列快照（管理端与候补卡用） */
 async function waitingSnapshot(weekStartMs, now = Date.now()) {
+  const week = await ensureWeek(weekStartMs, { now });
+  const allowCross = canCrossSlot(week, now);
   const values = await slotValuesOfWeek(weekStartMs);
   const rows = await Submit.findAll({
     where: {
@@ -682,10 +752,14 @@ async function waitingSnapshot(weekStartMs, now = Date.now()) {
       allowReschedule: Number(r.allowReschedule) !== 0,
       submittedAt: r.createTime,
       pos: i + 1,
-      canAccept: Number(r.allowReschedule) !== 0 ? free.length : (free.includes(r.wantBroadcastTime) ? 1 : 0),
+      // 收歌未截止时即使「接受调剂」也去不了别处 —— 只能等首选格自己空出来
+      canAccept: free.includes(r.wantBroadcastTime)
+        ? 1
+        : (Number(r.allowReschedule) !== 0 && allowCross ? free.length : 0),
     })),
     freeSlots: free,
     hasFree: free.length > 0,
+    crossSlot: allowCross,
     capacity,
     indexTotal: indexOf.size,
   };
@@ -742,6 +816,7 @@ module.exports = {
   msOfWeekStartDate,
   getLockOffsetMinutes,
   // 算法
+  canCrossSlot,
   initialAllocate,
   reschedule,
   runAllocators,

@@ -58,20 +58,36 @@
 ## 点歌体系（⚠️ 现行＝协议版；2026-09-24 又收到《V1 规格》PDF → 对照 `docs/song-protocol-vs-v1-spec.md`）
 - **⛔ 权限铁律（V1 规格 PDF 的增量）**：普通管理员（REVIEWER）**只能** 查看申请 / 通过 / 驳回 / 看排期候补；
   **执行排期、锁定、人工调整歌曲、配置时段/容量/调剂规则** 一律仅超管。
-  ⚠️ 现状有 6 个接口仍挂在 `requireAdmin`（run/lock/assign/slots/rules/quota），**待改 requireSuperAdmin**。
-  V1 还要求：锁定后连超管都不能普通改（要走 unlock+原因）；`preview` 模拟排期（只算不写库）；
-  调剂按成本表（同日其他 10 / 前后一天同时段 20 / 前后一天其他 30 / 更远 50）而非下标距离。
+  ✅ **已落地（2026-09-25）**：`requireSuperAdmin` 共 11 条 —— `PUT quota/slots/rules/window`、
+  `POST schedule/preview|run|lock`、`POST :id/assign`、`PUT :id/played|revoke`、`DELETE songs`、两个 sweep。
+  GET 类 + `approve`/`reject` 仍 `requireAdmin`（= V1 的 REVIEWER）。
+  ⚠️ **管理端 / 小程序的按钮显隐还没做** —— 普通管理员点了会 403。
+- **✅ 锁定守卫（2026-09-25）**：`assertWeekNotLocked()` / `assertWeekOpen()`（`submitController`）；
+  approve / reject / remove / revoke / batch / assign / played / runSchedule 全加。
+  assign 额外校验**目标时段所属周**也没锁；setQuota 若目标周 LOCKED 则跳过重算。
+  ⚠️ `unlock` 接口仍未做（V1 说可先不提供）。
 - **现行＝协议版（2026-09-24）**：提交**不判容量**，一律 `review=PENDING/schedule=UNASSIGNED`（没有 40904）；
   审核通过只是拿到候选资格（`review=APPROVED + schedule=UNASSIGNED`），随后 `initialAllocate`
   按首选时段分组、组内提交时间升序取前 capacity 落座，其余 `WAITING`；`reschedule` 三级排序
   （可接受位置少 → 提交早 → 距原时段近，`allow_reschedule=0` 只认首选）；到 `schedule_lock_at`
   `lockWeek` 跑最后调度、剩余 `WAITING → AUTO_REJECTED`、周 `LOCKED`。
+- **⛔ 算法闸门（2026-09-25，陛下点名的 bug）**：**收歌截止前 `reschedule` 只做「原位递补」，绝不跨时段**。
+  判据 `songSchedulingService.canCrossSlot(week, now)` = `now >= weekly_schedule.applicationEndAt`。
+  `reschedule` 的 `crossSlot` 默认 `null`（自动判断），只有 `lockWeek()` 与超管手动「执行排期」显式传 `true`。
+  原因：收歌中还有新申请 / 未审的人在进来，别处的空位**可能属于某个「首选那一格」的原申请者**；
+  提前调剂会让他审完后没位置，且被挪走的人已是 APPROVED、**回不到首选格**。
+  （`reschedule` 原来挂在「每次审核后 + 每分钟 sweep」上，等于审核没结束就在跨格调剂 —— 这就是那个 bug。）
+- **✅ 选址＝成本表**（`songRescheduleCost.js`）：同天其他时段 10 / 前后一天同时段 20 /
+  前后一天其他时段 30 / 更远日期 50 / 跨周 ∞；`pickBest` cost 相同按下标升序（可复现）。**不是下标距离**。
 - **占位口径唯一化**：`review_status=APPROVED AND schedule_status=APPROVED`（驳回自动释放位子，不需要 release）。
   **`status` 是派生镜像**，新值 5 已播放 / 6 已通过待排期 / 7 已取消；改状态一律走
   `songStatusService.applyChange()`，不许单写 status。
-- 文件：`songStatusService`（三维+派生+日志）、`songSchedulingService`（周+算法+锁定+播放）、
-  `songQueueService`（读路径+调度器+一批兼容壳）、`models/{weeklySchedule,assignmentLog,requestStatusLog}`、
-  `sql/migrations/2026-09-24-song-protocol.sql`。验证 `node scripts/verify-song-protocol.js`（97 项）。
+  ⚠️ `applyChange` 已是**带条件 UPDATE**（guard = 本次真要改的维度的旧值）；影响 0 行 = 被并发抢先
+  → 返回**空 `logs`**。调用方一律用 `if (r.logs.length)` 判断是否抢到，别改成看 row。
+- 文件：`songStatusService`（三维+派生+日志+乐观锁）、`songSchedulingService`（周+算法+锁定+播放）、
+  `songRescheduleCost`（成本表）、`songQueueService`（读路径+调度器+一批兼容壳）、
+  `models/{weeklySchedule,assignmentLog,requestStatusLog}`、`sql/migrations/2026-09-24-song-protocol.sql`。
+  验证 `node scripts/verify-song-protocol.js` → **130 项**（含 G2 闸门 / G3 成本表 / P 权限守卫三节）。
 - **有意偏离协议**：不建 `schedule_slots` 表（格子仍由 broadcastSlotService 派生，避免两本账）；
   容量仍是全局 KV 不按格拆。**废弃** `song_queue_limit`（候补无上限）。
 - `scripts/verify-song-queue.js` 已作废（文件头守卫直接跳过）。

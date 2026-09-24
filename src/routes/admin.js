@@ -214,7 +214,8 @@ router.get('/submit/quota', adminAuth, requireAdmin, submit.quota);
  *       200: { description: ok }
  *       400: { description: 每周上限不能小于每日上限 }
  */
-router.put('/submit/quota', adminAuth, requireAdmin, submit.setQuota);
+// V1 §2.1：容量配置属超管（普通管理员 = REVIEWER，只能审）
+router.put('/submit/quota', adminAuth, requireSuperAdmin, submit.setQuota);
 
 /**
  * @swagger
@@ -227,7 +228,8 @@ router.put('/submit/quota', adminAuth, requireAdmin, submit.setQuota);
  *     responses:
  *       200: { description: ok，data 里带各周期实际驳回了多少条 }
  */
-router.post('/submit/quota/sweep', adminAuth, requireAdmin, submit.sweepQuota);
+// 兜底 sweep 会真的重跑排期 + 锁定 + 标记播放 → 与「执行排期」同级，收超管
+router.post('/submit/quota/sweep', adminAuth, requireSuperAdmin, submit.sweepQuota);
 
 /* ── v2 排期容量 / 全局候补队列 / 点歌时间窗口 ──────────────────────
  * ⚠️ 全是字面量段，必须注册在 `/submit/:id` 之前，否则会被 :id 吃掉
@@ -235,7 +237,7 @@ router.post('/submit/quota/sweep', adminAuth, requireAdmin, submit.sweepQuota);
 /** 容量 + 候补队列 + 窗口 一体化快照 */
 router.get('/submit/capacity', adminAuth, requireAdmin, submit.capacity);
 /** 手动兜底：递补队首 → 满额清队 → 窗口截止定稿（幂等） */
-router.post('/submit/queue/sweep', adminAuth, requireAdmin, submit.sweepQueue);
+router.post('/submit/queue/sweep', adminAuth, requireSuperAdmin, submit.sweepQueue);
 /** 点歌时间窗口：读（管理员可看，用于常驻展示） */
 router.get('/submit/window', adminAuth, requireAdmin, submit.window);
 /** 点歌时间窗口：写（仅超管 —— 普通管理员只读） */
@@ -299,7 +301,8 @@ router.get('/submit/timeslots', adminAuth, requireAdmin, submit.timeslots);
  *     responses:
  *       200: { description: ok }
  */
-router.put('/submit/slots', adminAuth, requireAdmin, submit.saveSlots);
+// V1 §2.1：配置播出时段属超管
+router.put('/submit/slots', adminAuth, requireSuperAdmin, submit.saveSlots);
 
 /**
  * @swagger
@@ -323,10 +326,12 @@ router.get('/submit/schedule', adminAuth, requireAdmin, submit.schedule);
  * ───────────────────────────────────────────────────────────────── */
 /** 目标周的排期状态与时间锚点（申请窗 / 锁定时刻） */
 router.get('/submit/week', adminAuth, requireAdmin, submit.week);
-/** 执行第一轮排期 + 全局调剂（协议 §16 / §17） */
-router.post('/submit/schedule/run', adminAuth, requireAdmin, submit.runSchedule);
-/** 正式锁定：最后调度 + 无位自动驳回（协议 §18）；body.force 可提前锁 */
-router.post('/submit/schedule/lock', adminAuth, requireAdmin, submit.lock);
+/** 模拟排期：只算不写库（V1 要求 —— 算法出错时不污染正式数据）—— 仅超管 */
+router.post('/submit/schedule/preview', adminAuth, requireSuperAdmin, submit.previewSchedule);
+/** 执行第一轮排期 + 全局调剂（协议 §16 / §17）—— V1 §2.1：仅超管 */
+router.post('/submit/schedule/run', adminAuth, requireSuperAdmin, submit.runSchedule);
+/** 正式锁定：最后调度 + 无位自动驳回（协议 §18）；body.force 可提前锁 —— 仅超管 */
+router.post('/submit/schedule/lock', adminAuth, requireSuperAdmin, submit.lock);
 
 /**
  * @swagger
@@ -357,7 +362,8 @@ router.post('/submit/schedule/lock', adminAuth, requireAdmin, submit.lock);
  *       200: { description: ok }
  */
 router.get('/submit/rules', adminAuth, requireAdmin, submit.rules);
-router.put('/submit/rules', adminAuth, requireAdmin, submit.saveRules);
+// V1 §2.1：调剂 / 提交规则属超管
+router.put('/submit/rules', adminAuth, requireSuperAdmin, submit.saveRules);
 
 /**
  * @swagger
@@ -434,7 +440,8 @@ router.put('/submit/:id/approve', adminAuth, requireAdmin, submit.approve);
  *     responses:
  *       200: { description: 已撤销 }
  */
-router.put('/submit/:id/revoke', adminAuth, requireAdmin, submit.revoke);
+// V1 规格里没有「撤销审核」这一操作 → 收归超管（避免普通管理员改掉已定的审核结果）
+router.put('/submit/:id/revoke', adminAuth, requireSuperAdmin, submit.revoke);
 
 /**
  * @swagger
@@ -459,7 +466,8 @@ router.put('/submit/:id/revoke', adminAuth, requireAdmin, submit.revoke);
  *     responses:
  *       200: { description: ok }
  */
-router.post('/submit/:id/assign', adminAuth, requireAdmin, submit.assign);
+// V1 §2.1：人工调整歌曲时段属超管
+router.post('/submit/:id/assign', adminAuth, requireSuperAdmin, submit.assign);
 
 /**
  * @swagger
@@ -478,7 +486,8 @@ router.post('/submit/:id/assign', adminAuth, requireAdmin, submit.assign);
  *     responses:
  *       200: { description: ok }
  */
-router.put('/submit/:id/played', adminAuth, requireAdmin, submit.played);
+// V1 里播放由系统自动标记，人工修正收归超管
+router.put('/submit/:id/played', adminAuth, requireSuperAdmin, submit.played);
 
 /**
  * @swagger

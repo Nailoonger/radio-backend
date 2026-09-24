@@ -236,7 +236,8 @@ const DAY = 24 * 60 * 60 * 1000;
       await S.applyChange(row, { reviewStatus: S.REVIEW.APPROVED, reviewerId: 1, reviewTime: new Date() });
     }
     await sched.initialAllocate(weekStart, { now });
-    await sched.reschedule(weekStart, { now: now + 1000 });
+    // 全局调剂属于「收歌截止后 / 超管手动执行 / 锁定前」的动作 → 显式放开跨时段
+    await sched.reschedule(weekStart, { now: now + 1000, crossSlot: true });
 
     const rf = await Submit.findByPk(flex.id);
     const rr = await Submit.findByPk(rigid.id);
@@ -275,7 +276,7 @@ const DAY = 24 * 60 * 60 * 1000;
       await S.applyChange(row, { reviewStatus: S.REVIEW.APPROVED, reviewerId: 1, reviewTime: new Date() });
     }
     await sched.initialAllocate(weekStart, { now });
-    await sched.reschedule(weekStart, { now });
+    await sched.reschedule(weekStart, { now, crossSlot: true });
     const rx = await Submit.findByPk(x.id);
     const ry = await Submit.findByPk(y.id);
     const rz = await Submit.findByPk(z.id);
@@ -286,6 +287,63 @@ const DAY = 24 * 60 * 60 * 1000;
       Number(ry.scheduleStatus) === S.SCHEDULE.APPROVED && ry.scheduledSlot === V[9],
       `schedule=${ry.scheduleStatus} slot=${ry.scheduledSlot}`);
     check('不接受调剂且首选已满的 Z 继续等待', Number(rz.scheduleStatus) === S.SCHEDULE.WAITING, rz.scheduleStatus);
+
+    /* ══════════ G2. 收歌未截止 → 不许跨时段 ══════════ */
+    say('');
+    say('--- G2. 收歌未截止：只做原位递补，别处的空位不外借 ---');
+    // 这是「保证每个时段原先申请者的排期」的核心回归：
+    // 收歌窗口还没结束（application_end_at 之前）时，别的格子空着也不能占 ——
+    // 那个空位要留给「首选那一格」的原申请者（他可能还没被审核通过）。
+    // 用一个更远的播出周跑这一节 —— 不 destroy、不碰 weekStart 的数据，
+    // 免得把 G 节的 X/Y/Z 和下面 H 节的断言搞坏。
+    const gateWeekMs = weekStart + 14 * DAY;
+    const GV = await sched.slotValuesOfWeek(gateWeekMs);
+    const gateWeek = await sched.ensureWeek(gateWeekMs, { now });
+    const openAt = +new Date(gateWeek.applicationStartAt) + 3600 * 1000;    // 收歌中
+    const closedAt = +new Date(gateWeek.applicationEndAt) + 3600 * 1000;   // 收歌已截止
+    check('闸门：收歌中不允许跨时段', sched.canCrossSlot(gateWeek, openAt) === false);
+    check('闸门：收歌截止后允许跨时段', sched.canCrossSlot(gateWeek, closedAt) === true);
+
+    await mkSeated(GV[1], { minutesAgo: 90, song: '占住首选' });
+    const flexEarly = await mk(GV[1], { minutesAgo: 40, song: '早段候补' });
+    await S.applyChange(await Submit.findByPk(flexEarly.id), {
+      reviewStatus: S.REVIEW.APPROVED, reviewerId: 1, reviewTime: new Date(),
+    });
+    await sched.initialAllocate(gateWeekMs, { now: openAt });
+
+    const noCross = await sched.reschedule(gateWeekMs, { now: openAt });
+    const rfEarly = await Submit.findByPk(flexEarly.id);
+    check('收歌中：候补的人不会被塞到别的空位',
+      Number(rfEarly.scheduleStatus) === S.SCHEDULE.WAITING && noCross.rescheduled === 0,
+      `schedule=${rfEarly.scheduleStatus} rescheduled=${noCross.rescheduled}`);
+    check('收歌中：返回值标明 crossSlot=false', noCross.crossSlot === false, String(noCross.crossSlot));
+
+    const withCross = await sched.reschedule(gateWeekMs, { now: closedAt });
+    const rfLate = await Submit.findByPk(flexEarly.id);
+    check('收歌截止后才跨时段调剂',
+      Number(rfLate.scheduleStatus) === S.SCHEDULE.APPROVED && rfLate.scheduledSlot !== GV[1] && withCross.rescheduled === 1,
+      `schedule=${rfLate.scheduleStatus} slot=${rfLate.scheduledSlot} rescheduled=${withCross.rescheduled}`);
+    check('跨时段后首选（意愿数据）仍是原值', rfLate.wantBroadcastTime === GV[1], rfLate.wantBroadcastTime);
+
+    /* ══════════ G3. 调剂成本表 ══════════ */
+    say('');
+    say('--- G3. 调剂成本表（V1 §10）---');
+    // V[0..2] = 周一早/午/晚，V[3..5] = 周二，V[9] = 周四，GV = 两周后的同一批格子
+    const cost = require('../src/services/songRescheduleCost');
+    check('首选自身 cost = 0', cost.costBetween(V[0], V[0]) === 0, String(cost.costBetween(V[0], V[0])));
+    check('同一天其他时段 cost = 10', cost.costBetween(V[0], V[1]) === 10, String(cost.costBetween(V[0], V[1])));
+    check('前/后一天相同时段 cost = 20', cost.costBetween(V[0], V[3]) === 20, String(cost.costBetween(V[0], V[3])));
+    check('前/后一天其他时段 cost = 30', cost.costBetween(V[0], V[5]) === 30, String(cost.costBetween(V[0], V[5])));
+    check('更远日期 cost = 50', cost.costBetween(V[0], V[9]) === 50, String(cost.costBetween(V[0], V[9])));
+    check('跨周 = 不可接受 ∞', cost.costBetween(V[0], GV[0]) === Infinity);
+    check('解析不出的值 = 不可接受 ∞', cost.costBetween(V[0], '随便写的') === Infinity);
+    // 这正是「下标距离」与规格不等价的地方：跨天相邻 ≠ 同天相邻
+    check('跨天相邻(20) 不再与同天相邻(10) 打平',
+      cost.costBetween(V[0], V[1]) < cost.costBetween(V[0], V[3]));
+    check('pickBest 选 cost 最小的（同天优先于次日）',
+      cost.pickBest([V[3], V[1], V[9]], V[0], new Map(V.map((v, i) => [v, i]))) === V[1]);
+    check('cost 相同时按下标升序（结果可复现）',
+      cost.pickBest([V[2], V[1]], V[0], new Map(V.map((v, i) => [v, i]))) === V[1]);
 
     /* ══════════ H. 锁定 ══════════ */
     say('');
@@ -442,11 +500,21 @@ const DAY = 24 * 60 * 60 * 1000;
     const routeList = (r) => r.stack
       .filter((l) => l.route)
       .map((l) => Object.keys(l.route.methods).join(',').toUpperCase() + ' ' + l.route.path);
-    const adminRoutes = routeList(require('../src/routes/admin'));
+    const adminRouter = require('../src/routes/admin');
+    const adminRoutes = routeList(adminRouter);
     const userRoutes = routeList(require('../src/routes/user'));
 
+    /** 某条路由挂的中间件函数名（断言权限守卫用；null-prototype 无 name 的记为 ''） */
+    const guardsOf = (router, key) => {
+      const hit = router.stack
+        .filter((l) => l.route)
+        .find((l) => Object.keys(l.route.methods).join(',').toUpperCase() + ' ' + l.route.path === key);
+      return hit ? hit.route.stack.map((s) => s.name || '') : [];
+    };
+
     const wantAdmin = [
-      'POST /submit/schedule/run', 'POST /submit/schedule/lock', 'GET /submit/week',
+      'POST /submit/schedule/preview', 'POST /submit/schedule/run', 'POST /submit/schedule/lock',
+      'GET /submit/week',
       'POST /submit/:id/assign', 'PUT /submit/:id/played', 'GET /submit/:id/status-logs',
     ];
     wantAdmin.forEach((w) => check(`管理端已挂载 ${w}`, adminRoutes.includes(w)));
@@ -466,6 +534,24 @@ const DAY = 24 * 60 * 60 * 1000;
       literalBefore(adminRoutes, 'POST /submit/schedule/run', 'POST /submit/:id/assign'));
     check('GET /submit/window 排在 GET /submit/:id 之前（用户端）',
       literalBefore(userRoutes, 'GET /submit/window', 'GET /submit/:id'));
+
+    /* ══════════ P. 权限守卫（V1 §2.1）══════════ */
+    say('');
+    say('--- P. 权限守卫：写排期规则类接口必须超管 ---');
+    const mustSuper = [
+      'PUT /submit/quota', 'PUT /submit/slots', 'PUT /submit/rules', 'PUT /submit/window',
+      'POST /submit/schedule/preview', 'POST /submit/schedule/run', 'POST /submit/schedule/lock',
+      'POST /submit/:id/assign', 'PUT /submit/:id/played', 'PUT /submit/:id/revoke',
+      'DELETE /submit/songs',
+    ];
+    mustSuper.forEach((k) => check(`仅超管：${k}`, guardsOf(adminRouter, k).includes('requireSuperAdmin')));
+
+    const reviewerCan = [
+      'GET /submit/list', 'PUT /submit/:id/approve', 'PUT /submit/:id/reject',
+      'GET /submit/schedule', 'GET /submit/week',
+    ];
+    reviewerCan.forEach((k) => check(`普通管理员可用：${k}`,
+      guardsOf(adminRouter, k).includes('requireAdmin') && !guardsOf(adminRouter, k).includes('requireSuperAdmin')));
 
     /* ══════════ 汇总 ══════════ */
     say('');

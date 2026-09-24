@@ -27,7 +27,7 @@
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-const { RequestStatusLog } = require('../models');
+const { Submit, RequestStatusLog } = require('../models');
 const logger = require('../utils/logger');
 
 /* ------------------------------------------------------------------ *
@@ -172,7 +172,29 @@ async function applyChange(submit, changes, opts = {}) {
 
   patch.status = deriveStatus(after.reviewStatus, after.scheduleStatus, after.playStatus);
 
-  const row = await submit.update(patch, { transaction });
+  /**
+   * 条件 UPDATE（乐观锁）——《V1 规格》第 13 节「count < capacity 才 UPDATE」的等价物。
+   *
+   * 只对「本次真的要改的维度」加**读取时的旧值**作为条件：
+   *   排期落座时 schedule_status 必须仍是 UNASSIGNED，抢晚了就影响 0 行。
+   * 影响 0 行 = 别人先改了这一次 → 直接返回空 logs，调用方据此跳过，
+   * 于是 capacity=3 时不会出现第 4 首 APPROVED（管理端手动触发与定时器重叠也不会超卖）。
+   *
+   * 未参与本次变更的维度不进 WHERE —— 否则「只想改播放状态」会被无关的并发改动误伤。
+   */
+  const guard = { id: submit.id };
+  Object.keys(DIMENSION_OF).forEach((k) => {
+    if (patch[k] === undefined) return;
+    guard[k] = before[k];
+  });
+
+  const [affected] = await Submit.update(patch, { where: guard, transaction });
+  if (affected === 0) {
+    logger.warn(`[songStatus] 并发冲突，本次变更放弃 #${submit.id}`);
+    return { row: submit, status: Number(submit.status) || 0, logs: [], conflict: true };
+  }
+  if (typeof submit.set === 'function') submit.set(patch);   // 内存实例同步，调用方读字段才是新值
+  const row = submit;
 
   // ── 落状态日志（哪个维度变了就记哪条）──
   const logs = [];

@@ -15,6 +15,10 @@ sync ok（submit / weekly_schedule / assignment_log / request_status_log …）
 
 --- G. 调剂优先级 ---
 
+--- G2. 收歌未截止：只做原位递补，别处的空位不外借 ---
+
+--- G3. 调剂成本表（V1 §10）---
+
 --- H. 锁定 ---
 
 --- I. 播放标记 ---
@@ -31,8 +35,10 @@ sync ok（submit / weekly_schedule / assignment_log / request_status_log …）
 
 --- O. 路由挂载与顺序 ---
 
+--- P. 权限守卫：写排期规则类接口必须超管 ---
+
 ══════════════════════════════════
-通过 97 项
+通过 130 项
 ✅ 全部通过
 
   ✓ 下周格子数 = 5 × 时段数  [n=15]
@@ -59,8 +65,8 @@ sync ok（submit / weekly_schedule / assignment_log / request_status_log …）
   ✓ 第一格已占满（capacity=1）  [seated=1]
   ✓ 格子已满仍能提交（协议：提交不判容量）  [review=0 schedule=0]
   ✓ 提交后镜像 status = 0 待审核  [0]
-  ✓ 第一轮排期落座 1 条  [{"weekId":1,"assigned":1,"waiting":2}]
-  ✓ 第一轮排期进候补 2 条  [{"weekId":1,"assigned":1,"waiting":2}]
+  ✓ 第一轮排期落座 1 条  [{"weekId":1,"assigned":1,"waiting":2,"actions":[]}]
+  ✓ 第一轮排期进候补 2 条  [{"weekId":1,"assigned":1,"waiting":2,"actions":[]}]
   ✓ 提交最早的拿到正式位  [schedule=1 slot=2026-09-28 午间 12:20]
   ✓ 后两位进 WAITING  [2/2]
   ✓ 落座者镜像 status = 1 已排期  [1]
@@ -68,9 +74,9 @@ sync ok（submit / weekly_schedule / assignment_log / request_status_log …）
   ✓ 候补位次：居中排第 1 位
   ✓ 候补位次：最晚排第 2 位
   ✓ 周状态推进到 SCHEDULING
-  ✓ 第一轮排期幂等（重跑不重复落座）  [{"weekId":1,"assigned":0,"waiting":0}]
+  ✓ 第一轮排期幂等（重跑不重复落座）  [{"weekId":1,"assigned":0,"waiting":0,"actions":[]}]
   ✓ assign_log 记了 INITIAL 一条
-  ✓ 原位递补 1 条  [{"weekId":1,"promoted":1,"rescheduled":1,"left":0}]
+  ✓ 原位递补 1 条  [{"weekId":1,"promoted":1,"rescheduled":0,"left":1,"crossSlot":false,"actions":[]}]
   ✓ 补上的是队列里提交最早的（居中）  [schedule=1 slot=2026-09-28 午间 12:20]
   ✓ 驳回后不再占位（review≠APPROVED）
   ✓ 递补写入 PROMOTED 日志
@@ -83,6 +89,22 @@ sync ok（submit / weekly_schedule / assignment_log / request_status_log …）
   ✓ 可接受位置少的优先：X 先拿到 V[5]  [schedule=1 slot=2026-09-29 晚间 17:30]
   ✓ Y 随后拿到剩下的 V[9]  [schedule=1 slot=2026-10-01 早间 07:20]
   ✓ 不接受调剂且首选已满的 Z 继续等待  [2]
+  ✓ 闸门：收歌中不允许跨时段
+  ✓ 闸门：收歌截止后允许跨时段
+  ✓ 收歌中：候补的人不会被塞到别的空位  [schedule=2 rescheduled=0]
+  ✓ 收歌中：返回值标明 crossSlot=false  [false]
+  ✓ 收歌截止后才跨时段调剂  [schedule=1 slot=2026-10-12 早间 07:20 rescheduled=1]
+  ✓ 跨时段后首选（意愿数据）仍是原值  [2026-10-12 午间 12:20]
+  ✓ 首选自身 cost = 0  [0]
+  ✓ 同一天其他时段 cost = 10  [10]
+  ✓ 前/后一天相同时段 cost = 20  [20]
+  ✓ 前/后一天其他时段 cost = 30  [30]
+  ✓ 更远日期 cost = 50  [50]
+  ✓ 跨周 = 不可接受 ∞
+  ✓ 解析不出的值 = 不可接受 ∞
+  ✓ 跨天相邻(20) 不再与同天相邻(10) 打平
+  ✓ pickBest 选 cost 最小的（同天优先于次日）
+  ✓ cost 相同时按下标升序（结果可复现）
   ✓ 锁定后周状态 = LOCKED  [LOCKED]
   ✓ 锁定时仍无位置的候补 → AUTO_REJECTED  [3]
   ✓ 自动驳回写了理由  [排期已锁定，没有可用位置]
@@ -91,7 +113,7 @@ sync ok（submit / weekly_schedule / assignment_log / request_status_log …）
   ✓ 审核维度保持 APPROVED（没被人为驳回）  [1]
   ✓ 已拿到位置的不受锁定影响
   ✓ 重复锁定幂等  [true]
-  ✓ 未到锁定时刻且没传 force → 不锁  [{"id":2,"weekStartDate":"2026-10-05","status":"DRAFT","statusText":"未发布","applicationStartAt":"2026-10-03T18:00:00+08:00","applicationEndAt":"2026-10-04T18:00:00+08:00","reviewStartAt":"2026-10-04T18:00:00+08:00","scheduleLockAt":"2026-10-05T00:00:00+08:00","lockedAt":null,"lockText":"2026-10-05T00:00:00+08:00","secondsToLock":626340,"canApply":false,"locked":false,"already":false,"tooEarly":true,"rejected":0}]
+  ✓ 未到锁定时刻且没传 force → 不锁  [{"id":3,"weekStartDate":"2026-10-05","status":"DRAFT","statusText":"未发布","applicationStartAt":"2026-10-03T18:00:00+08:00","applicationEndAt":"2026-10-04T18:00:00+08:00","reviewStartAt":"2026-10-04T18:00:00+08:00","scheduleLockAt":"2026-10-05T00:00:00+08:00","lockedAt":null,"lockText":"2026-10-05T00:00:00+08:00","secondsToLock":626340,"canApply":false,"locked":false,"already":false,"tooEarly":true,"rejected":0}]
   ✓ 传 force 可以提前锁定  [LOCKED]
   ✓ 锁定状态不回退（ensureWeek 不覆盖 LOCKED）  [LOCKED]
   ✓ 播出时刻已过的被标记已播放
@@ -118,9 +140,10 @@ sync ok（submit / weekly_schedule / assignment_log / request_status_log …）
   ✓ 不同歌名不受影响
   ✓ 每人每周次数仍生效（默认 2 次已用完）  [{"ok":false,"used":2,"limit":2,"remaining":0}]
   ✓ 点歌时间窗口仍在（enabled 且给出起止）  [每周六 18:00 – 周日 18:00 open=false]
-  ✓ sweep 覆盖到了目标周  [[{"weekStartDate":"2026-09-28","weekId":3,"assigned":1,"waiting":0,"promoted":0,"rescheduled":0}]]
+  ✓ sweep 覆盖到了目标周  [[{"weekStartDate":"2026-09-28","weekId":4,"assigned":1,"waiting":0,"promoted":0,"rescheduled":0}]]
   ✓ sweep 把审核通过的人排上了位  [1]
-  ✓ sweep 到锁定时刻自动锁定  [[{"weekStartDate":"2026-09-28","weekId":3,"locked":true,"rejected":0}]]
+  ✓ sweep 到锁定时刻自动锁定  [[{"weekStartDate":"2026-09-28","weekId":4,"locked":true,"rejected":0}]]
+  ✓ 管理端已挂载 POST /submit/schedule/preview
   ✓ 管理端已挂载 POST /submit/schedule/run
   ✓ 管理端已挂载 POST /submit/schedule/lock
   ✓ 管理端已挂载 GET /submit/week
@@ -132,3 +155,19 @@ sync ok（submit / weekly_schedule / assignment_log / request_status_log …）
   ✓ GET /submit/week 排在 GET /submit/:id 之前
   ✓ POST /submit/schedule/run 排在 POST /submit/:id/assign 之前
   ✓ GET /submit/window 排在 GET /submit/:id 之前（用户端）
+  ✓ 仅超管：PUT /submit/quota
+  ✓ 仅超管：PUT /submit/slots
+  ✓ 仅超管：PUT /submit/rules
+  ✓ 仅超管：PUT /submit/window
+  ✓ 仅超管：POST /submit/schedule/preview
+  ✓ 仅超管：POST /submit/schedule/run
+  ✓ 仅超管：POST /submit/schedule/lock
+  ✓ 仅超管：POST /submit/:id/assign
+  ✓ 仅超管：PUT /submit/:id/played
+  ✓ 仅超管：PUT /submit/:id/revoke
+  ✓ 仅超管：DELETE /submit/songs
+  ✓ 普通管理员可用：GET /submit/list
+  ✓ 普通管理员可用：PUT /submit/:id/approve
+  ✓ 普通管理员可用：PUT /submit/:id/reject
+  ✓ 普通管理员可用：GET /submit/schedule
+  ✓ 普通管理员可用：GET /submit/week
