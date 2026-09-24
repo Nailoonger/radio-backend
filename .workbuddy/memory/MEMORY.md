@@ -20,6 +20,7 @@
 - 静态预览搬小程序样式：**rpx 必须折算 px（1rpx=0.52px）**，否则声明被丢、容器塌 0；折完别再套 scale。固定高手机框里 `vh` 换固定 px。静态页验证直接 `file://`。
 - agent-browser：stdio 必须用文件 fd 不能管道（会挂死）；`set viewport` 在 `open` 之前；会话跑久会崩（3680 字节空白截图 + 「全 0 但没报错」假绿）——一次会话 ≤3 张、截图带体积断言、首张热身丢弃；CLI click 不支持属性选择器（eval 里 `.click()`）。
 - safe-delete 钩子的 trash 本机是坏的：清临时文件走 Node `fs.unlinkSync`。
+- **给陛下的命令要按终端分方言**（2026-09-24）：陛下多在自己开 PowerShell 里跑，那里 `curl` 是 `Invoke-WebRequest` 的别名，`-x/-o/-w` 会报 `ParameterBindingException`（缺少 SessionVariable）。探端口用 `Test-NetConnection -ComputerName 127.0.0.1 -Port 7890`；确需真 curl 就写 `curl.exe`，且输出黑洞是 `NUL` 不是 `/dev/null`；带 `=`/`:` 的 git 参数（`-c http.proxy=…`）要加引号。
 - **push 这步只能交给用户**（2026-09-24 实测）：我这边 shell 走 WorkBuddy 自带 PortableGit（`~/.workbuddy/binaries/PortableGit/versions/<v>/`），它的 `credential.helper=helper-selector` 是宿主注入的、不在 PATH，非交互 shell 取不到 token → `could not read Username for 'https://github.com'`。也没有 `gh`。所以我的职责边界＝**改完 + 本地 commit + 给用户 push 与服务器更新步骤**，别在 push 上死磕。
 - git push 前先开代理（FlClash 127.0.0.1:7890）。代理没起时 git 的报错是 `Failed to connect to 127.0.0.1:7890`（**不是**网络不通，别看错方向）；代理起来后端口探测 `echo > /dev/tcp/127.0.0.1/7890` 会通。
 - **预览自检三件套**：模拟点击页签后逐屏截图 + 未定义类名扫描 + 溢出量测（表格 ≥2 个操作按钮量 `td.scrollWidth`）。配方在 skill `web-ui-screenshot-verify`。
