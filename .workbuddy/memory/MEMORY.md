@@ -10,7 +10,8 @@
 - **别在本机构建/部署**：改完 → 本地 commit → 交陛下 push + 服务器更新步骤。提交身份用全局 `Nailoonger <1493586497@qq.com>`，别写仓库级 user.email/name。
 
 ## 部署（服务器 `~/radio`）
-- `docker compose build <svc>` + `up -d --force-recreate <svc>`（restart 不换镜像）。admin-web 改 views：`npm run build` → `build admin-web` → `up -d --force-recreate --no-deps admin-web`。
+- `docker compose build <svc>` + `up -d --force-recreate <svc>`（restart 不换镜像）。admin-web 改 views：`docker compose build admin-web` → `up -d --force-recreate --no-deps admin-web`。
+  （`admin-web/Dockerfile` 是**多阶段构建**，容器内自己 `npm ci + npm run build`，注释明写「不再依赖主机预构建」→ 服务器上**不需要**先跑 `npm run build`；本机 `npm run build` 只用于自检。）
 - **加表靠启动 `sync({alter:false})`**（只建缺失的表）；**加列 / 索引必须跑 `scripts/db-repair.js`**（幂等、只加不改不删）。`sql/schema.sql` 只在数据卷首次初始化时执行。
 - 固定顺序：备份 → build → `run --rm radio-backend node scripts/db-repair.js` → `up -d --force-recreate radio-backend` → 只跑幂等回填 UPDATE → `POST /api/admin/submit/queue/sweep`。
 - ⚠️ MySQL `ALTER TABLE ADD COLUMN` **不幂等**（重跑 1060 并中断后续语句）。
