@@ -492,8 +492,9 @@ Page({
   /**
    * 提交成功回执（协议版新增）
    * 讲清三步：已提交 → 等待审核 → 统一排期，并点明「最晚什么时候有结果」。
-   * 锁定时刻不硬编码（服务端可配 song_lock_offset_minutes），取这条投稿的 card.lockAt；
-   * 取不到就退回「播出周周一前」这种相对说法，不编一个假时刻给学生。
+   * ⚠️ 2026-09-25 起「收歌截止 ≠ 审核截止」：回执里的审核截止取 win.reviewAt（服务端下发），
+   *    不再拿收歌截止顶替；锁定时刻取这条投稿的 card.lockAt（= 审核截止），
+   *    取不到就退回相对说法，不编一个假时刻给学生。
    */
   showReceipt(r) {
     const card = (r && r.card) || {};
@@ -506,9 +507,9 @@ Page({
         song: [this.data.songName, this.data.singer].filter(Boolean).join(' — '),
         at: fmtDate(Date.now()).slice(5, 16), // MM-DD HH:mm
         leftText: left !== null && left >= 0 ? '本周还剩 ' + left + ' 次点歌机会' : '',
-        auditAt: this.data.winClosesAt,
-        lockText: (lockAt ? '排期结果最晚在 ' + lockAt + '（播出周周一）' : '排期结果最晚在播出周周一')
-          + '前确定，届时可在「我的投稿」看到。',
+        auditAt: this.data.winReviewAt || this.data.winClosesAt || '',
+        lockText: (lockAt ? '排期结果最晚在 ' + lockAt + '（审核截止）' : '排期结果最晚在审核截止')
+          + '确定，届时可在「我的投稿」看到。',
         allowReschedule: this.data.allowReschedule,
       },
     });

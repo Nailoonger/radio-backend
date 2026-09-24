@@ -12,7 +12,9 @@
       <div class="sec" style="flex:1">
         <div class="sec-head">
           <span class="sec-title">排期容量与候补</span>
-          <span class="tag tag-pass">即时生效</span>
+          <span class="tag" :class="auth.isSuperAdmin ? 'tag-pass' : ''">
+            {{ auth.isSuperAdmin ? '仅超管可改' : '只读 · 仅超管可改' }}
+          </span>
         </div>
         <div class="card" style="padding:18px 20px">
           <div class="quota-grid">
@@ -63,10 +65,17 @@
               </div>
             </div>
             <div class="quota-buttons">
-              <el-button type="primary" :loading="capSaving" @click="saveCapacity" class="btn-save">
+              <!-- 普通管理员：接口已收超管（40301），这里一并置灰，别让人点了才吃 403 -->
+              <el-button
+                type="primary" :loading="capSaving" :disabled="!auth.isSuperAdmin"
+                @click="saveCapacity" class="btn-save"
+              >
                 <IconCheck :size="15" class="btn-icon" />保存
               </el-button>
-              <el-button :loading="sweeping" plain @click="sweepQueue" class="btn-sweep">
+              <el-button
+                :loading="sweeping" plain :disabled="!auth.isSuperAdmin"
+                @click="sweepQueue" class="btn-sweep"
+              >
                 <IconRefresh :size="15" class="btn-icon" />递补 + 定稿检查
               </el-button>
             </div>
@@ -84,7 +93,9 @@
       <div class="sec" style="flex:1">
         <div class="sec-head">
           <span class="sec-title">提交规则</span>
-          <span class="tag tag-pass">即时生效</span>
+          <span class="tag" :class="auth.isSuperAdmin ? 'tag-pass' : ''">
+            {{ auth.isSuperAdmin ? '即时生效 · 仅超管可改' : '只读 · 仅超管可改' }}
+          </span>
         </div>
         <div class="card" style="padding:8px 20px">
           <div class="kv">
@@ -108,10 +119,17 @@
           <div class="kv" style="border-bottom:none">
             <span class="k" style="width:132px">保存</span>
             <span class="rowc gap13">
-              <el-button type="primary" size="small" :loading="ruleSaving" @click="saveRules" class="btn-save">
+              <el-button
+                type="primary" size="small" :loading="ruleSaving"
+                :disabled="!auth.isSuperAdmin" @click="saveRules" class="btn-save"
+              >
                 <IconCheck :size="14" class="btn-icon" />保存规则
               </el-button>
-              <span class="micro">改完点这里才生效 · 保存后会显示服务端真正生效的值</span>
+              <span class="micro">
+                {{ auth.isSuperAdmin
+                  ? '改完点这里才生效 · 保存后会显示服务端真正生效的值'
+                  : '只读 · 提交规则由超级管理员维护（后端 40301 把关）' }}
+              </span>
             </span>
           </div>
         </div>
@@ -136,7 +154,7 @@
           <span class="tag" :class="auth.isSuperAdmin ? 'tag-pass' : ''">
             {{ auth.isSuperAdmin ? '仅超管可改' : '只读 · 仅超管可改' }}
           </span>
-          <span class="micro">窗口结束时刻 = 审核截止时刻</span>
+          <span class="micro">收歌截止 ≠ 审核截止（本版拆开）</span>
         </span>
       </div>
       <div class="card" style="padding:18px 20px">
@@ -150,18 +168,18 @@
               </div>
               <div class="win-cd">
                 <template v-if="win.enabled === false">一直开放</template>
-                <template v-else-if="win.open">开放中 · 距截止 {{ fmtDur(winCd?.ms) }}</template>
+                <template v-else-if="win.open">开放中 · 距收歌截止 {{ fmtDur(winCd?.ms) }}</template>
                 <template v-else>未开放 · 距开放 {{ fmtDur(winCd?.ms) }}</template>
               </div>
             </div>
             <div class="win-meta">
-              <div>本周窗口 {{ hhmm(win.start) }} → {{ hhmm(win.end) }}</div>
-              <div v-if="win.closesAt">审核截止 {{ hhmm(win.closesAt) }}</div>
+              <div>本周收歌 {{ hhmm(win.start) }} → {{ hhmm(win.end) }}</div>
+              <div v-if="win.reviewAt">审核截止 {{ hhmm(win.reviewAt) }}</div>
               <div v-else-if="win.opensAt">下次开放 {{ hhmm(win.opensAt) }}</div>
             </div>
           </div>
           <div class="win-note">
-            {{ win.note || '窗口结束时刻 = 审核截止时刻：到点后未补位的候补与未审完的补位件会被系统自动驳回' }}
+            {{ win.note || '收歌截止只停止新提交；到审核截止才自动排期、驳回剩余候补并锁定本周' }}
           </div>
         </div>
 
@@ -175,27 +193,46 @@
             </span>
           </div>
           <div class="kv">
-            <span class="k" style="width:132px">开始</span>
+            <span class="k" style="width:132px">收歌开始</span>
             <span class="rowc gap8 wrap">
               <el-select v-model="winForm.startDay" style="width:106px" :disabled="winDisabled">
-                <el-option v-for="d in win.allowedStartDays || []" :key="d.day" :label="d.name" :value="d.day" />
+                <el-option v-for="d in win.allowedDays || []" :key="d.day" :label="d.name" :value="d.day" />
               </el-select>
               <el-time-select
                 v-model="winForm.startTime" start="00:00" step="00:10" end="23:50"
                 placeholder="时刻" style="width:120px" :disabled="winDisabled"
               />
+              <span class="micro">从这里开始可以点歌</span>
             </span>
           </div>
           <div class="kv">
-            <span class="k" style="width:132px">结束</span>
+            <span class="k" style="width:132px">收歌结束</span>
             <span class="rowc gap8 wrap">
               <el-select v-model="winForm.endDay" style="width:106px" :disabled="winDisabled">
-                <el-option v-for="d in win.allowedEndDays || []" :key="d.day" :label="d.name" :value="d.day" />
+                <el-option v-for="d in win.allowedDays || []" :key="d.day" :label="d.name" :value="d.day" />
               </el-select>
               <el-time-select
                 v-model="winForm.endTime" start="00:00" step="00:10" end="23:50"
                 placeholder="时刻" style="width:120px" :disabled="winDisabled"
               />
+              <span class="micro">到点停止收新歌，已提交的继续审核</span>
+            </span>
+          </div>
+          <!-- 审核截止（2026-09-25 与收歌截止拆开）：null = 跟随「收歌结束 + 偏移」，保住升级前的行为 -->
+          <div class="kv">
+            <span class="k" style="width:132px">审核截止</span>
+            <span class="rowc gap8 wrap">
+              <el-select v-model="winForm.reviewDay" style="width:158px" :disabled="winDisabled">
+                <el-option :label="followLabel" :value="null" />
+                <el-option v-for="d in win.allowedDays || []" :key="d.day" :label="d.name" :value="d.day" />
+              </el-select>
+              <el-time-select
+                v-model="winForm.reviewTime" start="00:00" step="00:10" end="23:50"
+                placeholder="时刻" style="width:120px"
+                :disabled="winDisabled || winForm.reviewDay === null"
+              />
+              <span class="tag tag-pass" v-if="win.reviewConfigured">已单独配置</span>
+              <span class="micro">到点自动排期 + 驳回剩余候补 + 锁定本周</span>
             </span>
           </div>
           <div class="kv" style="border-bottom:none">
@@ -209,7 +246,7 @@
               </el-button>
               <span class="micro">
                 {{ auth.isSuperAdmin
-                  ? '开始日只能周五 / 周六 / 周日，结束日只能周六 / 周日，最长 72 小时'
+                  ? '星期任选 周一 → 周日（最长可铺满整周）；审核截止不得早于收歌结束、不得晚于播出周周一 00:00'
                   : '只有超级管理员能修改点歌时间窗口（后端 40301 把关）' }}
               </span>
             </span>
@@ -280,13 +317,20 @@
               </div>
             </div>
             <div class="rowc gap8" style="margin-top:13px">
-              <el-button :disabled="slotTimes.length >= (slotConfig?.maxSlots || 6)" @click="addSlot">
+              <el-button
+                :disabled="!auth.isSuperAdmin || slotTimes.length >= (slotConfig?.maxSlots || 6)"
+                @click="addSlot"
+              >
                 <IconPlus :size="15" class="btn-icon" />
                 加一个时段{{ slotTimes.length >= (slotConfig?.maxSlots || 6) ? '（已达上限）' : '' }}
               </el-button>
-              <el-button type="primary" :loading="slotSaving" @click="saveSlots">
+              <el-button
+                type="primary" :loading="slotSaving" :disabled="!auth.isSuperAdmin"
+                @click="saveSlots"
+              >
                 <IconCheck :size="15" class="btn-icon" />发布时段
               </el-button>
+              <span class="micro" v-if="!auth.isSuperAdmin">只读 · 播出时段由超级管理员维护</span>
             </div>
             <div class="micro" style="margin-top:11px;line-height:1.7">
               留空则退回解析「开播时间」设置，再退回默认三个。
@@ -505,10 +549,22 @@ async function sweepQueue() {
 
 /* ─────────── v2：点歌时间窗口 ─────────── */
 const win = ref({});
-const winForm = reactive({ enabled: 0, startDay: 6, startTime: '18:00', endDay: 0, endTime: '18:00' });
+const winForm = reactive({
+  enabled: 0, startDay: 6, startTime: '18:00', endDay: 0, endTime: '18:00',
+  // null = 「跟随收歌结束 + 偏移」档位（升级前的旧行为，保持不变）
+  reviewDay: null, reviewTime: '22:00',
+});
 const winSaving = ref(false);
 /** 非超管或未启用窗口 → 表单只读 */
 const winDisabled = computed(() => !auth.isSuperAdmin || !Number(winForm.enabled));
+
+/** 「跟随收歌结束 + 偏移」档位的文案：偏移分钟数由服务端下发，前端不硬编码 360 */
+const followLabel = computed(() => {
+  const m = Number(win.value?.followOffsetMinutes);
+  if (!Number.isFinite(m) || m <= 0) return '跟随收歌结束';
+  const h = m / 60;
+  return `跟随收歌结束 + ${Number.isInteger(h) ? `${h} 小时` : `${m} 分钟`}`;
+});
 
 const winCd = computed(() => {
   const w = win.value;
@@ -525,6 +581,10 @@ function fillWinForm(d) {
   winForm.startTime = cfg.startTime || '18:00';
   winForm.endDay = Number(cfg.endDay ?? 0);
   winForm.endTime = cfg.endTime || '18:00';
+  // ⚠️ 未单独配置时必须回 null（下拉落在「跟随…」档），不能拿服务端推导出的生效值冒充配置值 ——
+  //    否则管理员只是改了收歌时间、顺手保存，就把「收歌结束 + 偏移」固化成具体时刻，行为悄悄变了
+  winForm.reviewDay = cfg.reviewDay === null || cfg.reviewDay === undefined ? null : Number(cfg.reviewDay);
+  winForm.reviewTime = cfg.reviewTime || '22:00';
 }
 async function fetchWindow() {
   win.value = await http.get('/admin/submit/window');
@@ -532,7 +592,11 @@ async function fetchWindow() {
 }
 async function saveWindow() {
   if (Number(winForm.enabled) && (!winForm.startTime || !winForm.endTime)) {
-    ElMessage.warning('请填写开始与结束时刻（HH:mm）');
+    ElMessage.warning('请填写收歌开始与结束时刻（HH:mm）');
+    return;
+  }
+  if (Number(winForm.enabled) && winForm.reviewDay !== null && !winForm.reviewTime) {
+    ElMessage.warning('请填写审核截止时刻（HH:mm）');
     return;
   }
   winSaving.value = true;
@@ -543,10 +607,13 @@ async function saveWindow() {
       startTime: winForm.startTime,
       endDay: Number(winForm.endDay),
       endTime: winForm.endTime,
+      // null 是合法档位（跟随收歌结束 + 偏移），后端不会当非法值拒掉
+      reviewDay: winForm.reviewDay === null ? null : Number(winForm.reviewDay),
+      reviewTime: winForm.reviewTime || null,
     });
     fillWinForm(win.value);
     await Promise.all([fetchCapacity(), fetchSchedule()]);
-    ElMessage.success(`点歌时间已更新：${win.value?.windowText || '—'}（窗口结束 = 审核截止）`);
+    ElMessage.success(`点歌时间已更新：${win.value?.windowText || '—'}（审核截止 ${win.value?.reviewText || '—'}）`);
   } finally { winSaving.value = false; }
 }
 

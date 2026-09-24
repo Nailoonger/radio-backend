@@ -66,6 +66,8 @@ function create(page) {
         winLine1: win.windowText || '',
         winLine2: line2,
         winClosesAt: isNaN(closes) ? '' : fmtIso(win.closesAt),
+        // 审核截止：2026-09-25 起与「收歌截止」分开配置，回执屏要报的是这个时刻
+        winReviewAt: win.reviewAt ? fmtIso(win.reviewAt) : '',
       };
     },
 
@@ -74,7 +76,8 @@ function create(page) {
       if (!v) return;
       const d = page.data || {};
       if (d.winLine1 === v.winLine1 && d.winLine2 === v.winLine2 && d.winOpen === v.winOpen
-        && d.winEnabled === v.winEnabled && d.winClosesAt === v.winClosesAt) return;   // 秒级去抖：文案没变不 setData
+        && d.winEnabled === v.winEnabled && d.winClosesAt === v.winClosesAt
+        && d.winReviewAt === v.winReviewAt) return;   // 秒级去抖：文案没变不 setData
       page.setData(v);
       if (typeof page.onWindowChange === 'function') page.onWindowChange(v);
     },

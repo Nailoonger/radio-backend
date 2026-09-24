@@ -19,6 +19,8 @@ const { parse, compileScript, compileTemplate } = SFC;
 /** 模板作用域内建变量 / 全局对象，出现在 _ctx 里也不算错 */
 const ALLOW = new Set([
   '$event', '$slots', '$attrs', '$props', '$refs', '$emit', '$options',
+  // 路由 / 状态管理注入的全局属性（app.use(router) 后模板可直接用，不是「未声明」）
+  '$router', '$route', '$store',
   'Math', 'Number', 'String', 'Boolean', 'Array', 'Object', 'Date', 'JSON',
   'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'console',
   'true', 'false', 'null', 'undefined', 'NaN', 'Infinity',
@@ -76,6 +78,7 @@ const files = targets.length
   ? targets
   : [
       path.join(ROOT, 'admin-web/src/views/SubmitList.vue'),
+      path.join(ROOT, 'admin-web/src/views/SongSettings.vue'),
       path.join(ROOT, 'admin-web/src/components/StatusTag.vue'),
     ];
 

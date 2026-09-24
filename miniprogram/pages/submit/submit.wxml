@@ -27,7 +27,7 @@
             <view class="step-rail"><view class="step-dot"></view><view class="step-line"></view></view>
             <view class="step-main">
               <view class="step-t">等待审核</view>
-              <view class="step-d" wx:if="{{receipt.auditAt}}">审核截止 {{receipt.auditAt}}（点歌窗口关闭时）。通过后进入排期。</view>
+              <view class="step-d" wx:if="{{receipt.auditAt}}">审核截止 {{receipt.auditAt}}，在此之前都可以审。通过后进入排期。</view>
               <view class="step-d" wx:else>审核通过后进入排期，按「首选时段 + 提交时间先后」分配正式位。</view>
             </view>
           </view>

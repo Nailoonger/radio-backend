@@ -5,7 +5,8 @@
          「提交只进审核队列 → 审核通过才拿到候选资格 → 系统按首选时段分组、组内按提交先后统一排期
           → 排不上的进候补 → 到 schedule_lock_at 跑最后一次调度并锁定」。
          所以主角从「窗口定稿时刻」换成「周状态 + 排期锁定倒计时」。
-         锁定时刻 = 窗口结束 + song_lock_offset_minutes（默认 360 分）= 播出周周一 00:00，偏移量由服务端字段反算，前端不硬编码。 ══════════ -->
+         锁定时刻 = **独立的「审核截止」**（2026-09-25 起与收歌截止拆开：收歌结束只停止收新歌，
+         到审核截止才自动排期 + 驳回候补 + 锁定）。所有时刻一律由服务端字段下发，前端不硬编码。 ══════════ -->
     <div class="tile summary-tile">
       <div class="tile-main">
         <div class="tile-status">
@@ -23,21 +24,32 @@
         </div>
         <div class="tile-meta">
           锁定时刻 <b class="tile-strong">{{ hhmm(week.scheduleLockAt) }}</b>
-          = 点歌窗口结束（{{ hhmm(week.applicationEndAt || win.closesAt) }}）+ 偏移 {{ lockOffsetMin }} 分钟。<br>
+          = 审核截止（收歌截止 {{ hhmm(week.applicationEndAt) }} → 留白 {{ lockOffsetMin }} 分钟）。<br>
           到点系统跑最后一次调度：排不上的候补转「未排上」，该周置为已锁定。
         </div>
-        <div class="tile-actions">
+        <!-- 写数据的动作仅超管（后端 requireSuperAdmin 已经拦死，前端给出一致的观感） -->
+        <div class="tile-actions" v-if="canWrite">
           <el-button
             class="tile-btn tile-btn--primary" size="small"
-            :loading="running" :disabled="week.locked"
+            :loading="running" :disabled="weekLocked"
             @click="runSchedule"
           >执行排期</el-button>
           <el-button
             class="tile-btn tile-btn--ghost" size="small"
-            :loading="locking" :disabled="week.locked"
+            :disabled="weekLocked"
+            @click="openPreview"
+          >模拟排期</el-button>
+          <span class="tile-sep" />
+          <el-button
+            class="tile-btn tile-btn--ghost" size="small"
+            :loading="locking" :disabled="weekLocked"
             @click="lockWeek"
           >锁定本周</el-button>
-          <span class="tile-act-hint">{{ week.locked ? '已锁定 · 进入查看日志' : '手动锁需二次确认' }}</span>
+          <span class="tile-act-hint">{{ weekLocked ? '已锁定 · 进入查看日志' : '模拟排期只算不写库' }}</span>
+        </div>
+        <div class="tile-readonly" v-else>
+          <i class="t-dot2 idle" />
+          <span>排期的执行与锁定由超级管理员负责，你只能审核与查看</span>
         </div>
       </div>
 
@@ -216,38 +228,44 @@
         <el-table-column label="操作" width="200" fixed="right" align="right">
           <template #default="{ row }">
             <div class="op-cell">
-              <!-- 待审(0) / v2 遗留的补位待审(4)：通过 or 驳回 -->
+              <!-- 待审(0) / v2 遗留的补位待审(4)：通过 or 驳回 —— 审核员也有权限 -->
               <template v-if="[0, 4].includes(Number(row.status))">
                 <el-button size="small" type="primary" @click="approve(row)">通过</el-button>
                 <el-button size="small" @click="reject(row)">驳回</el-button>
               </template>
 
-              <!-- 已通过·待排期(6)：系统还没给它落座，管理员可以手动指派 or 改驳回 -->
+              <!-- 已通过·待排期(6)：超管可手动指派；审核员只能改驳回或看轨迹 -->
               <template v-else-if="Number(row.status) === 6">
-                <el-button size="small" type="primary" @click="openAssign(row)">指派时段</el-button>
+                <el-button v-if="canWrite" size="small" type="primary" @click="openAssign(row)">指派时段</el-button>
                 <el-button size="small" @click="reject(row)">改驳回</el-button>
+                <el-button v-if="!canWrite" size="small" @click="openAssign(row, true)">查看日志</el-button>
               </template>
 
-              <!-- 候补中(3)：等空位；也能人工插队指派 -->
+              <!-- 候补中(3)：等空位；也能人工插队指派（指派 = 改数据，仅超管） -->
               <template v-else-if="Number(row.status) === 3">
-                <el-button size="small" type="primary" @click="openAssign(row)">指派时段</el-button>
+                <el-button v-if="canWrite" size="small" type="primary" @click="openAssign(row)">指派时段</el-button>
                 <el-button size="small" @click="reject(row)">驳回</el-button>
+                <el-button v-if="!canWrite" size="small" @click="openAssign(row, true)">查看日志</el-button>
               </template>
 
-              <!-- 已排期(1)：换格 or 补标播放 -->
+              <!-- 已排期(1)：换格 / 补标播放 —— 均改数据，仅超管 -->
               <template v-else-if="Number(row.status) === 1">
-                <el-button size="small" @click="openAssign(row)">改时段</el-button>
-                <el-button size="small" @click="markPlayed(row)">标记播放</el-button>
+                <template v-if="canWrite">
+                  <el-button size="small" :disabled="weekLocked" @click="openAssign(row)">改时段</el-button>
+                  <el-button size="small" :disabled="weekLocked" @click="markPlayed(row)">标记播放</el-button>
+                </template>
+                <el-button size="small" @click="openAssign(row, true)">查看日志</el-button>
               </template>
 
-              <!-- 已播放(5)：只能反悔 -->
+              <!-- 已播放(5)：只能反悔（仅超管） -->
               <template v-else-if="Number(row.status) === 5">
-                <el-button size="small" @click="markPlayed(row, false)">取消播放</el-button>
+                <el-button v-if="canWrite" size="small" :disabled="weekLocked" @click="markPlayed(row, false)">取消播放</el-button>
+                <el-button size="small" @click="openAssign(row, true)">查看日志</el-button>
               </template>
 
-              <!-- 已驳回(2)：撤销可拉回待审重走流程 -->
+              <!-- 已驳回(2)：撤销可拉回待审重走流程（仅超管） -->
               <template v-else-if="Number(row.status) === 2">
-                <el-button size="small" @click="revoke(row)">撤销</el-button>
+                <el-button v-if="canWrite" size="small" :disabled="weekLocked" @click="revoke(row)">撤销</el-button>
                 <el-button size="small" @click="openAssign(row, true)">查看日志</el-button>
               </template>
 
@@ -675,7 +693,7 @@
             <template v-else-if="lockMs === null">—</template>
             <template v-else>{{ fmtDur(lockMs) }}</template>
           </div>
-          <div class="micro">{{ hhmm(week.scheduleLockAt) }} = 窗口结束 {{ hhmm(week.applicationEndAt || win.closesAt) }} + {{ lockOffsetMin }} 分钟</div>
+          <div class="micro">{{ hhmm(week.scheduleLockAt) }} = 审核截止（收歌截止 {{ hhmm(week.applicationEndAt) }} → 留白 {{ lockOffsetMin }} 分钟）</div>
         </div>
       </div>
 
@@ -684,15 +702,24 @@
         <div class="grow" style="flex:1;min-width:200px">
           <div class="tile-status">
             <i class="t-dot" :class="{ idle: !win.open }"></i>
-            点歌窗口 {{ hhmm(win.opensAt) }} ~ {{ hhmm(win.closesAt) }} · {{ win.open ? '开放中' : '已关闭' }}
+            收歌 {{ hhmm(win.start || week.applicationStartAt) }} ~ {{ hhmm(week.applicationEndAt || win.closesAt) }} · {{ win.open ? '收歌中' : '已截止' }}
           </div>
           <div class="tile-meta" style="margin-top:8px">
             占位口径：<b class="tile-strong">审核通过 且 已排期</b>。待审与待排期都<b class="tile-strong">不占位</b>，
-            所以「已排期」会小于「已提交」。
+            所以「已排期」会小于「已提交」。<br>
+            审核截止 <b class="tile-strong">{{ hhmm(week.scheduleLockAt) }}</b> —— 收歌结束后到这一刻之前，都还能慢慢审、手动调格子。
           </div>
-          <div class="tile-actions">
-            <el-button class="tile-btn tile-btn--primary" size="small" :loading="running" :disabled="week.locked" @click="runSchedule">执行排期</el-button>
-            <el-button class="tile-btn tile-btn--ghost" size="small" :loading="locking" :disabled="week.locked" @click="lockWeek">锁定本周</el-button>
+          <!-- 排期执行 / 模拟 / 锁定 = 写数据，仅超管（后端 requireSuperAdmin 已锁） -->
+          <div class="tile-actions" v-if="canWrite">
+            <el-button class="tile-btn tile-btn--primary" size="small" :loading="running" :disabled="weekLocked" @click="runSchedule">执行排期</el-button>
+            <el-button class="tile-btn tile-btn--ghost" size="small" :disabled="weekLocked" @click="openPreview">模拟排期</el-button>
+            <span class="tile-sep" />
+            <el-button class="tile-btn tile-btn--ghost" size="small" :loading="locking" :disabled="weekLocked" @click="lockWeek">锁定本周</el-button>
+            <span class="tile-act-hint">模拟排期只算不写库</span>
+          </div>
+          <div class="tile-readonly" v-else>
+            <i class="t-dot2 idle" />
+            <span>排期的执行与锁定由超级管理员负责，你只能审核与查看</span>
           </div>
         </div>
         <div class="tile-metric"><div class="k">已排期</div><div class="v num">{{ approvedCount }}</div><div class="d">= 占位</div></div>
@@ -724,7 +751,7 @@
             <span class="sc-count"><b class="num">{{ s.scheduled }}</b><i>/</i>{{ s.capacity || '不限' }}</span>
             <span class="sc-tags">
               <span class="sc-tag fulltag" v-if="s.full">已满</span>
-              <span class="sc-tag freetag" v-else-if="!s.scheduled">空位</span>
+              <span class="sc-tag freetag" v-else-if="!s.scheduled">{{ freeSlotLabel }}</span>
               <span class="sc-tag wait" v-if="s.waiting > 0">候补 {{ s.waiting }}</span>
               <span class="sc-tag pend" v-if="s.pending > 0">待审 {{ s.pending }}</span>
             </span>
@@ -736,7 +763,7 @@
         <span><span class="sc-tag wait">候补 n</span>首选这一格、还没排上（可能被调剂走）</span>
         <span><span class="sc-tag pend">待审 n</span>还没审，不占位</span>
         <span><span class="sc-tag fulltag">已满</span>该格正式位用尽</span>
-        <span><span class="sc-tag freetag">空位</span>执行排期时会被填上</span>
+        <span><span class="sc-tag freetag">{{ freeSlotLabel }}</span>{{ freeSlotWhy }}</span>
       </div>
 
       <!-- 全局候补队列（协议版取消了候补人数上限） -->
@@ -885,6 +912,94 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- ══════════ 模拟排期（dryRun，只算不写库；超管） ══════════ -->
+    <el-dialog v-model="previewVisible" width="880px" top="7vh" class="preview-dialog">
+      <template #header>
+        <div class="pp-head">
+          <span class="pp-title">模拟排期结果</span>
+          <span class="micro">只算不写库 · {{ preview.week?.weekStartDate || week.weekStartDate || '—' }} 那一周</span>
+          <span class="tag" :class="preview.crossSlot ? 'tag-pass' : 'tag-amber'">
+            {{ preview.crossSlot ? '已放开跨时段调剂' : '收歌中 · 只做原位递补' }}
+          </span>
+        </div>
+        <div class="pp-modes">
+          <el-radio-group v-model="previewMode" size="small" @change="loadPreview">
+            <el-radio-button value="auto">按闸门（收歌中只原位递补）</el-radio-button>
+            <el-radio-button value="force">模拟「立即执行排期」</el-radio-button>
+          </el-radio-group>
+          <span class="micro">{{ preview.crossSlotReason || '' }}</span>
+        </div>
+      </template>
+
+      <div v-loading="previewLoading" class="pp-wrap">
+        <div class="pp-grid">
+          <div class="pp-block">
+            <div class="pp-bt"><span class="n">本次落座</span><span class="c">{{ preview.plan?.assign?.length || 0 }} 条</span></div>
+            <div class="pp-item" v-for="x in preview.plan?.assign || []" :key="'a' + x.id">
+              <span class="nm">{{ x.songName }}</span>
+              <span class="fl">{{ x.want }}</span><span class="ar">→</span><span class="to">{{ x.to }}</span>
+              <span class="cost">{{ costText(x.cost) }}</span>
+            </div>
+            <div class="pp-empty" v-if="!(preview.plan?.assign || []).length">当前没有新的落座动作（都已在位上）</div>
+          </div>
+
+          <div class="pp-block">
+            <div class="pp-bt"><span class="n">原位递补</span><span class="c">{{ preview.plan?.promote?.length || 0 }} 条</span></div>
+            <div class="pp-item" v-for="x in preview.plan?.promote || []" :key="'p' + x.id">
+              <span class="nm">{{ x.songName }}</span>
+              <span class="fl">{{ x.want }}</span><span class="ar">→</span><span class="to">{{ x.to }}</span>
+              <span class="cost">{{ costText(x.cost) }}</span>
+            </div>
+            <div class="pp-empty" v-if="!(preview.plan?.promote || []).length">本格没空出位置，无需递补</div>
+            <div class="pp-note" v-else>本格空出，按提交时间补上最早的一位</div>
+          </div>
+
+          <div class="pp-block">
+            <div class="pp-bt"><span class="n">跨时段调剂</span><span class="c">{{ preview.plan?.rescheduled?.length || 0 }} 条</span></div>
+            <div class="pp-item" v-for="x in preview.plan?.rescheduled || []" :key="'r' + x.id">
+              <span class="nm">{{ x.songName }}</span>
+              <span class="fl">{{ x.want }}</span><span class="ar">→</span><span class="to">{{ x.to }}</span>
+              <span class="cost">{{ costText(x.cost) }}</span>
+            </div>
+            <div class="pp-empty" v-if="!(preview.plan?.rescheduled || []).length">
+              <template v-if="!preview.crossSlot">
+                <span class="tag tag-mute">收歌未截止</span>
+                空位<b>不外借</b> —— 要留给首选那一格的申请者。收歌截止后再看，这一栏才会有内容。
+              </template>
+              <template v-else>没有需要跨时段调剂的人（要么都在首选位上了，要么不接受调剂）</template>
+            </div>
+          </div>
+
+          <div class="pp-block">
+            <div class="pp-bt"><span class="n">锁定后将被自动驳回</span><span class="c">{{ preview.plan?.waiting?.length || 0 }} 条</span></div>
+            <div class="pp-item" v-for="x in preview.plan?.waiting || []" :key="'w' + x.id">
+              <span class="nm">{{ x.songName }}</span>
+              <span class="fl">{{ x.want }}</span><span class="ar">→</span><span class="to">无可用位置</span>
+              <span class="cost">—</span>
+            </div>
+            <div class="pp-empty" v-if="!(preview.plan?.waiting || []).length">太好了，没有会被驳回的候补</div>
+          </div>
+        </div>
+
+        <div class="pp-slots" v-if="(preview.slots || []).length">
+          <span class="micro">模拟后各格占用：</span>
+          <span class="pp-slot" v-for="s in preview.slots" :key="'s' + s.value" :class="{ full: s.full }">
+            {{ s.value }} <b>{{ s.seated }}</b>→<b>{{ s.after }}</b>/{{ s.capacity || '不限' }}
+          </span>
+        </div>
+
+        <div class="pp-foot">
+          这张面板<b>不改动任何数据</b>，纯粹先看一眼。跨时段调剂的代价列用的是成本表 ——
+          <b>同一天其他时段 10 · 前后一天相同时段 20 · 前后一天其他时段 30 · 更远日期 50</b>。
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="previewVisible = false">关闭</el-button>
+        <el-button type="primary" :loading="running" @click="runScheduleFromPreview">按此结果执行排期</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -894,6 +1009,7 @@ import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import http from '@/utils/http';
 import dayjs from 'dayjs';
+import { useAuthStore } from '@/stores/auth';
 import { IconSearch, IconClose, IconInfo } from '@/components/icons';
 import StatusTag from '@/components/StatusTag.vue';
 import EmptyState from '@/components/EmptyState.vue';
@@ -914,6 +1030,7 @@ const ST = {
 };
 
 const router = useRouter();
+const auth = useAuthStore();
 const fmt = (t) => (t ? dayjs(t).format('YYYY-MM-DD HH:mm') : '—');
 const mmdd = (t) => (t ? dayjs(t).format('MM-DD') : '—');
 /** 带明确 +08:00 偏移的 ISO → MM-DD HH:mm（服务端下发的时刻一律走这里） */
@@ -1014,13 +1131,37 @@ const lockMs = computed(() => {
   return new Date(iso).getTime() - nowTs.value;
 });
 
-/** 锁定偏移（分钟）= scheduleLockAt − applicationEndAt。服务端字段可配（song_lock_offset_minutes），前端不硬编码 360 */
+/** 收歌截止 → 审核截止的留白（分钟）。锁定时刻 = 审核截止，所以这个差值就是「审稿窗口」 */
 const lockOffsetMin = computed(() => {
   const a = week.value.applicationEndAt;
   const b = week.value.scheduleLockAt;
-  if (!a || !b) return 360;
-  return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000);
+  if (!a || !b) return 0;
+  return Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000));
 });
+
+/**
+ * 跨时段闸门（与后端 `songSchedulingService.canCrossSlot()` 同口径）：
+ * 收歌截止前，别处的空位**不外借** —— 要留给首选那一格的原申请者。
+ * 只用来切文案，真正拦人的是服务端。
+ */
+const crossSlotAllowed = computed(() => {
+  const end = week.value.applicationEndAt;
+  if (!end) return false;
+  return nowTs.value >= new Date(end).getTime();
+});
+/** 空位格子的说法：收歌中「不外借」 / 已截止「可填」 */
+const freeSlotLabel = computed(() => (crossSlotAllowed.value ? '可填' : '不外借'));
+const freeSlotWhy = computed(() => (crossSlotAllowed.value
+  ? '执行排期时会被填上'
+  : '发给本时段提交最早的候补'));
+
+/**
+ * 写数据的动作一律仅超管 —— 与后端 `requireSuperAdmin` 对齐（V1 §2.1）。
+ * 不是「点了才吃 403」：执行排期 / 模拟排期 / 锁定 / 改时段 / 指派 / 标记播放 / 撤销 全部按角色显隐。
+ */
+const canWrite = computed(() => !!auth.isSuperAdmin);
+/** 已锁定的周排期只读（后端也会拒，这里给出一致的观感） */
+const weekLocked = computed(() => !!week.value.locked);
 
 const weekRangeText = computed(() => {
   const s = schedule.value.weekStart || week.value.weekStartDate;
@@ -1072,6 +1213,41 @@ async function runSchedule() {
     await refreshAll();
   } catch { /* 拦截器已提示 */ }
   finally { running.value = false; }
+}
+
+/* ══════════ 模拟排期（只算不写库，超管专用）
+     接 POST /admin/submit/schedule/preview —— dryRun 不落库，算法出问题也不污染正式数据。
+     twoMode：「自动路径」= 受收歌闸门约束（收歌中只做原位递补）；
+               「立即执行」= 等同于点「执行排期」（放开跨时段调剂）。 ══════════ */
+const previewVisible = ref(false);
+const previewLoading = ref(false);
+const preview = ref({});
+const previewMode = ref('auto');   // auto | force
+const COST_CN = {
+  0: '首选', 10: '同天异时段', 20: '隔天同时段', 30: '隔天异时段', 50: '更远日期',
+};
+const costText = (c) => {
+  if (c === null || c === undefined) return '—';
+  return COST_CN[c] || `成本 ${c}`;
+};
+
+async function loadPreview() {
+  previewLoading.value = true;
+  try {
+    const body = previewMode.value === 'force' ? { crossSlot: true } : {};
+    preview.value = await http.post('/admin/submit/schedule/preview', body) || {};
+  } catch { /* 拦截器已提示 */ }
+  finally { previewLoading.value = false; }
+}
+function openPreview() {
+  previewVisible.value = true;
+  previewMode.value = 'auto';
+  loadPreview();
+}
+/** 按预览结果执行（= 正式跑一遍，会写库） */
+async function runScheduleFromPreview() {
+  await runSchedule();
+  if (!running.value) previewVisible.value = false;
 }
 
 /**
@@ -2161,6 +2337,46 @@ onBeforeUnmount(() => {
 .tile-btn.is-disabled, .tile-btn.is-disabled:hover {
   background: rgba(255, 255, 255, 0.1) !important; border-color: transparent !important;
   color: rgba(255, 255, 255, 0.4) !important;
+}
+.tile-sep { width: 1px; height: 20px; background: rgba(255, 255, 255, 0.24); margin: 0 2px; }
+
+/* 普通管理员看到的只读提示（深色卡里的虚线块，与 v8 的只读态一致） */
+.tile-readonly {
+  display: flex; align-items: center; gap: 8px; margin-top: 18px; align-self: flex-start;
+  font-size: var(--fs-xs); color: rgba(255, 255, 255, 0.55);
+  border: 1px dashed rgba(255, 255, 255, 0.24); border-radius: 10px; padding: 8px 12px;
+}
+
+/* ══════════ 模拟排期面板（预览 §04） ══════════ */
+.preview-dialog .pp-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.preview-dialog .pp-title { font-size: var(--fs-xl); font-weight: 600; color: var(--ink); }
+.preview-dialog .pp-modes { display: flex; align-items: center; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+.pp-wrap { min-height: 120px; }
+.pp-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 18px; }
+.pp-block { padding: 14px 0; border-bottom: 1px solid var(--divider); }
+.pp-bt { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.pp-bt .n { font-size: var(--fs-md); font-weight: 600; color: var(--ink); }
+.pp-bt .c { margin-left: auto; font-size: var(--fs-xs); color: var(--muted-2); font-family: var(--mono); }
+.pp-item { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); padding: 5px 0; }
+.pp-item .nm { min-width: 84px; font-weight: 500; color: var(--ink); }
+.pp-item .fl { color: var(--muted); font-size: var(--fs-xs); }
+.pp-item .ar { color: var(--soft); }
+.pp-item .to { color: var(--ink-2); font-size: var(--fs-xs); }
+.pp-item .cost {
+  margin-left: auto; font-size: var(--fs-2xs); color: var(--muted-2);
+  background: var(--parchment); border-radius: 5px; padding: 2px 6px;
+}
+.pp-empty, .pp-note { font-size: var(--fs-xs); color: var(--muted-2); line-height: 1.7; padding: 4px 0; }
+.pp-empty .tag { margin-right: 6px; }
+.pp-slots { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 0; }
+.pp-slot {
+  font-size: var(--fs-2xs); font-family: var(--mono); color: var(--muted-2);
+  background: var(--parchment); border-radius: 6px; padding: 3px 7px;
+}
+.pp-slot.full { color: var(--accent); background: var(--acc-bg); }
+.pp-foot {
+  margin-top: 4px; padding: 10px 12px; background: var(--parchment);
+  border-radius: 10px; font-size: var(--fs-xs); color: var(--muted-2); line-height: 1.8;
 }
 
 /* ══════════ 周状态机（排期矩阵顶部 · 展示用） ══════════ */

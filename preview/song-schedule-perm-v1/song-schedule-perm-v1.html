@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>菁悠广播站 · 管理后台 · 点歌排期「权限 + 闸门」适配 v1（静态预览）</title>
+<style>
+/* ============================================================
+   菁悠广播站 · 管理后台 · 点歌排期「权限 + 闸门」适配 v1
+   静态预览，不改动任何业务代码
+
+   设计系统完全继承 preview/admin-ui-v8 + preview/song-queue-admin-v2：
+     1. 全局只有一个强调色 --accent，所有「可点」的东西都用它
+     2. 不用任何装饰性渐变、不用彩色投影
+     3. 深色卡 --tile 是视觉主角，其余信息一律退到羊皮纸
+   本版只做「状态可见性」，不引入任何新视觉语言。
+   ============================================================ */
+:root{
+  --ink:#1d1d1f; --ink-2:#333333; --muted:#7a7a7a; --muted-2:#6e6e73;
+  --soft:#c7c7cc; --hairline:#e0e0e0; --divider:#f0f0f0;
+  --parchment:#f5f5f7; --canvas:#ffffff; --tile:#272729; --tile-2:#3a3a3c;
+  --accent:#0066cc; --accent-dark:#2997ff; --live:#ff453a;
+  --amber-bg:#fef3c7; --amber-fg:#8a6100;
+  --green-bg:#e7f5ec; --green-fg:#1e7a46;
+  --red-bg:#fde8e8;  --red-fg:#b42318;
+  --acc-bg:#e6f0fa;
+  --r-card:18px; --r-input:12px; --r-tile:20px; --r-pill:9999px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --fs-2xs:10.5px; --fs-xs:11.5px; --fs-sm:12.5px; --fs-md:13.5px;
+  --fs-xl:17px; --fs-2xl:19px; --fs-3xl:26px; --fs-num:30px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","HarmonyOS Sans SC",
+         "MiSans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:#fafafc}
+body{font-family:var(--font);color:var(--ink);font-size:14px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;padding:0 0 90px}
+button{font-family:inherit;font-size:inherit;border:none;background:none;cursor:pointer;color:inherit}
+b{font-weight:600}
+
+.wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+
+/* ── 页头 ── */
+.page-head{padding:38px 0 22px}
+.page-head .kicker{font-size:var(--fs-xs);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted);font-weight:600;margin-bottom:8px}
+.page-head h1{font-size:var(--fs-3xl);letter-spacing:-.02em;font-weight:600}
+.page-head .sub{color:var(--muted-2);font-size:var(--fs-md);margin-top:10px;max-width:760px}
+
+/* ── 版块 ── */
+section{margin-top:34px}
+.sec-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+.sec-head .no{font-family:var(--mono);font-size:var(--fs-xs);color:var(--accent);
+  border:1px solid var(--acc-bg);background:var(--acc-bg);border-radius:6px;padding:2px 7px;font-weight:600}
+.sec-head h2{font-size:var(--fs-xl);font-weight:600;letter-spacing:-.01em}
+.sec-head .hint{color:var(--muted);font-size:var(--fs-sm);margin-left:auto}
+
+/* ── 结论卡 ── */
+.verdict{background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-card);
+  padding:22px 24px;display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.verdict .col .t{font-size:var(--fs-sm);color:var(--muted);margin-bottom:6px}
+.verdict .col .v{font-size:var(--fs-md);font-weight:600;line-height:1.55}
+.verdict .col .v em{font-style:normal;color:var(--accent)}
+.verdict .col .v s{color:var(--muted);font-weight:400}
+
+/* ── 通用卡 ── */
+.card-plain{background:var(--canvas);border:1px solid var(--hairline);
+  border-radius:var(--r-card);padding:22px 24px}
+.card-plain h4{font-size:var(--fs-md);font-weight:600;margin-bottom:4px}
+.card-plain .note{color:var(--muted-2);font-size:var(--fs-sm);margin-bottom:16px;line-height:1.6}
+
+/* 并排对照 */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:900px){.duo{grid-template-columns:1fr}}
+.duo .pane{display:flex;flex-direction:column}
+.role-chip{align-self:flex-start;font-size:var(--fs-2xs);font-weight:600;letter-spacing:.03em;
+  border-radius:var(--r-pill);padding:3px 10px;margin-bottom:10px}
+.role-chip.super{background:var(--acc-bg);color:var(--accent)}
+.role-chip.reviewer{background:var(--parchment);color:var(--muted-2);border:1px solid var(--hairline)}
+
+/* ══ 深色状态条（真实组件复刻） ══ */
+.tile{background:var(--tile);color:#f5f5f7;border-radius:var(--r-tile);padding:22px 24px;
+  display:grid;grid-template-columns:1.5fr 1fr;gap:26px;align-items:start}
+.tile-title{font-size:var(--fs-2xl);font-weight:600;letter-spacing:-.01em}
+.tile-cd{font-size:var(--fs-sm);color:var(--accent-dark);margin-top:6px;font-weight:500}
+.tile-meta{font-size:var(--fs-xs);color:#a1a1a6;margin-top:12px;line-height:1.75}
+.tile-actions{display:flex;align-items:center;gap:10px;margin-top:18px;flex-wrap:wrap}
+.tile-act-hint{font-size:var(--fs-xs);color:#8e8e93}
+
+/* 按钮（v8：tile-btn） */
+.tile-btn{border-radius:10px;padding:0 15px;height:32px;font-size:var(--fs-sm);font-weight:500;
+  transition:all .18s var(--ease);border:1px solid transparent;display:inline-flex;align-items:center}
+.tile-btn--primary{background:var(--accent);color:#fff}
+.tile-btn--primary:hover{background:#0058b0}
+.tile-btn--ghost{border-color:#5a5a5e;color:#e5e5ea}
+.tile-btn--ghost:hover{border-color:#8e8e93;background:rgba(255,255,255,.04)}
+.tile-btn[disabled]{opacity:.4;cursor:not-allowed}
+.tile-sep{width:1px;height:20px;background:#48484a;margin:0 2px}
+
+/* 只读态（普通管理员看到的） */
+.tile-readonly{display:flex;align-items:center;gap:8px;margin-top:18px;
+  font-size:var(--fs-xs);color:#8e8e93;border:1px dashed #48484a;border-radius:10px;
+  padding:8px 12px;align-self:flex-start}
+.tile-readonly .dot{width:6px;height:6px;border-radius:50%;background:#8e8e93;flex:none}
+
+/* ══ 列表操作列 ══ */
+.rowline{display:flex;align-items:center;gap:10px;background:var(--canvas);
+  border:1px solid var(--hairline);border-radius:12px;padding:12px 14px}
+.rowline + .rowline{margin-top:8px}
+.rowline > div:first-child{flex:none}
+.rowline .song{font-size:var(--fs-md);font-weight:600;min-width:76px;white-space:nowrap}
+.rowline .sg{font-size:var(--fs-xs);color:var(--muted);white-space:nowrap}
+.rowline .sp{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.btn-s{border:1px solid var(--hairline);background:var(--canvas);border-radius:8px;
+  padding:0 10px;height:28px;font-size:var(--fs-sm);display:inline-flex;align-items:center;
+  white-space:nowrap;transition:all .18s var(--ease)}
+.btn-s:hover{border-color:var(--accent);color:var(--accent)}
+.btn-s--primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-s--primary:hover{background:#0058b0;color:#fff}
+.link{color:var(--accent);font-size:var(--fs-sm);cursor:pointer}
+.link:hover{text-decoration:underline}
+.vsep{width:1px;height:16px;background:var(--hairline)}
+.absent{font-size:var(--fs-xs);color:var(--muted);font-style:normal}
+
+.tag{display:inline-flex;align-items:center;font-size:var(--fs-2xs);font-weight:600;
+  border-radius:var(--r-pill);padding:3px 9px;letter-spacing:.02em}
+.tag-outline{background:transparent;border:1px solid var(--hairline);color:var(--muted-2)}
+.tag-acc{background:var(--acc-bg);color:var(--accent)}
+.tag-amber{background:var(--amber-bg);color:var(--amber-fg)}
+.tag-green{background:var(--green-bg);color:var(--green-fg)}
+.tag-mute{background:var(--parchment);color:var(--muted-2)}
+
+/* ══ 排期矩阵图例 / 文案 ══ */
+.legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;
+  font-size:var(--fs-xs);color:var(--muted-2);padding-top:14px;margin-top:14px;
+  border-top:1px solid var(--divider)}
+.legend .li{display:flex;align-items:center;gap:6px}
+.matrix{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.mcell{background:var(--parchment);border:1px solid var(--hairline);border-radius:12px;padding:11px 12px}
+.mcell .d{font-size:var(--fs-2xs);color:var(--muted);letter-spacing:.02em}
+.mcell .c{font-size:var(--fs-md);font-weight:600;margin:3px 0 6px}
+.mcell .c i{font-style:normal;color:var(--muted);font-weight:400;font-size:var(--fs-xs)}
+.mcell .tags{display:flex;gap:4px;flex-wrap:wrap}
+.mcell .tag{font-size:9.5px;padding:2px 6px;white-space:nowrap}
+
+/* ══ 模拟排期面板（新增） ══ */
+.preview-panel{background:var(--canvas);border:1px solid var(--hairline);
+  border-radius:var(--r-card);overflow:hidden}
+.pp-head{display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid var(--divider)}
+.pp-head h4{font-size:var(--fs-md);font-weight:600}
+.pp-head .sub{font-size:var(--fs-xs);color:var(--muted)}
+.pp-head .sp{margin-left:auto;display:flex;gap:8px;align-items:center}
+.pp-body{display:grid;grid-template-columns:repeat(2,1fr)}
+@media (max-width:900px){.pp-body{grid-template-columns:1fr}}
+.pp-block{padding:18px 22px;border-right:1px solid var(--divider);border-bottom:1px solid var(--divider)}
+.pp-block:nth-child(2n){border-right:none}
+.pp-block .bt{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.pp-block .bt .n{font-size:var(--fs-md);font-weight:600}
+.pp-block .bt .c{font-size:var(--fs-xs);color:var(--muted);margin-left:auto;font-family:var(--mono)}
+.pp-item{display:flex;align-items:center;gap:9px;font-size:var(--fs-sm);padding:6px 0}
+.pp-item + .pp-item{border-top:1px solid var(--divider)}
+.pp-item .nm{font-weight:500;min-width:88px}
+.pp-item .fl{color:var(--muted);font-size:var(--fs-xs)}
+.pp-item .ar{color:var(--soft)}
+.pp-item .to{color:var(--ink-2);font-size:var(--fs-xs)}
+.pp-item .cost{margin-left:auto;font-family:var(--mono);font-size:var(--fs-2xs);
+  color:var(--muted-2);background:var(--parchment);border-radius:5px;padding:2px 6px}
+.cost-10{color:var(--accent)!important;background:var(--acc-bg)!important}
+.pp-empty{font-size:var(--fs-xs);color:var(--muted);padding:8px 0}
+.pp-foot{padding:14px 22px;background:var(--parchment);font-size:var(--fs-xs);color:var(--muted-2)}
+.pp-foot b{color:var(--ink-2)}
+
+/* ══ 设置页保存条 ══ */
+.setbar{display:flex;align-items:center;gap:12px;background:var(--parchment);
+  border:1px solid var(--hairline);border-radius:12px;padding:12px 16px}
+.setbar .sp{margin-left:auto;display:flex;gap:8px;align-items:center}
+.setbar .why{font-size:var(--fs-xs);color:var(--muted)}
+.setbar.locked{background:var(--canvas);border-style:dashed}
+.btn-s[disabled]{opacity:.45;cursor:not-allowed}
+.btn-s[disabled]:hover{border-color:var(--hairline);color:inherit}
+
+/* ══ 变更清单 ══ */
+.chg{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media (max-width:900px){.chg{grid-template-columns:1fr}}
+.chg .it{background:var(--canvas);border:1px solid var(--hairline);border-radius:14px;padding:16px 18px}
+.chg .it .h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.chg .it .h .n{font-family:var(--mono);font-size:var(--fs-2xs);color:var(--muted)}
+.chg .it .h b{font-size:var(--fs-md)}
+.chg .it p{font-size:var(--fs-sm);color:var(--muted-2);line-height:1.65}
+.code{font-family:var(--mono);font-size:var(--fs-xs);background:var(--parchment);
+  border-radius:5px;padding:1px 5px;color:var(--ink-2)}
+.foot{margin-top:44px;padding-top:20px;border-top:1px solid var(--hairline);
+  color:var(--muted);font-size:var(--fs-xs);line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="page-head">
+    <div class="kicker">静态预览 · v1 · 2026-09-25</div>
+    <h1>点歌排期 · 权限与闸门适配</h1>
+    <div class="sub">
+      后端这轮改了：11 个接口收归超管、锁定后禁止改动、<b>收歌截止前不跨时段调剂</b>、新增模拟排期。
+      前端<b>不需要重做</b> —— 视觉层一行不动，只补「状态可见性」。
+    </div>
+  </div>
+
+  <!-- ══════════ 结论 ══════════ -->
+  <div class="verdict">
+    <div class="col">
+      <div class="t">视觉层</div>
+      <div class="v"><s>不用动。</s><br>强调色 / 无渐变 / 深色卡 / 字号节奏全部保留</div>
+    </div>
+    <div class="col">
+      <div class="t">必须补（否则点了 403）</div>
+      <div class="v">按钮按角色显隐<br><em>管理端已有现成的 isSuperAdmin 机制</em></div>
+    </div>
+    <div class="col">
+      <div class="t">必须改（否则会误解）</div>
+      <div class="v">排期页文案口径<br><em>「空位」在收歌截止前不外借</em></div>
+    </div>
+  </div>
+
+  <!-- ══════════ 1. 深色状态条 ══════════ -->
+  <section>
+    <div class="sec-head">
+      <span class="no">01</span>
+      <h2>深色状态条：按钮按角色分流</h2>
+      <span class="hint">SubmitList.vue · .tile-actions</span>
+    </div>
+
+    <div class="duo">
+      <!-- 超管 -->
+      <div class="pane">
+        <span class="role-chip super">超级管理员</span>
+        <div class="tile" style="grid-template-columns:1fr">
+          <div>
+            <div class="tile-title">2026-09-28 那一周</div>
+            <div class="tile-cd">距排期锁定 2 天 22 小时</div>
+            <div class="tile-meta">
+              锁定时刻 <b style="color:#f5f5f7">周一 00:00</b> = 点歌窗口结束（周日 18:00）+ 偏移 360 分钟。<br>
+              到点系统跑最后一次调度：排不上的候补转「未排上」，该周置为已锁定。
+            </div>
+            <div class="tile-actions">
+              <button class="tile-btn tile-btn--primary">执行排期</button>
+              <button class="tile-btn tile-btn--ghost">模拟排期</button>
+              <span class="tile-sep"></span>
+              <button class="tile-btn tile-btn--ghost">锁定本周</button>
+              <span class="tile-act-hint">模拟排期只算不写库</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 普通管理员 -->
+      <div class="pane">
+        <span class="role-chip reviewer">普通管理员（审核员）</span>
+        <div class="tile" style="grid-template-columns:1fr">
+          <div>
+            <div class="tile-title">2026-09-28 那一周</div>
+            <div class="tile-cd">距排期锁定 2 天 22 小时</div>
+            <div class="tile-meta">
+              锁定时刻 <b style="color:#f5f5f7">周一 00:00</b> = 点歌窗口结束（周日 18:00）+ 偏移 360 分钟。<br>
+              到点系统跑最后一次调度：排不上的候补转「未排上」，该周置为已锁定。
+            </div>
+            <div class="tile-readonly">
+              <span class="dot"></span>
+              <span>排期的执行与锁定由<b style="color:#c7c7cc;font-weight:600">超级管理员</b>负责，你只能审核与查看</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-plain" style="margin-top:16px">
+      <div class="note" style="margin:0">
+        <b>实现方式</b>：管理端已有一处判断 —— <span class="code">stores/auth.js → isSuperAdmin = admin.role === 0</span>，
+        左侧菜单（<span class="code">superAdmin: true</span>）和路由守卫都在用它。按钮上直接加
+        <span class="code">v-if="auth.isSuperAdmin"</span> 即可，<b>不新增任何样式</b>。
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 2. 列表操作列 ══════════ -->
+  <section>
+    <div class="sec-head">
+      <span class="no">02</span>
+      <h2>列表操作列：只切视图的保留，改数据的收走</h2>
+      <span class="hint">SubmitList.vue · 行内动作</span>
+    </div>
+
+    <div class="duo" style="grid-template-columns:1.12fr 1fr">
+      <div class="pane">
+        <span class="role-chip super">超级管理员</span>
+        <div class="rowline">
+          <div><div class="song">晴天</div><div class="sg">周杰伦 · 首选 周一 午间</div></div>
+          <div class="sp">
+            <span class="tag tag-green">已排期</span>
+            <span class="tag tag-acc">接受调剂</span>
+            <button class="btn-s btn-s--primary">改时段</button>
+            <button class="btn-s">标记播放</button>
+            <span class="vsep"></span>
+            <button class="btn-s">撤销</button>
+            <span class="link">查看日志</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane">
+        <span class="role-chip reviewer">普通管理员（审核员）</span>
+        <div class="rowline">
+          <div><div class="song">晴天</div><div class="sg">周杰伦 · 首选 周一 午间</div></div>
+          <div class="sp">
+            <span class="tag tag-green">已排期</span>
+            <span class="tag tag-acc">接受调剂</span>
+            <em class="absent">改时段 / 标记播放 / 撤销已隐藏</em>
+            <span class="link">查看日志</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-plain" style="margin-top:16px">
+      <div class="note" style="margin:0">
+        收走的（<b>仅超管</b>）：<span class="code">改时段/指派时段</span> ·
+        <span class="code">标记播放/取消播放</span> · <span class="code">撤销</span>。
+        保留的（<b>普通管理员</b>）：<span class="code">查看日志</span>（只读）、审核通过 / 驳回。
+        <br>另：本周已锁定时，「改时段」「标记播放」「撤销」也要一并置灰 —— 后端已拒绝，前端给出一致的观感。
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 3. 文案口径 ══════════ -->
+  <section>
+    <div class="sec-head">
+      <span class="no">03</span>
+      <h2>排期页文案：说清「空位什么时候才能填」</h2>
+      <span class="hint">对应后端 crossSlot 闸门</span>
+    </div>
+
+    <div class="duo">
+      <div class="pane">
+        <span class="role-chip reviewer">收歌中（窗口未结束）</span>
+        <div class="card-plain">
+          <h4>2026-09-28 ~ 10-02 · 收歌中</h4>
+          <div class="note">窗口关闭前，候补的人<b>只能等自己首选那一格空出来</b>。</div>
+          <div class="matrix">
+            <div class="mcell">
+              <div class="d">周一 09-28</div>
+              <div class="c">1<i>/1</i></div>
+              <div class="tags"><span class="tag tag-green">已排</span><span class="tag tag-amber">候补 2</span></div>
+            </div>
+            <div class="mcell">
+              <div class="d">周二 09-29</div>
+              <div class="c">1<i>/1</i></div>
+              <div class="tags"><span class="tag tag-green">已排</span></div>
+            </div>
+            <div class="mcell">
+              <div class="d">周三 09-30</div>
+              <div class="c">0<i>/1</i></div>
+              <div class="tags"><span class="tag tag-mute">不外借</span></div>
+            </div>
+            <div class="mcell">
+              <div class="d">周四 10-01</div>
+              <div class="c">1<i>/1</i></div>
+              <div class="tags"><span class="tag tag-green">已排</span></div>
+            </div>
+            <div class="mcell">
+              <div class="d">周五 10-02</div>
+              <div class="c">0<i>/1</i></div>
+              <div class="tags"><span class="tag tag-mute">不外借</span></div>
+            </div>
+          </div>
+          <div class="legend">
+            <span class="li"><span class="tag tag-green">已排</span>审核通过且已落座（占位）</span>
+            <span class="li"><span class="tag tag-amber">候补</span>首选已满，等本格空位</span>
+            <span class="li"><span class="tag tag-mute">不外借</span>该时空位暂时不填，留给首选这一格的申请者</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane">
+        <span class="role-chip super">收歌已截止（到锁定前）</span>
+        <div class="card-plain">
+          <h4>2026-09-28 ~ 10-02 · 已截止</h4>
+          <div class="note">窗口已关，不会再有人首选某一格 → 空位<b>可以填</b>了。</div>
+          <div class="matrix">
+            <div class="mcell">
+              <div class="d">周一 09-28</div>
+              <div class="c">1<i>/1</i></div>
+              <div class="tags"><span class="tag tag-green">已排</span><span class="tag tag-amber">候补 2</span></div>
+            </div>
+            <div class="mcell">
+              <div class="d">周二 09-29</div>
+              <div class="c">1<i>/1</i></div>
+              <div class="tags"><span class="tag tag-green">已排</span></div>
+            </div>
+            <div class="mcell">
+              <div class="d">周三 09-30</div>
+              <div class="c">0<i>/1</i></div>
+              <div class="tags"><span class="tag tag-acc">可填</span></div>
+            </div>
+            <div class="mcell">
+              <div class="d">周四 10-01</div>
+              <div class="c">1<i>/1</i></div>
+              <div class="tags"><span class="tag tag-green">已排</span></div>
+            </div>
+            <div class="mcell">
+              <div class="d">周五 10-02</div>
+              <div class="c">0<i>/1</i></div>
+              <div class="tags"><span class="tag tag-acc">可填</span></div>
+            </div>
+          </div>
+          <div class="legend">
+            <span class="li"><span class="tag tag-green">已排</span>审核通过且已落座（占位）</span>
+            <span class="li"><span class="tag tag-acc">可填</span>执行排期时会被跨时段调剂填上</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-plain" style="margin-top:16px">
+      <div class="note" style="margin:0">
+        <b>要改的文案（3 处）</b>：
+        ① 矩阵图例「空位 · 执行排期时会被填上」→ 按窗口状态切换成上面的两种说法；
+        ② 锁定提醒「先<b>执行排期</b>把它们落座」→ 收歌中补一句「此时只做原位递补」；
+        ③ 行内说明「审核已过、还没落座，执行排期时落座」→ 同上。<br>
+        判据用接口已返回的 <span class="code">window.open</span> / <span class="code">week.applicationEndAt</span>，前端不需要新接口。
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 4. 模拟排期面板 ══════════ -->
+  <section>
+    <div class="sec-head">
+      <span class="no">04</span>
+      <h2>新增：模拟排期面板</h2>
+      <span class="hint">新接口 POST /submit/schedule/preview</span>
+    </div>
+
+    <div class="preview-panel">
+      <div class="pp-head">
+        <h4>模拟排期结果</h4>
+        <span class="sub">只算不写库 · 2026-09-28 那一周</span>
+        <span class="sp">
+          <span class="tag tag-amber">收歌中 · 只做原位递补</span>
+          <button class="btn-s">关闭</button>
+          <button class="btn-s btn-s--primary">按此结果执行排期</button>
+        </span>
+      </div>
+
+      <div class="pp-body">
+        <div class="pp-block">
+          <div class="bt"><span class="n">本次落座</span><span class="c">3 条</span></div>
+          <div class="pp-item"><span class="nm">稻香</span><span class="fl">周一 午间</span><span class="ar">→</span><span class="to">周一 午间</span><span class="cost cost-10">首选</span></div>
+          <div class="pp-item"><span class="nm">夜曲</span><span class="fl">周二 早间</span><span class="ar">→</span><span class="to">周二 早间</span><span class="cost cost-10">首选</span></div>
+          <div class="pp-item"><span class="nm">青花瓷</span><span class="fl">周四 晚间</span><span class="ar">→</span><span class="to">周四 晚间</span><span class="cost cost-10">首选</span></div>
+        </div>
+
+        <div class="pp-block">
+          <div class="bt"><span class="n">原位递补</span><span class="c">1 条</span></div>
+          <div class="pp-item"><span class="nm">七里香</span><span class="fl">周一 午间</span><span class="ar">→</span><span class="to">周一 午间</span><span class="cost cost-10">首选</span></div>
+          <div class="pp-empty" style="color:var(--muted-2)">本格空出，按提交时间补上最早的一位</div>
+        </div>
+
+        <div class="pp-block">
+          <div class="bt"><span class="n">跨时段调剂</span><span class="c">0 条</span></div>
+          <div class="pp-empty">
+            <span class="tag tag-mute">收歌未截止</span>
+            周三、周五还有空位，但<b>不外借</b> —— 要留给首选这两格的申请者。
+          </div>
+        </div>
+
+        <div class="pp-block">
+          <div class="bt"><span class="n">锁定后将被自动驳回</span><span class="c">2 条</span></div>
+          <div class="pp-item"><span class="nm">告白气球</span><span class="fl">周一 午间</span><span class="ar">→</span><span class="to">无可用位置</span><span class="cost">—</span></div>
+          <div class="pp-item"><span class="nm">简单爱</span><span class="fl">周二 早间</span><span class="ar">→</span><span class="to">无可用位置</span><span class="cost">—</span></div>
+        </div>
+      </div>
+
+      <div class="pp-foot">
+        说明：这张面板<b>不会改动任何数据</b>，纯粹是「先看一眼」。代价列用的是新成本表 ——
+        <b>同一天其他时段 10 · 前/后一天相同时段 20 · 前/后一天其他时段 30 · 更远日期 50</b>。
+        收歌截止后再点一次，跨时段调剂那一栏才会有内容。
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 5. 点歌设置页 ══════════ -->
+  <section>
+    <div class="sec-head">
+      <span class="no">05</span>
+      <h2>点歌设置页：保存条按角色分流</h2>
+      <span class="hint">SongSettings.vue</span>
+    </div>
+
+    <div class="duo">
+      <div class="pane">
+        <span class="role-chip super">超级管理员</span>
+        <div class="setbar">
+          <span class="tag tag-outline">每格容量</span>
+          <span class="why">1 首 / 格 · 共 15 格</span>
+          <span class="sp"><button class="btn-s btn-s--primary">保存设置</button></span>
+        </div>
+      </div>
+      <div class="pane">
+        <span class="role-chip reviewer">普通管理员（审核员）</span>
+        <div class="setbar locked">
+          <span class="tag tag-outline">每格容量</span>
+          <span class="why">只读 · 容量 / 时段 / 规则 / 窗口由超级管理员维护</span>
+          <span class="sp"><button class="btn-s" disabled>保存设置</button></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-plain" style="margin-top:16px">
+      <div class="note" style="margin:0">
+        设置页涉及 4 个接口，<b>全部已收超管</b>：<span class="code">PUT /submit/quota</span>（容量）、
+        <span class="code">PUT /submit/slots</span>（时段）、<span class="code">PUT /submit/rules</span>（规则）、
+        <span class="code">PUT /submit/window</span>（窗口）。<br>
+        ⚠️ 这个页面目前<b>没有任何角色判断</b>（连原本就是超管的「窗口」也只是靠后端拦），所以普通管理员现在点保存会吃 403 —— 必须一起补。
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 变更清单 ══════════ -->
+  <section>
+    <div class="sec-head">
+      <span class="no">06</span>
+      <h2>落地清单（3 处，均为条件渲染 + 文案，无新视觉）</h2>
+    </div>
+    <div class="chg">
+      <div class="it">
+        <div class="h"><span class="n">01</span><b>按钮按角色显隐</b></div>
+        <p>SubmitList.vue：执行排期 / 模拟排期 / 锁定本周 / 改时段 / 标记播放 / 撤销。<br>
+           SongSettings.vue：4 个保存按钮。<br>
+           用现成的 <span class="code">auth.isSuperAdmin</span>。</p>
+      </div>
+      <div class="it">
+        <div class="h"><span class="n">02</span><b>排期页文案口径</b></div>
+        <p>矩阵图例、锁定提醒、行内说明共 3 句，按「收歌是否已截止」切换说法。<br>
+           数据源 <span class="code">window.open</span>，不加接口。</p>
+      </div>
+      <div class="it">
+        <div class="h"><span class="n">03</span><b>模拟排期面板</b></div>
+        <p>新按钮 + 结果面板（落座 / 原位递补 / 跨时段调剂 / 将被自动驳回）。<br>
+           接 <span class="code">POST /submit/schedule/preview</span>，只算不写库。</p>
+      </div>
+    </div>
+
+    <div class="foot">
+      小程序端<b>暂不改</b>：「接受调剂」开关在收歌期内不会真的跨格（要等截止后），但这个差别对学生是透明的，文案加了反而绕。<br>
+      本页是静态预览，<b>未改动任何业务代码</b>。点头后我再动 admin-web。
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

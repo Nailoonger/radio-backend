@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>菁悠广播站 · 管理后台 · 点歌时间窗口（周内任选 + 审核截止独立）v1（静态预览）</title>
+<style>
+/* ============================================================
+   点歌时间窗口 v1 静态预览
+   - 只画「点歌设置 › 点歌时间窗口」这一张卡
+   - 设计系统完全继承 preview/admin-ui-v8 与 admin-web/src/styles/theme.css：
+       1. 全局只有一个强调色 --accent #0066CC，所有「可点」的东西都用它
+       2. 不用任何装饰性渐变、不用彩色投影
+       3. 深色卡 --tile 是视觉主角，其余信息一律退到羊皮纸
+   - 不引入任何新视觉语言，只加两处配置项
+   ============================================================ */
+:root{
+  --ink:#1d1d1f; --ink-2:#333333; --muted:#7a7a7a; --muted-2:#6e6e73;
+  --soft:#c7c7cc; --hairline:#e0e0e0; --divider:#f0f0f0;
+  --parchment:#f5f5f7; --canvas:#ffffff; --tile:#272729; --tile-2:#3a3a3c;
+  --accent:#0066cc; --accent-dark:#2997ff; --live:#ff453a;
+  --amber-bg:#fef3c7; --amber-fg:#8a6100;
+  --green-bg:#e7f5ec; --green-fg:#1e7a46;
+  --red-bg:#fde8e8; --red-fg:#b42318;
+  --acc-bg:#e6f0fa;
+  --r-card:18px; --r-input:12px; --r-tile:20px; --r-pill:9999px;
+  --fs-2xs:10.5px; --fs-xs:11.5px; --fs-sm:12.5px; --fs-md:13.5px;
+  --fs-xl:17px; --fs-2xl:19px;
+  --lh-xl:1.35;
+  --ls-tight-sm:-0.4px; --ls-wide:0.3px; --ls-wide-sm:0.5px;
+  --ease:cubic-bezier(0.22,0.61,0.36,1);
+  --font:-apple-system,BlinkMacSystemFont,"HarmonyOS Sans SC","MiSans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--parchment); color:var(--ink);
+  font-family:var(--font); font-size:var(--fs-md);
+  -webkit-font-smoothing:antialiased;
+  padding:26px 26px 60px;
+}
+.wrap{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+
+/* ── 页头 ── */
+.head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.head h1{margin:0;font-size:var(--fs-2xl);font-weight:600;letter-spacing:var(--ls-tight-sm)}
+.head .sub{margin-top:7px;font-size:var(--fs-sm);color:var(--muted-2);letter-spacing:var(--ls-wide-sm)}
+.ver{
+  display:inline-flex;align-items:center;height:24px;padding:0 11px;border-radius:var(--r-pill);
+  background:var(--ink);color:#fff;font-size:var(--fs-xs);letter-spacing:var(--ls-wide-sm);font-weight:600;
+}
+
+/* ── 通用件 ── */
+.sec{display:flex;flex-direction:column;gap:13px}
+.sec-title{font-size:var(--fs-xl);font-weight:600;letter-spacing:var(--ls-tight-sm);line-height:var(--lh-xl)}
+.card{background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-card)}
+.rowc{display:flex;align-items:center}
+.wrapf{flex-wrap:wrap}
+.gap8{gap:8px}.gap13{gap:13px}.grow{flex:1;min-width:0}
+.micro{font-size:var(--fs-xs);color:var(--muted-2);letter-spacing:var(--ls-wide-sm)}
+.num{font-variant-numeric:tabular-nums}
+.tag{
+  display:inline-flex;align-items:center;height:22px;padding:0 10px;border-radius:var(--r-pill);
+  font-size:var(--fs-xs);letter-spacing:var(--ls-wide-sm);background:var(--divider);color:var(--muted-2);
+}
+.tag-pass{background:var(--acc-bg);color:var(--accent)}
+.tag-old{background:var(--divider);color:var(--muted-2)}
+.tag-new{background:var(--acc-bg);color:var(--accent);font-weight:600}
+
+/* ── 改动摘要 ── */
+.delta{background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-card);padding:16px 20px}
+.delta dl{margin:0;display:grid;grid-template-columns:118px 1fr;gap:11px 14px;font-size:var(--fs-sm)}
+.delta dt{color:var(--muted)}
+.delta dd{margin:0;color:var(--ink-2);line-height:1.75}
+.delta .was{color:var(--muted-2)}
+.delta b{font-weight:600;color:var(--ink)}
+
+/* ── 窗口卡（与业务页一致） ── */
+.sec-head{display:flex;align-items:center;justify-content:space-between;gap:13px;flex-wrap:wrap}
+.tile{
+  background:var(--tile);color:#fff;border-radius:var(--r-tile);padding:16px 20px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.win-tile{margin-bottom:16px}
+.win-status{display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);color:rgba(255,255,255,.84)}
+.t-dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--live);box-shadow:0 0 8px rgba(255,69,58,.7)}
+.t-dot.idle{background:rgba(255,255,255,.34);box-shadow:none}
+.win-cd{font-size:22px;font-weight:600;color:#fff;letter-spacing:var(--ls-tight-sm);margin-top:6px;font-variant-numeric:tabular-nums}
+.win-sub{margin-top:5px;font-size:var(--fs-xs);color:rgba(255,255,255,.55);letter-spacing:var(--ls-wide-sm)}
+.win-meta{
+  flex:none;min-width:210px;font-size:var(--fs-xs);color:rgba(255,255,255,.62);
+  line-height:1.9;letter-spacing:var(--ls-wide-sm);font-variant-numeric:tabular-nums;
+}
+.win-meta .k2{color:rgba(255,255,255,.42)}
+.win-note{
+  font-size:var(--fs-xs);color:rgba(255,255,255,.52);line-height:1.7;
+  letter-spacing:var(--ls-wide-sm);border-top:1px solid rgba(255,255,255,.14);padding-top:10px;
+}
+.win-form{padding:0 20px}
+.kv{display:flex;align-items:center;font-size:var(--fs-md);padding:13px 0;border-bottom:1px solid var(--divider)}
+.kv:last-child{border-bottom:none}
+.kv .k{width:104px;flex:none;color:var(--muted);font-size:var(--fs-sm)}
+/* 新增行的强调浅底：负外边距让底色向两侧溢出，内边距补回来 => 内容与其它行严格对齐 */
+.kv.is-new{background:var(--acc-bg);border-radius:10px;margin:2px -10px;padding-left:10px;padding-right:10px}
+
+/* 控件模拟（尺寸照 Element Plus default 32px） */
+.sel{
+  display:inline-flex;align-items:center;justify-content:space-between;gap:8px;
+  height:32px;min-width:92px;padding:0 11px;border-radius:var(--r-input);
+  background:var(--canvas);box-shadow:0 0 0 1px var(--hairline) inset;
+  font-size:var(--fs-md);color:var(--ink-2);
+}
+.sel.t{min-width:104px}
+.caret{width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid var(--soft);flex:none}
+.sw{width:40px;height:20px;border-radius:var(--r-pill);background:var(--accent);position:relative;flex:none}
+.sw i{position:absolute;top:2px;left:22px;width:16px;height:16px;border-radius:50%;background:#fff;display:block}
+.btn{
+  height:32px;padding:0 18px;border:none;border-radius:10px;background:var(--accent);color:#fff;
+  font-size:var(--fs-md);font-family:var(--font);font-weight:500;cursor:pointer;
+}
+.btn:hover{background:#0059b3}
+.hintline{
+  display:flex;align-items:flex-start;gap:8px;font-size:var(--fs-xs);color:var(--ink-2);
+  background:var(--parchment);border-radius:10px;padding:10px 12px;line-height:1.7;
+}
+
+/* ── 范例表 ── */
+table{width:100%;border-collapse:collapse;font-size:var(--fs-sm);font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--divider)}
+th{color:var(--muted-2);font-weight:500;font-size:var(--fs-xs);letter-spacing:var(--ls-wide-sm);background:var(--parchment)}
+tr:last-child td{border-bottom:none}
+td.c{color:var(--accent);font-weight:600}
+
+/* ── 小程序文案示意 ── */
+.phone{width:360px;max-width:100%;background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-card);padding:16px 18px}
+.phone .row{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--divider);font-size:var(--fs-md)}
+.phone .row:last-child{border-bottom:none}
+.phone .row .lb{color:var(--muted);font-size:var(--fs-sm)}
+.two{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div>
+      <h1>点歌时间窗口 · 周内任选 + 审核截止独立</h1>
+      <div class="sub">静态预览 · 未改动任何业务代码 · 只画「点歌设置 › 点歌时间窗口」这一张卡</div>
+    </div>
+    <span class="ver">v1</span>
+  </div>
+
+  <!-- ══════════ 改动摘要 ══════════ -->
+  <div class="delta">
+    <dl>
+      <dt>① 星期放开</dt>
+      <dd><span class="was">旧：收歌开始只能选 周五 / 周六 / 周日，结束只能选 周六 / 周日，最长 72 小时。</span><br>
+          <b>新：开始与结束都可任选 周一 → 周日，最长可铺满整周（周一 00:00 → 周日 23:59）。</b></dd>
+
+      <dt>② 审核截止独立</dt>
+      <dd><span class="was">旧：收歌结束时刻 ＝ 审核截止 ＝ 自动排期锁定时刻，同一个点。</span><br>
+          <b>新：拆成两项。收歌结束只停止收新歌，审核截止单独配一个时刻，到点才自动排期、驳回剩余候补并锁定本周。</b></dd>
+
+      <dt>③ 保留不变</dt>
+      <dd>窗口限制的总开关、「窗口外提交报 40907」、仅超管可改、每人每周 2 次、同曲一周去重 —— 全部照旧。</dd>
+
+      <dt>④ 一条硬约束</dt>
+      <dd>窗口与审核截止都必须落在<b>播出周的上一周之内、不得跨过周一 00:00</b>。
+          跨了的话，同样在窗口里点歌，周一前和周一后会被算成「投给不同的周」。审核截止另加一条：不得早于收歌结束、不得晚于播出周周一 00:00。</dd>
+    </dl>
+  </div>
+
+  <!-- ══════════ 新版卡片 ══════════ -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-title">点歌时间窗口</span>
+      <span class="rowc gap8">
+        <span class="tag tag-pass">仅超管可改</span>
+        <span class="micro">收歌截止 ≠ 审核截止（本版拆开）</span>
+      </span>
+    </div>
+
+    <div class="card" style="padding:18px 20px">
+      <!-- 状态条 -->
+      <div class="tile win-tile">
+        <div class="rowc wrapf" style="gap:26px;align-items:flex-start">
+          <div class="grow">
+            <div class="win-status"><i class="t-dot"></i>开放中 · 正在收歌</div>
+            <div class="win-cd">2 天 06:12:33</div>
+            <div class="win-sub">距收歌截止（周日 12:00）</div>
+          </div>
+          <div class="win-meta">
+            <div><span class="k2">本周收歌</span> 周一 00:00 → 周日 12:00</div>
+            <div><span class="k2">审核截止</span> 周日 22:00</div>
+            <div><span class="k2">本期播出周</span> 10/05 – 10/11</div>
+          </div>
+        </div>
+        <div class="win-note">
+          收歌截止只停止新提交；到审核截止（周日 22:00）系统才自动排期、把剩余候补驳回并锁定本周。
+        </div>
+      </div>
+
+      <!-- 表单 -->
+      <div class="win-form">
+        <div class="kv">
+          <span class="k">启用窗口限制</span>
+          <span class="rowc gap13 wrapf">
+            <span class="sw"><i></i></span>
+            <span class="micro">关掉 = 学生任何时间都能提交（此时审核截止改用「播出周周一 00:00」兜底）</span>
+          </span>
+        </div>
+
+        <div class="kv">
+          <span class="k">收歌开始</span>
+          <span class="rowc gap8 wrapf">
+            <span class="sel">周一 <i class="caret"></i></span>
+            <span class="sel t">00:00 <i class="caret"></i></span>
+            <span class="micro">从这里开始可以点歌</span>
+          </span>
+        </div>
+
+        <div class="kv">
+          <span class="k">收歌结束</span>
+          <span class="rowc gap8 wrapf">
+            <span class="sel">周日 <i class="caret"></i></span>
+            <span class="sel t">12:00 <i class="caret"></i></span>
+            <span class="micro">到点停止收新歌，已提交的继续审核</span>
+          </span>
+        </div>
+
+        <div class="kv is-new">
+          <span class="k">审核截止</span>
+          <span class="rowc gap8 wrapf">
+            <span class="sel">周日 <i class="caret"></i></span>
+            <span class="sel t">22:00 <i class="caret"></i></span>
+            <span class="tag tag-new">新增</span>
+            <span class="micro">到点自动排期 + 驳回剩余候补 + 锁定本周</span>
+          </span>
+        </div>
+
+        <div class="kv">
+          <span class="k">保存</span>
+          <span class="rowc gap13 wrapf">
+            <button class="btn">保存窗口</button>
+            <span class="micro">星期任选 周一 → 周日；窗口不跨周一 00:00；审核截止不得早于收歌结束、不得晚于播出周周一 00:00</span>
+          </span>
+        </div>
+
+        <div class="hintline" style="margin:4px 0 16px">
+          <span>审核截止比收歌结束晚，才有留白：收完歌到自动排期之间，管理员还能慢慢审、手动调格子、处置候补。两者设成同一个时刻＝旧行为。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 配置范例 ══════════ -->
+  <div class="sec">
+    <span class="sec-title">三种典型配法</span>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>场景</th><th>收歌开始</th><th>收歌结束</th><th>审核截止</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>整周全天开放</td>
+            <td>周一 00:00</td><td>周日 23:59</td><td class="c">周日 23:59</td>
+            <td class="micro" style="color:var(--muted-2)">随时能点。审核截止已顶到最晚，等于没有留白</td>
+          </tr>
+          <tr>
+            <td>整周收歌 + 周日审核</td>
+            <td>周一 00:00</td><td>周日 12:00</td><td class="c">周日 22:00</td>
+            <td class="micro" style="color:var(--muted-2)">推荐。收歌一整个星期，最后一晚专门审稿排期</td>
+          </tr>
+          <tr>
+            <td>周末常规（旧默认）</td>
+            <td>周六 18:00</td><td>周日 18:00</td><td class="c">周日 22:00</td>
+            <td class="micro" style="color:var(--muted-2)">最接近现在的行为，只是审核截止从 18:00 挪到 22:00</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════ 小程序端文案 ══════════ -->
+  <div class="sec">
+    <span class="sec-title">小程序端会看到什么</span>
+    <div class="two">
+      <div class="phone">
+        <div class="row"><span class="lb">点歌时间</span><span>每周一 00:00 – 周日 12:00</span></div>
+        <div class="row"><span class="lb">状态</span><span style="color:var(--green-fg)" class="num">开放中 · 还有 2 天 6 小时</span></div>
+        <div class="row"><span class="lb">审核截止</span><span class="num">周日 22:00</span></div>
+      </div>
+      <div class="phone">
+        <div class="row"><span class="lb">点歌时间</span><span>每周一 00:00 – 周日 12:00</span></div>
+        <div class="row"><span class="lb">状态</span><span style="color:var(--muted-2)" class="num">本周已结束 · 下次开放 周一 00:00</span></div>
+        <div class="row"><span class="lb">审核截止</span><span class="num">周日 22:00</span></div>
+      </div>
+    </div>
+    <div class="micro">文案仍由服务端下发（学生端不硬编码星期与时刻），这里只是把新形态下的样子画出来。</div>
+  </div>
+
+</div>
+</body>
+</html>
