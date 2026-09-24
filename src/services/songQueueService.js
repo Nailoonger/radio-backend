@@ -58,10 +58,12 @@ async function lockAtOfWeek(weekStartMs, now = Date.now()) {
   return week.scheduleLockAt ? new Date(+new Date(week.scheduleLockAt)) : null;
 }
 
-/** @deprecated 保留旧名，语义改为「锁定时刻」 */
+/** @deprecated 保留旧名，语义改为「锁定时刻（= 审核截止）」 */
 async function windowEndOfWeek(cfg, weekStartMs) {
   const week = await sched.ensureWeek(weekStartMs, Date.now());
-  return week.scheduleLockAt ? new Date(+new Date(week.scheduleLockAt)) : songWindow.windowRangeAt(cfg, weekStartMs - 1000).end;
+  if (week.scheduleLockAt) return new Date(+new Date(week.scheduleLockAt));
+  const rng = await songWindow.anchorRangeAt(cfg, weekStartMs - 1000);
+  return rng.reviewAt;
 }
 
 /* ------------------------------------------------------------------ *

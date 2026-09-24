@@ -191,6 +191,13 @@
 **窗口字段口径**：`startDay` / `endDay` 用 `0=周日 … 6=周六`（与 `bj.WEEKDAY_CN` 一致）；时刻 `HH:mm`。
 `enabled = 0` → 不限时间（回到现状行为）。**定稿时刻 = 窗口结束时刻**，不再单独配置（少一个会打架的开关）。
 
+> ⚠️ **本页 §4.2 / §6.6 的窗口口径已被 2026-09-25 改版取代**（陛下裁决：周内任选 + 审核截止独立）：
+> ① 起止星期放开到 **周一 → 周日 任选**，最长可铺满整周（旧白名单 + 72h 上限废除）；
+> ② **收歌截止 ≠ 审核截止** —— 审核截止独立配置（`reviewDay` / `reviewTime`），
+> `schedule_lock_at` 改由它派生（未配置时退回「收歌结束 + `song_lock_offset_minutes`」，行为同旧）。
+> 权威口径见 `docs/song-protocol.md`（§2 时间锚点 / §3.1 闸门）与
+> `docs/song-protocol-vs-v1-spec.md` 第八节。本页仅作 v2 历史记录，**不要再按它改代码**。
+
 ### 4.3 退役清单 / 错误码
 
 - `song_quota` 表：停止写入，迁移时 `TRUNCATE`（留表一个版本，v2.4 再 DROP）；`songQuotaService.js` 顶部标 `@deprecated`

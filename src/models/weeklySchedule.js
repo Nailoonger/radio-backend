@@ -10,9 +10,10 @@
  *      └──────────────────── 取消 ────────────────────> CANCELLED
  *
  * 时间锚点全部由 KV 点歌窗口派生（`songWindowService`），本表只是**落库快照**：
- *    application_start_at / application_end_at   ← 窗口起止
+ *    application_start_at / application_end_at   ← 窗口起止（收歌起止）
  *    review_start_at                             = application_end_at
- *    schedule_lock_at                            = 窗口结束 + 偏移（默认 6h → 播出周周一 00:00）
+ *    review_end_at = schedule_lock_at            ← 独立「审核截止」（2026-09-25 起单独配置，
+ *                                                  未配置时退回「收歌结束 + song_lock_offset_minutes」）
  *
  * 为什么要有这张表（而不是继续纯派生）：
  *   ① 锁定是一次**写动作**，必须记住「这周已经锁过了」，不能靠时间反推；

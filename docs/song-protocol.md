@@ -85,13 +85,25 @@ DRAFT ──发布──> APPLICATION ──申请截止──> REVIEW ──已
 
 - **一周一行**，`week_start_date` 唯一 → 同一周不可能出现两份排期。
 - **懒创建**：学生第一次提交（或管理员第一次打开该周）时自动建行，管理员不用先「创建下周排期」。
-- 时间锚点**全部由 KV 点歌窗口派生**（沿用「窗口规则不变」的决定，不新增一套申请时间配置）：
+- 时间锚点**全部由 KV 点歌窗口派生**（不新增一套申请时间配置）：
 
   | 字段 | 来源 |
   |---|---|
-  | `application_start_at` / `application_end_at` | KV `song_submit_window` 的窗口起止 |
-  | `review_start_at` | = `application_end_at` |
-  | `schedule_lock_at` | = 窗口结束 + `song_lock_offset_minutes`（默认 360 分钟 = 6h）→ **播出周周一 00:00** |
+  | `application_start_at` / `application_end_at` | KV `song_submit_window` 的**收歌**起止 |
+  | `review_start_at` | = `application_end_at`（收歌结束即审核开始） |
+  | `schedule_lock_at` / `review_end_at` | = **独立「审核截止」**：配了 `reviewDay`/`reviewTime` 就用它；没配则退回 `application_end_at` + `song_lock_offset_minutes`（默认 360 分）；窗口限制关闭时退回播出周周一 00:00 |
+
+  ⚠️ **2026-09-25 起「收歌截止 ≠ 审核截止」**：收歌结束只停止收新歌，到审核截止才自动排期 +
+  驳回剩余候补 + 锁定本周。两者之间是留给管理员的审稿/调格留白。
+  默认配置（周六 18:00 → 周日 18:00、未配审核截止）下 `schedule_lock_at` 仍是**播出周周一 00:00**，
+  升级不改行为。
+
+  ⚠️ **窗口位置算法**：窗口锚在**收歌周的周一 00:00**（= `nextWeekRange(now).start − 7 天`）：
+  `offsetOf(day,time) = ((day===0?7:day)−1) * 1 天 + HH:mm`，星期**任选周一→周日**，最长可铺满整周。
+  硬约束只有一条：`0 ≤ startOff < endOff ≤ 7 天`（**不跨播出周周一 00:00**）——
+  只有窗口整体落在同一周内，窗口里任意时刻的 `nextWeekRange(now)` 才指向同一个播出周。
+  旧实现用 `offBack(d)=(1−d+7)%7` 从播出周往回推，`offBack(周一)=0` 会让 `startDay=周一` 落到
+  **播出周本身** → 语义直接崩；新公式对旧白名单（五/六/日）与旧公式完全等价。
 
 - `DRAFT/APPLICATION/REVIEW` 由时间自动推进；`SCHEDULING / LOCKED / CANCELLED` 是**写动作**的结果，
   不会被时间反向覆盖（`ensureWeek` 不覆盖 `LOCKED`）。

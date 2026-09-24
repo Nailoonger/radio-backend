@@ -39,8 +39,9 @@ const S = require('./songStatusService');
 const logger = require('../utils/logger');
 
 const DAYS_PER_WEEK = 5;                    // 周一到周五
-const KV_LOCK_OFFSET = 'song_lock_offset_minutes';
-const DEFAULT_LOCK_OFFSET_MINUTES = 360;    // 窗口结束后 6h → 播出周周一 00:00
+/** 审核截止未单独配置时的兜底偏移（真值在 songWindowService，这里只做转发/再导出） */
+const KV_LOCK_OFFSET = songWindow.KV_LOCK_OFFSET;
+const DEFAULT_LOCK_OFFSET_MINUTES = 360;
 
 const WEEK_STATUS = {
   DRAFT: 'DRAFT',
@@ -172,30 +173,27 @@ function isSeated(row) {
 /* ------------------------------------------------------------------ *
  * 周（weekly_schedule）：懒创建 + 状态推进
  * ------------------------------------------------------------------ */
+/** 审核截止未单独配置时的兜底偏移（分钟）—— 真值口唯一在 songWindowService */
 async function getLockOffsetMinutes() {
-  try {
-    const n = parseInt(await kv.get(KV_LOCK_OFFSET, ''), 10);
-    return Number.isFinite(n) && n >= 0 ? n : DEFAULT_LOCK_OFFSET_MINUTES;
-  } catch (e) {
-    return DEFAULT_LOCK_OFFSET_MINUTES;
-  }
+  return songWindow.getLockOffsetMinutes();
 }
 
 /**
- * 时间锚点全部由 KV 点歌窗口派生 —— 沿用「窗口规则不变」的决定，
- * 不额外引入一套管理员要维护的申请时间配置。
+ * 时间锚点全部由 KV 点歌窗口派生（2026-09-25 改版后含独立审核截止）。
+ *   applicationEndAt = 收歌截止（只停止收新歌）
+ *   scheduleLockAt   = 审核截止（到点自动排期 + 驳回候补 + 锁定本周）
+ * 两者不再相等 —— 收歌结束后到审核截止之间，管理员仍可慢慢审、手动调格子。
  */
 async function anchorOf(weekStartMs, now = Date.now()) {
   const cfg = await songWindow.getConfig(now);
   // 传「周一前 1 秒」，nextWeekRange 正好指向这一周
-  const rng = songWindow.windowRangeAt(cfg, weekStartMs - 1000);
-  const offset = await getLockOffsetMinutes();
+  const rng = await songWindow.anchorRangeAt(cfg, weekStartMs - 1000);
   return {
     applicationStartAt: rng.start,
     applicationEndAt: rng.end,
-    reviewStartAt: rng.end,
-    scheduleLockAt: new Date(rng.end.getTime() + offset * 60 * 1000),
-    reviewEndAt: new Date(rng.end.getTime() + offset * 60 * 1000),
+    reviewStartAt: rng.end,          // 收歌截止 = 审核开始
+    scheduleLockAt: rng.reviewAt,    // 锁定时刻 = 独立审核截止
+    reviewEndAt: rng.reviewAt,
   };
 }
 
@@ -265,6 +263,8 @@ function weekView(week, now = Date.now()) {
     applicationStartAt: start ? songWindow.toBjsIso(new Date(start)) : null,
     applicationEndAt: end ? songWindow.toBjsIso(new Date(end)) : null,
     reviewStartAt: week.reviewStartAt ? songWindow.toBjsIso(new Date(+new Date(week.reviewStartAt))) : null,
+    // 审核截止（= 锁定时刻）：2026-09-25 起独立配置，前端别再拿 lockAt − applicationEndAt 反算偏移
+    reviewEndAt: week.reviewEndAt ? songWindow.toBjsIso(new Date(+new Date(week.reviewEndAt))) : null,
     scheduleLockAt: lock ? songWindow.toBjsIso(new Date(lock)) : null,
     lockedAt: week.lockedAt ? songWindow.toBjsIso(new Date(+new Date(week.lockedAt))) : null,
     lockText: lock ? songWindow.toBjsIso(new Date(lock)) : null,

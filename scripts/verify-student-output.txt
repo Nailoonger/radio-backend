@@ -1,219 +1,205 @@
-﻿node.exe : (sequelize) Warning: SQLite does not support 'BIGINT' with UNSIGNED 
-or ZEROFILL. Plain 'BIGINT' will be used instead. 
-所在位置 行:445 字符: 52
-+ ... io-backend; & "C:\Users\Administrator\.workbuddy\binaries\node\versio ...
-+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: ((sequelize) War... used instead.  
-   :String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
->> Check: https://www.sqlite.org/datatype3.html
-(sequelize) Warning: SQLite does not support 'INTEGER' with UNSIGNED or ZEROFIL
-L. Plain 'INTEGER' will be used instead. 
->> Check: https://www.sqlite.org/datatype3.html
-[36m[2026-09-21T08:25:48.993Z] [INFO][0m [student] 閲嶇疆瀵嗙爜 20240101锛堟搷浣滀汉 teacher锛?[31m[2026-09-21T08:25:49.238Z] [ERROR][0m code2session error: {
-  errcode: 40013,
-  errmsg: 'invalid appid, rid: 6ab0ea0e-5d036502-5510f725'
-}
-[31m[2026-09-21T08:25:49.238Z] [ERROR][0m code2Session 澶辫触: 寰俊鎺ュ彛閿欒: invalid appid, rid: 6ab0ea0e-5d036502-5510f725
-[33m[2026-09-21T08:25:49.238Z] [WARN][0m [dev] 浣跨敤 mock openid: mock_mock_xyz
-[31m[2026-09-21T08:25:49.419Z] [ERROR][0m code2session error: {
-  errcode: 40013,
-  errmsg: 'invalid appid, rid: 6ab0ea0f-00c75730-4cc0b88b'
-}
-[31m[2026-09-21T08:25:49.419Z] [ERROR][0m code2Session 澶辫触: 寰俊鎺ュ彛閿欒: invalid appid, rid: 6ab0ea0f-00c75730-4cc0b88b
-[33m[2026-09-21T08:25:49.419Z] [WARN][0m [dev] 浣跨敤 mock openid: mock_mock_avatar_test
-[31m[2026-09-21T08:25:49.609Z] [ERROR][0m code2session error: {
-  errcode: 40013,
-  errmsg: 'invalid appid, rid: 6ab0ea0f-67cb6e6d-25ced0ff'
-}
-[31m[2026-09-21T08:25:49.609Z] [ERROR][0m code2Session 澶辫触: 寰俊鎺ュ彛閿欒: invalid appid, rid: 6ab0ea0f-67cb6e6d-25ced0ff
-[33m[2026-09-21T08:25:49.609Z] [WARN][0m [dev] 浣跨敤 mock openid: mock_mock_avatar_test
-[36m[2026-09-21T08:25:49.650Z] [INFO][0m [student] 瀵煎嚭 7 鏉¤处鍙凤紙鎿嶄綔浜?teacher锛?[36m[2026-09-21T08:25:49.718Z] [INFO][0m [student] 鎾ら攢鎵规 5锛氬凡鎾ら攢 2 涓湭婵€娲昏处鍙凤紙鎿嶄綔浜?teacher锛?[36m[2026-09-21T08:25:49.734Z] [INFO][0m [student] 鎵归噺閲嶇疆瀵嗙爜 1 涓紙鎿嶄綔浜?teacher锛?[33m[2026-09-21T08:25:49.802Z] [WARN][0m [student] 鏁村眾娓呯悊 2026锛坰afe锛夛細鍒犻櫎 1 鍋滅敤 1锛屽叡 2 涓紙鎿嶄綔浜?teacher锛岃€楁椂 2ms锛?[33m[2026-09-21T08:25:49.840Z] [WARN][0m [student] 鏁村眾娓呯悊 2027锛坉isable锛夛細鍒犻櫎 0 鍋滅敤 2锛屽叡 2 涓紙鎿嶄綔浜?teacher锛岃€楁椂 1ms锛?[33m[2026-09-21T08:25:49.849Z] [WARN][0m [student] 鏁村眾娓呯悊 2027锛坧urge锛夛細鍒犻櫎 2 鍋滅敤 0锛屽叡 2 涓紙鎿嶄綔浜?teacher锛岃€楁椂 1ms锛?[36m[2026-09-21T08:25:49.866Z] [INFO][0m [student] 閲嶇疆瀵嗙爜 20240101锛堟搷浣滀汉 teacher锛?[36m[2026-09-21T08:25:49.909Z] [INFO][0m [student] 鎵归噺鍋滅敤 2 涓紙鎿嶄綔浜?teacher锛?[36m[2026-09-21T08:25:49.913Z] [INFO][0m [student] 鎵归噺鍚敤 2 涓紙鎿嶄綔浜?teacher锛?瀛︾敓璐﹀彿浣撶郴楠岃瘉缁撴灉
+学生账号体系验证结果
 ============================================================
-sync ok锛堣嚜鍔ㄥ缓琛細user / import_batch / submit / message / notice_ack 鈥︼級
+sync ok（自动建表：user / import_batch / submit / message / notice_ack …）
 
---- A. 褰掍竴鍖栦笌璐﹀彿鐢熸垚 ---
+--- A. 归一化与账号生成 ---
 
---- B. 鐪熷疄鍚嶅唽锛? 鍒?+ 绌鸿 + 鍙充晶绌哄垪锛?--
+--- B. 真实名册（4 列 + 空行 + 右侧空列）---
 
---- C. 鏃犺〃澶?/ 鑴忔暟鎹閿?---
+--- C. 无表头 / 脏数据容错 ---
 
---- D. 瀵煎叆钀藉簱 / 骞傜瓑 / 宸叉縺娲讳繚鎶?---
+--- D. 导入落库 / 幂等 / 已激活保护 ---
 
---- E. 鐧诲綍 / 鏀瑰瘑 / 閲嶇疆瀵嗙爜 ---
+--- E. 登录 / 改密 / 重置密码 ---
 
---- F. 瀵煎嚭 ---
+--- F. 导出 ---
 
---- G. 鍒楄〃 / 缁熻 / 鎵规鎾ら攢 / 鎶曠杩佺Щ / 鍒犻櫎淇濇姢 ---
+--- G. 列表 / 统计 / 批次撤销 / 投稿迁移 / 删除保护 ---
 
---- G2. 鎸夊勾绾ф煡璇笌鏁村眾娓呯悊 ---
+--- G2. 按年级查询与整届清理 ---
 
---- G3. 鏀瑰悕锛坮emark + nickname 蹇呴』鍚屾椂鐢熸晥锛?--
+--- G3. 改名（remark + nickname 必须同时生效）---
 
---- G4. 鎵归噺鍚敤 / 鍋滅敤 ---
+--- G4. 批量启用 / 停用 ---
 
---- H. 璺敱椤哄簭涓庨壌鏉?---
+--- H. 路由顺序与鉴权 ---
 
 ------------------------------------------------------------
-閫氳繃 174 椤癸紝澶辫触 0 椤?鍏ㄩ儴閫氳繃 鉁?
-閫氳繃鐨勬柇瑷€锛?    1. 骞寸骇銆?024銆嶁啋 2024  [2024]
-    2. 骞寸骇銆?024绾с€嶁啋 2024  [2024]
-    3. 骞寸骇銆?024灞娿€嶁啋 2024  [2024]
-    4. 骞寸骇銆?4銆嶁啋 2024  [2024]
-    5. 骞寸骇銆?4绾с€嶁啋 2024  [2024]
-    6. 骞寸骇銆岋紥锛愶紥锛斻€嶁啋 2024  [2024]
-    7. 骞寸骇銆? 2024  銆嶁啋 2024  [2024]
-    8. 骞寸骇銆?2024銆嶁啋 2024  [2024]
-    9. 骞寸骇銆岄珮涓€銆嶈鎷掞紙鏃犲勾浠斤級  [骞寸骇銆岄珮涓€銆嶆棤娉曡瘑鍒紝搴斾负 4 浣嶅叆瀛﹀勾浠斤紙濡?2024锛塢
-   10. 鐝骇 / 搴忓彿銆?銆嶁啋 01  [01]
-   11. 鐝骇 / 搴忓彿銆?1銆嶁啋 01  [01]
-   12. 鐝骇 / 搴忓彿銆?鐝€嶁啋 01  [01]
-   13. 鐝骇 / 搴忓彿銆岄珮涓€(1)鐝€嶁啋 01  [01]
-   14. 鐝骇 / 搴忓彿銆?鍙枫€嶁啋 05  [05]
-   15. 鐝骇 / 搴忓彿銆岀5銆嶁啋 05  [05]
-   16. 鐝骇 / 搴忓彿銆岋紤锛掋€嶁啋 12  [12]
-   17. 鐝骇 / 搴忓彿銆?99 銆嶁啋 99  [99]
-   18. 搴忓彿 100 瓒呰寖鍥磋鎷? [搴忓彿銆?00銆嶈秴鍑鸿寖鍥达紙1~99锛塢
-   19. 鍗曞垪鍚堝苟銆?0240101銆嶁啋 2024+01+01  [["2024","01","01"]]
-   20. 鍗曞垪鍚堝苟銆?024-01-01銆嶁啋 2024+01+01  [["2024","01","01"]]
-   21. 鍗曞垪鍚堝苟銆?024绾?鐝?鍙枫€嶁啋 2024+1+1  [["2024","1","1"]]
-   22. 鍗曞垪鍚堝苟銆?024 01 01銆嶁啋 2024+01+01  [["2024","01","01"]]
-   23. 璐﹀彿鎷兼帴 2024+01+01 = 20240101
-   24. 璇嗗埆涓烘湁琛ㄥご妯″紡  [header]
-   25. 琛ㄥご鍦ㄧ 1 琛? [0]
-   26. 鍒楁槧灏?骞寸骇=0 鐝骇=1 搴忓彿=2 濮撳悕=3  [{"grade":0,"class":1,"seat":2,"name":3}]
-   27. 7 琛屾暟鎹紙灏鹃儴绌鸿宸茶烦杩囷級  [totalRows=7]
-   28. 7 琛屽叏閮ㄨВ鏋愭垚鍔?   29. 璐﹀彿涓庨鏈熷畬鍏ㄤ竴鑷? [20240101,20240202,20240322,20240433,20240745,20241054,20241332]
-   30. 濮撳悕姝ｇ‘鎻愬彇锛堢 4 鍒楋級  [寮犱笁,鏉庝簩,鏉庡洓,鑾夎帀,灏忕背,鏉庝笁,钄″緪]
-   31. 琛屽彿 = 琛ㄦ牸鐪熷疄琛屽彿锛堢 2 琛屾槸绗竴鏉℃暟鎹級  [rowNo=2]
-   32. 鍙充晶绌哄垪琚拷鐣ワ紙娌℃湁澶氫綑鍒楁姤閿欙級
-   33. 鏃犺〃澶?鈫?鎸夊垪搴忚В鏋? [position]
-   34. 鏃犺〃澶存椂璐﹀彿姝ｇ‘
-   35. 鍗曞垪 20240101 鍙媶涓夋  [20240101]
-   36. 鍗曞垪 2024绾?鐝?鍙?鍙媶涓夋  [20240203]
-   37. 2024绾?/ 1鐝?/ 5鍙?鈫?20240105  [20240105]
-   38. 24 / 02 / 绗? 鈫?20240206  [20240206]
-   39. 缂虹彮绾?鈫?鏍囧紓甯? [鐝骇銆屻€嶆棤娉曡瘑鍒紝搴斾负鏁板瓧]
-   40. 搴忓彿 100 鈫?鏍囧紓甯? [搴忓彿銆?00銆嶈秴鍑鸿寖鍥达紙1~99锛塢
-   41. 鏈壒閲嶅 鈫?鍚庝竴琛屾爣寮傚父  [鏈壒娆″唴璐﹀彿 20240801 閲嶅锛堢 6 琛屽凡鍑虹幇锛塢
-   42. 鍏ㄧ┖琛ㄨ鎷? [娌℃湁璇诲埌浠讳綍鏁版嵁琛岋紙琛ㄥご涓嬮潰鍏ㄦ槸绌鸿锛燂級]
-   43. 棰勮 7 鏉″叏閮?new  [{"new":7,"update":0,"active":0,"invalid":0}]
-   44. 棣栨瀵煎叆鏂板缓 7 涓? [{"batchId":1,"created":7,"updated":0,"skipped":0,"invalid":0,"total":7,"totalRows":7,"warnings":[],"errors":[],"preview":{"mode":"header","summary":{"new":7,"update":0,"active":0,"invalid":0},"rows":[{"rowNo":2,"username":"20240101","grade":"2024","classNo":"01","seatNo":"01","name":"寮犱笁","state":"new","error":""},{"rowNo":3,"username":"20240202","grade":"2024","classNo":"02","seatNo":"02","name":"鏉庝簩","state":"new","error":""},{"rowNo":4,"username":"20240322","grade":"2024","classNo":"03","seatNo":"22","name":"鏉庡洓","state":"new","error":""},{"rowNo":5,"username":"20240433","grade":"2024","classNo":"04","seatNo":"33","name":"鑾夎帀","state":"new","error":""},{"rowNo":6,"username":"20240745","grade":"2024","classNo":"07","seatNo":"45","name":"灏忕背","state":"new","error":""},{"rowNo":7,"username":"20241054","grade":"2024","classNo":"10","seatNo":"54","name":"鏉庝笁","state":"new","error":""},{"rowNo":8,"username":"20241332","grade":"2024","classNo":"13","seatNo":"32","name":"钄″緪","state":"new","error":""}]}}]
-   45. 钀藉簱鍚?count 澶嶆牳 = 7  [total=7]
-   46. 搴撻噷纭疄鏄?7 涓鐢熻处鍙?   47. 璐﹀彿 20240101 瀛樺湪涓斿鍚嶄负寮犱笁
-   48. 閲嶅瀵煎叆涓嶄骇鐢熸柊璐﹀彿锛坈reated=0锛? [{"batchId":2,"created":0,"updated":7,"skipped":0,"invalid":0,"total":7,"totalRows":7,"warnings":[],"errors":[],"preview":{"mode":"header","summary":{"new":0,"update":7,"active":0,"invalid":0},"rows":[{"rowNo":2,"username":"20240101","grade":"2024","classNo":"01","seatNo":"01","name":"寮犱笁","state":"update","error":""},{"rowNo":3,"username":"20240202","grade":"2024","classNo":"02","seatNo":"02","name":"鏉庝簩","state":"update","error":""},{"rowNo":4,"username":"20240322","grade":"2024","classNo":"03","seatNo":"22","name":"鏉庡洓","state":"update","error":""},{"rowNo":5,"username":"20240433","grade":"2024","classNo":"04","seatNo":"33","name":"鑾夎帀","state":"update","error":""},{"rowNo":6,"username":"20240745","grade":"2024","classNo":"07","seatNo":"45","name":"灏忕背","state":"update","error":""},{"rowNo":7,"username":"20241054","grade":"2024","classNo":"10","seatNo":"54","name":"鏉庝笁","state":"update","error":""},{"rowNo":8,"username":"20241332","grade":"2024","classNo":"13","seatNo":"32","name":"钄″緪","state":"update","error":""}]}}]
-   49. 閲嶅瀵煎叆 7 鏉¤蛋銆岃鐩栨洿鏂般€? [updated=7]
-   50. 閲嶅瀵煎叆鍚庢€绘暟浠嶆槸 7
-   51. 宸叉縺娲昏处鍙疯繘鍏?active锛堝彈淇濇姢锛? [{"new":0,"update":6,"active":1,"invalid":0}]
-   52. 榛樿瀵煎叆璺宠繃宸叉縺娲昏处鍙? [{"batchId":3,"created":0,"updated":6,"skipped":1,"invalid":0,"total":6,"totalRows":7,"warnings":[],"errors":[],"preview":{"mode":"header","summary":{"new":0,"update":6,"active":1,"invalid":0},"rows":[{"rowNo":2,"username":"20240101","grade":"2024","classNo":"01","seatNo":"01","name":"寮犱笁","state":"active","error":""},{"rowNo":3,"username":"20240202","grade":"2024","classNo":"02","seatNo":"02","name":"鏉庝簩","state":"update","error":""},{"rowNo":4,"username":"20240322","grade":"2024","classNo":"03","seatNo":"22","name":"鏉庡洓","state":"update","error":""},{"rowNo":5,"username":"20240433","grade":"2024","classNo":"04","seatNo":"33","name":"鑾夎帀","state":"update","error":""},{"rowNo":6,"username":"20240745","grade":"2024","classNo":"07","seatNo":"45","name":"灏忕背","state":"update","error":""},{"rowNo":7,"username":"20241054","grade":"2024","classNo":"10","seatNo":"54","name":"鏉庝笁","state":"update","error":""},{"rowNo":8,"username":"20241332","grade":"2024","classNo":"13","seatNo":"32","name":"钄″緪","state":"update","error":""}]}}]
-   53. force 瀵煎叆鍙鐩栧凡婵€娲昏处鍙凤紙updated=7锛? [{"batchId":4,"created":0,"updated":7,"skipped":0,"invalid":0,"total":7,"totalRows":7,"warnings":[],"errors":[],"preview":{"mode":"header","summary":{"new":0,"update":7,"active":0,"invalid":0},"rows":[{"rowNo":2,"username":"20240101","grade":"2024","classNo":"01","seatNo":"01","name":"寮犱笁","state":"update","error":""},{"rowNo":3,"username":"20240202","grade":"2024","classNo":"02","seatNo":"02","name":"鏉庝簩","state":"update","error":""},{"rowNo":4,"username":"20240322","grade":"2024","classNo":"03","seatNo":"22","name":"鏉庡洓","state":"update","error":""},{"rowNo":5,"username":"20240433","grade":"2024","classNo":"04","seatNo":"33","name":"鑾夎帀","state":"update","error":""},{"rowNo":6,"username":"20240745","grade":"2024","classNo":"07","seatNo":"45","name":"灏忕背","state":"update","error":""},{"rowNo":7,"username":"20241054","grade":"2024","classNo":"10","seatNo":"54","name":"鏉庝笁","state":"update","error":""},{"rowNo":8,"username":"20241332","grade":"2024","classNo":"13","seatNo":"32","name":"钄″緪","state":"update","error":""}]}}]
-   54. force 瑕嗙洊涓嶇瀵嗙爜锛堜粛鑳界敤鍒濆瀵嗙爜鐧诲綍锛?   55. 璐﹀彿瀵嗙爜鐧诲綍鎴愬姛  [{"code":0,"message":"鐧诲綍鎴愬姛","data":{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVuaWQiOiIyMDI0MDEwMSIsInVpZCI6MSw]
-   56. 杩斿洖骞寸骇鐝骇淇℃伅  [2024 绾?1 鐝璢
-   57. 鏍囪 isDefaultPwd=true
-   58. 杩斿洖 token
-   59. 璁板綍鏈€杩戠櫥褰曟椂闂?   60. 鐧诲綍娆℃暟 +1  [1]
-   61. 瀵嗙爜閿欒 鈫?40101  [code=40101 http=200]
-   62. 璐﹀彿涓嶅瓨鍦?鈫?40101  [code=40101 http=200]
-   63. 涓ょ澶辫触鐨勬枃妗堜竴鑷达紙闃茶处鍙锋灇涓撅級  [璐﹀彿鎴栧瘑鐮侀敊璇痌
-   64. 甯?token 鍙闂?/user/me  [{"code":0,"message":"ok","data":{"openid":null,"nickname":"寮犱笁","avatar":"","id":1,"username":"20240101","name":"寮犱笁","gra]
-   65. /user/me 杩斿洖璐﹀彿涓庣彮绾?   66. /user/me 涓嶈繑鍥?password 瀛楁
-   67. 鏃?token 璁块棶 鈫?401  [401]
-   68. 鏀瑰瘑锛氱函鏁板瓧琚嫆  [鏂板瘑鐮佸繀椤诲悓鏃跺寘鍚瓧姣嶅拰鏁板瓧]
-   69. 鏀瑰瘑锛氬師瀵嗙爜閿欒琚嫆  [鍘熷瘑鐮佷笉姝ｇ‘]
-   70. 鏀瑰瘑鎴愬姛骞惰繑鍥炴柊 token  [瀵嗙爜淇敼鎴愬姛]
-   71. 鏀瑰瘑鍚?isDefaultPwd=false
-   72. 鏀瑰瘑鍚庢棫 token 绔嬪埢澶辨晥  [401]
-   73. 鏀瑰瘑鍚庢柊 token 鍙敤
-   74. 鏀瑰瘑鍚庢棫瀵嗙爜鐧诲綍澶辫触  [code=40101]
-   75. 鏀瑰瘑鍚庢柊瀵嗙爜鐧诲綍鎴愬姛
-   76. 绠＄悊鍛樺仠鐢ㄨ处鍙? [宸插仠鐢╙
-   77. 鍋滅敤鍚庢棤娉曠櫥褰曪紙40301锛? [40301]
-   78. 鍋滅敤鍚庡凡鍙戞斁鐨?token 琚涪锛?01锛? [401]
-   79. 绠＄悊鍛橀噸缃负鍒濆瀵嗙爜  [宸查噸缃负鍒濆瀵嗙爜]
-   80. 閲嶇疆鍚庡彲鐢ㄥ垵濮嬪瘑鐮佺櫥褰?   81. 閲嶇疆鍚?isDefaultPwd 鍥炲埌 true
-   82. 娴嬭瘯鐜寰俊鐧诲綍浠嶆斁琛岋紙淇濇姢鏃㈡湁 56 鏉＄敤渚嬶級  [ok]
-   83. 鐢熶骇鐜 + 寮€鍏?on 鈫?鎷︽埅寰俊鐧诲綍
-   84. 鐢熶骇鐜 + 寮€鍏?off 鈫?鏀捐寰俊鐧诲綍
-   85. 娴嬭瘯鐜姘歌繙鏀捐锛堥伩鍏嶈繛閿佸け璐ワ級
-   86. 寰俊鐧诲綍瀵瑰甫 avatar 鐨勮€佸鎴风浠嶆斁琛岋紙鍏煎锛? [ok]
-   87. 瀹㈡埛绔紶鐨?avatar 涓嶄細鍏ュ簱锛堝ご鍍忓彧鑳藉浣滃浘锛?   88. /user/me 杩斿洖鐨?avatar 鎭掍负绌?   89. 閲嶅鐧诲綍涔熶笉浼氭妸澶村儚鍐欒繘鍘?   90. 閲嶅鐧诲綍杩斿洖鐮佹甯?   91. 瀵煎嚭鍒?9 鍒? [9]
-   92. 瀵煎嚭 7 琛? [7]
-   93. 鏈敼瀵嗙殑琛屽甫鍒濆瀵嗙爜  [user20240101]
-   94. 宸叉敼瀵嗙殑琛屽垵濮嬪瘑鐮佸垪涓虹┖锛堝涓嶅嚭鍝堝笇锛?   95. 宸叉敼瀵嗚鏍囪涓哄凡婵€娲? [宸叉縺娲籡
-   96. 瀵煎嚭鍒楅『搴?骞寸骇/鐝骇/搴忓彿/濮撳悕/璐﹀彿/鍒濆瀵嗙爜
-   97. 瀵煎嚭鎺ュ彛杩斿洖 200  [200]
-   98. 瀵煎嚭鍝嶅簲甯?xlsx 绫诲瀷  [application/vnd.openxmlformats-officedocument.spreadsheetml.sheet]
-   99. 瀵煎嚭鏂囦欢鍚嶅惈涓枃骞寸骇  [attachment; filename="student-account.xlsx"; filename*=UTF-8''%E5%AD%A6%E7%94%9F]
-  100. 妯℃澘涓嬭浇 200  [200]
-  101. 鍒楄〃杩斿洖 7 鏉? [7]
-  102. 鍒楄〃鎸夊勾绾х彮绾у簭鍙锋帓搴忥紙绗竴鏉?20240101锛? [20240101]
-  103. 鍏抽敭璇嶆悳濮撳悕鍛戒腑 1 鏉? [1]
-  104. 缁熻鎬绘暟涓?7  [{"total":7,"activated":1,"inactive":6}]
-  105. 缁熻鎸夌彮绾у垎缁?7 缁? [7]
-  106. 缁熻閲?宸叉縺娲?+ 鏈縺娲?= 鎬绘暟  [{"total":7,"activated":1,"inactive":6}]
-  107. 鏀圭彮绾у悗璐﹀彿閲嶇畻涓?20240502  [20240502]
-  108. 鎶曠璁板綍璺熺潃杩佸埌鏂拌处鍙? [20240502]
-  109. 鏀瑰埌宸插瓨鍦ㄧ殑璐﹀彿琚嫆锛?0901锛? [40901]
-  110. 鏈夋姇绋跨殑璐﹀彿涓嶇‖鍒狅紝鏀逛负鍋滅敤  [{"deleted":false,"disabled":true,"submitCount":1,"message":"璇ヨ处鍙锋湁 1 鏉℃姇绋胯褰曪紝宸叉敼涓哄仠鐢紙涓嶅垹闄わ級"}]
-  111. 璇ヨ处鍙风‘瀹炶繕鍦ㄥ簱閲?  112. 绗簩涓壒娆℃柊寤?2 涓? [{"batchId":5,"created":2,"updated":0,"skipped":0,"invalid":0,"total":2,"totalRows":2,"warnings":[],"errors":[],"preview":{"mode":"header","summary":{"new":2,"update":0,"active":0,"invalid":0},"rows":[{"rowNo":2,"username":"20250101","grade":"2025","classNo":"01","seatNo":"01","name":"鏂扮敓鐢?,"state":"new","error":""},{"rowNo":3,"username":"20250102","grade":"2025","classNo":"01","seatNo":"02","name":"鏂扮敓涔?,"state":"new","error":""}]}}]
-  113. 鎵规鍒楄〃闈炵┖涓旀渶鏂扮殑鍦ㄦ渶鍓? [count=5 first=2025绾?xlsx]
-  114. 鎾ら攢鎵规鍒犳帀 2 涓湭婵€娲昏处鍙? [{"batchId":5,"removed":2,"keptActivated":0,"keptWithSubmit":0}]
-  115. 鎾ら攢鍚?2025 绾ц处鍙峰凡涓嶅湪搴撻噷
-  116. 鎵归噺閲嶇疆涓嶇粰鑼冨洿琚嫆锛堥槻鎵嬫粦鍏ㄩ噺锛? [40001]
-  117. 鎸夌彮绾ф壒閲忛噸缃敓鏁? [{"affected":1,"initPasswordRule":"user + 瀛﹀彿"}]
-  118. 骞寸骇姹囨€伙細1 涓勾绾?/ 鍏?7 涓处鍙? [{"gradeCount":1,"total":7,"activated":1,"disabled":1}]
-  119. 骞寸骇鍗＄墖瀛楁榻愬叏锛堝勾绾у悕 / 鐝骇鏁?/ 宸叉縺娲?/ 鍋滅敤锛? [{"grade":"2024","name":"2024 绾?,"classCount":7,"total":7,"activated":1,"inactive":6,"disabled":1,"lastImportAt":"2026-09-21 08:25:48.179 +00:00"}]
-  120. 骞寸骇鏄庣粏璇曠畻锛? 涓彲鍒?/ 1 涓彧鍋滅敤  [canDelete=6 withSubmit=1]
-  121. 骞寸骇鏄庣粏甯?7 涓彮鐨勫垎甯? [7]
-  122. 璇曠畻鏄彧璇荤殑锛屼竴琛岄兘娌℃敼
-  123. 骞寸骇鍙傛暟鏀寔銆?4绾с€嶇畝鍐? [2024]
-  124. 涓嶅瓨鍦ㄧ殑骞寸骇 鈫?40401  [40401]
-  125. purge 涓嶇粰纭涓茶鎷掞紙40001锛? [鍗遍櫓鎿嶄綔锛氳鎶婃姇绋胯褰曢噷鐨勮处鍙蜂竴骞跺垹鎺夛紝璇峰湪纭妗嗛噷鍘熸牱杈撳叆骞寸骇銆?024銆峕
-  126. 琚嫆鍚?2024 灞婃暟鎹竴琛屾病鍔?  127. 2026 灞婂鐢熷彲姝ｅ父鐧诲綍
-  128. 2026 灞婅瘯绠楋細1 鍙垹 / 1 鍙仠鐢? [{"canDelete":1,"withSubmit":1}]
-  129. 涓€閿竻鐞?2026 灞婏細鍒?1 鍋?1  [{"grade":"2026","name":"2026 绾?,"mode":"safe","total":2,"deleted":1,"disabled":1,"costMs":2,"receipt":{"createTime":"2026-09-21T08:25:49.801Z","updateTime":"2026-09-21T08:25:49.801Z","id":1,"grade":"2026","gradeName":"2026 绾?,"mode":"safe","total":2,"deleted":1,"disabled":1,"classCount":1,"untouched":7,"costMs":2,"operatorId":1,"operatorName":"teacher","disabledAccounts":[{"username":"20260101","name":"姣曚笟鐢?,"className":"2026 绾?1 鐝?}],"update_time":"2026-09-21T08:25:49.801Z","create_time":"2026-09-21T08:25:49.801Z","costText":"0.0s"}}]
-  130. 鏈夋姇绋胯褰曠殑璐﹀彿鍙仠鐢ㄣ€佷粛鑳芥煡鍒?  131. 鏃犳姇绋胯褰曠殑璐﹀彿琚湡姝ｅ垹闄?  132. 鏁村眾娓呯悊鍚庤鍋滅敤璐﹀彿鐨?token 绔嬪埢澶辨晥锛堜笉绛?30 绉掔紦瀛橈級  [401]
-  133. 琚垹璐﹀彿鏃犳硶鍐嶇櫥褰? [40101]
-  134. 娓呯悊鍚庡勾绾у垪琛ㄨ繕鐣欑潃 2026锛堝仠鐢ㄨ处鍙蜂粛鍦ㄦ。锛? [["2024","2026"]]
-  135. disable 妯″紡锛氫竴涓笉鍒犮€佸叏閮ㄥ仠鐢? [{"grade":"2027","name":"2027 绾?,"mode":"disable","total":2,"deleted":0,"disabled":2,"costMs":1,"receipt":{"createTime":"2026-09-21T08:25:49.839Z","updateTime":"2026-09-21T08:25:49.839Z","id":2,"grade":"2027","gradeName":"2027 绾?,"mode":"disable","total":2,"deleted":0,"disabled":2,"classCount":0,"untouched":8,"costMs":1,"operatorId":1,"operatorName":"teacher","disabledAccounts":[],"update_time":"2026-09-21T08:25:49.839Z","create_time":"2026-09-21T08:25:49.839Z","costText":"0.0s"}}]
-  136. purge 纭涓插啓閿欒鎷? [鍗遍櫓鎿嶄綔锛氳鎶婃姇绋胯褰曢噷鐨勮处鍙蜂竴骞跺垹鎺夛紝璇峰湪纭妗嗛噷鍘熸牱杈撳叆骞寸骇銆?027銆峕
-  137. purge 纭涓叉纭?鈫?鏁村眾娓呯┖  [{"grade":"2027","name":"2027 绾?,"mode":"purge","total":2,"deleted":2,"disabled":0,"costMs":1,"receipt":{"createTime":"2026-09-21T08:25:49.848Z","updateTime":"2026-09-21T08:25:49.848Z","id":3,"grade":"2027","gradeName":"2027 绾?,"mode":"purge","total":2,"deleted":2,"disabled":0,"classCount":0,"untouched":8,"costMs":1,"operatorId":1,"operatorName":"teacher","disabledAccounts":[],"update_time":"2026-09-21T08:25:49.848Z","create_time":"2026-09-21T08:25:49.848Z","costText":"0.0s"}}]
-  138. 鏀瑰悕锛歅UT { name } 杩斿洖鎴愬姛  [宸蹭繚瀛榏
-  139. 鏀瑰悕锛氳繑鍥炰綋 name 宸叉槸鏂板悕  [寮犱笁涓癩
-  140. 鏀瑰悕锛歳emark 钀藉簱  [寮犱笁涓癩
-  141. 鏀瑰悕锛歯ickname 鍚屾钀藉簱锛堝彧鍐?remark 浼氭紡鎺夎繖鏉★級  [寮犱笁涓癩
-  142. 鏀瑰悕锛氭寜鏂板悕鑳芥悳鍒帮紝涓斿垪琛?name 鏄柊鍚? [{"total":1,"name":"寮犱笁涓?}]
-  143. 鏀瑰悕锛氬鐢熺 /user/me 鐨?nickname 鏄柊鍚? [寮犱笁涓癩
-  144. 鏀瑰悕锛氬鐢熺 /user/me 鐨?name 鏄柊鍚? [寮犱笁涓癩
-  145. 鏀瑰悕锛氫紶 remark 鍒悕鍚屾牱鐢熸晥锛堜笉浼氬啀闈欓粯浠€涔堥兘涓嶆敼锛? [{"remark":"寮犱笁","nickname":"寮犱笁"}]
-  146. 鏀瑰悕锛氱┖鐧藉悕琚嫆锛?0001锛? [濮撳悕涓嶈兘涓虹┖]
-  147. 鏀瑰悕锛氳鎷掑悗搴撻噷鐨勫悕瀛楁病琚姩杩? [寮犱笁]
-  148. 鏀瑰悕锛氳秴杩?64 瀛楄鎷掞紙40001锛? [濮撳悕鏈€闀?64 涓瓧绗
-  149. 鏀瑰悕锛氭敼鐘舵€佷笉浼氶『鎵嬫竻鎺夊鍚? [寮犱笁]
-  150. 鎵归噺鍋滅敤锛氬簱閲岃嚦灏?2 涓鐢熻处鍙? [2]
-  151. 鎵归噺鍋滅敤锛氭帴鍙ｆ垚鍔? [宸插仠鐢?2 涓处鍙穄
-  152. 鎵归噺鍋滅敤锛歛ffected=2  [2]
-  153. 鎵归噺鍋滅敤锛氫袱琛?status 閮芥槸 0  [0,0]
-  154. 鎵归噺鍚敤锛氫袱琛?status 閮藉洖鍒?1  [1,1]
-  155. 鎵归噺鍋滅敤锛氱┖ ids 琚嫆锛?0001锛? [璇峰厛鍕鹃€夎鎿嶄綔鐨勮处鍙穄
-  156. 鎵归噺鍋滅敤锛氱己 status 琚嫆锛?0001锛? [缂哄皯 status锛?=鍚敤 0=鍋滅敤锛塢
-  157. 鎵归噺鍋滅敤锛氳秴杩?500 涓鎷掞紙40001锛? [涓€娆℃渶澶氭搷浣?500 涓处鍙穄
-  158. /student/:id 宸叉敞鍐? [81]
-  159. 瀛楅潰閲忚矾鐢?/student/import/preview 鎺掑湪 /student/:id 涔嬪墠  [index=66 param=81]
-  160. 瀛楅潰閲忚矾鐢?/student/import/commit 鎺掑湪 /student/:id 涔嬪墠  [index=67 param=81]
-  161. 瀛楅潰閲忚矾鐢?/student/template 鎺掑湪 /student/:id 涔嬪墠  [index=68 param=81]
-  162. 瀛楅潰閲忚矾鐢?/student/list 鎺掑湪 /student/:id 涔嬪墠  [index=69 param=81]
-  163. 瀛楅潰閲忚矾鐢?/student/stats 鎺掑湪 /student/:id 涔嬪墠  [index=70 param=81]
-  164. 瀛楅潰閲忚矾鐢?/student/export 鎺掑湪 /student/:id 涔嬪墠  [index=71 param=81]
-  165. 瀛楅潰閲忚矾鐢?/student/batches 鎺掑湪 /student/:id 涔嬪墠  [index=76 param=81]
-  166. 瀛楅潰閲忚矾鐢?/student/grades 鎺掑湪 /student/:id 涔嬪墠  [index=72 param=81]
-  167. 瀛楅潰閲忚矾鐢?/student/grade/:grade 鎺掑湪 /student/:id 涔嬪墠  [index=73 param=81]
-  168. 瀛楅潰閲忚矾鐢?/student/reset-password/batch 鎺掑湪 /student/:id 涔嬪墠  [index=77 param=81]
-  169. 瀛楅潰閲忚矾鐢?/student/status/batch 鎺掑湪 /student/:id 涔嬪墠  [index=78 param=81]
-  170. 瀛楅潰閲忚矾鐢?/student/delete/batch 鎺掑湪 /student/:id 涔嬪墠  [index=80 param=81]
-  171. 瀛︾敓璐﹀彿鎺ュ彛鏈櫥褰?鈫?401  [401]
-  172. 鎷垮鐢?token 璋冪鐞嗙鎺ュ彛 鈫?401  [401]
-  173. 涓婁紶 .txt 琚嫆  [涓嶆敮鎸佺殑鏂囦欢绫诲瀷 .txt锛屼粎鍏佽 xlsx / xls / csv]
-  174. 涓嶄紶鏂囦欢琚嫆  [璇烽€夋嫨瑕佸鍏ョ殑琛ㄦ牸鏂囦欢锛堝瓧娈靛悕 file锛塢
-锛堝啓缁撴灉鏂囦欢澶辫触锛欵BUSY: resource busy or locked, open 'C:\Users\Administrator\radio-backend\scripts\verify-student-output.txt'锛?
+通过 174 项，失败 0 项
+全部通过 ✅
+
+通过的断言：
+    1. 年级「2024」→ 2024  [2024]
+    2. 年级「2024级」→ 2024  [2024]
+    3. 年级「2024届」→ 2024  [2024]
+    4. 年级「24」→ 2024  [2024]
+    5. 年级「24级」→ 2024  [2024]
+    6. 年级「２０２４」→ 2024  [2024]
+    7. 年级「  2024  」→ 2024  [2024]
+    8. 年级「'2024」→ 2024  [2024]
+    9. 年级「高一」被拒（无年份）  [年级「高一」无法识别，应为 4 位入学年份（如 2024）]
+   10. 班级 / 序号「1」→ 01  [01]
+   11. 班级 / 序号「01」→ 01  [01]
+   12. 班级 / 序号「1班」→ 01  [01]
+   13. 班级 / 序号「高一(1)班」→ 01  [01]
+   14. 班级 / 序号「5号」→ 05  [05]
+   15. 班级 / 序号「第5」→ 05  [05]
+   16. 班级 / 序号「１２」→ 12  [12]
+   17. 班级 / 序号「 99 」→ 99  [99]
+   18. 序号 100 超范围被拒  [序号「100」超出范围（1~99）]
+   19. 单列合并「20240101」→ 2024+01+01  [["2024","01","01"]]
+   20. 单列合并「2024-01-01」→ 2024+01+01  [["2024","01","01"]]
+   21. 单列合并「2024级1班1号」→ 2024+1+1  [["2024","1","1"]]
+   22. 单列合并「2024 01 01」→ 2024+01+01  [["2024","01","01"]]
+   23. 账号拼接 2024+01+01 = 20240101
+   24. 识别为有表头模式  [header]
+   25. 表头在第 1 行  [0]
+   26. 列映射 年级=0 班级=1 序号=2 姓名=3  [{"grade":0,"class":1,"seat":2,"name":3}]
+   27. 7 行数据（尾部空行已跳过）  [totalRows=7]
+   28. 7 行全部解析成功
+   29. 账号与预期完全一致  [20240101,20240202,20240322,20240433,20240745,20241054,20241332]
+   30. 姓名正确提取（第 4 列）  [张三,李二,李四,莉莉,小米,李三,蔡徐]
+   31. 行号 = 表格真实行号（第 2 行是第一条数据）  [rowNo=2]
+   32. 右侧空列被忽略（没有多余列报错）
+   33. 无表头 → 按列序解析  [position]
+   34. 无表头时账号正确
+   35. 单列 20240101 可拆三段  [20240101]
+   36. 单列 2024级2班3号 可拆三段  [20240203]
+   37. 2024级 / 1班 / 5号 → 20240105  [20240105]
+   38. 24 / 02 / 第6 → 20240206  [20240206]
+   39. 缺班级 → 标异常  [班级「」无法识别，应为数字]
+   40. 序号 100 → 标异常  [序号「100」超出范围（1~99）]
+   41. 本批重复 → 后一行标异常  [本批次内账号 20240801 重复（第 6 行已出现）]
+   42. 全空表被拒  [没有读到任何数据行（表头下面全是空行？）]
+   43. 预览 7 条全部 new  [{"new":7,"update":0,"active":0,"invalid":0}]
+   44. 首次导入新建 7 个  [{"batchId":1,"created":7,"updated":0,"skipped":0,"invalid":0,"total":7,"totalRows":7,"warnings":[],"errors":[],"preview":{"mode":"header","summary":{"new":7,"update":0,"active":0,"invalid":0},"rows":[{"rowNo":2,"username":"20240101","grade":"2024","classNo":"01","seatNo":"01","name":"张三","state":"new","error":""},{"rowNo":3,"username":"20240202","grade":"2024","classNo":"02","seatNo":"02","name":"李二","state":"new","error":""},{"rowNo":4,"username":"20240322","grade":"2024","classNo":"03","seatNo":"22","name":"李四","state":"new","error":""},{"rowNo":5,"username":"20240433","grade":"2024","classNo":"04","seatNo":"33","name":"莉莉","state":"new","error":""},{"rowNo":6,"username":"20240745","grade":"2024","classNo":"07","seatNo":"45","name":"小米","state":"new","error":""},{"rowNo":7,"username":"20241054","grade":"2024","classNo":"10","seatNo":"54","name":"李三","state":"new","error":""},{"rowNo":8,"username":"20241332","grade":"2024","classNo":"13","seatNo":"32","name":"蔡徐","state":"new","error":""}]}}]
+   45. 落库后 count 复核 = 7  [total=7]
+   46. 库里确实是 7 个学生账号
+   47. 账号 20240101 存在且姓名为张三
+   48. 重复导入不产生新账号（created=0）  [{"batchId":2,"created":0,"updated":7,"skipped":0,"invalid":0,"total":7,"totalRows":7,"warnings":[],"errors":[],"preview":{"mode":"header","summary":{"new":0,"update":7,"active":0,"invalid":0},"rows":[{"rowNo":2,"username":"20240101","grade":"2024","classNo":"01","seatNo":"01","name":"张三","state":"update","error":""},{"rowNo":3,"username":"20240202","grade":"2024","classNo":"02","seatNo":"02","name":"李二","state":"update","error":""},{"rowNo":4,"username":"20240322","grade":"2024","classNo":"03","seatNo":"22","name":"李四","state":"update","error":""},{"rowNo":5,"username":"20240433","grade":"2024","classNo":"04","seatNo":"33","name":"莉莉","state":"update","error":""},{"rowNo":6,"username":"20240745","grade":"2024","classNo":"07","seatNo":"45","name":"小米","state":"update","error":""},{"rowNo":7,"username":"20241054","grade":"2024","classNo":"10","seatNo":"54","name":"李三","state":"update","error":""},{"rowNo":8,"username":"20241332","grade":"2024","classNo":"13","seatNo":"32","name":"蔡徐","state":"update","error":""}]}}]
+   49. 重复导入 7 条走「覆盖更新」  [updated=7]
+   50. 重复导入后总数仍是 7
+   51. 已激活账号进入 active（受保护）  [{"new":0,"update":6,"active":1,"invalid":0}]
+   52. 默认导入跳过已激活账号  [{"batchId":3,"created":0,"updated":6,"skipped":1,"invalid":0,"total":6,"totalRows":7,"warnings":[],"errors":[],"preview":{"mode":"header","summary":{"new":0,"update":6,"active":1,"invalid":0},"rows":[{"rowNo":2,"username":"20240101","grade":"2024","classNo":"01","seatNo":"01","name":"张三","state":"active","error":""},{"rowNo":3,"username":"20240202","grade":"2024","classNo":"02","seatNo":"02","name":"李二","state":"update","error":""},{"rowNo":4,"username":"20240322","grade":"2024","classNo":"03","seatNo":"22","name":"李四","state":"update","error":""},{"rowNo":5,"username":"20240433","grade":"2024","classNo":"04","seatNo":"33","name":"莉莉","state":"update","error":""},{"rowNo":6,"username":"20240745","grade":"2024","classNo":"07","seatNo":"45","name":"小米","state":"update","error":""},{"rowNo":7,"username":"20241054","grade":"2024","classNo":"10","seatNo":"54","name":"李三","state":"update","error":""},{"rowNo":8,"username":"20241332","grade":"2024","classNo":"13","seatNo":"32","name":"蔡徐","state":"update","error":""}]}}]
+   53. force 导入可覆盖已激活账号（updated=7）  [{"batchId":4,"created":0,"updated":7,"skipped":0,"invalid":0,"total":7,"totalRows":7,"warnings":[],"errors":[],"preview":{"mode":"header","summary":{"new":0,"update":7,"active":0,"invalid":0},"rows":[{"rowNo":2,"username":"20240101","grade":"2024","classNo":"01","seatNo":"01","name":"张三","state":"update","error":""},{"rowNo":3,"username":"20240202","grade":"2024","classNo":"02","seatNo":"02","name":"李二","state":"update","error":""},{"rowNo":4,"username":"20240322","grade":"2024","classNo":"03","seatNo":"22","name":"李四","state":"update","error":""},{"rowNo":5,"username":"20240433","grade":"2024","classNo":"04","seatNo":"33","name":"莉莉","state":"update","error":""},{"rowNo":6,"username":"20240745","grade":"2024","classNo":"07","seatNo":"45","name":"小米","state":"update","error":""},{"rowNo":7,"username":"20241054","grade":"2024","classNo":"10","seatNo":"54","name":"李三","state":"update","error":""},{"rowNo":8,"username":"20241332","grade":"2024","classNo":"13","seatNo":"32","name":"蔡徐","state":"update","error":""}]}}]
+   54. force 覆盖不碰密码（仍能用初始密码登录）
+   55. 账号密码登录成功  [{"code":0,"message":"登录成功","data":{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVuaWQiOiIyMDI0MDEwMSIsInVpZCI6MSw]
+   56. 返回年级班级信息  [2024 级 1 班]
+   57. 标记 isDefaultPwd=true
+   58. 返回 token
+   59. 记录最近登录时间
+   60. 登录次数 +1  [1]
+   61. 密码错误 → 40101  [code=40101 http=200]
+   62. 账号不存在 → 40101  [code=40101 http=200]
+   63. 两种失败的文案一致（防账号枚举）  [账号或密码错误]
+   64. 带 token 可访问 /user/me  [{"code":0,"message":"ok","data":{"openid":null,"nickname":"张三","avatar":"","id":1,"username":"20240101","name":"张三","gra]
+   65. /user/me 返回账号与班级
+   66. /user/me 不返回 password 字段
+   67. 无 token 访问 → 401  [401]
+   68. 改密：纯数字被拒  [新密码必须同时包含字母和数字]
+   69. 改密：原密码错误被拒  [原密码不正确]
+   70. 改密成功并返回新 token  [密码修改成功]
+   71. 改密后 isDefaultPwd=false
+   72. 改密后旧 token 立刻失效  [401]
+   73. 改密后新 token 可用
+   74. 改密后旧密码登录失败  [code=40101]
+   75. 改密后新密码登录成功
+   76. 管理员停用账号  [已停用]
+   77. 停用后无法登录（40301）  [40301]
+   78. 停用后已发放的 token 被踢（401）  [401]
+   79. 管理员重置为初始密码  [已重置为初始密码]
+   80. 重置后可用初始密码登录
+   81. 重置后 isDefaultPwd 回到 true
+   82. 测试环境微信登录仍放行（保护既有 56 条用例）  [ok]
+   83. 生产环境 + 开关 on → 拦截微信登录
+   84. 生产环境 + 开关 off → 放行微信登录
+   85. 测试环境永远放行（避免连锁失败）
+   86. 微信登录对带 avatar 的老客户端仍放行（兼容）  [ok]
+   87. 客户端传的 avatar 不会入库（头像只能姓作图）
+   88. /user/me 返回的 avatar 恒为空
+   89. 重复登录也不会把头像写进去
+   90. 重复登录返回码正常
+   91. 导出列 9 列  [9]
+   92. 导出 7 行  [7]
+   93. 未改密的行带初始密码  [user20240101]
+   94. 已改密的行初始密码列为空（导不出哈希）
+   95. 已改密行标记为已激活  [已激活]
+   96. 导出列顺序 年级/班级/序号/姓名/账号/初始密码
+   97. 导出接口返回 200  [200]
+   98. 导出响应带 xlsx 类型  [application/vnd.openxmlformats-officedocument.spreadsheetml.sheet]
+   99. 导出文件名含中文年级  [attachment; filename="student-account.xlsx"; filename*=UTF-8''%E5%AD%A6%E7%94%9F]
+  100. 模板下载 200  [200]
+  101. 列表返回 7 条  [7]
+  102. 列表按年级班级序号排序（第一条 20240101）  [20240101]
+  103. 关键词搜姓名命中 1 条  [1]
+  104. 统计总数为 7  [{"total":7,"activated":1,"inactive":6}]
+  105. 统计按班级分组 7 组  [7]
+  106. 统计里 已激活 + 未激活 = 总数  [{"total":7,"activated":1,"inactive":6}]
+  107. 改班级后账号重算为 20240502  [20240502]
+  108. 投稿记录跟着迁到新账号  [20240502]
+  109. 改到已存在的账号被拒（40901）  [40901]
+  110. 有投稿的账号不硬删，改为停用  [{"deleted":false,"disabled":true,"submitCount":1,"message":"该账号有 1 条投稿记录，已改为停用（不删除）"}]
+  111. 该账号确实还在库里
+  112. 第二个批次新建 2 个  [{"batchId":5,"created":2,"updated":0,"skipped":0,"invalid":0,"total":2,"totalRows":2,"warnings":[],"errors":[],"preview":{"mode":"header","summary":{"new":2,"update":0,"active":0,"invalid":0},"rows":[{"rowNo":2,"username":"20250101","grade":"2025","classNo":"01","seatNo":"01","name":"新生甲","state":"new","error":""},{"rowNo":3,"username":"20250102","grade":"2025","classNo":"01","seatNo":"02","name":"新生乙","state":"new","error":""}]}}]
+  113. 批次列表非空且最新的在最前  [count=5 first=2025级.xlsx]
+  114. 撤销批次删掉 2 个未激活账号  [{"batchId":5,"removed":2,"keptActivated":0,"keptWithSubmit":0}]
+  115. 撤销后 2025 级账号已不在库里
+  116. 批量重置不给范围被拒（防手滑全量）  [40001]
+  117. 按班级批量重置生效  [{"affected":1,"initPasswordRule":"user + 学号"}]
+  118. 年级汇总：1 个年级 / 共 7 个账号  [{"gradeCount":1,"total":7,"activated":1,"disabled":1}]
+  119. 年级卡片字段齐全（年级名 / 班级数 / 已激活 / 停用）  [{"grade":"2024","name":"2024 级","classCount":7,"total":7,"activated":1,"inactive":6,"disabled":1,"lastImportAt":"2026-09-24 18:09:22.772 +00:00"}]
+  120. 年级明细试算：6 个可删 / 1 个只停用  [canDelete=6 withSubmit=1]
+  121. 年级明细带 7 个班的分布  [7]
+  122. 试算是只读的，一行都没改
+  123. 年级参数支持「24级」简写  [2024]
+  124. 不存在的年级 → 40401  [40401]
+  125. purge 不给确认串被拒（40001）  [危险操作：要把投稿记录里的账号一并删掉，请在确认框里原样输入年级「2024」]
+  126. 被拒后 2024 届数据一行没动
+  127. 2026 届学生可正常登录
+  128. 2026 届试算：1 可删 / 1 只停用  [{"canDelete":1,"withSubmit":1}]
+  129. 一键清理 2026 届：删 1 停 1  [{"grade":"2026","name":"2026 级","mode":"safe","total":2,"deleted":1,"disabled":1,"costMs":3,"receipt":{"createTime":"2026-09-24T18:09:24.540Z","updateTime":"2026-09-24T18:09:24.540Z","id":1,"grade":"2026","gradeName":"2026 级","mode":"safe","total":2,"deleted":1,"disabled":1,"classCount":1,"untouched":7,"costMs":3,"operatorId":1,"operatorName":"teacher","disabledAccounts":[{"username":"20260101","name":"毕业甲","className":"2026 级 1 班"}],"update_time":"2026-09-24T18:09:24.540Z","create_time":"2026-09-24T18:09:24.540Z","costText":"0.0s"}}]
+  130. 有投稿记录的账号只停用、仍能查到
+  131. 无投稿记录的账号被真正删除
+  132. 整届清理后被停用账号的 token 立刻失效（不等 30 秒缓存）  [401]
+  133. 被删账号无法再登录  [40101]
+  134. 清理后年级列表还留着 2026（停用账号仍在档）  [["2024","2026"]]
+  135. disable 模式：一个不删、全部停用  [{"grade":"2027","name":"2027 级","mode":"disable","total":2,"deleted":0,"disabled":2,"costMs":2,"receipt":{"createTime":"2026-09-24T18:09:24.578Z","updateTime":"2026-09-24T18:09:24.578Z","id":2,"grade":"2027","gradeName":"2027 级","mode":"disable","total":2,"deleted":0,"disabled":2,"classCount":0,"untouched":8,"costMs":2,"operatorId":1,"operatorName":"teacher","disabledAccounts":[],"update_time":"2026-09-24T18:09:24.578Z","create_time":"2026-09-24T18:09:24.578Z","costText":"0.0s"}}]
+  136. purge 确认串写错被拒  [危险操作：要把投稿记录里的账号一并删掉，请在确认框里原样输入年级「2027」]
+  137. purge 确认串正确 → 整届清空  [{"grade":"2027","name":"2027 级","mode":"purge","total":2,"deleted":2,"disabled":0,"costMs":1,"receipt":{"createTime":"2026-09-24T18:09:24.587Z","updateTime":"2026-09-24T18:09:24.587Z","id":3,"grade":"2027","gradeName":"2027 级","mode":"purge","total":2,"deleted":2,"disabled":0,"classCount":0,"untouched":8,"costMs":1,"operatorId":1,"operatorName":"teacher","disabledAccounts":[],"update_time":"2026-09-24T18:09:24.587Z","create_time":"2026-09-24T18:09:24.587Z","costText":"0.0s"}}]
+  138. 改名：PUT { name } 返回成功  [已保存]
+  139. 改名：返回体 name 已是新名  [张三丰]
+  140. 改名：remark 落库  [张三丰]
+  141. 改名：nickname 同步落库（只写 remark 会漏掉这条）  [张三丰]
+  142. 改名：按新名能搜到，且列表 name 是新名  [{"total":1,"name":"张三丰"}]
+  143. 改名：学生端 /user/me 的 nickname 是新名  [张三丰]
+  144. 改名：学生端 /user/me 的 name 是新名  [张三丰]
+  145. 改名：传 remark 别名同样生效（不会再静默什么都不改）  [{"remark":"张三","nickname":"张三"}]
+  146. 改名：空白名被拒（40001）  [姓名不能为空]
+  147. 改名：被拒后库里的名字没被动过  [张三]
+  148. 改名：超过 64 字被拒（40001）  [姓名最长 64 个字符]
+  149. 改名：改状态不会顺手清掉姓名  [张三]
+  150. 批量停用：库里至少 2 个学生账号  [2]
+  151. 批量停用：接口成功  [已停用 2 个账号]
+  152. 批量停用：affected=2  [2]
+  153. 批量停用：两行 status 都是 0  [0,0]
+  154. 批量启用：两行 status 都回到 1  [1,1]
+  155. 批量停用：空 ids 被拒（40001）  [请先勾选要操作的账号]
+  156. 批量停用：缺 status 被拒（40001）  [缺少 status（1=启用 0=停用）]
+  157. 批量停用：超过 500 个被拒（40001）  [一次最多操作 500 个账号]
+  158. /student/:id 已注册  [88]
+  159. 字面量路由 /student/import/preview 排在 /student/:id 之前  [index=73 param=88]
+  160. 字面量路由 /student/import/commit 排在 /student/:id 之前  [index=74 param=88]
+  161. 字面量路由 /student/template 排在 /student/:id 之前  [index=75 param=88]
+  162. 字面量路由 /student/list 排在 /student/:id 之前  [index=76 param=88]
+  163. 字面量路由 /student/stats 排在 /student/:id 之前  [index=77 param=88]
+  164. 字面量路由 /student/export 排在 /student/:id 之前  [index=78 param=88]
+  165. 字面量路由 /student/batches 排在 /student/:id 之前  [index=83 param=88]
+  166. 字面量路由 /student/grades 排在 /student/:id 之前  [index=79 param=88]
+  167. 字面量路由 /student/grade/:grade 排在 /student/:id 之前  [index=80 param=88]
+  168. 字面量路由 /student/reset-password/batch 排在 /student/:id 之前  [index=84 param=88]
+  169. 字面量路由 /student/status/batch 排在 /student/:id 之前  [index=85 param=88]
+  170. 字面量路由 /student/delete/batch 排在 /student/:id 之前  [index=87 param=88]
+  171. 学生账号接口未登录 → 401  [401]
+  172. 拿学生 token 调管理端接口 → 401  [401]
+  173. 上传 .txt 被拒  [不支持的文件类型 .txt，仅允许 xlsx / xls / csv]
+  174. 不传文件被拒  [请选择要导入的表格文件（字段名 file）]

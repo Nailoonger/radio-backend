@@ -983,7 +983,7 @@ exports.saveWindow = async (req, res, next) => {
     const body = req.body || {};
     await songWindow.setConfig(body, req.admin.id);
     const st = await songWindow.describe();
-    return success(res, st, `点歌时间已更新：${st.windowText}（窗口结束即审核开始）`);
+    return success(res, st, `点歌时间已更新：${st.windowText}（审核截止 ${st.reviewText}）`);
   } catch (e) {
     if (e instanceof ApiError) return next(e);
     return next(e);
