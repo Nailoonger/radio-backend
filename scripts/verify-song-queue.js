@@ -27,6 +27,42 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 process.env.DB_DIALECT = 'sqlite';
 process.env.DB_STORAGE = ':memory:';
 
+/* ══════════════════════════════════════════════════════════════════════
+ * ⛔ 本脚本已被取代（2026-09-24）—— 下面的断言**不再执行**，仅作历史留档
+ *
+ * 它断言的是 v2「提交即占位 + 全局 FIFO 候补队列 + 窗口结束定稿」那一套行为。
+ * 用户 2026-09-24 决定按业务协议重做点歌算法，以下行为被**有意废除**（不是回归）：
+ *   · 提交时判容量、格子满进候补、格子+候补都满返回 40904
+ *   · 全局候补 FIFO（跨时段无差别补位）、未审候补补位后 status=4
+ *   · 满额清队 closeQueueIfFull
+ *   · 窗口结束（周日 18:00）就定稿清 3 / 4
+ *
+ * 取而代之的是 docs/song-protocol.md：
+ *   · 提交不判容量，一律 PENDING_REVIEW
+ *   · 审核通过后跑「第一轮排期」：同格按提交时间取前 capacity，其余 WAITING
+ *   · 原位递补 + 全局调剂（可接受位置少 → 提交时间早 → 距原时段近）
+ *   · 到 schedule_lock_at 才锁定：跑最后一次调度 + 剩余 WAITING → AUTO_REJECTED
+ *
+ * 现行验证：`node scripts/verify-song-protocol.js`
+ * ══════════════════════════════════════════════════════════════════════ */
+(function archiveGuard() {
+  let superseded = false;
+  try { require('../src/services/songSchedulingService'); superseded = true; } catch (e) { superseded = false; }
+  if (!superseded) return;
+  const msg = [
+    '',
+    '⛔ scripts/verify-song-queue.js 已作废：它断言的 v2 口径已被 docs/song-protocol.md 取代。',
+    '   本文件保留为历史记录，下面的断言不再执行。',
+    '   现行验证请跑：node scripts/verify-song-protocol.js',
+    '',
+  ].join('\n');
+  console.log(msg);
+  try {
+    require('fs').writeFileSync(require('path').join(__dirname, 'verify-song-queue-output.txt'), msg, 'utf8');
+  } catch (e) { /* 写不进去也不影响 */ }
+  process.exit(0);
+})();
+
 const fs = require('fs');
 const path = require('path');
 

@@ -317,6 +317,17 @@ router.put('/submit/slots', adminAuth, requireAdmin, submit.saveSlots);
  */
 router.get('/submit/schedule', adminAuth, requireAdmin, submit.schedule);
 
+/* ── 协议版排期算法（2026-09-24，docs/song-protocol.md）─────────────
+ * 第一轮排期 / 全局调剂 / 锁定 / 人工调整 / 播放标记
+ * ⚠️ 全是字面量段，必须注册在 `/submit/:id` 之前
+ * ───────────────────────────────────────────────────────────────── */
+/** 目标周的排期状态与时间锚点（申请窗 / 锁定时刻） */
+router.get('/submit/week', adminAuth, requireAdmin, submit.week);
+/** 执行第一轮排期 + 全局调剂（协议 §16 / §17） */
+router.post('/submit/schedule/run', adminAuth, requireAdmin, submit.runSchedule);
+/** 正式锁定：最后调度 + 无位自动驳回（协议 §18）；body.force 可提前锁 */
+router.post('/submit/schedule/lock', adminAuth, requireAdmin, submit.lock);
+
 /**
  * @swagger
  * /api/admin/submit/rules:
@@ -424,6 +435,62 @@ router.put('/submit/:id/approve', adminAuth, requireAdmin, submit.approve);
  *       200: { description: 已撤销 }
  */
 router.put('/submit/:id/revoke', adminAuth, requireAdmin, submit.revoke);
+
+/**
+ * @swagger
+ * /api/admin/submit/{id}/assign:
+ *   post:
+ *     tags: [管理端-投稿审核]
+ *     summary: 人工指定播出时段（协议 §20）
+ *     description: |
+ *       管理员手工把一条点歌放到某个时段。写入 assignment_log（type=MANUAL），
+ *       历史链不断 —— 仍能看到「原来排在哪、为什么换」。
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [slot]
+ *             properties:
+ *               slot: { type: string, example: "2026-09-21 午间 12:20" }
+ *               reason: { type: string }
+ *     responses:
+ *       200: { description: ok }
+ */
+router.post('/submit/:id/assign', adminAuth, requireAdmin, submit.assign);
+
+/**
+ * @swagger
+ * /api/admin/submit/{id}/played:
+ *   put:
+ *     tags: [管理端-投稿审核]
+ *     summary: 标记已播放 / 取消播放标记
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               played: { type: boolean, default: true }
+ *     responses:
+ *       200: { description: ok }
+ */
+router.put('/submit/:id/played', adminAuth, requireAdmin, submit.played);
+
+/**
+ * @swagger
+ * /api/admin/submit/{id}/status-logs:
+ *   get:
+ *     tags: [管理端-投稿审核]
+ *     summary: 状态变更历史（「这首歌为什么现在是这个状态」）
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: ok }
+ */
+router.get('/submit/:id/status-logs', adminAuth, requireAdmin, submit.statusLogs);
 
 /**
  * @swagger

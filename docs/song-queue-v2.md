@@ -1,5 +1,14 @@
 # 点歌审核规则 v2 · 排期容量池 + 全局候补队列 + 点歌时间窗口
 
+> ⛔ **已被取代（2026-09-24）**：本文描述的「提交即占位 + 全局 FIFO 候补队列 + 窗口结束定稿」
+> 已被按业务协议重做的算法替换，现行口径见 **`docs/song-protocol.md`**。
+> 本文**保留为历史记录**（不删），下列内容不要再作为实现依据：
+>   · 提交时判容量（格子满 → 进候补，格子 + 候补都满 → 40904）
+>   · 全局候补 FIFO、未审候补补位后 `status=4`、`promote()` / `closeQueueIfFull()`
+>   · 窗口结束（周日 18:00）就定稿清 3 / 4
+>   · 单字段 `status` 0/1/2/3/4、`song_queue_limit` 候补上限
+> 仍然有效的是本文 §6.6 的**点歌时间窗口**（规则不变，只是接进了新的周状态机）。
+>
 > 状态：**规则已定稿（2026-09-20 23:00，v2.4），业务代码待开工**
 > 取代：`docs/song-quota.md` 的「日 / 周名额」口径（该文保留为历史记录，不删）
 > 波及：`src/services/songQuotaService.js`（退役）、🆕 `src/services/songQueueService.js`、🆕 `src/services/songWindowService.js`、`broadcastSlotService.js`、`controllers/admin/submitController.js`、`controllers/user/submitController.js`、`models/submit.js`、`routes/admin.js`（窗口配置：仅超管路由）、`app.js`（挂调度器）、管理端 `SongSettings.vue` + 排期矩阵屏 + 小程序点歌页/我的投稿页

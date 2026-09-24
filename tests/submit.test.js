@@ -40,7 +40,11 @@ describe('用户端：投稿', () => {
       .send({ type: 1, songName: '起风了', singer: '买辣椒也用券', wishContent: '毕业快乐', wantBroadcastTime: slot });
     expect(res.body.code).toBe(0);
     expect(res.body.data.id).toBeGreaterThan(0);
-    expect(res.body.data.outcome).toBe('seated');     // v2：提交即占位
+    // 协议版（docs/song-protocol.md）：提交**不判容量**，一律落成「待审核 + 未排期」，
+    // 究竟排不排得上要等审核通过后由排期算法算 —— 所以 outcome 是 submitted 而不是 seated。
+    expect(res.body.data.outcome).toBe('submitted');
+    expect(res.body.data.reviewStatus).toBe(0);
+    expect(res.body.data.scheduleStatus).toBe(0);
     submitId = res.body.data.id;
   });
 

@@ -1,37 +1,39 @@
 'use strict';
 
 /**
- * 管理端 - 投稿审核（规则 v2，docs/song-queue-v2.md）
+ * 管理端 - 投稿审核与排期（协议版，2026-09-24，docs/song-protocol.md）
+ *
+ * 审核：
  * GET    /api/admin/submit/list            列表（分页、筛选）
- * GET    /api/admin/submit/:id             详情
- * PUT    /api/admin/submit/:id/approve     通过
- * PUT    /api/admin/submit/:id/reject      驳回（必填驳回理由）
+ * GET    /api/admin/submit/:id             详情（含三维状态 + 状态变更历史）
+ * PUT    /api/admin/submit/:id/approve     审核通过（→ 进排期候选池）
+ * PUT    /api/admin/submit/:id/reject      审核驳回（必填理由）
  * PUT    /api/admin/submit/:id/revoke      撤销审核结果（回到待审）
  * DELETE /api/admin/submit/:id             删除
  * POST   /api/admin/submit/batch           批量审核
  *
- * 排期容量与候补（v2）：
- * GET    /api/admin/submit/schedule        下周排期矩阵 + 全局候补队列 + 定稿时刻
- * GET    /api/admin/submit/capacity        容量 / 候补 / 窗口 快照
- * POST   /api/admin/submit/queue/sweep     手动触发「递补 + 满额清队 + 定稿清理」（幂等）
- * GET    /api/admin/submit/window          点歌时间窗口（读）
- * PUT    /api/admin/submit/window          点歌时间窗口（写，仅超管）
+ * 排期（协议 §16~§20）：
+ * GET    /api/admin/submit/schedule        下周排期矩阵（三维）+ 候补队列 + 锁定时刻
+ * GET    /api/admin/submit/week            目标周的排期状态与时间锚点
+ * POST   /api/admin/submit/schedule/run    执行第一轮排期 + 全局调剂
+ * POST   /api/admin/submit/schedule/lock   正式锁定（最后调度 + 无位自动驳回）
+ * POST   /api/admin/submit/:id/assign      人工指定时段
+ * PUT    /api/admin/submit/:id/played      标记已播放 / 取消
+ * GET    /api/admin/submit/capacity        容量与候补快照
+ * POST   /api/admin/submit/queue/sweep     手动兜底 sweep（幂等）
  *
  * ═══════════════════════════════════════════════════════════════════════
- * v2 与 v1 最大的区别：**审核不再改变容量**
- *   占位发生在学生「提交」那一刻（songQueueService.decideSeat）：
- *     正式位有空 → status=0 待审（已占位）
- *     格子满     → status=3 候补中（全局队列，先进先出）
- *   所以本文件只需要把状态流转做对，不再有「占名额 / 还名额」这套两本账，
- *   也就不会出现「驳回已通过件不还名额」这种泄漏。
+ * 协议版与 v2 最大的区别：
+ *   v2  「提交即占位」—— 审核只是内容把关，位子在学生提交那一刻就定了。
+ *   协议 「审核通过后才进排期」—— 审核通过只是拿到**候选资格**，
+ *        真正的位置由第一轮排期（按首选时段 + 提交时间）决定，
+ *        没排上的人是 WAITING，靠原位递补 / 全局调剂再争取。
  *
- * 状态：0 待审 · 1 已排期 · 2 已驳回 · 3 候补中 · 4 已补位·待审
- * 释放正式位的动作（驳回 / 撤销 / 删除）之后统一调 songQueue.runAfterRelease()
- * ——内部会递补队首、并在排期满额时清空候补队列，全部幂等。
+ * 状态真值是三个维度（review/schedule/play），`status` 只是派生镜像。
+ * 本文件所有状态改动一律走 `songStatusService.applyChange()`，不直接写 status。
  * ═══════════════════════════════════════════════════════════════════════
  */
 const { Op, fn, col } = require('sequelize');
-const dayjs = require('dayjs');
 const { Submit, User, Admin, sequelize } = require('../../models');
 const { success, fail, ApiError, Codes } = require('../../utils/response');
 const songQueue = require('../../services/songQueueService');
@@ -40,73 +42,107 @@ const submitRule = require('../../services/submitRuleService');
 const roster = require('../../services/studentRosterService');
 const songNotice = require('../../services/songNoticeService');
 const broadcastSlot = require('../../services/broadcastSlotService');
+const S = require('../../services/songStatusService');
+const sched = require('../../services/songSchedulingService');
+const logger = require('../../utils/logger');
 
-/** 占正式位的状态（= 已排期占用的口径） */
-const SEATED = songQueue.SEATED_STATUS;
-const ST = songQueue.ST;
+const ST = S.ST;
 
-/**
- * 释放位子之后跑一次：递补 + 满额清队 + 定稿清理（幂等）
- *
- * ⚠️ 必须 await —— 早先写成 setImmediate 异步「着火即忘」，结果是：
- *   ① 接口回「空出的位子已开始递补」，管理员立刻刷新列表却还是空的，
- *      过一个 tick 才变，看起来像 bug；
- *   ② 与后续请求（学生提交、另一次审核）抢着改同一条记录，行为不可预期。
- * 内部已经吞掉异常（位子已释放，递补失败只记日志，下次 sweep 会重试），
- * 所以 await 不会把审核动作本身搞失败。
- */
-async function afterRelease() {
+/** 给接口对象塞上三维状态视图 */
+function withStatus(o) { return { ...o, ...S.statusView(o) }; }
+
+/** 拿到这条点歌所属周的周一 00:00（绝对时刻） */
+function weekMsOf(submit) {
+  const ws = sched.weekStartOfRow(submit);
+  return ws ? ws.getTime() : null;
+}
+
+/** 审核动作之后让这一周的排期与候补重新对齐（幂等） */
+async function runWeekSchedule(submit, opts = {}) {
+  const ms = weekMsOf(submit);
+  if (ms === null) return { promoted: 0, rescheduled: 0, left: 0 };
   try {
-    return await songQueue.runAfterRelease();
+    const a = await sched.initialAllocate(ms, opts);
+    const b = await sched.reschedule(ms, opts);
+    return { ...b, assigned: a.assigned, waiting: a.waiting };
   } catch (e) {
-    return { promoted: 0, closed: 0, full: false, error: e.message };
+    // 排期失败不能把审核动作本身搞失败（审核已经落库了），但**必须留痕** ——
+    // 静默吞掉会让「审核通过了却一直没有位置」变成一个查不出来的悬案。
+    logger.warn(`[songSchedule] 审核后重算排期失败 week=${new Date(ms).toISOString()}：${e.message}`);
+    return { promoted: 0, rescheduled: 0, left: 0, error: e.message };
   }
 }
 
-/** 把递补结果拼成给管理员看的话 */
+/** 把调剂结果拼成给管理员看的话 */
 function releaseMsg(base, rel) {
-  if (!rel || !rel.promoted) return base;
-  return `${base}，已由候补队列递补 ${rel.promoted} 条`;
+  if (!rel) return base;
+  const bits = [];
+  if (rel.promoted) bits.push(`原位递补 ${rel.promoted} 条`);
+  if (rel.rescheduled) bits.push(`跨时段调剂 ${rel.rescheduled} 条`);
+  return bits.length ? `${base}，已${bits.join('、')}` : base;
 }
 
 /* ------------------------------------------------------------------ *
- * 内部：通过一条投稿
- * v2 不再有「占名额」这一步 —— 位子在学生提交时就占好了，
- * 审核只负责内容把关，因此这里不会出现「过了但没占位」的脏数据。
+ * 内部：审核通过 / 驳回
  * ------------------------------------------------------------------ */
+/**
+ * 协议 §14：这里的 approve **只是审核通过**，不等于拿到位置。
+ *   审核通过 → review=APPROVED / schedule=UNASSIGNED → 进排期候选池
+ *   之后由 initialAllocate 决定谁是 APPROVED、谁是 WAITING
+ */
 async function approveOne(submit, adminId) {
-  const status = Number(submit.status);
+  const review = Number(submit.reviewStatus) || 0;
+  const schedule = Number(submit.scheduleStatus) || 0;
 
-  if (status === ST.SCHEDULED) {
+  if (review === S.REVIEW.APPROVED) {
     return { submit, changed: false, already: true };
   }
-  // v1 的老毛病：通过一条已驳回的记录会静默无操作却返回「已通过」。
-  // v2 明确报错，让管理员知道要先撤销。
-  if (status === ST.REJECTED) {
+  // v1 的老毛病：通过一条已驳回的记录会静默无操作却返回「已通过」。这里明确报错。
+  if (review === S.REVIEW.REJECTED) {
     throw new ApiError(Codes.PARAM_ERROR, '这条已驳回，请先撤销再通过');
   }
-
-  // 候补中：只记审核痕迹，留在队列等位（补位时会直接进「已排期」）
-  if (status === ST.QUEUED) {
-    const [n] = await Submit.update(
-      { reviewerId: adminId, reviewTime: new Date(), rejectReason: null, autoRejected: 0 },
-      { where: { id: submit.id, status: ST.QUEUED } }
-    );
-    return { submit: await Submit.findByPk(submit.id), changed: !!n, queued: !!n };
+  if (review === S.REVIEW.CANCELLED) {
+    throw new ApiError(Codes.PARAM_ERROR, '这条已被取消，不能通过');
   }
 
-  // 待审(0) / 已补位待审(4) → 已排期
-  const [n] = await Submit.update(
-    {
-      status: ST.SCHEDULED,
-      reviewerId: adminId,
-      reviewTime: new Date(),
-      rejectReason: null,
-      autoRejected: 0,
-    },
-    { where: { id: submit.id, status: { [Op.in]: [ST.PENDING, ST.PROMOTED] } } }
-  );
-  return { submit: await Submit.findByPk(submit.id), changed: !!n };
+  // 曾被系统自动驳回（无位 / 逾期）的，审核通过时要把排期维度重置回候选池
+  const changes = {
+    reviewStatus: S.REVIEW.APPROVED,
+    reviewerId: adminId,
+    reviewTime: new Date(),
+    rejectReason: null,
+    autoRejected: 0,
+  };
+  if (schedule === S.SCHEDULE.AUTO_REJECTED) {
+    changes.scheduleStatus = S.SCHEDULE.UNASSIGNED;
+  } else if (schedule === S.SCHEDULE.UNASSIGNED) {
+    changes.scheduleStatus = S.SCHEDULE.UNASSIGNED;
+  }
+
+  const r = await S.applyChange(submit, changes, {
+    operatorId: adminId, operatorName: 'ADMIN', reason: 'REVIEW_APPROVED',
+  });
+  return { submit: r.row, changed: true };
+}
+
+/**
+ * 审核驳回：review → REJECTED，位子随之释放（占位要求 review=APPROVED）
+ * schedule 维度**保留原值**，用来回答「他当时排到了哪一格」
+ */
+async function rejectOne(submit, adminId, reason) {
+  const review = Number(submit.reviewStatus) || 0;
+  if (review === S.REVIEW.REJECTED) {
+    throw new ApiError(Codes.PARAM_ERROR, '这条已是驳回状态，无需重复操作');
+  }
+  const wasSeated = sched.isSeated(submit);
+  const r = await S.applyChange(submit, {
+    reviewStatus: S.REVIEW.REJECTED,
+    reviewerId: adminId,
+    reviewTime: new Date(),
+    rejectReason: reason,
+    autoRejected: 0,
+  }, { operatorId: adminId, operatorName: 'ADMIN', reason: 'REVIEW_REJECTED' });
+  return { submit: r.row, wasSeated };
 }
 
 /* ------------------------------------------------------------------ *
@@ -118,20 +154,18 @@ exports.list = async (req, res, next) => {
       status, type,
       page = 1, pageSize = 10,
       keyword, startDate, endDate,
-      slot,                       // 精确筛选某播出时段（排期矩阵点格子用）
+      slot,
+      reviewStatus, scheduleStatus,      // 协议版：可以直接按维度筛
     } = req.query;
 
     const where = {};
     if (status !== undefined && status !== '') where.status = parseInt(status, 10);
     if (type !== undefined && type !== '') where.type = parseInt(type, 10);
+    if (reviewStatus !== undefined && reviewStatus !== '') where.reviewStatus = parseInt(reviewStatus, 10);
+    if (scheduleStatus !== undefined && scheduleStatus !== '') where.scheduleStatus = parseInt(scheduleStatus, 10);
     if (startDate && endDate) {
       where.createTime = { [Op.between]: [startDate, endDate] };
     }
-    /* 时段筛选（排期矩阵点格子）与关键词搜索都走 OR —— 必须合并成一个数组，
-       否则后写的 `where[Op.or] = ...` 会把前一个直接覆盖掉。
-       ⚠️ v2 里「排到哪一格」的权威字段是 scheduledSlot（实际排期），
-          wantBroadcastTime 只是学生首选（候补件还没排期，只有首选）。
-          所以两个都查，点某一格时既能看到排进去的、也能看到首选它的候补件。 */
     const or = [];
     if (slot) {
       const v = String(slot);
@@ -155,9 +189,7 @@ exports.list = async (req, res, next) => {
       limit: parseInt(pageSize, 10),
     });
 
-    // 关联用户昵称/头像
-    // ⚠️ 账号体系下 user.openid 为空、投稿的 openid 字段里存的是**学号**，
-    //    所以必须 openid / username 两个键一起查，再用「投稿里的那个键」去找人。
+    // 关联用户昵称/头像（账号体系下投稿的 openid 字段里存的是学号）
     const keys = [...new Set(rows.map(r => r.openid))];
     const users = keys.length
       ? await User.findAll({
@@ -172,7 +204,6 @@ exports.list = async (req, res, next) => {
     });
     const displayName = (u) => (u && (u.nickname || u.remark)) || '匿名';
 
-    // ── 审核人（⚠️ 与投稿人是两回事：投稿人 = openid/学号，审核人 = 管理员的 reviewer_id）──
     const reviewerIds = [...new Set(rows.map((r) => r.reviewerId).filter(Boolean))];
     const admins = reviewerIds.length
       ? await Admin.findAll({ where: { id: reviewerIds }, attributes: ['id', 'username', 'nickname'] })
@@ -181,36 +212,31 @@ exports.list = async (req, res, next) => {
     const reviewerName = (r) => {
       if (Number(r.autoRejected) === 1) return '系统自动驳回';
       const a = adminMap.get(Number(r.reviewerId));
-      return a ? (a.nickname || a.username) : (r.status === 0 ? '' : '—');
+      return a ? (a.nickname || a.username) : (Number(r.reviewStatus) === 0 ? '' : '—');
     };
 
     const list = rows.map(r => {
       const u = userMap.get(r.openid);
-      return {
+      return withStatus({
         ...r.toJSON(),
-        // 投稿人
         nickname: displayName(u),
         studentNo: (u && u.username) || '',
         avatar: (u && u.avatar) || '',
-        // 审核人
         reviewerName: reviewerName(r),
         reviewTime: r.reviewTime,
-        // 前端据此把「系统自动驳回」和人工驳回区分开
         autoRejected: Number(r.autoRejected) === 1,
-      };
+      });
     });
 
-    /* v2：候补中的行补一个「第几位」—— 列表要直接写出位次，管理员才知道谁快补上了。
-       只对 status=3 的行算（每行一条 COUNT），其它状态没有位次这个概念。 */
+    // 候补中的行补「第几位」
     await Promise.all(list.map(async (item) => {
-      if (Number(item.status) !== ST.QUEUED) return;
+      if (Number(item.scheduleStatus) !== S.SCHEDULE.WAITING) return;
       try {
-        const q = await songQueue.queuePosOf(item);
+        const q = await sched.waitingPosOf(item);
         item.queuePos = q.pos;
         item.queueAhead = q.ahead;
-      } catch (e) {
-        item.queuePos = null;   // 读不到位次不该让整个列表失败
-      }
+        item.queueTotal = q.total;
+      } catch (e) { item.queuePos = null; }
     }));
 
     return success(res, {
@@ -233,13 +259,12 @@ exports.detail = async (req, res, next) => {
       attributes: ['openid', 'username', 'nickname', 'remark', 'grade', 'classNo', 'seatNo', 'avatar', 'status', 'lastLoginAt', 'loginCount'],
     });
 
-    // ── 投稿人画像（审核处理台左侧深色卡用）──
     const key = submit.openid;
     const [totalCount, approved, rejected, pending, agg] = await Promise.all([
       Submit.count({ where: { openid: key } }),
-      Submit.count({ where: { openid: key, status: 1 } }),
-      Submit.count({ where: { openid: key, status: 2 } }),
-      Submit.count({ where: { openid: key, status: 0 } }),
+      Submit.count({ where: { openid: key, reviewStatus: S.REVIEW.APPROVED } }),
+      Submit.count({ where: { openid: key, reviewStatus: S.REVIEW.REJECTED } }),
+      Submit.count({ where: { openid: key, reviewStatus: S.REVIEW.PENDING } }),
       Submit.findOne({
         where: { openid: key },
         attributes: [
@@ -249,7 +274,6 @@ exports.detail = async (req, res, next) => {
         raw: true,
       }),
     ]);
-    // 本周点歌次数（每人每周上限；系统自动驳回不占次数，规则与服务端一致）
     let weekly = null;
     try { weekly = await submitRule.checkUserWeeklyLimit(key); } catch (e) { weekly = null; }
 
@@ -276,31 +300,38 @@ exports.detail = async (req, res, next) => {
       weekRemaining: weekly ? weekly.remaining : null,
     };
 
-    // 审核人（与投稿人分开）
     let reviewer = null;
     if (submit.reviewerId) {
       reviewer = await Admin.findOne({ where: { id: submit.reviewerId }, attributes: ['username', 'nickname'] });
     }
     const reviewerName = Number(submit.autoRejected) === 1
       ? '系统自动驳回'
-      : (reviewer ? (reviewer.nickname || reviewer.username) : (Number(submit.status) === 0 ? '' : '—'));
+      : (reviewer ? (reviewer.nickname || reviewer.username) : (Number(submit.reviewStatus) === 0 ? '' : '—'));
+
+    // 协议：处理台要能看到「这首歌为什么现在是这个状态」+ 换过几次时段
+    let statusHistory = [];
+    let assignments = [];
+    if (Number(submit.type) === 1) {
+      try { statusHistory = await S.historyOf(submit.id, 50); } catch (e) { statusHistory = []; }
+      try {
+        const { AssignmentLog } = require('../../models');
+        assignments = await AssignmentLog.findAll({ where: { requestId: submit.id }, order: [['id', 'ASC']], raw: true });
+      } catch (e) { assignments = []; }
+    }
 
     return success(res, {
-      ...submit.toJSON(),
-      // 投稿人
+      ...withStatus(submit.toJSON()),
       nickname: submitter.nickname,
       studentNo: submitter.username,
       avatar: (user && user.avatar) || '',
-      // 审核人
       reviewerName,
       autoRejected: Number(submit.autoRejected) === 1,
       submitter,
-      /* v2：点歌的候补/补位说明 —— 处理台要靠它显示「候补第几位 / 首选 vs 实际排到 /
-         定稿时刻」。cardFor 是学生端同一份实现（docs/song-queue-v2.md §7），
-         取不到就返回 null，处理台退回「只显示列表字段」的形态，不影响审核动作。 */
       card: Number(submit.type) === 1
         ? await songQueue.cardFor(submit).catch(() => null)
         : null,
+      statusHistory,
+      assignments,
     });
   } catch (e) {
     return next(e);
@@ -308,7 +339,7 @@ exports.detail = async (req, res, next) => {
 };
 
 /* ------------------------------------------------------------------ *
- * 通过 / 驳回 / 删除
+ * 通过 / 驳回 / 删除 / 撤销
  * ------------------------------------------------------------------ */
 exports.approve = async (req, res, next) => {
   try {
@@ -316,16 +347,24 @@ exports.approve = async (req, res, next) => {
     if (!submit) throw new ApiError(Codes.NOT_FOUND, '投稿不存在');
 
     const result = await approveOne(submit, req.admin.id);
-    const fresh = result.submit;
+    let fresh = result.submit;
 
-    // 通过可能刚好占满最后一个空位 → 立刻检查是否需要清空候补队列（幂等）
-    if (result.changed && Number(fresh.type) === 1) await afterRelease();
+    // 审核通过 → 进排期候选池 → 立刻跑一次该周的排期（幂等）
+    // 这样管理员点完「通过」就能在矩阵上看到位置变化，不用额外点「执行排期」。
+    let rel = null;
+    if (result.changed && Number(fresh.type) === 1) {
+      rel = await runWeekSchedule(fresh, { operatorId: req.admin.id });
+      // ⚠️ 排期会**再改一次这条记录**（schedule_status 0 → 1/2）。
+      //    不 reload 就会把「已通过 · 待排期」这个中间态回给前端 —— 界面显示
+      //    「还没排上」，刷新一下又变成「已排期」，看起来像 bug。
+      await fresh.reload();
+    }
 
-    let msg = '已通过';
-    if (result.already) msg = '已是已排期状态';
-    else if (result.queued) msg = '已通过审核，仍在候补队列中等待空位';
+    let msg = '已通过审核，进入排期';
+    if (result.already) msg = '这条已经是「审核通过」了';
+    if (rel && rel.assigned) msg += `（新增落座 ${rel.assigned} 条）`;
 
-    const data = { ...fresh.toJSON() };
+    const data = withStatus(fresh.toJSON());
     if (Number(fresh.type) === 1) {
       try { data.card = await songQueue.cardFor(fresh); } catch (e) { data.card = null; }
     }
@@ -343,24 +382,12 @@ exports.reject = async (req, res, next) => {
     }
     const submit = await Submit.findByPk(req.params.id);
     if (!submit) throw new ApiError(Codes.NOT_FOUND, '投稿不存在');
-    // v1 的老毛病：可以把已驳回的再驳回一次，把审核人/时间覆盖成别人的。v2 拦住。
-    if (Number(submit.status) === ST.REJECTED) {
-      throw new ApiError(Codes.PARAM_ERROR, '这条已是驳回状态，无需重复操作');
-    }
 
-    const wasSeated = SEATED.includes(Number(submit.status));
-    // 人工驳回：auto_rejected 归零，把「系统驳回」的痕迹清掉
-    await submit.update({
-      status: ST.REJECTED,
-      rejectReason: reason,
-      reviewerId: req.admin.id,
-      reviewTime: new Date(),
-      autoRejected: 0,
-    });
+    const { submit: fresh, wasSeated } = await rejectOne(submit, req.admin.id, reason);
 
-    // 原来占着正式位 → 位子立即释放 → 立刻从候补队列递补（v1 漏了这一步，名额会泄漏）
-    const rel = wasSeated ? await afterRelease() : null;
-    return success(res, submit, releaseMsg(wasSeated ? '已驳回，位子已释放' : '已驳回', rel));
+    // 驳回使 review 离开 APPROVED → 位子释放 → 立刻让候补重新对齐
+    const rel = (wasSeated && Number(fresh.type) === 1) ? await runWeekSchedule(fresh, { operatorId: req.admin.id }) : null;
+    return success(res, withStatus(fresh.toJSON()), releaseMsg(wasSeated ? '已驳回，位子已释放' : '已驳回', rel));
   } catch (e) {
     return next(e);
   }
@@ -370,9 +397,13 @@ exports.remove = async (req, res, next) => {
   try {
     const submit = await Submit.findByPk(req.params.id);
     if (!submit) throw new ApiError(Codes.NOT_FOUND, '投稿不存在');
-    const wasSeated = Number(submit.type) === 1 && SEATED.includes(Number(submit.status));
+    const wasSeated = Number(submit.type) === 1 && sched.isSeated(submit);
+    const ms = Number(submit.type) === 1 ? weekMsOf(submit) : null;
     await submit.destroy();
-    const rel = wasSeated ? await afterRelease() : null;
+    let rel = null;
+    if (wasSeated && ms !== null) {
+      rel = await sched.runAllocators(ms, { operatorId: req.admin.id }).catch(() => null);
+    }
     return success(res, null, releaseMsg(wasSeated ? '已删除，位子已释放' : '已删除', rel));
   } catch (e) {
     return next(e);
@@ -380,43 +411,43 @@ exports.remove = async (req, res, next) => {
 };
 
 /**
- * 撤销审核结果（v8 审核处理台 / 列表的「撤销」）
- *   已排期(1) / 已补位(4) → 回到待审(0)，位子还在他手上
- *   已驳回(2) → 回到待审(0)；若该格已经满了，则改回到候补队列(3)，避免超容
+ * 撤销审核结果
+ *   审核通过(1) → 回到待审(0)；排期维度重置，位子释放并触发调剂
+ *   已驳回(2)   → 回到待审(0)，重新走审核
  */
 exports.revoke = async (req, res, next) => {
   try {
     const submit = await Submit.findByPk(req.params.id);
     if (!submit) throw new ApiError(Codes.NOT_FOUND, '投稿不存在');
-    const status = Number(submit.status);
-    if (status === ST.PENDING) {
+    const review = Number(submit.reviewStatus) || 0;
+    if (review === S.REVIEW.PENDING) {
       throw new ApiError(Codes.PARAM_ERROR, '这条还是待审状态，无需撤销');
     }
+    const wasSeated = sched.isSeated(submit);
+    const fromSlot = submit.scheduledSlot || null;
 
-    const wasSeated = SEATED.includes(status);
-    // 撤销要把「审核人 / 审核时间」一起清掉 —— 撤销是操作者自己做的事，不算审核结果
-    const reset = {
+    // 撤销 = 把三维一起归零（审核人 / 审核时间也清掉，撤销是操作者自己做的事）
+    const r = await S.applyChange(submit, {
+      reviewStatus: S.REVIEW.PENDING,
+      scheduleStatus: S.SCHEDULE.UNASSIGNED,
+      playStatus: S.PLAY.NOT_PLAYED,
+      scheduledSlot: null,
+      assignedAt: null,
+      playedAt: null,
       rejectReason: null,
       reviewTime: null,
       reviewerId: null,
       autoRejected: 0,
-    };
+    }, { operatorId: req.admin.id, operatorName: 'ADMIN', reason: 'REVOKED' });
 
-    if (status === ST.REJECTED && Number(submit.type) === 1) {
-      // 驳回件复活：能坐回原格就坐，坐不下就排队（否则会直接超容）
-      const slotValue = submit.scheduledSlot || submit.wantBroadcastTime;
-      const { outcome } = await songQueue.decideSeat({ slotValue });
-      if (outcome === 'seated') {
-        await submit.update({ ...reset, status: ST.PENDING, scheduledSlot: slotValue });
-      } else {
-        await submit.update({ ...reset, status: ST.QUEUED, scheduledSlot: null, queueAt: new Date() });
+    let rel = null;
+    if (Number(r.row.type) === 1) {
+      if (fromSlot) {
+        await sched.logAssignment(r.row.id, fromSlot, null, sched.ASSIGN.RELEASED, sched.ASSIGN_REASON.slotReleased, req.admin.id);
       }
-    } else {
-      await submit.update({ ...reset, status: ST.PENDING });
-      if (wasSeated) await afterRelease();
+      if (wasSeated) rel = await runWeekSchedule(r.row, { operatorId: req.admin.id });
     }
-
-    return success(res, null, status === ST.REJECTED ? '已撤销，回到待审' : '已撤销，回到待审');
+    return success(res, withStatus(r.row.toJSON()), releaseMsg('已撤销，回到待审', rel));
   } catch (e) {
     return next(e);
   }
@@ -424,9 +455,6 @@ exports.revoke = async (req, res, next) => {
 
 /* ------------------------------------------------------------------ *
  * 批量审核
- * 通过：逐条走和单条完全相同的路径；已驳回的跳过（不报错、不假成功）
- * 驳回：必须带状态过滤 —— 已驳回的不许二次驳回（v1 会覆盖审核人）
- * 都不再涉及「名额耗尽中途停」：容量在提交时就定好了
  * ------------------------------------------------------------------ */
 exports.batch = async (req, res, next) => {
   try {
@@ -441,37 +469,38 @@ exports.batch = async (req, res, next) => {
       throw new ApiError(Codes.PARAM_ERROR, '驳回操作必须填写理由');
     }
 
-    if (action === 'reject') {
-      const [affected] = await Submit.update(
-        {
-          status: ST.REJECTED,
-          reviewerId: req.admin.id,
-          reviewTime: new Date(),
-          rejectReason: reason,
-          autoRejected: 0,
-        },
-        { where: { id: ids, status: { [Op.in]: [ST.PENDING, ST.SCHEDULED, ST.QUEUED, ST.PROMOTED] } } }
-      );
-      await afterRelease();
-      return success(res, { affected, skipped: ids.length - affected }, '批量操作完成');
-    }
-
-    // 通过：逐条处理
     let affected = 0;
     const skipped = [];
+    const weeks = new Set();
+
     for (const id of ids) {
       const submit = await Submit.findByPk(id);
       if (!submit) { skipped.push(id); continue; }
       try {
-        const r = await approveOne(submit, req.admin.id);
-        if (r.changed) affected += 1;
-        else skipped.push(id);
+        if (action === 'approve') {
+          const r = await approveOne(submit, req.admin.id);
+          if (r.changed) affected += 1; else skipped.push(id);
+        } else {
+          const r = await rejectOne(submit, req.admin.id, reason);
+          affected += 1;
+          if (r.wasSeated) { const ms = weekMsOf(submit); if (ms !== null) weeks.add(ms); }
+        }
+        if (Number(submit.type) === 1) {
+          const ms = weekMsOf(submit);
+          if (ms !== null) weeks.add(ms);
+        }
       } catch (e) {
-        if (e instanceof ApiError) { skipped.push(id); continue; }   // 已驳回件跳过，不中断整批
+        if (e instanceof ApiError) { skipped.push(id); continue; }
         throw e;
       }
     }
-    await afterRelease();
+
+    // 涉及的每一周统一重跑排期（一次，而不是每条约一次）
+    for (const ms of weeks) {
+      await sched.initialAllocate(ms, { operatorId: req.admin.id }).catch(() => null);
+      await sched.runAllocators(ms, { operatorId: req.admin.id }).catch(() => null);
+    }
+
     return success(res, { affected, skipped }, '批量操作完成');
   } catch (e) {
     return next(e);
@@ -479,64 +508,272 @@ exports.batch = async (req, res, next) => {
 };
 
 /* ------------------------------------------------------------------ *
- * 排期容量：快照 / 设置 / 手动兜底
- * v2 没有「日/周名额」了 —— 容量 = 每格正式位 × 格子数，候补 = 一条全局队列
+ * 排期：矩阵 / 执行 / 锁定 / 人工调整 / 播放
  * ------------------------------------------------------------------ */
-exports.capacity = async (req, res, next) => {
+/**
+ * 先算一条点歌属于哪个周（没有排期行时用「首选时段」推）
+ */
+async function targetWeekMs(now = Date.now()) {
+  const slots = await broadcastSlot.getSlots(now);
+  if (slots.list.length) {
+    const ws = sched.weekStartOfValue(slots.list[0].value);
+    if (ws) return ws.getTime();
+  }
+  return songWindow.windowRangeAt(await songWindow.getConfig(now), now).weekStart.getTime();
+}
+
+/** 排期矩阵（三维）+ 全局候补队列 */
+exports.schedule = async (req, res, next) => {
   try {
-    const [queue, win, capacity] = await Promise.all([
-      songQueue.snapshot(),
-      songWindow.status(),
-      songQueue.getCapacity(),
-    ]);
-    const ws = songQueue.weekStartOfValue((await broadcastSlot.getSlots()).list[0]?.value);
+    const now = Date.now();
+    const slots = await broadcastSlot.getSlots(now);
+    const values = slots.list.map((s) => s.value);
+    const capacity = await songQueue.getCapacity();
+    const weekMs = values.length ? sched.weekStartOfValue(values[0]).getTime() : await targetWeekMs(now);
+    const week = await sched.ensureWeek(weekMs, { now });
+
+    // ① 每格已占（review=APPROVED AND schedule=APPROVED）
+    const seatedMap = await sched.countSeatedBySlot(values);
+    // ② 每格「首选这一格但还在候补」的数量
+    const waitingRows = await Submit.findAll({
+      where: { type: 1, reviewStatus: S.REVIEW.APPROVED, scheduleStatus: S.SCHEDULE.WAITING, wantBroadcastTime: { [Op.in]: values } },
+      attributes: ['wantBroadcastTime', [fn('COUNT', col('id')), 'n']],
+      group: ['wantBroadcastTime'],
+      raw: true,
+    });
+    const waitingMap = {};
+    waitingRows.forEach((r) => { waitingMap[r.wantBroadcastTime] = Number(r.n) || 0; });
+    // ③ 每格「还在审核中」的数量
+    const pendingRows = await Submit.findAll({
+      where: { type: 1, reviewStatus: S.REVIEW.PENDING, wantBroadcastTime: { [Op.in]: values } },
+      attributes: ['wantBroadcastTime', [fn('COUNT', col('id')), 'n']],
+      group: ['wantBroadcastTime'],
+      raw: true,
+    });
+    const pendingMap = {};
+    pendingRows.forEach((r) => { pendingMap[r.wantBroadcastTime] = Number(r.n) || 0; });
+
+    const days = [];
+    let byDate = null;
+    let totalPending = 0;
+    let totalScheduled = 0;
+    slots.list.forEach((s) => {
+      if (!byDate || byDate.date !== s.date) {
+        byDate = { date: s.date, weekday: s.weekday, monthDay: s.monthDay, slots: [] };
+        days.push(byDate);
+      }
+      const seated = seatedMap[s.value] || 0;
+      const waiting = waitingMap[s.value] || 0;
+      const pending = pendingMap[s.value] || 0;
+      totalPending += pending;
+      totalScheduled += seated;
+      byDate.slots.push({
+        value: s.value,
+        date: s.date,
+        time: s.time,
+        period: s.period,
+        label: s.label,
+        scheduled: seated,          // 已排期（占位）
+        waiting,                    // 首选这一格、还在候补
+        pending,                    // 还在审核中
+        approved: seated,           // 兼容旧字段名
+        promoted: 0,                // 兼容旧字段名（协议版没有「补位未审」）
+        seated,
+        left: capacity > 0 ? Math.max(0, capacity - seated) : null,
+        capacity,
+        full: capacity > 0 && seated >= capacity,
+      });
+    });
+
+    const [queue, win] = await Promise.all([songQueue.snapshot(now), songWindow.status(now)]);
+
     return success(res, {
+      weekStart: slots.weekStart,
+      weekEnd: slots.weekEnd,
+      rangeText: slots.rangeText,
       capacity,
       weekCapacity: queue.weekCapacity,
+      totalPending,
+      totalScheduled,
+      totalWaiting: queue.total,
+      days,
       queue,
+      week: sched.weekView(week, now),
       window: win,
-      finalizeAt: ws ? songWindow.toBjsIso(songQueue.windowEndOfWeek(win.config, ws.getTime())) : null,
+      lockAt: week.scheduleLockAt ? songWindow.toBjsIso(new Date(+new Date(week.scheduleLockAt))) : null,
+      /** @deprecated 旧字段名（= 锁定时刻） */
+      finalizeAt: week.scheduleLockAt ? songWindow.toBjsIso(new Date(+new Date(week.scheduleLockAt))) : null,
     });
   } catch (e) {
     return next(e);
   }
 };
 
-/** 兼容旧路径 GET /admin/submit/quota（内容与 /capacity 一致） */
-exports.quota = exports.capacity;
-
-/**
- * 设置排期容量与候补上限（兼容旧路径 PUT /admin/submit/quota）
- * body: { capacity?, queueLimit? }
- */
-exports.setQuota = async (req, res, next) => {
+/** 目标周的状态与时间锚点 */
+exports.week = async (req, res, next) => {
   try {
-    const { capacity, queueLimit } = req.body || {};
-    if (capacity !== undefined && capacity !== null && capacity !== '') {
-      await broadcastSlot.setCapacity(capacity);
-    }
-    if (queueLimit !== undefined && queueLimit !== null && queueLimit !== '') {
-      const n = Math.max(parseInt(queueLimit, 10) || 0, 0);
-      await broadcastSlot.clearCache();
-      const kvSvc = require('../../services/kvService');
-      await kvSvc.set(songQueue.KV_QUEUE_LIMIT, n, '全局候补队列人数上限（0=自动=下周正式位总数）');
-    }
-    // 改小上限 / 增加候补位后，顺手跑一次递补，行为符合直觉
-    await songQueue.sweepAll();
-    return success(res, await songQueue.snapshot(), '容量设置已更新');
+    const now = Date.now();
+    const ms = req.query.weekStart
+      ? new Date(`${req.query.weekStart}T00:00:00+08:00`).getTime()
+      : await targetWeekMs(now);
+    const week = await sched.ensureWeek(ms, { now });
+    const values = await sched.slotValuesOfWeek(ms);
+    const counters = await sched.countSeatedBySlot(values);
+    const capacity = await songQueue.getCapacity();
+    const seated = Object.values(counters).reduce((a, b) => a + b, 0);
+    const total = capacity > 0 ? values.length * capacity : 0;
+    return success(res, {
+      ...sched.weekView(week, now),
+      slots: values.length,
+      capacity,
+      seated,
+      left: total ? Math.max(0, total - seated) : null,
+      total,
+    });
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/** 执行第一轮排期 + 全局调剂（管理端「执行调度」按钮） */
+exports.runSchedule = async (req, res, next) => {
+  try {
+    const now = Date.now();
+    const body = req.body || {};
+    const ms = body.weekStart
+      ? new Date(`${body.weekStart}T00:00:00+08:00`).getTime()
+      : await targetWeekMs(now);
+    const a = await sched.initialAllocate(ms, { now, operatorId: req.admin.id });
+    const b = await sched.reschedule(ms, { now, operatorId: req.admin.id });
+    const week = await sched.ensureWeek(ms, { now });
+    return success(res, {
+      week: sched.weekView(week, now),
+      assigned: a.assigned,
+      waiting: a.waiting,
+      promoted: b.promoted,
+      rescheduled: b.rescheduled,
+      stillWaiting: b.left,
+    }, `排期完成：落座 ${a.assigned} 条、进候补 ${a.waiting} 条、递补 ${b.promoted + b.rescheduled} 条`);
   } catch (e) {
     return next(e);
   }
 };
 
 /**
- * 手动兜底（POST /admin/submit/queue/sweep，幂等）：
- * 递补队首 → 满额清队 → 窗口截止定稿清理
+ * 正式锁定（协议 §18）
+ * 到锁定时刻由调度器自动执行；也可以管理员手动锁（force）
  */
+exports.lock = async (req, res, next) => {
+  try {
+    const now = Date.now();
+    const body = req.body || {};
+    const ms = body.weekStart
+      ? new Date(`${body.weekStart}T00:00:00+08:00`).getTime()
+      : await targetWeekMs(now);
+    const force = body.force === true || body.force === 1 || body.force === '1';
+    const r = await sched.lockWeek(ms, { now, operatorId: req.admin.id, force });
+    if (r.tooEarly) {
+      throw new ApiError(Codes.PARAM_ERROR, `还没到锁定时刻（${r.lockText}），如需提前锁定请传 force: true`);
+    }
+    return success(res, r, r.already
+      ? '这一周已经锁定过了'
+      : `已锁定：最后调度完成，无可用位置的 ${r.rejected} 条已自动驳回`);
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/** 人工指定时段（协议 §20） */
+exports.assign = async (req, res, next) => {
+  try {
+    const { slot, reason } = req.body || {};
+    if (!slot) throw new ApiError(Codes.PARAM_ERROR, '请传 slot（目标时段值）');
+    const submit = await Submit.findByPk(req.params.id);
+    if (!submit) throw new ApiError(Codes.NOT_FOUND, '投稿不存在');
+    if (Number(submit.type) !== 1) throw new ApiError(Codes.PARAM_ERROR, '只能对点歌做排期调整');
+
+    try {
+      const r = await sched.manualAssign(submit, String(slot), {
+        operatorId: req.admin.id,
+        reason: reason || sched.ASSIGN_REASON.manual,
+      });
+      // 新位置占了，原位置空了 → 重新对齐候补
+      const old = Number(submit.scheduleStatus) === S.SCHEDULE.APPROVED ? submit.scheduledSlot : null;
+      void old;
+      await sched.runAllocators(sched.weekStartOfValue(String(slot)).getTime(), { operatorId: req.admin.id }).catch(() => null);
+      return success(res, withStatus(r.row.toJSON()), '已调整播出时段');
+    } catch (e) {
+      if (e.code === 40001) throw new ApiError(Codes.PARAM_ERROR, e.message);
+      throw e;
+    }
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/** 标记已播放 / 取消已播放 */
+exports.played = async (req, res, next) => {
+  try {
+    const submit = await Submit.findByPk(req.params.id);
+    if (!submit) throw new ApiError(Codes.NOT_FOUND, '投稿不存在');
+    const played = (req.body || {}).played === undefined ? true : !!(req.body || {}).played;
+    const r = await sched.setPlayed(submit, played, { operatorId: req.admin.id });
+    return success(res, withStatus(r.row.toJSON()), played ? '已标记为已播放' : '已取消播放标记');
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/** 状态变更历史（后台「这首歌为什么是这个状态」） */
+exports.statusLogs = async (req, res, next) => {
+  try {
+    return success(res, await S.historyOf(req.params.id, 100));
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/* ------------------------------------------------------------------ *
+ * 容量 / 兜底
+ * ------------------------------------------------------------------ */
+exports.capacity = async (req, res, next) => {
+  try {
+    return success(res, await songQueue.capacitySnapshot());
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/** 兼容旧路径 GET /admin/submit/quota */
+exports.quota = exports.capacity;
+
+/**
+ * 设置每格容量（`queueLimit` 在协议版已废弃 —— 候补没有人数上限，传了也不生效）
+ * body: { capacity? }
+ */
+exports.setQuota = async (req, res, next) => {
+  try {
+    const { capacity } = req.body || {};
+    if (capacity !== undefined && capacity !== null && capacity !== '') {
+      await broadcastSlot.setCapacity(capacity);
+    }
+    await broadcastSlot.clearCache();
+    // 改容量后立刻重跑排期（可能多出位置 / 少掉位置），行为符合直觉
+    const now = Date.now();
+    const ms = await targetWeekMs(now);
+    await sched.initialAllocate(ms, { now, operatorId: req.admin.id }).catch(() => null);
+    await sched.runAllocators(ms, { now, operatorId: req.admin.id }).catch(() => null);
+    return success(res, await songQueue.snapshot(now), '每格容量已更新，排期已重算');
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/** 手动兜底（POST /admin/submit/queue/sweep，幂等） */
 exports.sweepQueue = async (req, res, next) => {
   try {
-    const result = await songQueue.sweepAll();
-    return success(res, result, '已执行递补与定稿检查');
+    const result = await sched.sweep({ now: Date.now(), operatorId: req.admin.id });
+    return success(res, result, '已执行排期兜底（含锁定与播放标记）');
   } catch (e) {
     return next(e);
   }
@@ -546,9 +783,8 @@ exports.sweepQueue = async (req, res, next) => {
 exports.sweepQuota = exports.sweepQueue;
 
 /* ------------------------------------------------------------------ *
- * 点歌设置：注意事项（两份）/ 播出时段 / 提交规则
+ * 点歌设置：注意事项 / 播出时段 / 提交规则
  * ------------------------------------------------------------------ */
-/** 一次拿到两份注意事项（点歌 + 文稿），省一次往返 */
 exports.notice = async (req, res, next) => {
   try {
     return success(res, await songNotice.getAllForAdmin());
@@ -577,7 +813,6 @@ exports.saveNotice = async (req, res, next) => {
   }
 };
 
-/** 播出时段：读取当前生效的配置（含来源：后台发布 / 台词解析 / 默认） */
 exports.timeslots = async (req, res, next) => {
   try {
     return success(res, await broadcastSlot.getAdminConfig());
@@ -586,97 +821,6 @@ exports.timeslots = async (req, res, next) => {
   }
 };
 
-/**
- * 下周排期矩阵 + 全局候补队列 + 定稿时刻（v2 重写）
- *
- * 每格口径（全部按 scheduled_slot = 实际排期）：
- *   approved  已排期（status=1）
- *   pending   待审（status=0，已占位）
- *   promoted  已补位 · 待审（status=4，候补递补上来的，第 ① 优先审）
- *   seated = approved + pending + promoted（= 该格已占位总数）
- *   left / capacity / full
- *
- * queue 是**全局**候补队列（跨所有时段，先进先出），不挂在格子上。
- */
-exports.schedule = async (req, res, next) => {
-  try {
-    const now = Date.now();
-    const slots = await broadcastSlot.getSlots(now);
-    const values = slots.list.map((s) => s.value);
-    const usage = await songQueue.slotUsage(values, now);
-
-    const rows = await Submit.findAll({
-      where: {
-        type: 1,
-        status: { [Op.in]: [ST.PENDING, ST.SCHEDULED, ST.PROMOTED] },
-        scheduledSlot: { [Op.in]: values },
-      },
-      attributes: ['scheduledSlot', 'status', [fn('COUNT', col('id')), 'n']],
-      group: ['scheduledSlot', 'status'],
-      raw: true,
-    });
-    const counters = {};
-    rows.forEach((r) => {
-      const k = r.scheduledSlot;
-      if (!counters[k]) counters[k] = { approved: 0, pending: 0, promoted: 0 };
-      const n = Number(r.n) || 0;
-      if (Number(r.status) === ST.SCHEDULED) counters[k].approved += n;
-      else if (Number(r.status) === ST.PENDING) counters[k].pending += n;
-      else counters[k].promoted += n;
-    });
-
-    const days = [];
-    let byDate = null;
-    let totalPending = 0;
-    slots.list.forEach((s) => {
-      if (!byDate || byDate.date !== s.date) {
-        byDate = { date: s.date, weekday: s.weekday, monthDay: s.monthDay, slots: [] };
-        days.push(byDate);
-      }
-      const c = counters[s.value] || { approved: 0, pending: 0, promoted: 0 };
-      const u = usage[s.value] || { capacity: slots.capacity, seated: 0, left: null, full: false };
-      totalPending += c.pending + c.promoted;
-      byDate.slots.push({
-        value: s.value,
-        date: s.date,
-        time: s.time,
-        period: s.period,
-        label: s.label,
-        approved: c.approved,
-        pending: c.pending,
-        promoted: c.promoted,
-        seated: u.seated,
-        left: u.left,
-        capacity: u.capacity,
-        full: u.full,
-      });
-    });
-
-    const [queue, win] = await Promise.all([songQueue.snapshot(now), songWindow.status(now)]);
-    const ws = values.length ? songQueue.weekStartOfValue(values[0]) : null;
-    const finalizeAt = ws ? songWindow.toBjsIso(songQueue.windowEndOfWeek(win.config, ws.getTime())) : null;
-
-    return success(res, {
-      weekStart: slots.weekStart,
-      weekEnd: slots.weekEnd,
-      rangeText: slots.rangeText,
-      capacity: slots.capacity,
-      weekCapacity: queue.weekCapacity,
-      totalPending,
-      days,
-      queue,
-      window: win,
-      finalizeAt,
-    });
-  } catch (e) {
-    return next(e);
-  }
-};
-
-/* ------------------------------------------------------------------ *
- * 点歌时间窗口（读：管理员可看；写：仅超管，路由层 requireSuperAdmin）
- * 窗口时间必须常驻展示在点歌模块，前端一律用这里的字段，不许硬编码
- * ------------------------------------------------------------------ */
 exports.window = async (req, res, next) => {
   try {
     return success(res, await songWindow.describe());
@@ -688,16 +832,15 @@ exports.window = async (req, res, next) => {
 exports.saveWindow = async (req, res, next) => {
   try {
     const body = req.body || {};
-    const saved = await songWindow.setConfig(body, req.admin.id);
+    await songWindow.setConfig(body, req.admin.id);
     const st = await songWindow.describe();
-    return success(res, st, `点歌时间已更新：${st.windowText}（窗口结束即审核截止）`);
+    return success(res, st, `点歌时间已更新：${st.windowText}（窗口结束即审核开始）`);
   } catch (e) {
     if (e instanceof ApiError) return next(e);
     return next(e);
   }
 };
 
-/** 播出时段：发布 / 修改（用户 2026-09-18 要求可在后台维护） */
 exports.saveSlots = async (req, res, next) => {
   try {
     const { times, capacity } = req.body || {};
@@ -712,7 +855,6 @@ exports.saveSlots = async (req, res, next) => {
   }
 };
 
-/** 提交规则：每人每周上限 + 同曲一周内不可重复 */
 exports.rules = async (req, res, next) => {
   try {
     const rules = await submitRule.getRules();
@@ -733,14 +875,8 @@ exports.saveRules = async (req, res, next) => {
 };
 
 /**
- * 一键清空全部点歌数据（仅超级管理员，路由层 requireSuperAdmin 把关）
+ * 一键清空全部点歌数据（仅超级管理员）
  * DELETE /api/admin/submit/songs   body: { confirm: 'DELETE' }
- *
- * 范围（有意为之，别扩大）：
- *   - 只删 submit.type = 1（点歌），文稿 type = 2 一条不动；
- *   - song_quota 计数器整表清空（否则「本周已用 N 个名额」和现实对不上）；
- *   - notice_ack（注意事项确认记录）**不动** —— 那是「谁确认过规则」，不是歌单数据；
- *   - 不可恢复，前端必须二次确认弹窗。
  */
 exports.purgeSongs = async (req, res, next) => {
   try {
@@ -748,15 +884,23 @@ exports.purgeSongs = async (req, res, next) => {
     if (confirm !== 'DELETE') {
       throw new ApiError(Codes.PARAM_ERROR, '高危操作：请传 confirm: "DELETE" 明确确认');
     }
+    const { AssignmentLog, RequestStatusLog } = require('../../models');
     let deleted = 0;
+    let logs = 0;
     await sequelize.transaction(async (t) => {
+      const ids = (await Submit.findAll({ where: { type: 1 }, attributes: ['id'], raw: true, transaction: t })).map((r) => r.id);
+      if (ids.length) {
+        // 日志一并清（协议版新增的两张表，否则会留下指向不存在点歌的孤儿行）
+        await AssignmentLog.destroy({ where: { requestId: ids }, transaction: t });
+        await RequestStatusLog.destroy({ where: { requestId: ids }, transaction: t });
+      }
+      logs = ids.length;
       deleted = await Submit.destroy({ where: { type: 1 }, transaction: t });
-      // v2 起没有独立计数器表了（容量直接数 submit 行），所以这里不用再清 song_quota
     });
-    return success(res, { deletedSongs: deleted }, `已清空全部点歌数据（${deleted} 条），文稿不受影响`);
+    return success(res, { deletedSongs: deleted, logsCleared: logs }, `已清空全部点歌数据（${deleted} 条），文稿不受影响`);
   } catch (e) {
     return next(e);
   }
 };
 
-exports._internals = { approveOne };
+exports._internals = { approveOne, rejectOne, runWeekSchedule, targetWeekMs };

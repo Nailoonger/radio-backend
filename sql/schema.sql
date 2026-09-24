@@ -5,12 +5,16 @@
 --  说明:    与 Sequelize 模型保持一致，开发环境若使用 SQLite，
 --           Sequelize 会自动同步（sync）生成表结构；
 --           生产环境推荐使用本脚本手工初始化，便于运维审计。
--- 包含表: user, admin, submit, program, notice, message, system_setting, member, system_switch
+-- 包含表: user, admin, submit, weekly_schedule, assignment_log, request_status_log,
+--         program, notice, message, system_setting, member, system_switch
 -- =================================================================
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS `request_status_log`;
+DROP TABLE IF EXISTS `assignment_log`;
+DROP TABLE IF EXISTS `weekly_schedule`;
 DROP TABLE IF EXISTS `user`;
 DROP TABLE IF EXISTS `admin`;
 DROP TABLE IF EXISTS `submit`;
@@ -99,14 +103,23 @@ CREATE TABLE `submit` (
   `article_title`          VARCHAR(255) DEFAULT NULL COMMENT '文稿标题',
   `article_content`        TEXT         DEFAULT NULL COMMENT '文稿正文',
   `want_broadcast_time`    VARCHAR(64)  DEFAULT NULL COMMENT '学生首选播出时段，如 2026-09-21 午间 12:20（意愿数据，永不被覆盖）',
-  `scheduled_slot`         VARCHAR(64)  DEFAULT NULL COMMENT '实际排期时段（候补补位后可能与首选不同；候补中为空）',
-  `queue_at`               DATETIME     DEFAULT NULL COMMENT '进入候补队列时刻（FIFO 排序键）',
-  `promoted_at`            DATETIME     DEFAULT NULL COMMENT '递补为占位状态的时刻',
-  `status`                 TINYINT      NOT NULL DEFAULT 0 COMMENT '0=待审 1=已排期 2=已驳回 3=候补中 4=已补位待审',
+  `scheduled_slot`         VARCHAR(64)  DEFAULT NULL COMMENT '实际排期时段（assigned_slot；调剂后可能与首选不同；未排期为 NULL）',
+  `queue_at`               DATETIME     DEFAULT NULL COMMENT '[已废弃] v2 候补队列时刻，协议版不再写入',
+  `promoted_at`            DATETIME     DEFAULT NULL COMMENT '[已废弃] v2 递补时刻，协议版不再写入',
+  -- ── 协议版三维状态（docs/song-protocol.md）─────────────────────────
+  --    一个 status 同时表达「审核+排期+播放」会越来越乱，所以拆成三个正交维度。
+  --    占一个正式位 ⟺ review_status=1 AND schedule_status=1。
+  `review_status`          TINYINT      NOT NULL DEFAULT 0 COMMENT '0=PENDING待审 1=APPROVED审核通过 2=REJECTED审核驳回 3=CANCELLED已取消',
+  `schedule_status`        TINYINT      NOT NULL DEFAULT 0 COMMENT '0=UNASSIGNED未参与排期 1=APPROVED已获正式位 2=WAITING候补 3=AUTO_REJECTED无位自动驳回',
+  `play_status`            TINYINT      NOT NULL DEFAULT 0 COMMENT '0=NOT_PLAYED未播 1=PLAYED已播',
+  `allow_reschedule`       TINYINT      NOT NULL DEFAULT 1 COMMENT '1=允许被调剂到别的时段，0=只接受首选时段',
+  `assigned_at`            DATETIME     DEFAULT NULL COMMENT '拿到正式位的时刻',
+  `played_at`              DATETIME     DEFAULT NULL COMMENT '标记为已播的时刻',
+  `status`                 TINYINT      NOT NULL DEFAULT 0 COMMENT '派生镜像：0待审 1已排期 2已驳回 3候补中 4保留 5已播放 6已通过待排期 7已取消（由三维算出，勿单独写）',
   `reject_reason`          VARCHAR(255) DEFAULT NULL COMMENT '驳回理由',
   `reviewer_id`            BIGINT UNSIGNED DEFAULT NULL COMMENT '审核人',
   `review_time`            DATETIME     DEFAULT NULL COMMENT '审核时间',
-  `auto_rejected`          TINYINT      NOT NULL DEFAULT 0 COMMENT '1=系统自动驳回（满额/逾期），0=人工处理',
+  `auto_rejected`          TINYINT      NOT NULL DEFAULT 0 COMMENT '1=系统自动驳回（锁定后无位），0=人工处理',
   `create_time`            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `update_time`            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -116,8 +129,70 @@ CREATE TABLE `submit` (
   KEY `idx_create_time` (`create_time`),
   KEY `idx_type_status_create` (`type`, `status`, `create_time`),
   KEY `idx_sched_status` (`scheduled_slot`, `status`),
-  KEY `idx_queue` (`status`, `queue_at`, `id`)
+  KEY `idx_queue` (`status`, `queue_at`, `id`),
+  KEY `idx_review_sched` (`type`, `review_status`, `schedule_status`),
+  KEY `idx_assigned` (`scheduled_slot`, `review_status`, `schedule_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='投稿与点歌';
+
+-- -----------------------------------------------------------------
+--  3.1 weekly_schedule 周排期（一周一行，协议版）
+--      承载周状态机：DRAFT → APPLICATION → REVIEW → SCHEDULING → LOCKED
+--      时间锚点由 KV 点歌窗口派生后落库；懒创建（学生第一次提到这一周就建）
+-- -----------------------------------------------------------------
+CREATE TABLE `weekly_schedule` (
+  `id`                    BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `week_start_date`       DATE         NOT NULL COMMENT '该播出周的周一日期（北京时间）',
+  `application_start_at`  DATETIME     DEFAULT NULL COMMENT '申请（收歌）开始时刻',
+  `application_end_at`    DATETIME     DEFAULT NULL COMMENT '申请截止时刻',
+  `review_start_at`       DATETIME     DEFAULT NULL COMMENT '审核开始时刻（= 申请截止）',
+  `review_end_at`         DATETIME     DEFAULT NULL COMMENT '审核截止时刻（= 锁定时刻）',
+  `schedule_lock_at`      DATETIME     DEFAULT NULL COMMENT '排期锁定时刻：跑最后一次调度并驳回剩余候补',
+  `status`                VARCHAR(16)  NOT NULL DEFAULT 'DRAFT' COMMENT 'DRAFT/APPLICATION/REVIEW/SCHEDULING/LOCKED/CANCELLED',
+  `locked_at`             DATETIME     DEFAULT NULL COMMENT '实际锁定时刻',
+  `created_by`            BIGINT UNSIGNED DEFAULT NULL COMMENT '创建人 admin.id；自动懒创建为 NULL',
+  `created_at`            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `week_start_date` (`week_start_date`),
+  KEY `idx_week_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='周排期（一周一行，协议版）';
+
+-- -----------------------------------------------------------------
+--  3.2 assignment_log 排期变动日志
+--      时段身份用时段值字符串（如 2026-09-21 午间 12:20）—— 本项目不单建
+--      schedule_slots 表，格子由 broadcastSlotService 从 KV 派生（避免两本账）
+-- -----------------------------------------------------------------
+CREATE TABLE `assignment_log` (
+  `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `request_id`       BIGINT UNSIGNED NOT NULL COMMENT 'FK submit.id',
+  `from_slot`        VARCHAR(64)  DEFAULT NULL COMMENT '原时段值；第一轮排期为 NULL',
+  `to_slot`          VARCHAR(64)  DEFAULT NULL COMMENT '新时段值；释放位子时可为 NULL',
+  `assignment_type`  VARCHAR(24)  NOT NULL COMMENT 'INITIAL/RESCHEDULED/MANUAL/PROMOTED/RELEASED',
+  `reason`           VARCHAR(64)  DEFAULT NULL COMMENT 'ORIGINAL_SLOT_FULL / SLOT_RELEASED / INITIAL_ALLOCATION / MANUAL …',
+  `operator_id`      BIGINT UNSIGNED DEFAULT NULL COMMENT '人工操作的管理员 id；系统调度为 NULL',
+  `created_at`       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_assign_request` (`request_id`),
+  KEY `idx_assign_type_created` (`assignment_type`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='点歌排期变动日志（协议版）';
+
+-- -----------------------------------------------------------------
+--  3.3 request_status_log 状态变更日志（回答「为什么是这个状态」）
+-- -----------------------------------------------------------------
+CREATE TABLE `request_status_log` (
+  `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `request_id`     BIGINT UNSIGNED NOT NULL COMMENT 'FK submit.id',
+  `operator_id`    BIGINT UNSIGNED DEFAULT NULL COMMENT '管理员 id；系统动作为 NULL',
+  `operator_name`  VARCHAR(32)  DEFAULT NULL COMMENT 'SYSTEM / ADMIN / USER',
+  `dimension`      VARCHAR(16)  NOT NULL DEFAULT 'review' COMMENT 'review / schedule / play',
+  `from_status`    VARCHAR(24)  DEFAULT NULL COMMENT '变更前状态名，如 PENDING_REVIEW / WAITING',
+  `to_status`      VARCHAR(24)  NOT NULL COMMENT '变更后状态名',
+  `reason`         VARCHAR(255) DEFAULT NULL,
+  `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_rstatus_request` (`request_id`),
+  KEY `idx_rstatus_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='点歌状态变更日志（协议版）';
 
 -- -----------------------------------------------------------------
 --  4.1 song_quota 点歌名额计数器（日 / 周各一行）
