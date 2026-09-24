@@ -13,6 +13,9 @@
 - radio-nginx 会莫名自退（Exited 0）→ 80 全拒，排障先看它。admin-web 健康检查探 `http://127.0.0.1/`（localhost 解析 ::1）。
 - 本机 Docker Desktop Linux 引擎常没启动：`docker ps` 报 `npipe …cannot find the file` 就是它没开。
 - 改模型字段后老库炸 `ER_KEY_COLUMN_DOES_NOT_EXITS` → 先跑 `scripts/db-repair.js`（幂等）再 restart。服务器路径 `~/radio`。
+- **加表 / 加列的部署套路**（2026-09-24 定）：`src/app.js` 用 `sequelize.sync({alter:false})` —— **只建缺失的表，不改已有表**；`sql/schema.sql` 只挂在 mysql 的 `docker-entrypoint-initdb.d`，**仅数据卷首次初始化时执行**。所以「新增表」靠启动 sync 自动建，「新增列 / 索引」必须靠 `scripts/db-repair.js`（按各模型 rawAttributes 逐列 describeTable 比对后补，幂等、只加不改不删，表不存在时打印 `[skip]` 跳过）。
+- ⚠️ 手工迁移 SQL 里的 `ALTER TABLE ... ADD COLUMN` 在 MySQL **不幂等**（重跑 1060 ER_DUP_FIELDNAME 并中断后续语句）。线上固定顺序＝ 备份 → `build` → `run --rm radio-backend node scripts/db-repair.js` 补列 → `up -d --force-recreate radio-backend` 建表 → 只跑幂等的回填 UPDATE → 调兜底 `POST /api/admin/submit/queue/sweep`。
+- 迁移/回填前先备份：`set -a; . ./.env; set +a` 拿变量，再 `docker exec radio-mysql mysqldump -uroot -p"$DB_PASSWORD" "$DB_NAME" > ~/db-backup/<name>-$(date +%F-%H%M).sql`。
 
 ## 本机环境坑
 - **Bash 工具可用性不稳**（早前常 exit 127；2026-09-24 实测可用，能跑管道/heredoc/`git`）。Bash 可用时优先用它；走 PowerShell 时 stdout 不回显，必须 `| Out-File -Encoding utf8` 落盘再 Read（别用 `*>`）。node 中文乱码 → 脚本自己 `fs.writeFileSync(...,'utf8')`。
