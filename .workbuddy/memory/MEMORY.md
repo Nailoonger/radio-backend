@@ -15,12 +15,13 @@
 - 改模型字段后老库炸 `ER_KEY_COLUMN_DOES_NOT_EXITS` → 先跑 `scripts/db-repair.js`（幂等）再 restart。服务器路径 `~/radio`。
 
 ## 本机环境坑
-- **Bash 工具已坏**（exit 127），shell 一律走 **PowerShell**；stdout 用 `| Out-File -Encoding utf8` 落盘再 Read（别用 `*>`）。node 中文乱码 → 脚本自己 `fs.writeFileSync(...,'utf8')`。
+- **Bash 工具可用性不稳**（早前常 exit 127；2026-09-24 实测可用，能跑管道/heredoc/`git`）。Bash 可用时优先用它；走 PowerShell 时 stdout 不回显，必须 `| Out-File -Encoding utf8` 落盘再 Read（别用 `*>`）。node 中文乱码 → 脚本自己 `fs.writeFileSync(...,'utf8')`。
 - **同一文件多处改动必须串行 Edit**（并发 Edit 基于旧内容，后写的静默吞掉前一个）。
 - 静态预览搬小程序样式：**rpx 必须折算 px（1rpx=0.52px）**，否则声明被丢、容器塌 0；折完别再套 scale。固定高手机框里 `vh` 换固定 px。静态页验证直接 `file://`。
 - agent-browser：stdio 必须用文件 fd 不能管道（会挂死）；`set viewport` 在 `open` 之前；会话跑久会崩（3680 字节空白截图 + 「全 0 但没报错」假绿）——一次会话 ≤3 张、截图带体积断言、首张热身丢弃；CLI click 不支持属性选择器（eval 里 `.click()`）。
 - safe-delete 钩子的 trash 本机是坏的：清临时文件走 Node `fs.unlinkSync`。
-- git push 前先开代理（FlClash 127.0.0.1:7890），否则 schannel 断连。
+- **push 这步只能交给用户**（2026-09-24 实测）：我这边 shell 走 WorkBuddy 自带 PortableGit（`~/.workbuddy/binaries/PortableGit/versions/<v>/`），它的 `credential.helper=helper-selector` 是宿主注入的、不在 PATH，非交互 shell 取不到 token → `could not read Username for 'https://github.com'`。也没有 `gh`。所以我的职责边界＝**改完 + 本地 commit + 给用户 push 与服务器更新步骤**，别在 push 上死磕。
+- git push 前先开代理（FlClash 127.0.0.1:7890）。代理没起时 git 的报错是 `Failed to connect to 127.0.0.1:7890`（**不是**网络不通，别看错方向）；代理起来后端口探测 `echo > /dev/tcp/127.0.0.1/7890` 会通。
 - **预览自检三件套**：模拟点击页签后逐屏截图 + 未定义类名扫描 + 溢出量测（表格 ≥2 个操作按钮量 `td.scrollWidth`）。配方在 skill `web-ui-screenshot-verify`。
 - 本机自定义控件 `box-sizing` 是 content-box：带 padding 又限宽的元素补 `border-box`。
 - 不开 Docker 的整链路验证：后端 `DB_STORAGE=./data/_shot.db` + `npm run db:init` + seed 造数 + `node src/app.js`；admin-web vite dev（URL 是 `/student` 非 `/#/student`）；`localStorage.setItem('admin_token',token)` + `admin_info`(role:0) 进超管页。
