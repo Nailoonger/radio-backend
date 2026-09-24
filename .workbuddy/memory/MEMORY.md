@@ -32,13 +32,19 @@
 - 截图验证配方见 skill `web-ui-screenshot-verify`（agent-browser：stdio 用文件 fd 不能管道、`set viewport` 在 `open` 前、一次会话 ≤3 张、首张热身丢弃）。
 - 不开 Docker 的整链路验证：`DB_STORAGE=./data/_shot.db` + `npm run db:init` + seed + `node src/app.js`；admin-web vite dev（URL 是 `/student` 非 `/#/student`）；`localStorage` 存 `admin_token` + `admin_info`(role:0)。
 - jest 基线：56 条里 15 条失败全是已删 member 模块的（member.test 14 + switch.test 1），别当新回归。
-- **push 只能交给陛下**：本机 shell 走 WorkBuddy 自带 PortableGit，`credential.helper=helper-selector` 取不到 token，也没有 `gh`。git 已配仅 github 生效代理 `http.https://github.com.proxy=http://127.0.0.1:7890`；报 `Failed to connect to 127.0.0.1 port 7890` = 代理没启动。**FlClash 进程在跑 ≠ 代理在跑**（可能只监听 1053）。
+- **push 只能交给陛下**：本机 shell 走 WorkBuddy 自带 PortableGit，`credential.helper=helper-selector` 取不到 token（实测它**不返回任何凭据**，只是 `credential.helperselector.selected=manager` 再转 GCM），也没有 `gh`。git 已配仅 github 生效代理 `http.https://github.com.proxy=http://127.0.0.1:7890`；报 `Failed to connect to 127.0.0.1 port 7890` = 代理没启动。**FlClash 进程在跑 ≠ 代理在跑**（可能只监听 1053）。
+- ✅ **GCM 卡死的解法（2026-09-24 实测，能推上去）**：`git push` 无输出挂死 ≠ 网络问题
+  （`curl -x 127.0.0.1:7890 .../info/refs?service=git-receive-pack` 0.4s 返回 401 = 通道正常；
+  `GCM_TRACE=1 git credential fill` 日志停在 `Arguments: get`，**尚未查凭据库**＝卡在 UI/COM 初始化）。
+  加两个开关即可：`git -c credential.guiPrompt=false -c credential.interactive=never push origin master`
+  —— 走 Windows 凭据管理器里已有的 `LegacyGeneric:target=git:https://github.com`（用户 Nailoonger），不再弹窗。
+  ⚠️ 判据别搞错：**能 `ls-remote` 不代表能 push**（GET 与 receive-pack POST 走不同路径）。
 
 ## 后端约定
 - 容器 UTC、MySQL 北京时间；按天/周逻辑禁裸 `dayjs()`，统一 `src/utils/bjTime.js`。
 - 路由顺序：字面量段（`/submit/quota`）在参数路由（`/submit/:id`）之前。
 - ⚠️ `toast.push({icon:X})` 的图标必须确认已 import（漏导入会炸成功路径，被当成"操作失败"）。
-- 验证脚本（SQLite 内存库，改相关代码先跑）：`verify-song-protocol.js`(**158 项**)、`verify-song-submit.js`(107)、`verify-student-account.js`(174)。`verify-song-queue.js` 已作废。
+- 验证脚本（SQLite 内存库，改相关代码先跑）：`verify-song-protocol.js`(**161 项**)、`verify-song-submit.js`(107)、`verify-student-account.js`(174)。`verify-song-queue.js` 已作废。
 - **新开关不进 seed.js**（switch.test 断言恰好 4 条）：走 `switchService.KNOWN_SWITCHES` + 管理端补默认行；缺行视为 on。
 - `/admin/submit/list` 排序＝**先提交先审**：`create_time ASC, id ASC`（id 兜同秒，防分页重复/漏）。
 
