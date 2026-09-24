@@ -30,6 +30,8 @@
 - **push 这步只能交给用户**（2026-09-24 实测）：我这边 shell 走 WorkBuddy 自带 PortableGit（`~/.workbuddy/binaries/PortableGit/versions/<v>/`），它的 `credential.helper=helper-selector` 是宿主注入的、不在 PATH，非交互 shell 取不到 token → `could not read Username for 'https://github.com'`。也没有 `gh`。所以我的职责边界＝**改完 + 本地 commit + 给用户 push 与服务器更新步骤**，别在 push 上死磕。
 - git push 前先开代理（FlClash 127.0.0.1:7890）。代理没起时 git 的报错是 `Failed to connect to 127.0.0.1:7890`（**不是**网络不通，别看错方向）；代理起来后端口探测 `echo > /dev/tcp/127.0.0.1/7890` 会通。
 - **预览自检三件套**：模拟点击页签后逐屏截图 + 未定义类名扫描 + 溢出量测（表格 ≥2 个操作按钮量 `td.scrollWidth`）。配方在 skill `web-ui-screenshot-verify`。
+- **改前端后先跑两个源码自检（秒级，比截图便宜）**：`node scripts/check-vue-bindings.js`（编译 SFC 反查 `_ctx.` 未声明引用 —— **构建不报错、运行时只渲染空白**）、`node scripts/check-wxml-classes.js`（WXML 类名定义 + 标签配平 + 胶囊样式覆盖）。写完自检脚本**必须故意注入一个错误**确认它抓得到，别信假绿（这轮在脚本本身上栽了 3 次）。
+- **admin-web 构建撞 `[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED]`** 是本机钩子在拦 vite 清 `dist`，不是代码问题。先 `node -e "require('fs').rmSync('admin-web/dist',{recursive:true,force:true})"` 再 build。注意 `✓ N modules transformed` 已在报错之前打出 —— **编译其实全过**，别当成构建失败。
 - 本机自定义控件 `box-sizing` 是 content-box：带 padding 又限宽的元素补 `border-box`。
 - 不开 Docker 的整链路验证：后端 `DB_STORAGE=./data/_shot.db` + `npm run db:init` + seed 造数 + `node src/app.js`；admin-web vite dev（URL 是 `/student` 非 `/#/student`）；`localStorage.setItem('admin_token',token)` + `admin_info`(role:0) 进超管页。
 - jest 基线：56 条里 15 条失败全是已删 member 模块的（member.test 14 + switch.test 1），别当新回归。
@@ -67,7 +69,11 @@
 - `scripts/verify-song-queue.js` 已作废（文件头守卫直接跳过）。
 - **保留不变**：点歌时间窗口（周六18:00→周日18:00，仅超管改）、每人每周 2 次、同曲一周去重。
 - 周锚点全部由窗口派生：`schedule_lock_at = 窗口结束 + 360min = 播出周周一 00:00`。
-- 前端（小程序/admin-web）**还没改**：仍按派生 status 工作，6/7 两个新值待补；按惯例先出静态预览。
+- 前端（小程序/admin-web）**已落地**（2026-09-25 commit `9b07026`）：两端都按派生 `status` 工作，8 个值全支持；
+  小程序三桶是「status 并集」→ 拉全量本地分桶（`/user/submit/my` 的 status 只支持单值）；
+  管理端 8 个桶与 status 一一对应 → 单值筛即可。**占位口径唯一化**：
+  `已排期 = Σ 各格 seated`，不许再写 v2 的 `seated − pending − promoted`（协议版会算少）。
+  ⚠️ 文稿 `schedule` 恒 UNASSIGNED → 派生 status 也是 6，文案必须按 `type===2` 覆盖成「已通过」。
 
 ### v2 历史口径（仅供读旧文档/旧数据，别当实现依据）
 - 容量＝按播出格子：每格 `song_slot_capacity`(默认1) + 全局候补队列 `song_queue_limit`（0=自动）。提交即占位（0/1/4 占位，3=候补），容量按 `scheduled_slot`。状态机 0待审/1已排期/2已驳回/3候补中/4已补位待审。播出周前周日 18:00 定稿清 3、4（0 保留）；递补不要求先审。
