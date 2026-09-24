@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>菁悠广播站 · 点歌协议版 · 小程序前端方案 v3</title>
+<style>
+  /* ═══════════════════════════════════════════════════════════════
+     点歌「协议版」（docs/song-protocol.md）小程序端前端方案 v3 —— 静态预览
+     与 v2 的差别（这份预览要回答的）：
+       ① 提交不再占位：投稿页去掉「提交后即占住该时段」，加「接受调剂」开关
+       ② 我的投稿：状态桶从 5 个变 6 个（多「待排期」，候补不再叫「已补位」）
+       ③ 新增两态：6 已通过·待排期 / 7 已取消；5 已播放 单列
+     屏内尺寸逐条搬自 miniprogram/app.wxss + pages/submit + pages/mySubmit，
+     唯一换算：1rpx = 390/750 = 0.52px（浏览器不认 rpx）。
+     ═══════════════════════════════════════════════════════════════ */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #fff; color: #1D1D1F;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC",
+                 "MiSans", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  }
+  .wrap { padding: 40px 36px 72px; }
+
+  /* ── 预览外壳（不是设计稿） ── */
+  .hd { margin-bottom: 26px; max-width: 1100px; }
+  .hd h1 { margin: 0 0 8px; font-size: 24px; font-weight: 600; letter-spacing: -0.3px; }
+  .hd p { margin: 0 0 10px; font-size: 13px; line-height: 1.75; color: #7A7A7A; }
+  .hd code { background: #F5F5F7; border-radius: 4px; padding: 1px 6px; font-size: 12px; color: #333; }
+  .hd b { color: #1D1D1F; }
+  .diff { border: 1px solid #E0E0E0; border-radius: 12px; overflow: hidden; margin-top: 14px;
+          font-size: 12.5px; max-width: 1100px; }
+  .diff table { border-collapse: collapse; width: 100%; }
+  .diff th, .diff td { text-align: left; padding: 9px 13px; border-bottom: 1px solid #F0F0F0;
+                       vertical-align: top; line-height: 1.6; }
+  .diff th { background: #F5F5F7; font-weight: 600; font-size: 12px; color: #333; }
+  .diff tr:last-child td { border-bottom: none; }
+  .diff .old { color: #B42318; }
+  .diff .new { color: #0066CC; font-weight: 500; }
+  .buckets { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .bk { border: 1px solid #E0E0E0; border-radius: 9px; padding: 7px 11px; font-size: 11.5px;
+        line-height: 1.5; color: #333; background: #fff; }
+  .bk b { display: block; font-size: 12.5px; color: #1D1D1F; margin-bottom: 2px; }
+  .bk i { font-style: normal; color: #7A7A7A; }
+
+  .grid { display: flex; gap: 34px; flex-wrap: wrap; align-items: flex-start; margin-top: 30px; }
+  .col { width: 390px; }
+  .col-lbl { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .col-lbl em { font-style: normal; color: #0066CC; font-size: 11.5px; margin-left: 5px;
+                background: #EAF3FD; border-radius: 9999px; padding: 2px 8px; }
+  .col-sub { font-size: 12px; color: #7A7A7A; line-height: 1.6; min-height: 74px; margin-bottom: 10px; }
+  .frame { width: 390px; height: 844px; border-radius: 36px; overflow: hidden;
+           background: #fff; box-shadow: 0 0 0 1px #E0E0E0, 0 12px 30px rgba(0,0,0,.06); position: relative; }
+  .screen { width: 390px; height: 844px; position: relative; overflow: hidden; }
+
+  /* ── 设计令牌（搬自 app.wxss page{}） ── */
+  .screen {
+    --ink:#1D1D1F; --ink-2:#333333; --muted:#7A7A7A; --soft:#C7C7CC;
+    --hairline:#E0E0E0; --divider:#F0F0F0; --parchment:#F5F5F7; --canvas:#FFFFFF;
+    --tile:#272729; --tile-2:#3A3A3C; --accent:#0066CC; --accent-on-dark:#2997FF; --live:#FF453A;
+    --amber-bg:#FEF3C7; --amber-fg:#8A6100; --green-bg:#E7F5EC; --green-fg:#1E7A46;
+    --red-bg:#FDE8E8; --red-fg:#B42318; --accent-tint:#EAF3FD;
+    --r-card:17.68px; --r-input:11.96px; --r-pill:5199.48px;
+    background: var(--canvas); color: var(--ink); font-size: 14.56px; line-height: 1.5;
+  }
+  .screen .page { height: 844px; display: flex; flex-direction: column; background: var(--canvas); }
+  .screen .statusbar { height: 49.92px; flex: none; display: flex; align-items: center;
+                       justify-content: space-between; padding: 0 24.96px; font-size: 13.52px; font-weight: 600; }
+  .screen .navreserve { height: 20.8px; flex: none; }
+  .screen .body { flex: 1; min-height: 0; padding: 0 20.8px; display: flex; flex-direction: column;
+                  gap: 17.68px; overflow: hidden; }
+  .screen .pb-tabbar { flex: none; height: 78px; }
+
+  /* ── 文字层级 ── */
+  .screen .t-page { font-size: 28.08px; font-weight: 600; letter-spacing: -0.42px; line-height: 1.25; }
+  .screen .t-strong { font-size: 15.6px; font-weight: 500; line-height: 1.4; }
+  .screen .t-sub { font-size: 13px; color: var(--muted); line-height: 1.5; letter-spacing: 0.26px; }
+  .screen .t-cap { font-size: 11.96px; color: var(--muted); line-height: 1.5; letter-spacing: 0.26px; }
+  .screen .t-micro { font-size: 10.92px; color: var(--muted); line-height: 1.45; letter-spacing: 0.26px; }
+  .screen .stack { display: flex; flex-direction: column; }
+  .screen .between { display: flex; align-items: center; justify-content: space-between; }
+
+  /* ── 卡片 / 按钮 / 标签 ── */
+  .screen .card { background: var(--parchment); border-radius: var(--r-card); padding: 16.64px; }
+  .screen .btn { font-size: 15.6px; border-radius: var(--r-pill); padding: 11.44px 22.88px;
+                 text-align: center; line-height: 1.2; font-weight: 600; }
+  .screen .btn-block { width: 100%; font-size: 16.64px; padding: 15.6px 0; }
+  .screen .btn-primary { background: var(--accent); color: #fff; }
+  .screen .btn-disabled { background: #B9D2EE; color: #fff; }
+  .screen .btn-quiet { background: #fff; color: var(--ink-2); border: 1.04px solid var(--hairline); font-weight: 500; }
+  .screen .btn-ghost { background: transparent; color: var(--accent-on-dark);
+                       border: 1.04px solid var(--accent-on-dark); font-weight: 500; }
+  .screen .tag { display: inline-block; font-size: 12.48px; font-weight: 500; border-radius: var(--r-pill);
+                 padding: 4.16px 11.44px; line-height: 1.35; }
+  .screen .tag-pending { background: var(--amber-bg); color: var(--amber-fg); }
+  .screen .tag-pass { background: var(--green-bg); color: var(--green-fg); }
+  .screen .tag-reject { background: var(--red-bg); color: var(--red-fg); }
+  .screen .tag-queued { background: var(--divider); color: var(--ink-2); }
+  .screen .tag-acc { background: var(--accent-tint); color: var(--accent); }   /* 新增：6 已通过·待排期 */
+  .screen .tag-mute { background: var(--divider); color: var(--muted); }       /* 新增：5 已播放 */
+  .screen .tag-outline { background: #fff; border: 1.04px solid var(--hairline); color: var(--muted); }  /* 新增：7 已取消 */
+  .screen .chip { font-size: 10.92px; font-weight: 500; color: #CCCCCC; background: var(--tile-2);
+                  border-radius: var(--r-pill); padding: 6.24px 12.48px; letter-spacing: 0.52px; }
+
+  /* ── 窗口状态条 ── */
+  .screen .win-bar { display: flex; align-items: flex-start; gap: 7.28px;
+                     padding: 10.4px 13.52px; border-radius: 10.4px; background: var(--parchment); }
+  .screen .win-bar.open { background: var(--accent-tint); }
+  .screen .win-dot { width: 6.24px; height: 6.24px; margin-top: 4.68px; flex: none;
+                     border-radius: 50%; background: var(--soft); }
+  .screen .win-bar.open .win-dot { background: var(--accent); }
+  .screen .win-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3.12px; }
+  .screen .win-txt { font-size: 13px; color: var(--ink-2); }
+  .screen .win-sub { font-size: 11.96px; color: var(--muted); letter-spacing: 0.26px; }
+  .screen .win-bar.open .win-sub { color: var(--accent); font-weight: 600; }
+
+  /* ── 分段筛选（v2 是六格，协议版收成三格：全部 / 待审核 / 已播出） ── */
+  .screen .segment { position: relative; display: flex; background: var(--divider);
+                     border-radius: var(--r-pill); padding: 4.16px; }
+  .screen .segment-indicator { position: absolute; top: 4.16px; bottom: 4.16px; left: 4.16px;
+                               border-radius: var(--r-pill); background: #fff; }
+  .screen .segment-item { position: relative; flex: 1; text-align: center; font-size: 14.56px;
+                          color: var(--muted); padding: 8.32px 0; border-radius: var(--r-pill); line-height: 1.2;
+                          white-space: nowrap; }
+  .screen .segment-item.on { color: var(--ink); font-weight: 600; }
+  .screen .w3 { width: calc((100% - 8.32px) / 3); }   /* 桶从 6 个减到 3 个 */
+
+  /* ── 深色卡 / 候补卡 ── */
+  .screen .tile { background: var(--tile); border-radius: 19.76px; padding: 16.64px;
+                  display: flex; flex-direction: column; gap: 10.4px; }
+  .screen .tile-title { font-size: 26px; font-weight: 600; color: #fff; letter-spacing: -0.42px; line-height: 1.3; }
+  .screen .tile-meta { font-size: 13px; color: #CCCCCC; letter-spacing: 0.26px; line-height: 1.6; }
+  .screen .tile-chips { display: flex; gap: 8.32px; flex-wrap: wrap; }
+  .screen .tile-actions { display: flex; gap: 10.4px; margin-top: 2.08px; }
+  .screen .qc-hint { font-size: 11.96px; color: #CCCCCC; line-height: 1.6; letter-spacing: 0.26px; }
+  .screen .qc-bar { height: 5.2px; border-radius: 519.48px; background: rgba(255,255,255,.18); overflow: hidden; }
+  .screen .qc-bar-fill { height: 100%; border-radius: 519.48px; background: var(--accent-on-dark); }
+  .screen .qc-fail { background: var(--parchment); border-radius: var(--r-card); padding: 16.64px;
+                     display: flex; flex-direction: column; gap: 9.36px; }
+
+  /* ── 普通投稿行 ── */
+  .screen .item { background: var(--parchment); border-radius: var(--r-card); padding: 16.64px;
+                  display: flex; flex-direction: column; gap: 10.4px; }
+  .screen .reason { font-size: 11.96px; color: var(--red-fg); line-height: 1.45; }
+  .screen .cancel { font-size: 13px; color: var(--muted); padding: 5.2px 14.56px;
+                    border-radius: var(--r-pill); background: #fff; }
+
+  /* ── 表单 ── */
+  .screen .form { background: var(--parchment); border-radius: var(--r-card); padding: 17.68px;
+                  display: flex; flex-direction: column; gap: 17.68px; }
+  .screen .field { display: flex; flex-direction: column; gap: 8.32px; }
+  .screen .field-label { font-size: 13px; font-weight: 500; color: var(--muted); }
+  .screen .input { background: #fff; border-radius: var(--r-input); height: 45.76px; line-height: 45.76px;
+                   padding: 0 14.56px; font-size: 14.56px; width: 100%; }
+  .screen .ph { color: var(--soft); }
+  .screen .slot-row { display: flex; align-items: center; justify-content: space-between; gap: 8.32px;
+                      height: 45.76px; padding: 0 14.56px; background: var(--canvas);
+                      border: 1.04px solid var(--hairline); border-radius: 10.4px; }
+  .screen .slot-value { font-size: 14.56px; color: var(--ink); }
+  .screen .slot-sub { margin-top: 5.2px; font-size: 11.44px; color: var(--muted); letter-spacing: 0.26px; }
+  .screen .slot-arrow { width: 8.32px; height: 8.32px; flex: none; border-top: 2.08px solid var(--soft);
+                        border-right: 2.08px solid var(--soft); transform: rotate(45deg); }
+  .screen .quota-hint { display: flex; align-items: center; gap: 6.24px; margin-top: 10.4px;
+                        padding: 8.32px 12.48px; background: var(--parchment); border-radius: 8.32px;
+                        font-size: 12.48px; color: var(--ink-2); }
+  .screen .q-dot { width: 6.24px; height: 6.24px; border-radius: 50%; background: var(--accent); flex: none; }
+  .screen .bottom-cta { flex: none; padding: 8.32px 20.8px 14.56px; background: var(--canvas); }
+  .screen .hint { text-align: center; margin-bottom: 10.4px; font-size: 11.96px; color: var(--muted); }
+
+  /* ── 新增：接受调剂开关（协议版 allow_reschedule） ── */
+  .screen .switch-row { display: flex; align-items: flex-start; gap: 13.52px; background: #fff;
+                        border: 1.04px solid var(--hairline); border-radius: var(--r-input);
+                        padding: 12.48px 14.56px; }
+  .screen .switch-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4.16px; }
+  .screen .switch-lbl { font-size: 14.56px; color: var(--ink); }
+  .screen .switch-desc { font-size: 11.44px; color: var(--muted); line-height: 1.5; letter-spacing: 0.26px; }
+  .screen .switch { width: 45.76px; height: 26px; flex: none; border-radius: var(--r-pill);
+                    background: var(--soft); position: relative; margin-top: 1px; }
+  .screen .switch.on { background: var(--accent); }
+  .screen .switch-knob { position: absolute; top: 2.6px; left: 2.6px; width: 20.8px; height: 20.8px;
+                         border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+  .screen .switch.on .switch-knob { left: 22.36px; }
+
+  /* ── 新增：提交成功回执 ── */
+  .screen .receipt { background: #fff; border-radius: 22.88px; padding: 22.88px 20.8px;
+                     box-shadow: 0 6.24px 14.56px -6.24px rgba(15,28,46,.08),
+                                 0 22.88px 45.76px -18.72px rgba(15,28,46,.16);
+                     display: flex; flex-direction: column; gap: 15.6px; }
+  .screen .rc-mark { width: 46.8px; height: 46.8px; border-radius: 50%; background: var(--accent-tint);
+                     color: var(--accent); display: flex; align-items: center; justify-content: center;
+                     font-size: 22.88px; font-weight: 600; }
+  .screen .rc-title { font-size: 20.8px; font-weight: 600; letter-spacing: -0.31px; line-height: 1.3; }
+  .screen .rc-song { font-size: 15.6px; color: var(--ink); line-height: 1.45; }
+  .screen .steps { display: flex; flex-direction: column; gap: 0; }
+  .screen .step { display: flex; gap: 11.44px; }
+  .screen .step-rail { flex: none; width: 15.6px; display: flex; flex-direction: column; align-items: center; }
+  .screen .step-dot { width: 8.32px; height: 8.32px; border-radius: 50%; background: var(--soft); flex: none; margin-top: 5.2px; }
+  .screen .step.on .step-dot { background: var(--accent); }
+  .screen .step-line { flex: 1; width: 1.04px; background: var(--hairline); margin: 3.12px 0; }
+  .screen .step-main { flex: 1; min-width: 0; padding-bottom: 12.48px; }
+  .screen .step:last-child .step-main { padding-bottom: 0; }
+  .screen .step-t { font-size: 13.52px; color: var(--ink-2); line-height: 1.45; }
+  .screen .step-t.on { font-weight: 600; color: var(--ink); }
+  .screen .step-d { font-size: 11.44px; color: var(--muted); line-height: 1.55; margin-top: 3.12px; letter-spacing: 0.26px; }
+
+  /* ── Hero 卡（我的投稿） ── */
+  .screen .hero { background: #fff; border-radius: 22.88px; padding: 20.8px 20.8px 18.72px;
+                  box-shadow: 0 6.24px 14.56px -6.24px rgba(15,28,46,.08),
+                              0 22.88px 45.76px -18.72px rgba(15,28,46,.16);
+                  display: flex; flex-direction: column; gap: 15.6px; }
+  .screen .hero-top { display: flex; align-items: center; gap: 13.52px; }
+  .screen .avatar { width: 54.08px; height: 54.08px; flex: none; border-radius: 50%;
+                    background: var(--ink); color: #fff; display: flex; align-items: center;
+                    justify-content: center; font-size: 20.8px; font-weight: 600; }
+  .screen .hero-id { flex: 1; min-width: 0; }
+  .screen .hero-name { font-size: 18.72px; font-weight: 600; color: var(--ink); letter-spacing: -0.31px; }
+  .screen .hero-meta { font-size: 11.96px; color: var(--muted); margin-top: 4.16px; letter-spacing: 0.42px; }
+  .screen .hero-badge { flex: none; font-size: 10.92px; padding: 4.16px 10.4px; border-radius: var(--r-pill);
+                        background: rgba(0,102,204,.08); color: var(--accent); }
+  .screen .hero-stats { display: flex; background: var(--parchment); border-radius: 14.56px; padding: 12.48px 0; }
+  .screen .stat { flex: 1; text-align: center; position: relative; }
+  .screen .stat + .stat::before { content: ''; position: absolute; left: 0; top: 15%; bottom: 15%;
+                                  width: 1.04px; background: var(--hairline); }
+  .screen .stat .n { font-size: 19.76px; font-weight: 600; color: var(--ink);
+                     font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .screen .stat.warn .n { color: var(--amber-fg); }
+  .screen .stat.acc .n { color: var(--accent); }
+  .screen .stat .l { font-size: 10.92px; color: var(--muted); margin-top: 3.12px; letter-spacing: 0.52px; }
+  .screen .hero-note { font-size: 10.92px; color: var(--muted); letter-spacing: 0.26px; line-height: 1.5;
+                       margin-top: -6.24px; }
+
+  /* ── 底部假 tabBar ── */
+  .screen .tabbar { position: absolute; left: 0; right: 0; bottom: 0; height: 78px; background: #fff;
+                    display: flex; align-items: flex-start; padding-top: 9.36px;
+                    box-shadow: 0 -1px 0 var(--divider); }
+  .screen .tb { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4.16px;
+                font-size: 10.92px; color: var(--soft); }
+  .screen .tb.on { color: var(--accent); }
+  .screen .tb-i { width: 20.8px; height: 20.8px; border-radius: 6.24px; background: currentColor; opacity: .9; }
+
+  /* ── 溢出检测标记（自检用） ── */
+  .overflow { outline: 2px solid #FF3B30; outline-offset: -2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hd">
+    <h1>点歌协议版 · 小程序前端方案 <span style="color:#0066CC">v3</span>
+      <span style="font-size:13px; color:#7A7A7A; font-weight:400;">第 2 稿 · 桶减到 3 个</span></h1>
+    <p>
+      后端已按 <b>docs/song-protocol.md</b> 落地（97 项验证全过）。这份预览是<b>小程序端</b>的配套前端方案，共 <b>6 屏</b>，
+      只画改动过的地方：<b>投稿页</b>与<b>我的投稿</b>。视觉一律沿用 v2/v8 已定稿的设计系统，
+      <b>不新增颜色、不新增渐变</b>，只补 3 个状态胶囊（<code>待排期</code> / <code>已播放</code> / <code>已取消</code>）
+      和 1 个开关（<code>接受调剂</code>）。尺寸逐条搬自 <code>app.wxss</code> 与两个页面的 wxss，
+      <code>1rpx = 0.52px</code>，红描边 = 该节点溢出（自检标记，正式页面不存在）。
+    </p>
+
+    <div class="diff">
+      <table>
+        <thead><tr><th style="width:132px">位置</th><th style="width:300px">v2 口径（旧）</th><th>协议版（新）</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>提交那一刻</b></td>
+            <td class="old">提交即占住首选时段，按钮上方写「提交后即占住该时段 · 收歌截止 …」</td>
+            <td class="new">提交只进审核队列，<b>不占位</b>。按钮上方改成「提交后进入审核，通过后统一排期」，并新增「接受调剂」开关（服务端字段 <code>allow_reschedule</code>，默认开）。</td>
+          </tr>
+          <tr>
+            <td><b>审核通过后</b></td>
+            <td class="old">直接就是「已排期」，没有中间态</td>
+            <td class="new">先进入 <b>6 已通过 · 待排期</b>，等管理端跑完排期才落到「已排期」。学生要看得见这一步，否则会以为卡住了。</td>
+          </tr>
+          <tr>
+            <td><b>首选满了</b></td>
+            <td class="old">进候补队列 → 递补上来叫「已补位」（要再人工审一次）</td>
+            <td class="new">进候补 → 系统<b>按提交先后自动调剂</b>到别处即可直接「已排期」，不再有「已补位·待审」。调剂结果会明确告诉学生「你首选的是 X，已满，改排到 Y」。</td>
+          </tr>
+          <tr>
+            <td><b>状态桶</b></td>
+            <td class="old">6 格：全部 / 待审核 / 候补中 / 已补位 / 已通过 / 已驳回</td>
+            <td class="new">3 格：<b>全部 / 待审核 / 已播出</b>。桶少到只有三个，「全部」跟另外两格才真正对得上账（见下）。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="buckets">
+      <div class="bk"><b>全部 10</b><i>所有点歌投稿</i></div>
+      <div class="bk"><b>待审核 7</b><i>所有还没播出的</i></div>
+      <div class="bk"><b>已播出 3</b><i>已排期 + 已播放</i></div>
+    </div>
+    <p style="margin:12px 0 0; font-size:12.5px; color:#7A7A7A; line-height:1.7">
+      7 + 3 = 10 ✓ —— <b>三个桶互斥且穷尽</b>，「全部」永远等于另外两格之和，不会再出现「加起来对不上」。
+      <b>「待审核」按「还没播出」收口</b>：里面既有还在走流程的（待审核 / 待排期 / 候补中），
+      也有走完但没成的（未排上 / 已驳回 / 自己取消）。到底哪一种，看行内胶囊。
+    </p>
+
+    <div style="margin-top:20px;">
+      <div style="font-size:12px; font-weight:600; color:#333; margin-bottom:10px;">行内胶囊（7 个派生状态，粒度不降；桶只负责筛选）</div>
+
+      <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:9px;">
+        <span style="font-size:11.5px;color:#7A7A7A;width:76px;flex:none;">待审核桶内</span>
+        <span style="font-size:12.48px;font-weight:500;border-radius:9999px;padding:4px 11px;background:#FEF3C7;color:#8A6100;">待审核</span>
+        <span style="font-size:12.48px;font-weight:500;border-radius:9999px;padding:4px 11px;background:#EAF3FD;color:#0066CC;">待排期</span>
+        <span style="font-size:12.48px;font-weight:500;border-radius:9999px;padding:4px 11px;background:#F0F0F0;color:#333333;">候补中</span>
+        <span style="font-size:12.48px;font-weight:500;border-radius:9999px;padding:4px 11px;background:#FDE8E8;color:#B42318;">未排上</span>
+        <span style="font-size:12.48px;font-weight:500;border-radius:9999px;padding:4px 11px;background:#FDE8E8;color:#B42318;">已驳回</span>
+        <span style="font-size:12.48px;font-weight:500;border-radius:9999px;padding:4px 11px;background:#fff;border:1px solid #E0E0E0;color:#7A7A7A;">已取消</span>
+      </div>
+
+      <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+        <span style="font-size:11.5px;color:#7A7A7A;width:76px;flex:none;">已播出桶内</span>
+        <span style="font-size:12.48px;font-weight:500;border-radius:9999px;padding:4px 11px;background:#E7F5EC;color:#1E7A46;">已排期</span>
+        <span style="font-size:12.48px;font-weight:500;border-radius:9999px;padding:4px 11px;background:#F0F0F0;color:#7A7A7A;">已播放</span>
+      </div>
+
+      <p style="margin:12px 0 0; font-size:12.5px; color:#7A7A7A; line-height:1.75;">
+        琥珀 = 等人审 ／ 强调浅底 = 审过了、等系统排 ／ 中性灰 = 在排队 ／ 绿 = 排上了 ／
+        填灰 = 正常播完 ／ 红 = 没成 ／ 描边 = 学生自己撤的（不作数）。
+        <b>「已播放」填灰、「已取消」描边</b>是刻意的：两者都是结束态，但一个正常播完、一个是自己撤的，
+        用描边避免在列表里看着像成功。
+      </p>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <!-- ═══════════ ① 投稿页 · 协议版 ═══════════ -->
+    <div class="col">
+      <div class="col-lbl">① 投稿页 · 窗口开放中 <em>改</em></div>
+      <div class="col-sub">
+        底部提示从「提交后即占住该时段」改成「提交后进入审核，通过后统一排期」——
+        这是协议版最容易让学生误解的一处。表单多加一个「接受调剂」开关（默认开），开关是白底描边行，
+        不抢表单焦点。
+      </div>
+      <div class="frame"><div class="screen">
+        <div class="page">
+          <div class="statusbar"><span>19:05</span><span>●●● ⌾ ▮</span></div>
+          <div class="navreserve"></div>
+          <div class="body">
+            <div class="stack">
+              <div class="t-page">投稿</div>
+              <div class="t-sub">点歌或文稿，被选中即可在节目中播出</div>
+            </div>
+
+            <div class="win-bar open">
+              <div class="win-dot"></div>
+              <div class="win-main">
+                <div class="win-txt">点歌时间：每周六 18:00 – 周日 18:00</div>
+                <div class="win-sub">开放中 · 距截止 2 小时 15 分</div>
+              </div>
+            </div>
+
+            <div class="segment">
+              <div class="segment-indicator" style="width: calc((100% - 8.32px) / 2);"></div>
+              <div class="segment-item on">点歌</div>
+              <div class="segment-item">文稿投稿</div>
+            </div>
+
+            <div class="quota-hint"><div class="q-dot"></div><span>本周还能点 2 次（上限 2 次）</span></div>
+
+            <div class="form">
+              <div class="field"><div class="field-label">歌曲名</div><div class="input">起风了</div></div>
+              <div class="field"><div class="field-label">歌手</div><div class="input">买辣椒也用券</div></div>
+              <div class="field"><div class="field-label">希望播出时段</div>
+                <div class="slot-row"><div class="slot-value">2026-09-22 午间 12:20</div><div class="slot-arrow"></div></div>
+                <div class="slot-sub">可选范围：9/21 – 9/25（下周一到周五）</div>
+              </div>
+              <div class="switch-row">
+                <div class="switch-main">
+                  <div class="switch-lbl">接受调剂</div>
+                  <div class="switch-desc">首选时段排满时，允许系统把你调到别的时段；关掉就只有首选时段有空位才排得上</div>
+                </div>
+                <div class="switch on"><div class="switch-knob"></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="bottom-cta">
+            <div class="hint">提交后进入审核，通过后统一排期</div>
+            <div class="btn btn-block btn-primary">提交投稿</div>
+          </div>
+          <div class="pb-tabbar"></div>
+          <div class="tabbar">
+            <div class="tb"><div class="tb-i"></div><span>首页</span></div>
+            <div class="tb on"><div class="tb-i"></div><span>投稿</span></div>
+            <div class="tb"><div class="tb-i"></div><span>风采</span></div>
+            <div class="tb"><div class="tb-i"></div><span>我的</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ═══════════ ② 提交成功回执 ═══════════ -->
+    <div class="col">
+      <div class="col-lbl">② 提交成功回执 <em>新增</em></div>
+      <div class="col-sub">
+        协议版必须给这一步：学生点完「提交投稿」后要知道<b>接下来会发生什么</b>，否则会反复刷新等「已排期」。
+        用三段进度（已提交 → 审核 → 排期），当前段用强调色，未到段用灰；末尾一句点明「什么时候有结果」。
+      </div>
+      <div class="frame"><div class="screen">
+        <div class="page">
+          <div class="statusbar"><span>15:52</span><span>●●● ⌾ ▮</span></div>
+          <div class="navreserve"></div>
+          <div class="body">
+            <div class="receipt">
+              <div class="rc-mark">✓</div>
+              <div class="stack" style="gap:6.24px;">
+                <div class="rc-title">已提交，进入审核</div>
+                <div class="rc-song">起风了 — 买辣椒也用券</div>
+              </div>
+
+              <div class="steps">
+                <div class="step on">
+                  <div class="step-rail"><div class="step-dot"></div><div class="step-line"></div></div>
+                  <div class="step-main">
+                    <div class="step-t on">已提交</div>
+                    <div class="step-d">09-20 15:52 · 本周还剩 <b>1 次</b>点歌机会</div>
+                  </div>
+                </div>
+                <div class="step">
+                  <div class="step-rail"><div class="step-dot"></div><div class="step-line"></div></div>
+                  <div class="step-main">
+                    <div class="step-t">等待审核</div>
+                    <div class="step-d">审核截止 <b>09-20 18:00</b>（点歌窗口关闭时）。通过后进入排期。</div>
+                  </div>
+                </div>
+                <div class="step">
+                  <div class="step-rail"><div class="step-dot"></div></div>
+                  <div class="step-main">
+                    <div class="step-t">统一排期</div>
+                    <div class="step-d">按「首选时段 + 提交时间先后」分配正式位；首选排满会自动候补，
+                      你已勾选<b>接受调剂</b>，有空位时可能被调到别的时段。</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="t-cap" style="line-height:1.65; padding:0 4.16px;">
+              排期结果最晚在 <b>09-28 00:00</b>（播出周周一）前确定，届时可在「我的投稿」看到。
+            </div>
+          </div>
+          <div class="bottom-cta">
+            <div class="btn btn-block btn-primary">查看我的投稿</div>
+          </div>
+          <div class="pb-tabbar"></div>
+          <div class="tabbar">
+            <div class="tb"><div class="tb-i"></div><span>首页</span></div>
+            <div class="tb on"><div class="tb-i"></div><span>投稿</span></div>
+            <div class="tb"><div class="tb-i"></div><span>风采</span></div>
+            <div class="tb"><div class="tb-i"></div><span>我的</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ═══════════ ③ 我的投稿 · 三格统计 + 三格筛选 ═══════════ -->
+    <div class="col">
+      <div class="col-lbl">③ 我的投稿 · 三格统计 + 三格筛选 <em>改口径</em></div>
+      <div class="col-sub">
+        桶从六个减到三个，统计和筛选都跟着收：<b>全部 / 待审核 / 已播出</b>。
+        「待审核」= 所有还没播出的（含待排期、候补中、被驳回、自己取消的），底下加一行小字写清楚 ——
+        否则学生看到被驳回的躺在「待审核」里会以为哪里坏了。行内胶囊不减，仍是 7 种粒度。
+      </div>
+      <div class="frame"><div class="screen">
+        <div class="page">
+          <div class="statusbar"><span>19:12</span><span>●●● ⌾ ▮</span></div>
+          <div class="navreserve"></div>
+          <div class="body">
+            <div class="hero">
+              <div class="hero-top">
+                <div class="avatar">王</div>
+                <div class="hero-id">
+                  <div class="hero-name">王小明</div>
+                  <div class="hero-meta">高三 3 班 · 4 03 07</div>
+                </div>
+                <div class="hero-badge">菁悠成员</div>
+              </div>
+              <div class="hero-stats">
+                <div class="stat"><div class="n">10</div><div class="l">全部</div></div>
+                <div class="stat warn"><div class="n">7</div><div class="l">待审核</div></div>
+                <div class="stat"><div class="n">3</div><div class="l">已播出</div></div>
+              </div>
+              <div class="hero-note">「待审核」= 还没播出（含待排期、候补中、已驳回等）</div>
+            </div>
+
+            <div class="win-bar open">
+              <div class="win-dot"></div>
+              <div class="win-main">
+                <div class="win-txt">点歌时间：每周六 18:00 – 周日 18:00</div>
+                <div class="win-sub">开放中 · 距截止 2 小时 8 分</div>
+              </div>
+            </div>
+
+            <div class="segment">
+              <div class="segment-indicator w3" style="transform: translateX(0);"></div>
+              <div class="segment-item on">全部</div>
+              <div class="segment-item">待审核</div>
+              <div class="segment-item">已播出</div>
+            </div>
+
+            <div class="item">
+              <div class="between">
+                <div class="tag tag-pending">待审核</div>
+                <div class="t-micro">2026-09-20 17:44</div>
+              </div>
+              <div class="t-strong">孤勇者 — 陈奕迅</div>
+              <div class="t-cap">希望时段：9/24 午间 12:20 · 接受调剂</div>
+            </div>
+
+            <div class="item">
+              <div class="between">
+                <div class="tag tag-acc">待排期</div>
+                <div class="t-micro">2026-09-20 17:31</div>
+              </div>
+              <div class="stack" style="gap:4.16px;">
+                <div class="t-strong">晴天 — 周杰伦</div>
+                <div class="t-cap">送给高三三班的大家，毕业快乐。</div>
+              </div>
+              <div class="t-cap">希望时段：9/21 早间 07:20 · 接受调剂</div>
+            </div>
+          </div>
+          <div class="pb-tabbar"></div>
+          <div class="tabbar">
+            <div class="tb"><div class="tb-i"></div><span>首页</span></div>
+            <div class="tb"><div class="tb-i"></div><span>投稿</span></div>
+            <div class="tb"><div class="tb-i"></div><span>风采</span></div>
+            <div class="tb on"><div class="tb-i"></div><span>我的</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ═══════════ ④ 待审核桶 · 候补中 两种（接受 / 不接受调剂） ═══════════ -->
+    <div class="col">
+      <div class="col-lbl">④ 待审核桶 · 候补中 <em>深色主角</em></div>
+      <div class="col-sub">
+        「待审核」桶里最需要讲清的是候补：候补卡仍是全页唯一的深色主角。协议版多了「是否接受调剂」这一维，
+        直接写进说明文案，不单列字段；位次胶囊讲清「第几位」。上面那张不接受调剂，文案要让学生知道「只能等首选时段」。
+      </div>
+      <div class="frame"><div class="screen">
+        <div class="page">
+          <div class="statusbar"><span>19:14</span><span>●●● ⌾ ▮</span></div>
+          <div class="navreserve"></div>
+          <div class="body">
+            <div class="segment">
+              <div class="segment-indicator w3" style="transform: translateX(100%);"></div>
+              <div class="segment-item">全部</div>
+              <div class="segment-item on">待审核</div>
+              <div class="segment-item">已播出</div>
+            </div>
+
+            <div class="tile">
+              <div class="tile-chips"><div class="chip">候补中</div><div class="chip">第 1 位</div><div class="chip">不接受调剂</div></div>
+              <div class="tile-title">夜空中最亮的星</div>
+              <div class="stack" style="gap:3.12px;">
+                <div class="tile-meta">前面还有 0 人 · 首选 9/22 晚间 17:30</div>
+              </div>
+              <div class="qc-bar"><div class="qc-bar-fill" style="width:6%"></div></div>
+              <div class="qc-hint">你首选的那个时段已经排满，正在候补。你关掉了「接受调剂」，
+                所以只有首选时段出现空位时才会把这首排上去。</div>
+              <div class="qc-hint">09-28 00:00 排期锁定，届时还没空位就会自动结束</div>
+              <div class="tile-actions">
+                <div class="btn btn-ghost">放弃候补</div>
+              </div>
+            </div>
+
+            <div class="tile">
+              <div class="tile-chips"><div class="chip">候补中</div><div class="chip">第 3 位</div></div>
+              <div class="tile-title">起风了</div>
+              <div class="stack" style="gap:3.12px;">
+                <div class="tile-meta">前面还有 2 人 · 首选 9/22 晚间 17:30</div>
+              </div>
+              <div class="qc-hint">有空位时按提交先后自动补位。你接受调剂，也可能被调到别的时段，调好会在这里显示「已排期」。</div>
+              <div class="tile-actions">
+                <div class="btn btn-ghost">放弃候补</div>
+              </div>
+            </div>
+          </div>
+          <div class="pb-tabbar"></div>
+          <div class="tabbar">
+            <div class="tb"><div class="tb-i"></div><span>首页</span></div>
+            <div class="tb"><div class="tb-i"></div><span>投稿</span></div>
+            <div class="tb"><div class="tb-i"></div><span>风采</span></div>
+            <div class="tb on"><div class="tb-i"></div><span>我的</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ═══════════ ⑤ 已播出桶 · 已排期 / 已播放 ═══════════ -->
+    <div class="col">
+      <div class="col-lbl">⑤ 已播出桶 · 已排期 / 已播放 <em>改文案</em></div>
+      <div class="col-sub">
+        「已播出」桶只有两种形态：已排期（还没播）和已播放（播完了）。已排期仍是深色卡 —— 排到哪一场是学生最想知道的；
+        被调剂过的那张必须把「首选 → 实际」两行都写出来。已播放用灰胶囊，它是历史态，不抢眼。
+      </div>
+      <div class="frame"><div class="screen">
+        <div class="page">
+          <div class="statusbar"><span>18:42</span><span>●●● ⌾ ▮</span></div>
+          <div class="navreserve"></div>
+          <div class="body">
+            <div class="segment">
+              <div class="segment-indicator w3" style="transform: translateX(200%);"></div>
+              <div class="segment-item">全部</div>
+              <div class="segment-item">待审核</div>
+              <div class="segment-item on">已播出</div>
+            </div>
+
+            <div class="tile">
+              <div class="tile-chips"><div class="chip">已排期</div><div class="chip">已被调剂</div></div>
+              <div class="tile-title">9/23 午间 12:20</div>
+              <div class="tile-meta">起风了 · 买辣椒也用券</div>
+              <div class="tile-meta">你首选：9/22 晚间 17:30</div>
+              <div class="qc-hint">你首选的「2026-09-22 晚间 17:30」已排满，系统把你调剂到了
+                「2026-09-23 午间 12:20」。</div>
+            </div>
+
+            <div class="item">
+              <div class="between">
+                <div class="tag tag-mute">已播放</div>
+                <div class="t-micro">2026-09-19 18:40</div>
+              </div>
+              <div class="t-strong">晴天 — 周杰伦</div>
+              <div class="t-cap">播出时段：9/21 早间 07:20</div>
+            </div>
+
+          </div>
+          <div class="pb-tabbar"></div>
+          <div class="tabbar">
+            <div class="tb"><div class="tb-i"></div><span>首页</span></div>
+            <div class="tb"><div class="tb-i"></div><span>投稿</span></div>
+            <div class="tb"><div class="tb-i"></div><span>风采</span></div>
+            <div class="tb on"><div class="tb-i"></div><span>我的</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ═══════════ ⑥ 待审核桶 · 结尾态 ═══════════ -->
+    <div class="col">
+      <div class="col-lbl">⑥ 待审核桶 · 未排上 / 已驳回 / 已取消 <em>结尾态</em></div>
+      <div class="col-sub">
+        「待审核」桶里除了进行中，还装着三种结尾态。它们都不当深色主角 —— 失败不抢主角位，用羊皮纸卡 + 红字原因；
+        学生自己撤的用描边胶囊，一眼区分「自己取消」和「被驳回」。
+      </div>
+      <div class="frame"><div class="screen">
+        <div class="page">
+          <div class="statusbar"><span>10:26</span><span>●●● ⌾ ▮</span></div>
+          <div class="navreserve"></div>
+          <div class="body">
+            <div class="segment">
+              <div class="segment-indicator w3" style="transform: translateX(100%);"></div>
+              <div class="segment-item">全部</div>
+              <div class="segment-item on">待审核</div>
+              <div class="segment-item">已播出</div>
+            </div>
+
+            <div class="qc-fail">
+              <div class="between">
+                <div class="t-strong">日不落 — 蔡依林</div>
+                <div class="tag tag-reject">未排上</div>
+              </div>
+              <div class="t-sub">排期锁定前一直没等到空位</div>
+              <div class="t-cap">首选时段：9/22 早间 07:20 · 不接受调剂 · 提交于 9/19 18:31</div>
+            </div>
+
+            <div class="item">
+              <div class="between">
+                <div class="tag tag-reject">已驳回</div>
+                <div class="t-micro">2026-09-19 20:10</div>
+              </div>
+              <div class="t-strong">孤勇者 — 陈奕迅</div>
+              <div class="reason">驳回原因：本周已点过这首，换个下次吧 · 希望时段 9/24 午间</div>
+            </div>
+
+            <div class="item">
+              <div class="between">
+                <div class="tag tag-outline">已取消</div>
+                <div class="t-micro">2026-09-20 17:22</div>
+              </div>
+              <div class="t-strong" style="color:var(--muted)">稻香 — 周杰伦</div>
+              <div class="t-cap">学生自行撤销，位子已让给别人</div>
+            </div>
+          </div>
+          <div class="pb-tabbar"></div>
+          <div class="tabbar">
+            <div class="tb"><div class="tb-i"></div><span>首页</span></div>
+            <div class="tb"><div class="tb-i"></div><span>投稿</span></div>
+            <div class="tb"><div class="tb-i"></div><span>风采</span></div>
+            <div class="tb on"><div class="tb-i"></div><span>我的</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+
+  <div style="margin-top:44px; border-top:1px solid #F0F0F0; padding-top:22px; max-width:1100px;">
+    <div style="font-size:14px; font-weight:600; margin-bottom:8px;">这版已按陛下的意见改到第 2 稿</div>
+    <div style="font-size:13px; line-height:1.95; color:#333;">
+      <b>① 桶减到三个</b>（全部 / 待审核 / 已播出），「待审核」把待排期、候补中一起收进去 —— 已改，六格统计也变成三格。<br>
+      <b>② 「接受调剂」开关</b> —— 保留，在投稿表单里，默认开（屏 ① ）。<br>
+      <b>③ 提交成功回执</b> —— 保留，独立一屏（屏 ② ）。<br>
+      <b>④ 新增屏 ⑥</b>：桶少了以后，未排上 / 已驳回 / 已取消 这三种结尾态没地方展示了，
+      所以单独拆一屏画出来（它们同样落在「待审核」桶里）。
+    </div>
+
+    <div style="font-size:14px; font-weight:600; margin:22px 0 8px;">还剩一个要你定的小点</div>
+    <div style="font-size:13px; line-height:1.95; color:#333;">
+      <b>第三格叫「已播出」还是「已排上」？</b>你写的是「已播出」，我照做了；但这一格里装的其实是两种东西——
+      <b>已排期</b>（下周播、还没播）和<b>已播放</b>（播完了）。严格说「已播出」只覆盖后者。
+      两个选法：<br>
+      &nbsp;&nbsp;· 维持 <b>已播出</b>：学生视角更直白（我就想知道播没播），行内胶囊会写清是「已排期」还是「已播放」。<br>
+      &nbsp;&nbsp;· 换成 <b>已排上</b>：跟「待审核」更对仗，语义也更准。 <br>
+      你说一句我就换，改一个词的事。
+    </div>
+
+    <div style="font-size:13px; line-height:1.95; color:#333; margin-top:16px;">
+      <b>尺寸自检：</b>三格筛选每格 118.8px，最长的「待审核」三字不折行；三格统计每格 110.8px，留白充足。
+      本页六屏均按 390×844 固定框内排版，正文区高度 695px，逐屏内容量已按尺寸收过。
+    </div>
+  </div>
+</div>
+</body>
+</html>

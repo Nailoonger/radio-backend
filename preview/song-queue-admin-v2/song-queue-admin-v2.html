@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>菁悠广播站 · 管理后台 · 点歌协议版适配 v2</title>
+<style>
+/* ============================================================
+   菁悠广播站 · 管理后台 · 点歌「协议版」适配 v2（静态预览，不改动任何代码）
+   设计系统完全继承 preview/admin-ui-v8 + preview/song-queue-admin-v1：
+     1. 全局只有一个强调色 --accent，所有「可点」的东西都用它
+     2. 不用任何装饰性渐变、不用彩色投影
+     3. 深色卡 --tile 是视觉主角，其余信息一律退到羊皮纸 --parchment
+   本版新增：协议版 7 个状态胶囊（去掉「已补位·待审」）+ 周状态机条 + 排期矩阵三维格
+   ============================================================ */
+:root{
+  --ink:#1d1d1f; --ink-2:#333333; --muted:#7a7a7a; --muted-2:#6e6e73;
+  --soft:#c7c7cc; --hairline:#e0e0e0; --divider:#f0f0f0;
+  --parchment:#f5f5f7; --canvas:#ffffff; --tile:#272729; --tile-2:#3a3a3c;
+  --accent:#0066cc; --accent-dark:#2997ff; --live:#ff453a;
+  --amber-bg:#fef3c7; --amber-fg:#8a6100;
+  --green-bg:#e7f5ec; --green-fg:#1e7a46;
+  --red-bg:#fde8e8;  --red-fg:#b42318;
+  --acc-bg:#e6f0fa;
+  --r-card:18px; --r-input:12px; --r-tile:20px; --r-pill:9999px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --fs-2xs:10.5px; --fs-xs:11.5px; --fs-sm:12.5px; --fs-md:13.5px;
+  --fs-xl:17px; --fs-2xl:19px; --fs-3xl:26px; --fs-num:30px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","HarmonyOS Sans SC",
+         "MiSans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:#fafafc}
+body{font-family:var(--font);color:var(--ink);font-size:14px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;padding:0 0 80px}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;font-size:inherit;border:none;background:none;cursor:pointer;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+
+/* ── 预览外壳 ── */
+.shell{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);
+  backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid var(--hairline)}
+.shell-in{max-width:1480px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:18px}
+.shell-brand{display:flex;align-items:center;gap:11px;flex:none}
+.shell-mark{width:30px;height:30px;border-radius:9px;background:var(--ink);color:#fff;flex:none;
+  display:flex;align-items:center;justify-content:center}
+.shell-mark svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+.shell-brand b{font-size:14.5px;font-weight:600;letter-spacing:-.1px;display:block}
+.shell-brand span{font-size:11px;color:var(--muted);letter-spacing:.4px}
+.vbadge{font-size:11px;font-weight:600;letter-spacing:.6px;background:var(--ink);color:#fff;
+  border-radius:var(--r-pill);padding:3px 9px;flex:none}
+.tabs{display:flex;gap:6px;overflow-x:auto;flex:1;min-width:0;padding:2px 0}
+.tabs::-webkit-scrollbar{height:0}
+.tab{flex:none;height:28px;padding:0 10px;border-radius:var(--r-pill);font-size:12px;font-weight:500;
+  color:var(--muted);background:var(--divider);transition:background .18s,color .18s;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab.on{background:var(--ink);color:#fff;font-weight:600}
+.zoombox{display:flex;gap:6px;flex:none;align-items:center}
+.zoombox .tab{height:27px;padding:0 11px;font-size:12px}
+.stage{max-width:1480px;margin:0 auto;padding:24px}
+.screen{display:none}
+.screen.on{display:block;animation:fadeUp .3s var(--ease) both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── 浏览器取景框 ── */
+.frame-outer{width:1440px;transform-origin:top left}
+.frame{width:1440px;height:900px;display:flex;flex-direction:column;background:var(--canvas);
+  border:1px solid var(--hairline);border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.09)}
+.chrome{height:40px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;
+  background:var(--parchment);border-bottom:1px solid var(--hairline)}
+.dots{display:flex;gap:7px;flex:none}
+.dots i{width:11px;height:11px;border-radius:50%;background:#dcdce0;display:block}
+.url{flex:1;max-width:420px;height:24px;border-radius:var(--r-pill);background:#fff;
+  border:1px solid var(--hairline);display:flex;align-items:center;gap:7px;padding:0 11px;
+  font-size:11.5px;color:var(--muted);font-family:var(--mono)}
+.url svg{width:12px;height:12px;flex:none;color:var(--soft);stroke:currentColor;fill:none;stroke-width:1.7}
+.app{flex:1;display:flex;min-height:0;position:relative}
+.cap{font-size:12.5px;color:var(--muted);margin:12px 0 0 2px;display:flex;align-items:flex-start;gap:10px;line-height:1.65}
+.cap b{color:var(--ink);font-weight:600}
+.cap .sep{color:var(--soft)}
+
+/* ── 侧栏 / 顶栏 / 画布 ── */
+.rail{width:232px;flex:none;background:var(--canvas);border-right:1px solid var(--hairline);
+  display:flex;flex-direction:column;padding:18px 14px 14px}
+.rail-brand{display:flex;align-items:center;gap:11px;padding:0 6px 16px}
+.rail-logo{width:36px;height:36px;flex:none;border-radius:11px;background:var(--ink);color:#fff;
+  display:flex;align-items:center;justify-content:center}
+.rail-logo svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+.rail-name{font-size:var(--fs-md);font-weight:600;letter-spacing:-.2px}
+.rail-sub{font-size:var(--fs-2xs);color:var(--muted);letter-spacing:.5px;margin-top:1px}
+.rail-search{display:flex;align-items:center;gap:8px;height:34px;padding:0 11px;background:var(--parchment);
+  border-radius:10px;color:var(--soft);font-size:12.5px;margin-bottom:16px}
+.rail-search svg{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+.rail-group{font-size:10.5px;font-weight:600;color:var(--soft);letter-spacing:.9px;padding:12px 8px 7px}
+.rail-group:first-child{padding-top:0}
+.rail-item{display:flex;align-items:center;gap:8px;height:38px;padding:0 11px;border-radius:11px;
+  color:var(--ink-2);font-size:var(--fs-md);margin-bottom:2px}
+.rail-item svg{width:17px;height:17px;flex:none;color:var(--muted);stroke:currentColor;fill:none;
+  stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.rail-item .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rail-item.on{background:var(--ink);color:#fff;font-weight:600}
+.rail-item.on svg{color:#fff}
+.rail-badge{font-style:normal;flex:none;min-width:19px;height:19px;padding:0 6px;border-radius:var(--r-pill);
+  background:var(--ink);color:#fff;font-size:10.5px;font-weight:600;
+  display:inline-flex;align-items:center;justify-content:center}
+.rail-item.on .rail-badge{background:#fff;color:var(--ink)}
+.rail-account{flex:none;display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:13px;
+  background:var(--parchment);margin-top:12px}
+.rail-avatar{width:30px;height:30px;flex:none;border-radius:50%;background:var(--ink);color:#fff;
+  font-size:12.5px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.rail-account .who{flex:1;min-width:0}
+.rail-account .nm{font-size:var(--fs-sm);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rail-account .rl{font-size:var(--fs-2xs);color:var(--muted);margin-top:1px}
+
+.work{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{height:64px;flex:none;display:flex;align-items:center;gap:18px;padding:0 26px;
+  background:var(--canvas);border-bottom:1px solid var(--hairline)}
+.tb-title{font-size:var(--fs-2xl);font-weight:600;letter-spacing:-.3px;line-height:1.3}
+.tb-sub{font-size:var(--fs-sm);color:var(--muted);margin-top:2px;letter-spacing:.3px}
+.tbright{margin-left:auto;display:flex;align-items:center;gap:8px}
+.tb-search{display:flex;align-items:center;gap:8px;height:34px;width:220px;padding:0 12px;
+  background:var(--parchment);border-radius:10px;color:var(--soft);font-size:12.5px}
+.tb-search svg{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+.iconbtn{width:34px;height:34px;flex:none;border-radius:50%;background:var(--parchment);
+  display:flex;align-items:center;justify-content:center;color:var(--ink-2);position:relative}
+.iconbtn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+.canvas{flex:1;min-height:0;overflow-y:auto;background:var(--canvas);padding:24px 26px 34px;
+  display:flex;flex-direction:column;gap:22px}
+/* ⚠️ 必须禁掉 flex 子项收缩：.canvas 是固定高度取景框里的滚动容器，
+   默认 flex-shrink:1 会把表格卡压矮（一裁末尾行就消失，且量不出溢出）。 */
+.canvas>*{flex:none}
+.canvas::-webkit-scrollbar{width:8px}
+.canvas::-webkit-scrollbar-thumb{background:#e3e3e6;border-radius:4px}
+
+/* ── 排版 ── */
+.h1{font-size:var(--fs-3xl);font-weight:600;letter-spacing:-.6px;line-height:1.25}
+.sec-title{font-size:var(--fs-xl);font-weight:600;letter-spacing:-.4px;line-height:1.35}
+.link{font-size:12.5px;color:var(--accent);font-weight:500}
+.sub{font-size:var(--fs-sm);color:var(--muted);letter-spacing:.3px}
+.micro{font-size:var(--fs-xs);color:var(--muted-2);letter-spacing:.3px}
+.strong{font-size:var(--fs-md);font-weight:500;line-height:1.5}
+.mono{font-family:var(--mono);font-size:var(--fs-sm);color:var(--ink-2)}
+.rowc{display:flex;align-items:center}
+.between{display:flex;align-items:center;justify-content:space-between}
+.grow{flex:1;min-width:0}
+.stack{display:flex;flex-direction:column}
+.gap8{gap:8px}.gap13{gap:13px}.gap18{gap:18px}
+.sec{display:flex;flex-direction:column;gap:13px}
+.sec-head{display:flex;align-items:center;justify-content:space-between;gap:13px}
+.el{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── 卡 / 深色卡 ── */
+.card{background:var(--parchment);border-radius:var(--r-card);padding:20px}
+.card-white{background:#fff;border:1px solid var(--hairline);border-radius:var(--r-card);padding:20px}
+.tile{background:var(--tile);border-radius:var(--r-tile);padding:22px 24px;color:#fff;
+  display:flex;align-items:center;gap:26px}
+.tile-status{display:flex;align-items:center;gap:8px;font-size:var(--fs-xs);font-weight:500;color:#ccc;
+  letter-spacing:.3px}
+.t-dot{width:7px;height:7px;border-radius:50%;background:var(--accent-dark);flex:none}
+.t-dot.idle{background:#8e8e93}
+.tile-title{font-size:var(--fs-3xl);font-weight:600;color:#fff;letter-spacing:-.6px;line-height:1.25;margin-top:6px}
+.tile-meta{font-size:var(--fs-sm);color:#ccc;letter-spacing:.3px;line-height:1.6;margin-top:6px}
+.tile-metric{padding-left:26px;border-left:1px solid rgba(255,255,255,.14);min-width:112px}
+.tile-metric .k{font-size:var(--fs-xs);color:#a1a1a6;letter-spacing:.5px}
+.tile-metric .v{font-size:var(--fs-num);font-weight:600;line-height:1.15;margin-top:3px;color:#fff}
+.tile-metric .d{font-size:var(--fs-xs);color:#8e8e93;margin-top:2px;line-height:1.55}
+.tile-metric .d b{color:#fff;font-weight:600}
+.tile-actions{display:flex;gap:8px;margin-top:12px}
+
+/* ── 按钮 ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 18px;
+  border-radius:var(--r-pill);font-size:var(--fs-md);font-weight:500;white-space:nowrap}
+.btn svg{width:15px;height:15px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.btn-primary{background:var(--accent);color:#fff;font-weight:600}
+.btn-ghost{background:transparent;color:var(--accent-dark);border:1px solid var(--accent-dark);font-weight:500}
+.btn-quiet{background:#fff;border:1px solid var(--hairline);color:var(--ink-2)}
+.btn-plain{background:transparent;color:var(--muted);padding:0 10px}
+.btn-danger-quiet{background:#fff;border:1px solid var(--red-bg);color:var(--red-fg);font-weight:500}
+.btn-sm{height:30px;padding:0 14px;font-size:var(--fs-sm)}
+.btn-disabled{background:#b9d2ee;color:#fff}
+
+/* ── 状态胶囊（协议版 7 个；4「已补位·待审」已废弃） ── */
+.tag{display:inline-flex;align-items:center;height:23px;padding:0 10px;border-radius:var(--r-pill);
+  font-size:var(--fs-xs);font-weight:500;letter-spacing:.2px;white-space:nowrap}
+.tag-pending{background:var(--amber-bg);color:var(--amber-fg)}   /* 0 待审核 */
+.tag-pass{background:var(--green-bg);color:var(--green-fg)}      /* 1 已排期 */
+.tag-reject{background:var(--red-bg);color:var(--red-fg)}        /* 2 已驳回 */
+.tag-queue{background:#ebebee;color:var(--ink-2)}                /* 3 候补中 */
+.tag-acc{background:var(--acc-bg);color:var(--accent)}           /* 6 已通过·待排期（新增） */
+.tag-mute{background:#ebebee;color:var(--muted-2)}               /* 5 已播放 / 7 已取消（新增） */
+.tag-outline{background:#fff;border:1px solid var(--hairline);color:var(--muted-2)}
+.pos-chip{display:inline-flex;align-items:center;height:19px;padding:0 8px;border-radius:var(--r-pill);
+  background:var(--tile);color:#fff;font-size:10.5px;font-weight:600;flex:none}
+.ano{display:inline-flex;align-items:center;height:19px;padding:0 7px;border-radius:6px;
+  font-size:10.5px;font-weight:600;flex:none}
+.ano-mid{background:#ebebee;color:var(--ink-2)}
+.ano-acc{background:var(--acc-bg);color:var(--accent)}
+.ano-warn{background:var(--amber-bg);color:var(--amber-fg)}
+
+/* ── 周状态机条（协议版新增） ── */
+.wkflow{display:flex;align-items:center;gap:0;flex-wrap:wrap}
+.wkstep{display:flex;align-items:center;gap:8px;padding:7px 13px;border-radius:var(--r-pill);
+  background:var(--parchment);font-size:var(--fs-sm);color:var(--muted);white-space:nowrap}
+.wkstep.on{background:var(--ink);color:#fff;font-weight:600}
+.wkstep.done{background:var(--acc-bg);color:var(--accent)}
+.wkstep i{font-style:normal;font-size:10.5px;opacity:.75}
+.wkarrow{width:18px;flex:none;height:1px;background:var(--hairline);margin:0 6px}
+
+/* ── 排期矩阵（协议版三维格） ── */
+.sched-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.sched-day{display:flex;flex-direction:column;gap:8px;min-width:0}
+.sched-day-head{display:flex;align-items:baseline;gap:6px;font-size:var(--fs-md);color:var(--ink);
+  padding-bottom:6px;border-bottom:1px solid var(--divider)}
+.sched-cell{position:relative;text-align:left;border:1px solid var(--hairline);border-radius:10px;
+  background:var(--canvas);padding:9px 11px;display:flex;flex-direction:column;gap:4px;font-family:inherit;
+  transition:border-color .15s var(--ease),box-shadow .15s var(--ease)}
+.sched-cell:hover{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,102,204,.12)}
+.sched-cell.haswait{border-color:var(--accent)}
+.sched-cell.haspend{border-color:var(--amber-fg)}
+.sched-cell.free{background:var(--parchment);border-style:dashed}
+.sc-time{font-size:var(--fs-xs);color:var(--muted);letter-spacing:.5px}
+.sc-count{font-size:var(--fs-md);color:var(--ink-2)}
+.sc-count b{font-size:var(--fs-xl);color:var(--ink)}
+.sc-count i{font-style:normal;color:var(--soft);margin:0 1px}
+.sc-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:1px}
+.sc-tag{font-size:10.5px;font-weight:600;line-height:1;padding:3px 6px;border-radius:var(--r-pill)}
+.sc-tag.wait{background:var(--acc-bg);color:var(--accent)}
+.sc-tag.pend{background:var(--amber-bg);color:var(--amber-fg)}
+.sc-tag.fulltag{background:var(--tile);color:#fff}
+.sc-tag.freetag{background:#ebebee;color:var(--muted)}
+.legend{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.legend span{font-size:var(--fs-xs);color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+
+/* ── 列表 ── */
+.lrow{display:flex;align-items:center;gap:13px;padding:13px 16px;border-bottom:1px solid var(--divider)}
+.lrow:last-child{border-bottom:none}
+.lrow:hover{background:var(--parchment)}
+.ck{width:16px;height:16px;flex:none;border:1.5px solid var(--soft);border-radius:4px}
+.seg-inline{display:inline-flex;background:var(--divider);border-radius:var(--r-pill);padding:3px;gap:2px}
+.seg-inline .si{height:26px;padding:0 12px;border-radius:var(--r-pill);font-size:var(--fs-sm);
+  color:var(--muted);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.seg-inline .si.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.seg-inline .si em{font-style:normal;font-size:10.5px;color:var(--muted)}
+.filterbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.fchip{height:28px;padding:0 12px;border-radius:var(--r-pill);background:#fff;border:1px solid var(--hairline);
+  font-size:var(--fs-sm);color:var(--ink-2);display:inline-flex;align-items:center;gap:6px}
+.fchip em{font-style:normal;color:var(--soft)}
+.bar{height:6px;border-radius:var(--r-pill);background:var(--divider);overflow:hidden;margin-top:9px}
+.bar i{display:block;height:100%;border-radius:var(--r-pill);background:var(--accent)}
+.bar.warn i{background:var(--live)}
+.bar.ok i{background:var(--green-fg)}
+
+/* ── 说明页 ── */
+.doc{display:flex;flex-direction:column;gap:18px;max-width:1240px}
+.doc-head{background:#fff;border:1px solid var(--hairline);border-radius:var(--r-card);padding:26px 28px}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.7px;color:var(--accent);
+  background:var(--acc-bg);border-radius:var(--r-pill);padding:4px 10px;display:inline-block;margin-bottom:12px}
+.doc-head h1{font-size:26px;font-weight:600;letter-spacing:-.6px;margin-bottom:10px}
+.doc-head p{font-size:13.5px;color:var(--ink-2);line-height:1.8;max-width:900px}
+.doc-head p b{font-weight:600;color:var(--ink)}
+.doc-card{background:#fff;border:1px solid var(--hairline);border-radius:var(--r-card);padding:22px 24px}
+.doc-card h2{font-size:15px;font-weight:600;letter-spacing:-.2px;margin-bottom:13px}
+.doc-p{font-size:13px;color:var(--ink-2);line-height:1.75}
+.doc-p code,.doc-card code,.dtab code{font-family:var(--mono);font-size:11.5px;background:var(--parchment);
+  border-radius:5px;padding:1px 5px;color:var(--ink-2)}
+.dtab{width:100%;border-collapse:collapse}
+.dtab th{text-align:left;font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.5px;
+  padding:9px 12px;border-bottom:1px solid var(--hairline);background:var(--parchment)}
+.dtab td{font-size:12.5px;padding:9px 12px;border-bottom:1px solid var(--divider);color:var(--ink-2);
+  vertical-align:top;line-height:1.65}
+.dtab tr:last-child td{border-bottom:none}
+.dtab .nt{color:var(--muted)}
+.dtab .add{color:var(--accent);font-weight:600}
+.dtab .del{color:var(--red-fg);text-decoration:line-through}
+.plist{display:flex;flex-direction:column;gap:9px}
+.plist>div{display:flex;gap:12px;font-size:12.5px;line-height:1.7}
+.plist b{flex:none;width:118px;color:var(--ink);font-weight:600}
+.plist span{color:var(--ink-2)}
+.pillrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+/* ── 居中弹窗（人工指派） ── */
+.dlg-scrim{position:absolute;inset:0;background:rgba(0,0,0,.32);display:flex;align-items:center;
+  justify-content:center;padding:26px}
+.dlg{background:#fff;border-radius:var(--r-tile);display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:0 24px 64px rgba(0,0,0,.28);width:880px;max-height:100%}
+.dlg-head{flex:none;display:flex;align-items:flex-start;gap:13px;padding:20px 24px;
+  border-bottom:1px solid var(--hairline)}
+.dlg-body{flex:1;min-height:0;overflow-y:auto;display:flex}
+.dlg-foot{flex:none;display:flex;align-items:center;gap:16px;padding:14px 24px;border-top:1px solid var(--hairline)}
+.pick-main{flex:1;min-width:0;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:18px}
+.pick-side{width:300px;flex:none;border-left:1px solid var(--hairline);background:var(--parchment);
+  display:flex;flex-direction:column;gap:14px;padding:20px;overflow-y:auto}
+.pick-side .sec-title{font-size:14px}
+.slotbtn{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--hairline);
+  border-radius:10px;background:#fff;padding:9px 12px;font-size:var(--fs-md);width:100%}
+.slotbtn.cur{border-color:var(--accent);background:var(--acc-bg);color:var(--accent);font-weight:600}
+.slotbtn.other{border-color:var(--accent-dark);color:var(--accent-dark)}
+.slotbtn.gone{opacity:.45}
+.slot-list{display:flex;flex-direction:column;gap:8px}
+</style>
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-grid" viewBox="0 0 20 20"><rect x="2.6" y="2.6" width="6.2" height="6.2" rx="2"/><rect x="11.2" y="2.6" width="6.2" height="6.2" rx="2"/><rect x="2.6" y="11.2" width="6.2" height="6.2" rx="2"/><rect x="11.2" y="11.2" width="6.2" height="6.2" rx="2"/></symbol>
+  <symbol id="i-list" viewBox="0 0 20 20"><path d="M7.2 5h9.4M7.2 10h9.4M7.2 15h9.4"/><circle cx="3.6" cy="5" r="1.1"/><circle cx="3.6" cy="10" r="1.1"/><circle cx="3.6" cy="15" r="1.1"/></symbol>
+  <symbol id="i-music" viewBox="0 0 20 20"><path d="M8 15.2V5.6l7.6-1.5v9.3"/><circle cx="5.9" cy="15.2" r="2.1"/><circle cx="13.5" cy="13.4" r="2.1"/></symbol>
+  <symbol id="i-user" viewBox="0 0 20 20"><circle cx="10" cy="7" r="3.2"/><path d="M4.2 17c.7-3.2 3.1-5 5.8-5s5.1 1.8 5.8 5"/></symbol>
+  <symbol id="i-toggle" viewBox="0 0 20 20"><rect x="2.6" y="6.2" width="14.8" height="7.6" rx="3.8"/><circle cx="13.5" cy="10" r="2.5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 20 20"><path d="M10 2.8 15.8 5v5c0 3.3-2.3 6-5.8 7.2C6.5 16 4.2 13.3 4.2 10V5z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.7"/><path d="M10 2.8v2.1M10 15.1v2.1M2.8 10h2.1M15.1 10h2.1M4.9 4.9l1.5 1.5M13.6 13.6l1.5 1.5M15.1 4.9l-1.5 1.5M6.4 13.6l-1.5 1.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="8.7" cy="8.7" r="5.3"/><path d="M12.6 12.6 16.9 16.9"/></symbol>
+  <symbol id="i-check" viewBox="0 0 20 20"><path d="M4 10.6 7.9 14.5 16 6.2"/></symbol>
+  <symbol id="i-close" viewBox="0 0 20 20"><path d="M5.4 5.4l9.2 9.2M14.6 5.4l-9.2 9.2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.3"/><path d="M10 9.1v4.4M10 6.5v.2"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.3"/><path d="M10 5.9V10l2.9 1.7"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 20 20"><path d="M7.6 5.2 12.8 10l-5.2 4.8"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 20 20"><rect x="4.4" y="8.8" width="11.2" height="7.8" rx="2.4"/><path d="M7.2 8.8V6.9a2.8 2.8 0 0 1 5.6 0v1.9"/></symbol>
+  <symbol id="i-play" viewBox="0 0 20 20"><path d="M7.4 5.4 15 10l-7.6 4.6z"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 20 20"><path d="M4.6 6.6h9.2M11.4 4l2.6 2.6-2.6 2.6M15.4 13.4H6.2M8.6 10.8 6 13.4l2.6 2.6"/></symbol>
+  <symbol id="i-radio" viewBox="0 0 20 20"><circle cx="10" cy="11" r="2.4"/><path d="M6 7.2a5.4 5.4 0 0 1 8 0M3.6 4.9a8.6 8.6 0 0 1 12.8 0"/><path d="M10 13.4v3"/></symbol>
+</svg>
+
+<div class="shell">
+  <div class="shell-in">
+    <div class="shell-brand">
+      <span class="shell-mark"><svg><use href="#i-radio"/></svg></span>
+      <div><b>菁悠广播站</b><span>管理后台 · 静态预览</span></div>
+    </div>
+    <span class="vbadge">v2</span>
+    <div class="tabs">
+      <button class="tab on" data-go="0">方案说明</button>
+      <button class="tab" data-go="1">投稿 &amp; 点歌审核</button>
+      <button class="tab" data-go="2">下周排期矩阵</button>
+      <button class="tab" data-go="3">人工指派 · 标记播放</button>
+    </div>
+    <div class="zoombox">
+      <button class="tab" data-zoom="fit">适应宽度</button>
+      <button class="tab" data-zoom="1">100%</button>
+    </div>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+
+<!-- ══════════════════ 0 · 方案说明 ══════════════════ -->
+<section class="screen on">
+  <div class="doc">
+    <div class="doc-head">
+      <div class="eyebrow">v2 · 依据 docs/song-protocol.md（后端已落地，97 项验证全过）</div>
+      <h1>管理端对「协议版」的适配</h1>
+      <p>点歌规则已从 v2 的<b>「提交即占位 + 全局候补队列 + 窗口结束时定稿」</b>改成
+        <b>「提交只进审核队列 → 审核通过才拿到候选资格 → 系统按首选时段分组、组内按提交先后统一排期 → 排不上的进候补 → 窗口结束后调度锁定」</b>。
+        管理端三处界面因此要跟着换口径：<b>投稿审核列表</b>、<b>下周排期矩阵</b>，并新增
+        <b>人工指派</b>与<b>标记播放</b>两个操作入口。设计系统<b>完全沿用 v8</b>，不新增组件。</p>
+    </div>
+
+    <div class="doc-card">
+      <h2>一、与 v2 的四条硬差别（界面改动的全部依据）</h2>
+      <table class="dtab">
+        <thead><tr><th style="width:140px">维度</th><th style="width:300px">v2（旧）</th><th>协议版（新）</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>占位口径</b></td>
+            <td class="nt">提交即占该格一个正式位（待审也占一个位子）</td>
+            <td><span class="add">唯一等式</span>：<code>review_status=APPROVED AND schedule_status=APPROVED</code> 才算占位。
+              <b>驳回自动释放位子，不需要另跑 release</b>。</td>
+          </tr>
+          <tr>
+            <td><b>谁决定排到哪</b></td>
+            <td class="nt">学生提交时选定的格 + 递补时系统塞进空格</td>
+            <td>系统统一排：<b>按首选时段分组</b>，组内 <code>提交时间升序</code> 取前 N 个落座，其余转 <span class="tag tag-queue">候补中</span>。</td>
+          </tr>
+          <tr>
+            <td><b>递补 / 调剂</b></td>
+            <td class="nt">候补队首塞进空格，回来还要人工再审一次（<span class="del" style="text-decoration:none">已补位·待审</span>）</td>
+            <td>三级排序自动调剂：<b>可接受位置少 → 提交时间早 → 距原时段近</b>。留了 <code>allow_reschedule=0</code> 的学生只认首选。
+              调剂完直接就是 <span class="tag tag-pass">已排期</span>，<b>不再有「补位待审」</b>。</td>
+          </tr>
+          <tr>
+            <td><b>什么时候锁死</b></td>
+            <td class="nt">点歌窗口结束 = 审核截止，清候补与补位待审</td>
+            <td>窗口结束只是<b>停止收歌</b>。真正的锁定时刻 <code>schedule_lock_at</code> 由 <code>窗口结束 + song_lock_offset_minutes（默认 360 分）</code> 派生，
+              = <b>播出周周一 00:00</b>。到点跑最后一次调度，剩余候补转 <span class="tag tag-reject">未排上</span>，该周置 <b>已锁定</b>。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="doc-card">
+      <h2>二、状态胶囊：5 个 → 7 个（去掉 1 个）</h2>
+      <div class="pillrow" style="margin-bottom:14px">
+        <span class="tag tag-pending">待审核</span>
+        <span class="tag tag-acc">已通过 · 待排期</span>
+        <span class="tag tag-queue">候补中</span>
+        <span class="tag tag-pass">已排期</span>
+        <span class="tag tag-mute">已播放</span>
+        <span class="tag tag-reject">已驳回</span>
+        <span class="tag tag-mute">已取消</span>
+        <span style="color:var(--soft);font-size:12px">← 已废弃：</span>
+        <span class="tag tag-outline" style="text-decoration:line-through">已补位 · 待审</span>
+      </div>
+      <div class="plist">
+        <div><b>0 待审核</b><span>琥珀色沿用 v8。<b>不再占位</b> —— 只是排进了审核队列，下周二后依然可能排不上。</span></div>
+        <div><b>6 已通过 · 待排期</b><span><span class="add">新增</span>，强调色浅底。审核过了但系统还没跑排期（或没位置、还没落到候补）的中间态。
+          这是<b>管理员唯一需要盯着催的桶</b>，所以给强调色。</span></div>
+        <div><b>3 候补中</b><span>中性灰沿用 v1。行内挂 <span class="pos-chip">第 1 位</span>；额外标出该学生<b>是否接受调剂</b>（<code>allow_reschedule</code>），
+          不接受调剂的必须让审核员看得见。</span></div>
+        <div><b>1 已排期</b><span>绿色沿用 v8。<b>可被人工改时段</b>（人工指派），改完会在日志表留痕。</span></div>
+        <div><b>5 已播放</b><span><span class="add">新增</span>，中性灰。到播出时刻由系统自动标记（不再人工点「已播」）。灰色＝历史态，不抢眼。</span></div>
+        <div><b>2 已驳回</b><span>红色沿用 v8。协议版把两种失败合流：人工驳回、以及锁定后仍没排上（系统自动）。系统那种带 <span class="ano ano-warn">系统</span> 角标。</span></div>
+        <div><b>7 已取消</b><span><span class="add">新增</span>，中性灰。学生自己撤销 / 放弃候补的，<b>不删行</b>，只改状态 —— 所以列表里会看到它们。</span></div>
+      </div>
+    </div>
+
+    <div class="doc-card">
+      <h2>三、周状态机（新界面元素）</h2>
+      <p class="doc-p" style="margin-bottom:14px">每周一行 <code>weekly_schedule</code>，懒创建。管理端要能一眼看出<b>这一周走到哪一步</b>，
+        所以排期矩阵顶部加一条状态带（是<b>展示</b>，不是可点的流程控件）：</p>
+      <div class="wkflow">
+        <span class="wkstep done">草稿 <i>DRAFT</i></span><span class="wkarrow"></span>
+        <span class="wkstep done">收歌中 <i>APPLICATION</i></span><span class="wkarrow"></span>
+        <span class="wkstep on">审核中 <i>REVIEW</i></span><span class="wkarrow"></span>
+        <span class="wkstep">排期中 <i>SCHEDULING</i></span><span class="wkarrow"></span>
+        <span class="wkstep">已锁定 <i>LOCKED</i></span>
+      </div>
+      <p class="doc-p" style="margin-top:14px">
+        旧状态用浅色羊皮纸、当前状态用深色实心、已走过用强调浅底。旁边常驻一行
+        <b>锁定倒计时</b>（服务端 <code>secondsToLock</code>）。已锁定的周在矩阵上是<b>只读</b>的，按钮换成「已锁定 · 查看日志」。
+      </p>
+    </div>
+
+    <div class="doc-card">
+      <h2>四、权限边界（后端已定稿，界面必须跟着走）</h2>
+      <table class="dtab">
+        <thead><tr><th style="width:210px">能力</th><th style="width:130px">普通管理员</th><th>接口 / 说明</th></tr></thead>
+        <tbody>
+          <tr><td>查看周状态与排期</td><td><span class="tag tag-pass">可以</span></td><td><code>GET /admin/submit/week</code> · <code>GET /admin/submit/schedule</code></td></tr>
+          <tr><td>执行排期（首轮 + 调剂）</td><td><span class="tag tag-pass">可以</span></td><td><code>POST /admin/submit/schedule/run</code>。幂等，跑完返回 assigned / waiting / promoted / rescheduled。</td></tr>
+          <tr><td>锁定本周</td><td><span class="tag tag-pass">可以</span></td><td><code>POST /admin/submit/schedule/lock</code>。body 传 <code>force:true</code> 才能提前锁；不传则未到 <code>schedule_lock_at</code> 会被拒。</td></tr>
+          <tr><td>人工指定时段</td><td><span class="tag tag-pass">可以</span></td><td><code>POST /admin/submit/:id/assign</code>。落 <code>assignment_logs</code>，类型 <code>MANUAL</code>。</td></tr>
+          <tr><td>标记播放</td><td><span class="tag tag-pass">可以</span></td><td><code>PUT /admin/submit/:id/played</code>。平时由系统到点自动标，人工只在出事时补。</td></tr>
+          <tr><td>查状态变更历史</td><td><span class="tag tag-pass">可以</span></td><td><code>GET /admin/submit/:id/status-logs</code>（三维各自的 from → to + 原因 + 操作人）。</td></tr>
+          <tr><td>清空全部点歌数据</td><td><span class="tag tag-reject">不可</span></td><td>仅超管，需输入 <code>DELETE</code> 二次确认。</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="doc-card">
+      <h2>五、怎么看这版预览</h2>
+      <p class="doc-p">
+        右上角切 <b>投稿 &amp; 点歌审核 / 下周排期矩阵 / 人工指派 · 标记播放</b> 三屏；左上「适应宽度 / 100%」切缩放。
+        数据是静态示例，基准时刻取 <b>2026-09-23 周三 15:48</b>（点歌窗口已关闭、还没锁定，所以周状态是「审核中」），
+        口径互相咬合，可直接拿去对后端字段：<br>
+        <b>下周正式位 15</b> = 每格 1 × 15 格（周一~周五 × 3 时段）· <b>已排期 7</b>（占位 = 已审且已排）·
+        <b>待排期 3</b>（审核已过、UNASSIGNED，不占位）· <b>待审核 2</b>（不占位）· <b>候补中 2</b> · <b>已取消 1</b>。
+        7 + 3 + 2 + 2 + 1 = <b>15</b> = 全部；矩阵里「已满 7 格 + 空位 8 格」也正好等于 15 格。锁定时刻 09-28 00:00，距锁定 4 天 8 小时 12 分。
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 1 · 投稿 & 点歌审核 ══════════════════ -->
+<section class="screen">
+  <div class="frame-outer"><div class="frame">
+    <div class="chrome">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg><use href="#i-lock"/></svg>admin.radio.local/submit</div>
+    </div>
+    <div class="app">
+      <aside class="rail">
+        <div class="rail-brand">
+          <span class="rail-logo"><svg><use href="#i-radio"/></svg></span>
+          <div><div class="rail-name">菁悠广播站</div><div class="rail-sub">ADMIN CONSOLE</div></div>
+        </div>
+        <div class="rail-search"><svg><use href="#i-search"/></svg>搜索<kbd style="margin-left:auto">⌘K</kbd></div>
+        <div class="rail-group">内容</div>
+        <a class="rail-item"><svg><use href="#i-grid"/></svg><span class="txt">数据概览</span></a>
+        <a class="rail-item on"><svg><use href="#i-list"/></svg><span class="txt">投稿审核</span><i class="rail-badge">7</i></a>
+        <a class="rail-item"><svg><use href="#i-music"/></svg><span class="txt">点歌设置</span></a>
+        <a class="rail-item"><svg><use href="#i-shield"/></svg><span class="txt">播报与节目</span></a>
+        <div class="rail-group">系统</div>
+        <a class="rail-item"><svg><use href="#i-user"/></svg><span class="txt">学生账号</span></a>
+        <a class="rail-item"><svg><use href="#i-toggle"/></svg><span class="txt">开关与开关项</span></a>
+        <a class="rail-item"><svg><use href="#i-gear"/></svg><span class="txt">系统设置</span></a>
+        <div class="rail-account">
+          <span class="rail-avatar">管</span>
+          <div class="who"><div class="nm">李管理员</div><div class="rl">超级管理员</div></div>
+        </div>
+      </aside>
+
+      <div class="work">
+        <div class="topbar">
+          <div>
+            <div class="tb-title">投稿审核</div>
+            <div class="tb-sub">点歌 15 条 · 待处理 5 条 · 文稿 2 条</div>
+          </div>
+          <div class="tbright">
+            <span class="tb-search"><svg><use href="#i-search"/></svg>歌名 / 歌手 / 学号</span>
+            <button class="btn btn-quiet"><svg><use href="#i-clock"/></svg>看排期矩阵</button>
+          </div>
+        </div>
+
+        <div class="canvas">
+          <!-- 深色周状态条：协议版的主角从「定稿时刻」换成「周状态 + 锁定倒计时」 -->
+          <div class="tile">
+            <div class="grow" style="flex:1;min-width:220px">
+              <div class="tile-status"><i class="t-dot"></i>播出周 09-28 ~ 10-02 · 审核中（REVIEW）</div>
+              <div class="tile-title">距排期锁定 4 天 8 小时</div>
+              <div class="tile-meta">
+                锁定时刻 <b style="color:#fff">09-28 00:00</b> = 点歌窗口结束（09-20 18:00）+ 偏移 360 分钟。<br>
+                到点系统跑最后一次调度：排不上的候补转「未排上」，该周置为已锁定。
+              </div>
+              <div class="tile-actions">
+                <button class="btn btn-primary btn-sm"><svg><use href="#i-swap"/></svg>执行排期</button>
+                <button class="btn btn-ghost btn-sm"><svg><use href="#i-lock"/></svg>锁定本周</button>
+                <button class="btn btn-plain btn-sm" style="color:#ccc">手动锁需二次确认</button>
+              </div>
+            </div>
+            <div class="tile-metric"><div class="k">已排期</div><div class="v num">7</div><div class="d">已审且已占位</div></div>
+            <div class="tile-metric"><div class="k">待排期</div><div class="v num">3</div><div class="d">审核已过 · 等调度</div></div>
+            <div class="tile-metric"><div class="k">候补中</div><div class="v num">2</div><div class="d">首选已满 · 等空位</div></div>
+            <div class="tile-metric"><div class="k">正式位</div><div class="v num">7<i style="font-size:14px;color:#8e8e93">/15</i></div><div class="d">占位 7 · 空 <b>8</b></div></div>
+          </div>
+
+          <!-- 筛选：协议版桶 -->
+          <div class="sec">
+            <div class="sec-head">
+              <div class="seg-inline">
+                <span class="si on">全部 <em>15</em></span>
+                <span class="si">待审核 <em>2</em></span>
+                <span class="si">已通过·待排期 <em>3</em></span>
+                <span class="si">候补中 <em>2</em></span>
+                <span class="si">已排期 <em>7</em></span>
+                <span class="si">已播放 <em>0</em></span>
+                <span class="si">已驳回 <em>0</em></span>
+                <span class="si">已取消 <em>1</em></span>
+              </div>
+              <span class="micro">状态桶口径 = 后端派生镜像 <code>status</code>（0/6/3/1/5/2/7）</span>
+            </div>
+
+            <div class="filterbar">
+              <span class="fchip">年级 <em>▾</em></span>
+              <span class="fchip">类型：点歌 <em>▾</em></span>
+              <span class="fchip">时段 <em>▾</em></span>
+              <span class="fchip">只看不接受调剂 <em>0</em></span>
+              <span class="micro" style="margin-left:auto">已选 0 条 · 批量通过 / 批量驳回</span>
+            </div>
+
+            <div class="card" style="padding:0;background:#fff;border:1px solid var(--hairline)">
+
+              <!-- ① 待排期：协议版新增，管理员最该盯的桶 -->
+              <div class="lrow">
+                <span class="ck"></span>
+                <span class="tag tag-acc" style="flex:none">已通过 · 待排期</span>
+                <div class="grow">
+                  <div class="strong el">晴天 <span class="sub">· 周杰伦</span></div>
+                  <div class="micro" style="margin-top:2px">高三3班 王小明（40307）· 首选 09-21 早间 07:20 · 接受调剂 · 09-20 17:31 提交</div>
+                </div>
+                <span class="ano ano-acc">待调度</span>
+                <button class="btn btn-quiet btn-sm">指派时段</button>
+                <button class="btn btn-quiet btn-sm">改驳回</button>
+              </div>
+
+              <!-- ② 候补中：要标出「不接受调剂」 -->
+              <div class="lrow">
+                <span class="ck"></span>
+                <span class="tag tag-queue" style="flex:none">候补中</span>
+                <span class="pos-chip">第 1 位</span>
+                <div class="grow">
+                  <div class="strong el">夜空中最亮的星 <span class="sub">· 逃跑计划</span></div>
+                  <div class="micro" style="margin-top:2px">高二1班 张一（20101）· 首选 09-22 晚间 18:30 ·
+                    <b style="color:var(--red-fg)">不接受调剂</b> · 09-20 17:33 提交</span>
+                  </div>
+                </div>
+                <span class="ano ano-mid">等首选空位</span>
+                <button class="btn btn-quiet btn-sm">指派时段</button>
+                <button class="btn btn-danger-quiet btn-sm">驳回</button>
+              </div>
+
+              <!-- ③ 已排期（被调剂过） -->
+              <div class="lrow">
+                <span class="ck"></span>
+                <span class="tag tag-pass" style="flex:none">已排期</span>
+                <div class="grow">
+                  <div class="strong el">起风了 <span class="sub">· 买辣椒也用券</span></div>
+                  <div class="micro" style="margin-top:2px">高三3班 王小明（40307）·
+                    排到 <b style="color:var(--ink)">09-23 午间 12:20</b> · 首选 09-22 晚间 18:30（已满，系统调剂）</div>
+                </div>
+                <span class="ano ano-acc">已调剂</span>
+                <button class="btn btn-quiet btn-sm">改时段</button>
+                <button class="btn btn-quiet btn-sm"><svg><use href="#i-play"/></svg>标记播放</button>
+              </div>
+
+              <!-- ④ 待审核：不占位 -->
+              <div class="lrow">
+                <span class="ck"></span>
+                <span class="tag tag-pending" style="flex:none">待审核</span>
+                <div class="grow">
+                  <div class="strong el">孤勇者 <span class="sub">· 陈奕迅</span></div>
+                  <div class="micro" style="margin-top:2px">高二2班 李四（20202）· 首选 09-24 午间 12:20 ·
+                    同曲一周内已点过 1 次 <b style="color:var(--amber-fg)">（去重会拦提交，此处仅示意）</b></div>
+                </div>
+                <button class="btn btn-primary btn-sm">通过</button>
+                <button class="btn btn-danger-quiet btn-sm">驳回</button>
+              </div>
+
+              <!-- ⑤ 已取消 -->
+              <div class="lrow">
+                <span class="ck"></span>
+                <span class="tag tag-mute" style="flex:none">已取消</span>
+                <div class="grow">
+                  <div class="strong el" style="color:var(--muted)">稻香 <span class="sub">· 周杰伦</span></div>
+                  <div class="micro" style="margin-top:2px">高一4班 赵五（10404）· 学生于 09-20 17:22 自行撤销（行保留，只改状态）</div>
+                </div>
+                <button class="btn btn-plain btn-sm">查看日志</button>
+              </div>
+
+            </div>
+
+            <div class="micro">
+              说明：协议版列表里 <b>「待审核」不再等于「已占位」</b>，所以「通过」按钮旁边不再有「会释放位子」的提示；
+              反过来，<b>「驳回」一条已排期的点歌会立刻释放位子</b>，并且系统会顺手重跑一次调剂把候补提上来。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <div class="cap"><b>改动点</b><span class="sep">·</span>深色条从「定稿时刻 + 已占/待审/补位待审」换成
+    「周状态 + 锁定倒计时 + 已排期/待排期/候补中/正式位」；<span class="sep">·</span>
+    筛选桶去掉「已补位·待审」，加「已通过·待排期 / 已播放 / 已取消」；<span class="sep">·</span>
+    行内新增「指派时段 / 改时段 / 标记播放 / 查看日志」四个入口。</div>
+</section>
+
+<!-- ══════════════════ 2 · 下周排期矩阵 ══════════════════ -->
+<section class="screen">
+  <div class="frame-outer"><div class="frame">
+    <div class="chrome">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg><use href="#i-lock"/></svg>admin.radio.local/submit?panel=schedule</div>
+    </div>
+    <div class="app">
+      <aside class="rail">
+        <div class="rail-brand">
+          <span class="rail-logo"><svg><use href="#i-radio"/></svg></span>
+          <div><div class="rail-name">菁悠广播站</div><div class="rail-sub">ADMIN CONSOLE</div></div>
+        </div>
+        <div class="rail-search"><svg><use href="#i-search"/></svg>搜索</div>
+        <div class="rail-group">内容</div>
+        <a class="rail-item"><svg><use href="#i-grid"/></svg><span class="txt">数据概览</span></a>
+        <a class="rail-item on"><svg><use href="#i-list"/></svg><span class="txt">投稿审核</span></a>
+        <a class="rail-item"><svg><use href="#i-music"/></svg><span class="txt">点歌设置</span></a>
+        <div class="rail-group">系统</div>
+        <a class="rail-item"><svg><use href="#i-user"/></svg><span class="txt">学生账号</span></a>
+        <a class="rail-item"><svg><use href="#i-gear"/></svg><span class="txt">系统设置</span></a>
+        <div class="rail-account">
+          <span class="rail-avatar">管</span>
+          <div class="who"><div class="nm">李管理员</div><div class="rl">超级管理员</div></div>
+        </div>
+      </aside>
+
+      <div class="work">
+        <div class="topbar">
+          <div>
+            <div class="tb-title">下周排期</div>
+            <div class="tb-sub">播出周 09-28 ~ 10-02 · 每格正式位 1 · 共 15 格</div>
+          </div>
+          <div class="tbright">
+            <button class="btn btn-quiet"><svg><use href="#i-swap"/></svg>执行排期</button>
+            <button class="btn btn-primary"><svg><use href="#i-lock"/></svg>锁定本周</button>
+          </div>
+        </div>
+
+        <div class="canvas">
+          <!-- 周状态机 + 锁定倒计时 -->
+          <div class="card" style="display:flex;align-items:center;gap:22px;background:#fff;border:1px solid var(--hairline)">
+            <div class="wkflow">
+              <span class="wkstep done">草稿 <i>DRAFT</i></span><span class="wkarrow"></span>
+              <span class="wkstep done">收歌中 <i>APPLICATION</i></span><span class="wkarrow"></span>
+              <span class="wkstep on">审核中 <i>REVIEW</i></span><span class="wkarrow"></span>
+              <span class="wkstep">排期中 <i>SCHEDULING</i></span><span class="wkarrow"></span>
+              <span class="wkstep">已锁定 <i>LOCKED</i></span>
+            </div>
+            <div class="grow" style="text-align:right">
+              <div class="micro">距排期锁定</div>
+              <div class="sec-title num" style="margin-top:2px">4 天 8 小时 12 分</div>
+              <div class="micro">09-28 00:00 = 窗口结束 09-20 18:00 + 360 分钟</div>
+            </div>
+          </div>
+
+          <!-- 深色指标条 -->
+          <div class="tile">
+            <div class="grow" style="flex:1;min-width:200px">
+              <div class="tile-status"><i class="t-dot"></i>点歌窗口 09-19 18:00 ~ 09-20 18:00 · 已关闭</div>
+              <div class="tile-meta" style="margin-top:8px">
+                占位口径：<b style="color:#fff">review_status=APPROVED 且 schedule_status=APPROVED</b>。
+                待审核与待排期都<b style="color:#fff">不占位</b>，所以「已排期」可能小于「已提交」。
+              </div>
+            </div>
+            <div class="tile-metric"><div class="k">已排期</div><div class="v num">7</div><div class="d">= 占位</div></div>
+            <div class="tile-metric"><div class="k">待排期</div><div class="v num">3</div><div class="d">审核已过</div></div>
+            <div class="tile-metric"><div class="k">候补中</div><div class="v num">2</div><div class="d">等空位</div></div>
+            <div class="tile-metric"><div class="k">空位</div><div class="v num">8</div><div class="d">15 格 × 1 − 占位 7</div></div>
+          </div>
+
+          <!-- 三维矩阵 -->
+          <div class="sec">
+            <div class="sec-head">
+              <span class="sec-title">下周格子（每格三行：已排期 / 候补 / 待审）</span>
+              <span class="micro">点任意格筛该时段投稿 · 「候补」= 首选这一格但还没排上的人数（可能被调剂去别处）</span>
+            </div>
+
+            <div class="sched-grid">
+              <div class="sched-day">
+                <div class="sched-day-head"><b>周一</b><span class="micro">09-28</span></div>
+                <div class="sched-cell">
+                  <span class="sc-time">早间 07:20</span>
+                  <span class="sc-count"><b class="num">1</b><i>/</i>1</span>
+                  <span class="sc-tags"><span class="sc-tag fulltag">已满</span></span>
+                </div>
+                <div class="sched-cell haswait">
+                  <span class="sc-time">午间 12:20</span>
+                  <span class="sc-count"><b class="num">0</b><i>/</i>1</span>
+                  <span class="sc-tags"><span class="sc-tag freetag">空位</span><span class="sc-tag wait">候补 1</span></span>
+                </div>
+                <div class="sched-cell haspend">
+                  <span class="sc-time">晚间 18:30</span>
+                  <span class="sc-count"><b class="num">0</b><i>/</i>1</span>
+                  <span class="sc-tags"><span class="sc-tag freetag">空位</span><span class="sc-tag pend">待审 1</span></span>
+                </div>
+              </div>
+
+              <div class="sched-day">
+                <div class="sched-day-head"><b>周二</b><span class="micro">09-29</span></div>
+                <div class="sched-cell">
+                  <span class="sc-time">早间 07:20</span>
+                  <span class="sc-count"><b class="num">1</b><i>/</i>1</span>
+                  <span class="sc-tags"><span class="sc-tag fulltag">已满</span></span>
+                </div>
+                <div class="sched-cell free">
+                  <span class="sc-time">午间 12:20</span>
+                  <span class="sc-count"><b class="num">0</b><i>/</i>1</span>
+                  <span class="sc-tags"><span class="sc-tag freetag">空位</span></span>
+                </div>
+                <div class="sched-cell haswait">
+                  <span class="sc-time">晚间 18:30</span>
+                  <span class="sc-count"><b class="num">1</b><i>/</i>1</span>
+                  <span class="sc-tags"><span class="sc-tag fulltag">已满</span><span class="sc-tag wait">候补 1</span></span>
+                </div>
+              </div>
+
+              <div class="sched-day">
+                <div class="sched-day-head"><b>周三</b><span class="micro">09-30</span></div>
+                <div class="sched-cell free">
+                  <span class="sc-time">早间 07:20</span>
+                  <span class="sc-count"><b class="num">0</b><i>/</i>1</span>
+                  <span class="sc-tags"><span class="sc-tag freetag">空位</span></span>
+                </div>
+                <div class="sched-cell">
+                  <span class="sc-time">午间 12:20</span>
+                  <span class="sc-count"><b class="num">1</b><i>/</i>1</span>
+                  <span class="sc-tags"><span class="sc-tag fulltag">已满</span></span>
+                </div>
+                <div class="sched-cell haspend">
+                  <span class="sc-time">晚间 18:30</span>
+                  <span class="sc-count"><b class="num">0</b><i>/</i>1</span>
+                  <span class="sc-tags"><span class="sc-tag freetag">空位</span><span class="sc-tag pend">待审 1</span></span>
+                </div>
+              </div>
+
+              <div class="sched-day">
+                <div class="sched-day-head"><b>周四</b><span class="micro">10-01</span></div>
+                <div class="sched-cell free">
+                  <span class="sc-time">早间 07:20</span>
+                  <span class="sc-count"><b class="num">0</b><i>/</i>1</span>
+                  <span class="sc-tags"><span class="sc-tag freetag">空位</span></span>
+                </div>
+                <div class="sched-cell free">
+                  <span class="sc-time">午间 12:20</span>
+                  <span class="sc-count"><b class="num">0</b><i>/</i>1</span>
+                  <span class="sc-tags"><span class="sc-tag freetag">空位</span></span>
+                </div>
+                <div class="sched-cell">
+                  <span class="sc-time">晚间 18:30</span>
+                  <span class="sc-count"><b class="num">1</b><i>/</i>1</span>
+                  <span class="sc-tags"><span class="sc-tag fulltag">已满</span></span>
+                </div>
+              </div>
+
+              <div class="sched-day">
+                <div class="sched-day-head"><b>周五</b><span class="micro">10-02</span></div>
+                <div class="sched-cell">
+                  <span class="sc-time">早间 07:20</span>
+                  <span class="sc-count"><b class="num">1</b><i>/</i>1</span>
+                  <span class="sc-tags"><span class="sc-tag fulltag">已满</span></span>
+                </div>
+                <div class="sched-cell free">
+                  <span class="sc-time">午间 12:20</span>
+                  <span class="sc-count"><b class="num">0</b><i>/</i>1</span>
+                  <span class="sc-tags"><span class="sc-tag freetag">空位</span></span>
+                </div>
+                <div class="sched-cell">
+                  <span class="sc-time">晚间 18:30</span>
+                  <span class="sc-count"><b class="num">1</b><i>/</i>1</span>
+                  <span class="sc-tags"><span class="sc-tag fulltag">已满</span></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="legend">
+              <span><span class="sc-tag wait">候补 n</span>首选这一格、还没排上（可能被调剂走）</span>
+              <span><span class="sc-tag pend">待审 n</span>还没审，不占位</span>
+              <span><span class="sc-tag fulltag">已满</span>该格正式位用尽</span>
+              <span><span class="sc-tag freetag">空位</span>还有位子，执行排期时会被填上</span>
+            </div>
+          </div>
+
+          <!-- 候补队列 -->
+          <div class="sec">
+            <div class="sec-head">
+              <span class="sec-title">候补队列（全局 · 无人数上限）</span>
+              <span class="micro">协议版取消了 <code style="font-family:var(--mono)">song_queue_limit</code>；顺序只是展示，真正的补位由三级排序决定</span>
+            </div>
+            <div class="card card-white" style="padding:6px 0">
+              <div class="lrow" style="padding:11px 16px">
+                <span class="pos-chip">第 1 位</span>
+                <div class="grow">
+                  <div class="strong el">夜空中最亮的星 <span class="sub">· 逃跑计划</span></div>
+                  <div class="micro" style="margin-top:2px">首选 09-29 晚间 18:30 · 09-20 17:33 提交 ·
+                    <span style="color:var(--red-fg);font-weight:600">不接受调剂</span></div>
+                </div>
+                <span class="tag tag-queue">候补中</span>
+                <span class="micro num">已等 3 小时</span>
+                <button class="btn btn-quiet btn-sm">指派时段</button>
+              </div>
+              <div class="lrow" style="padding:11px 16px">
+                <span class="pos-chip">第 2 位</span>
+                <div class="grow">
+                  <div class="strong el">小幸运 <span class="sub">· 田馥甄</span></div>
+                  <div class="micro" style="margin-top:2px">首选 09-29 晚间 18:30 · 09-20 17:41 提交 · 接受调剂</div>
+                </div>
+                <span class="tag tag-queue">候补中</span>
+                <span class="micro num">已等 2 小时</span>
+                <button class="btn btn-quiet btn-sm">指派时段</button>
+              </div>
+            </div>
+            <div class="micro">
+              三级排序（<code style="font-family:var(--mono)">reschedule</code>）：<b>可接受位置少 → 提交时间早 → 距原时段近</b>。
+              所以「排在队首」不等于「先补上」—— 不接受调剂的人只在首选空位时才动，位次只用于同分情况。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <div class="cap"><b>改动点</b><span class="sep">·</span>顶部加周状态机 + 锁定倒计时；
+    <span class="sep">·</span>每格从「一个绝对角标」改成<b>三行：已排期 / 候补 / 待审</b>（协议版一格可以同时有三类人）；
+    <span class="sep">·</span>格边框语义重定义：<b>强调色 = 有候补</b>、<b>琥珀色 = 有待审</b>、虚线 = 空位；
+    <span class="sep">·</span>候补队列行标出「是否接受调剂」，并说明队首不等于先补上。</div>
+</section>
+
+<!-- ══════════════════ 3 · 人工指派 · 标记播放 ══════════════════ -->
+<section class="screen">
+  <div class="frame-outer"><div class="frame">
+    <div class="chrome">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg><use href="#i-lock"/></svg>admin.radio.local/submit?panel=assign</div>
+    </div>
+    <div class="app">
+      <aside class="rail">
+        <div class="rail-brand">
+          <span class="rail-logo"><svg><use href="#i-radio"/></svg></span>
+          <div><div class="rail-name">菁悠广播站</div><div class="rail-sub">ADMIN CONSOLE</div></div>
+        </div>
+        <div class="rail-search"><svg><use href="#i-search"/></svg>搜索</div>
+        <div class="rail-group">内容</div>
+        <a class="rail-item"><svg><use href="#i-grid"/></svg><span class="txt">数据概览</span></a>
+        <a class="rail-item on"><svg><use href="#i-list"/></svg><span class="txt">投稿审核</span></a>
+        <a class="rail-item"><svg><use href="#i-music"/></svg><span class="txt">点歌设置</span></a>
+        <div class="rail-group">系统</div>
+        <a class="rail-item"><svg><use href="#i-user"/></svg><span class="txt">学生账号</span></a>
+        <a class="rail-item"><svg><use href="#i-gear"/></svg><span class="txt">系统设置</span></a>
+        <div class="rail-account">
+          <span class="rail-avatar">管</span>
+          <div class="who"><div class="nm">李管理员</div><div class="rl">超级管理员</div></div>
+        </div>
+      </aside>
+
+      <div class="work">
+        <div class="topbar">
+          <div>
+            <div class="tb-title">人工指派时段</div>
+            <div class="tb-sub">夜空中最亮的星 · 高二1班 张一（20101）</div>
+          </div>
+          <div class="tbright">
+            <button class="btn btn-quiet">取消</button>
+            <button class="btn btn-primary">保存指派</button>
+          </div>
+        </div>
+
+        <div class="canvas" style="position:relative;padding:0">
+          <div class="dlg-scrim">
+            <div class="dlg">
+              <div class="dlg-head">
+                <span class="tag tag-queue" style="flex:none">候补中</span>
+                <span class="pos-chip">第 1 位</span>
+                <div class="grow">
+                  <div class="sec-title">夜空中最亮的星 <span class="sub" style="font-weight:400">· 逃跑计划</span></div>
+                  <div class="micro" style="margin-top:3px">
+                    高二1班 张一（20101）· 首选 <b>09-29 晚间 18:30</b> ·
+                    <b style="color:var(--red-fg)">不接受调剂（allow_reschedule=0）</b> · 09-20 17:33 提交
+                  </div>
+                </div>
+                <button class="btn btn-plain btn-sm"><svg><use href="#i-close"/></svg></button>
+              </div>
+
+              <div class="dlg-body">
+                <div class="pick-main">
+                  <div class="sec">
+                    <div class="sec-head">
+                      <span class="sec-title" style="font-size:14px">选一个新时段</span>
+                      <span class="micro">周一~周五 · 每格正式位 1 · 括号里是已占 / 上限</span>
+                    </div>
+                    <div class="slot-list">
+                      <button class="slotbtn other">
+                        <span>09-28 周一 · 午间 12:20</span>
+                        <span class="micro num">1 / 1 · 有 1 人在候补</span>
+                      </button>
+                      <button class="slotbtn">
+                        <span>09-28 周一 · 晚间 18:30</span>
+                        <span class="micro num">0 / 1 · 空位</span>
+                      </button>
+                      <button class="slotbtn">
+                        <span>09-29 周二 · 午间 12:20</span>
+                        <span class="micro num">0 / 1 · 空位</span>
+                      </button>
+                      <button class="slotbtn cur">
+                        <span>09-29 周二 · 晚间 18:30（当前首选）</span>
+                        <span class="micro num">1 / 1 · 已满</span>
+                      </button>
+                      <button class="slotbtn">
+                        <span>09-30 周三 · 晚间 18:30</span>
+                        <span class="micro num">0 / 1 · 空位</span>
+                      </button>
+                      <button class="slotbtn gone">
+                        <span>10-01 周四 · 午间 12:20</span>
+                        <span class="micro num">1 / 1 · 已满</span>
+                      </button>
+                    </div>
+                    <div class="micro">
+                      <b style="color:var(--amber-fg)">该学生不接受调剂。</b>
+                      人工指派可以越过这一限制（管理员权限），但服务端会在日志里把这次指派记为
+                      <code style="font-family:var(--mono)">MANUAL</code>，并在学生端如实显示「系统把你调剂到了 X」。
+                    </div>
+                  </div>
+
+                  <div class="sec">
+                    <div class="sec-head"><span class="sec-title" style="font-size:14px">指派后会发生什么</span></div>
+                    <div class="card" style="display:flex;flex-direction:column;gap:9px">
+                      <div class="strong">1. 这条申请置为 <span class="tag tag-pass">已排期</span>，占住所选格子</div>
+                      <div class="strong">2. 如果它原本在候补队列里，队列自动重排（后面的往前挪一位）</div>
+                      <div class="strong">3. 如果所选格原主人被挤走 —— 不会发生：只剩空位才允许指派</div>
+                      <div class="micro">被指派的那格若已满，按钮会置灰；也可以用「改时段」把已排期的条目换格，那一步会自动重跑一次调剂。</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pick-side">
+                  <div class="sec-title">这条的完整轨迹</div>
+                  <div class="card-white" style="padding:14px 16px;display:flex;flex-direction:column;gap:11px">
+                    <div>
+                      <div class="micro">审核</div>
+                      <div class="strong" style="margin-top:3px">PENDING → APPROVED</div>
+                      <div class="micro">09-20 17:40 · 李管理员</div>
+                    </div>
+                    <div style="border-top:1px solid var(--divider)"></div>
+                    <div>
+                      <div class="micro">排期</div>
+                      <div class="strong" style="margin-top:3px">UNASSIGNED → WAITING</div>
+                      <div class="micro">09-20 17:40 · 系统（首轮排期，首选已满）</div>
+                    </div>
+                    <div style="border-top:1px solid var(--divider)"></div>
+                    <div>
+                      <div class="micro">播放</div>
+                      <div class="strong" style="margin-top:3px">NOT_PLAYED</div>
+                      <div class="micro">尚未播出</div>
+                    </div>
+                  </div>
+                  <div class="btn btn-quiet" style="width:100%"><svg><use href="#i-play"/></svg>标记为已播放</div>
+                  <div class="btn btn-danger-quiet" style="width:100%">驳回这条申请</div>
+                  <div class="micro">
+                    轨迹读 <code style="font-family:var(--mono)">GET /admin/submit/:id/status-logs</code>，
+                    排期变动另读 <code style="font-family:var(--mono)">assignment_logs</code>（from_slot → to_slot）。
+                  </div>
+                </div>
+              </div>
+
+              <div class="dlg-foot">
+                <span class="micro grow">保存后立刻重跑该周的调剂，并刷新排期矩阵</span>
+                <button class="btn btn-quiet">取消</button>
+                <button class="btn btn-primary">保存指派</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <div class="cap"><b>新增屏</b><span class="sep">·</span>人工指派（<code>POST /admin/submit/:id/assign</code>）与标记播放
+    （<code>PUT /admin/submit/:id/played</code>）在 v1/v2 里都没有入口 —— 协议版把「排到哪」交给了系统，
+    管理端就必须留一个能手动兜底的地方。右侧常驻状态轨迹，避免管理员在不知道前因后果的情况下改数据。</div>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var screens = Array.prototype.slice.call(document.querySelectorAll('.screen'));
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab[data-go]'));
+  function go(i) {
+    screens.forEach(function (s, k) { s.classList.toggle('on', k === i); });
+    tabs.forEach(function (t, k) { t.classList.toggle('on', k === i); });
+    window.scrollTo(0, 0);
+  }
+  tabs.forEach(function (t, i) { t.addEventListener('click', function () { go(i); }); });
+
+  var outers = Array.prototype.slice.call(document.querySelectorAll('.frame-outer'));
+  function zoom(mode) {
+    var z = mode === '1' ? 1 : Math.min(1, (document.documentElement.clientWidth - 96) / 1440);
+    outers.forEach(function (o) { o.style.transform = 'scale(' + z + ')'; });
+    var f = document.querySelector('.screen.on .frame');
+    var h = f ? 900 * z : 900;
+    document.querySelectorAll('.screen.on .frame').forEach(function (el) { el.style.marginBottom = (h - 900) + 'px'; });
+  }
+  document.querySelectorAll('.tab[data-zoom]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.tab[data-zoom]').forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      zoom(b.getAttribute('data-zoom'));
+    });
+  });
+  document.querySelector('.tab[data-zoom="fit"]').classList.add('on');
+  zoom('fit');
+  window.addEventListener('resize', function () {
+    var on = document.querySelector('.tab[data-zoom].on');
+    zoom(on ? on.getAttribute('data-zoom') : 'fit');
+  });
+})();
+</script>
+</body>
+</html>

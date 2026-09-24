@@ -35,8 +35,32 @@
 - 验证脚本（SQLite 内存库，跑完读同目录 `*-output.txt`；改相关代码先跑）：`verify-song-queue.js`(89)、`verify-song-submit.js`(107)、`verify-student-account.js`(174，含 G3 改名/G4 批量停用)。
 - **新开关不进 seed.js**（switch.test 断言恰好 4 条）：走 `switchService.KNOWN_SWITCHES` + 管理端列表补默认行；缺行视为 on。
 
-## 点歌体系（v2 已落地，docs/song-queue-v2.md）
-- 容量＝按播出格子：每格 `song_slot_capacity`(默认1) + 全局候补队列 `song_queue_limit`（0=自动）。提交即占位（0/1/4 占位，3=候补），容量按 `scheduled_slot`。状态机 0待审/1已排期/2已驳回/3候补中/4已补位待审。播出周前周日 18:00 定稿清 3、4（0 保留）；递补不要求先审。调度器 `songQueueService.startScheduler()` 60s tick + KV 幂等。
+## 点歌体系（⚠️ 现行＝协议版；2026-09-24 又收到《V1 规格》PDF → 对照 `docs/song-protocol-vs-v1-spec.md`）
+- **⛔ 权限铁律（V1 规格 PDF 的增量）**：普通管理员（REVIEWER）**只能** 查看申请 / 通过 / 驳回 / 看排期候补；
+  **执行排期、锁定、人工调整歌曲、配置时段/容量/调剂规则** 一律仅超管。
+  ⚠️ 现状有 6 个接口仍挂在 `requireAdmin`（run/lock/assign/slots/rules/quota），**待改 requireSuperAdmin**。
+  V1 还要求：锁定后连超管都不能普通改（要走 unlock+原因）；`preview` 模拟排期（只算不写库）；
+  调剂按成本表（同日其他 10 / 前后一天同时段 20 / 前后一天其他 30 / 更远 50）而非下标距离。
+- **现行＝协议版（2026-09-24）**：提交**不判容量**，一律 `review=PENDING/schedule=UNASSIGNED`（没有 40904）；
+  审核通过只是拿到候选资格（`review=APPROVED + schedule=UNASSIGNED`），随后 `initialAllocate`
+  按首选时段分组、组内提交时间升序取前 capacity 落座，其余 `WAITING`；`reschedule` 三级排序
+  （可接受位置少 → 提交早 → 距原时段近，`allow_reschedule=0` 只认首选）；到 `schedule_lock_at`
+  `lockWeek` 跑最后调度、剩余 `WAITING → AUTO_REJECTED`、周 `LOCKED`。
+- **占位口径唯一化**：`review_status=APPROVED AND schedule_status=APPROVED`（驳回自动释放位子，不需要 release）。
+  **`status` 是派生镜像**，新值 5 已播放 / 6 已通过待排期 / 7 已取消；改状态一律走
+  `songStatusService.applyChange()`，不许单写 status。
+- 文件：`songStatusService`（三维+派生+日志）、`songSchedulingService`（周+算法+锁定+播放）、
+  `songQueueService`（读路径+调度器+一批兼容壳）、`models/{weeklySchedule,assignmentLog,requestStatusLog}`、
+  `sql/migrations/2026-09-24-song-protocol.sql`。验证 `node scripts/verify-song-protocol.js`（97 项）。
+- **有意偏离协议**：不建 `schedule_slots` 表（格子仍由 broadcastSlotService 派生，避免两本账）；
+  容量仍是全局 KV 不按格拆。**废弃** `song_queue_limit`（候补无上限）。
+- `scripts/verify-song-queue.js` 已作废（文件头守卫直接跳过）。
+- **保留不变**：点歌时间窗口（周六18:00→周日18:00，仅超管改）、每人每周 2 次、同曲一周去重。
+- 周锚点全部由窗口派生：`schedule_lock_at = 窗口结束 + 360min = 播出周周一 00:00`。
+- 前端（小程序/admin-web）**还没改**：仍按派生 status 工作，6/7 两个新值待补；按惯例先出静态预览。
+
+### v2 历史口径（仅供读旧文档/旧数据，别当实现依据）
+- 容量＝按播出格子：每格 `song_slot_capacity`(默认1) + 全局候补队列 `song_queue_limit`（0=自动）。提交即占位（0/1/4 占位，3=候补），容量按 `scheduled_slot`。状态机 0待审/1已排期/2已驳回/3候补中/4已补位待审。播出周前周日 18:00 定稿清 3、4（0 保留）；递补不要求先审。
 - 易错点：释放后 `afterRelease()` 必须 await；「播出周已结束」= `wsMs+5天`（周六00:00）；窗口文案「每周六」不是「每周周六」。
 - 时间窗口：默认周六 18:00 → 周日 18:00，KV `song_submit_window`；改窗口仅超管；窗口外 40907；窗口结束＝审核截止；锚 `nextWeekRange(now).start`。
 - **铁规矩**：点歌起止时间常驻展示，文案服务端下发（`GET /user/submit/window`），前端不硬编码。
