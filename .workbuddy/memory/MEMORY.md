@@ -40,11 +40,18 @@
 - 不开 Docker 的整链路验证：`DB_STORAGE=./data/_shot.db` + `npm run db:init` + seed + `node src/app.js`；admin-web vite dev（URL 是 `/student` 非 `/#/student`）；`localStorage` 存 `admin_token` + `admin_info`(role:0)。
 - jest 基线：56 条里 15 条失败全是已删 member 模块的（member.test 14 + switch.test 1），别当新回归。
 - **push 只能交给陛下**：本机 shell 走 WorkBuddy 自带 PortableGit，`credential.helper=helper-selector` 取不到 token（实测它**不返回任何凭据**，只是 `credential.helperselector.selected=manager` 再转 GCM），也没有 `gh`。git 已配仅 github 生效代理 `http.https://github.com.proxy=http://127.0.0.1:7890`；报 `Failed to connect to 127.0.0.1 port 7890` = 代理没启动。**FlClash 进程在跑 ≠ 代理在跑**（可能只监听 1053）。
-- ✅ **`git push` 挂死的解法（2026-09-27 实测，一次推成功）**：`git -c credential.guiPrompt=false -c credential.interactive=never push --progress origin master`
-  —— **关键在 `--progress`**。不带它时非 tty 下会**静默挂住**（90s / 120s 两次都被 timeout 杀掉、零输出），加上后 1.12 MiB 约 2 秒推完（`To … e7e8dcc..9f4d9bc master -> master`）。
-  ⚠️ **凭据本身是好的**：`GCM_TRACE=1 GCM_CREDENTIAL_STORE=wincredman git credential fill` **0.05 秒**返回 `username=Nailoonger` + `gho_…` token（不是卡在 UI/COM，2026-09-24 的旧结论在 2026-09-27 不成立）。
-  ⚠️⚠️ **判据别搞错**：`git push … | tail` 会把退出码换成 tail 的、还把进度吞掉 → 看起来"无输出＝成功"。
-  **唯一可信判据是 `git status -sb` 里的 `ahead N`，N=0 才算推上去**（这次一度误判成功，实际 `ahead 2`）。另：能 `ls-remote` 不代表能 push。
+- ✅ **`git push` 挂死的解法（2026-09-27 实测）**：**先用 curl 预热代理隧道，再 push 并带 `--progress` + 给足超时**。
+  ```bash
+  curl -s -o /dev/null -w "%{http_code}" --max-time 8 -x http://127.0.0.1:7890 \
+    "https://github.com/<owner>/<repo>.git/info/refs?service=git-receive-pack"   # 期望 401
+  timeout 180 git -c credential.guiPrompt=false -c credential.interactive=never push --progress origin master
+  ```
+  **规律：代理到 github 的 CONNECT 隧道「闲置后首次建立」极慢** —— 同一命令 7 次里 5 次被杀（90/100/120/180s 全 124 零输出），
+  而预热过的那 2 次分别 16 秒 / 2 秒推完。**零输出 ≠ 卡在凭据**（GIT_TRACE_CURL 显示隧道建完就在正常传，纯属慢）。
+  ⚠️ **凭据本身没问题**：`GCM_TRACE=1 GCM_CREDENTIAL_STORE=wincredman git credential fill` **0.05 秒**返回
+  `username=Nailoonger` + `gho_…`（2026-09-24 的「卡在 UI/COM 初始化」结论今天不成立）。
+  ⚠️⚠️ **判据别搞错**：`git push … | tail` 会把退出码换成 tail 的、进度全吞掉 → 看着像"无输出＝成功"。
+  **唯一可信判据是 `git status -sb` 的 `ahead N`，N=0 才算推上去**（这次一度误判成功，实际 ahead 2）。另：能 `ls-remote` 不代表能 push。
 
 ## 后端约定
 - 容器 UTC、MySQL 北京时间；按天/周逻辑禁裸 `dayjs()`，统一 `src/utils/bjTime.js`。
