@@ -234,8 +234,15 @@
             <StatusTag :status="row.status" :label="statusLabel(row)" />
           </template>
         </el-table-column>
-        <!-- 操作列按协议版七态分组：改数据一律实体描边按钮，只切视图用文字链接 -->
-        <el-table-column label="操作" width="200" fixed="right" align="right">
+        <!-- 操作列按协议版七态分组：改数据一律实体描边按钮，只切视图用文字链接。
+             ⚠️ 列宽口径（2026-09-27 实测，别凭感觉改）：
+               实体按钮 通过/驳回 54、撤销 54、改时段 66、标记播放 78、指派时段 78、改驳回 66；
+               文字链接（.op-log / .op-del）≈46 / 40，gap 6。
+               最长组合「改时段 66 + 标记播放 78 + 查看日志 46 + 删除 40 + 3×6 = 248」，
+               减 td 左右 padding 20 → 列宽**至少 236** 才不裁切；
+               低于 200 时旧的「查看日志」会被截成「查…」（曾经就是 200，踩过）。
+               兜底再加 flex-wrap：真放不下时换行，不裁切。 -->
+        <el-table-column label="操作" width="236" fixed="right" align="right">
           <template #default="{ row }">
             <div class="op-cell">
               <!-- 待审(0) / v2 遗留的补位待审(4)：通过 or 驳回 —— 审核员也有权限 -->
@@ -244,45 +251,56 @@
                 <el-button size="small" @click="reject(row)">驳回</el-button>
               </template>
 
-              <!-- 已通过·待排期(6)：超管可手动指派；审核员只能改驳回或看轨迹 -->
+              <!-- 已通过·待排期(6)：超管可手动指派；审核员只能改驳回或看轨迹。
+                   ⚠️ 超管不放「查看日志」：指派弹窗里本来就带完整状态轨迹，
+                   再放一个会让这一行 4 个控件 → flex 换行（2026-09-27 实测）。 -->
               <template v-else-if="Number(row.status) === 6">
                 <el-button v-if="canWrite" size="small" type="primary" @click="openAssign(row)">指派时段</el-button>
                 <el-button size="small" @click="reject(row)">改驳回</el-button>
-                <el-button v-if="!canWrite" size="small" @click="openAssign(row, true)">查看日志</el-button>
+                <el-button v-if="!canWrite" size="small" class="op-log" @click="openAssign(row, true)">查看日志</el-button>
               </template>
 
               <!-- 候补中(3)：等空位；也能人工插队指派（指派 = 改数据，仅超管） -->
               <template v-else-if="Number(row.status) === 3">
                 <el-button v-if="canWrite" size="small" type="primary" @click="openAssign(row)">指派时段</el-button>
                 <el-button size="small" @click="reject(row)">驳回</el-button>
-                <el-button v-if="!canWrite" size="small" @click="openAssign(row, true)">查看日志</el-button>
+                <el-button v-if="!canWrite" size="small" class="op-log" @click="openAssign(row, true)">查看日志</el-button>
               </template>
 
-              <!-- 已排期(1)：换格 / 补标播放 —— 均改数据，仅超管 -->
+              <!-- 已排期(1)：换格 / 补标播放 —— 均改数据，仅超管（同上：日志在改时段弹窗里） -->
               <template v-else-if="Number(row.status) === 1">
                 <template v-if="canWrite">
                   <el-button size="small" :disabled="weekLocked" @click="openAssign(row)">改时段</el-button>
                   <el-button size="small" :disabled="weekLocked" @click="markPlayed(row)">标记播放</el-button>
                 </template>
-                <el-button size="small" @click="openAssign(row, true)">查看日志</el-button>
+                <el-button v-if="!canWrite" size="small" class="op-log" @click="openAssign(row, true)">查看日志</el-button>
               </template>
 
               <!-- 已播放(5)：只能反悔（仅超管） -->
               <template v-else-if="Number(row.status) === 5">
                 <el-button v-if="canWrite" size="small" :disabled="weekLocked" @click="markPlayed(row, false)">取消播放</el-button>
-                <el-button size="small" @click="openAssign(row, true)">查看日志</el-button>
+                <el-button size="small" class="op-log" @click="openAssign(row, true)">查看日志</el-button>
               </template>
 
               <!-- 已驳回(2)：撤销可拉回待审重走流程（仅超管） -->
               <template v-else-if="Number(row.status) === 2">
                 <el-button v-if="canWrite" size="small" :disabled="weekLocked" @click="revoke(row)">撤销</el-button>
-                <el-button size="small" @click="openAssign(row, true)">查看日志</el-button>
+                <el-button size="small" class="op-log" @click="openAssign(row, true)">查看日志</el-button>
               </template>
 
               <!-- 已取消(7)：学生自己撤的，终态，只能看轨迹 -->
               <template v-else>
-                <el-button size="small" @click="openAssign(row, true)">查看日志</el-button>
+                <el-button size="small" class="op-log" @click="openAssign(row, true)">查看日志</el-button>
               </template>
+
+              <!-- 删除：v8 就有、协议版重做操作列时被弄丢了（2026-09-27 补回）。
+                   后端 DELETE /submit/:id 是 requireAdmin（普通管理员也能删，影响范围只有一条），
+                   但点歌若属于「已锁定的周」后端会拒（assertWeekOpen）→ 这里同步置灰。 -->
+              <el-button
+                size="small" class="op-del"
+                :disabled="row.type === 1 && weekLocked"
+                @click="removeRow(row)"
+              >删除</el-button>
             </div>
           </template>
         </el-table-column>
@@ -1695,6 +1713,33 @@ async function revoke(row) {
   await refreshAll();
 }
 
+/**
+ * 删除单条投稿（文稿 / 点歌都走这里）。
+ *
+ * ⚠️ 这条是 2026-09-27 补回来的回归：v8 时代操作列有删除，
+ * 协议版按七态重做操作列时漏掉了，后端 `DELETE /submit/:id` 一直还在。
+ *
+ * 后端语义（别在前端重复实现）：
+ *   - 点歌若属于「已锁定的周」→ 拒绝（`assertWeekOpen`，会破坏已公布的排期）→ 前端同步置灰；
+ *   - 占着正式位的点歌被删 → 服务端**自动释放位子并重跑该周调剂**，候补最合适的会被提上来，
+ *     所以提示里要说明「位子会释放」，别让人以为删了就空着。
+ */
+async function removeRow(row) {
+  const isSong = Number(row.type) === 1;
+  const name = isSong
+    ? `${row.songName || '点歌'}${row.singer ? ' · ' + row.singer : ''}`
+    : (row.articleTitle || '文稿');
+  await ElMessageBox.confirm(
+    `删除后不可恢复。\n《${name}》`
+    + (isSong ? '\n若这条已占正式位，位子会立刻释放，并自动重跑该周调剂（候补会补上来）。' : ''),
+    '删除这条投稿',
+    { type: 'warning', confirmButtonText: '删除', confirmButtonClass: 'el-button--danger' },
+  );
+  await http.delete(`/admin/submit/${row.id}`);
+  ElMessage.success('已删除');
+  await refreshAll();
+}
+
 async function batchApprove() {
   const r = await http.post('/admin/submit/batch', { ids: selection.value.map((x) => x.id), action: 'approve' });
   ElMessage.success(`批量通过完成${r?.skipped?.length ? `，${r.skipped.length} 条已驳回/已排期被跳过` : ''}`);
@@ -2090,11 +2135,20 @@ onBeforeUnmount(() => {
 .avatar-fallback.sys { color: var(--amber-fg); border-color: var(--amber-bg); }
 .rv-stack { min-width: 0; line-height: 1.45; }
 .micro.is-sys { color: var(--amber-fg); }
-.op-cell { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; }
+/* 操作列：只切视图的（查看日志）/ 危险操作（删除）用**文字链接**，省宽度也降调性。
+   实体按钮留给「改数据」的动作，视觉层次才分得开。 */
+.op-cell { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; row-gap: 4px; }
 .op-cell :deep(.el-button) {
   margin-left: 0; border-radius: var(--r-pill) !important;
   height: 30px; padding: 0 14px;
 }
+.op-cell .op-log.el-button,
+.op-cell .op-del.el-button { padding: 0 2px; height: 26px; background: transparent !important; border: none !important; }
+.op-cell .op-log.el-button { color: var(--muted) !important; }
+.op-cell .op-log.el-button:hover { color: var(--ink) !important; }
+.op-cell .op-del.el-button { color: var(--red-fg) !important; }
+.op-cell .op-del.el-button:hover { color: #8f1b12 !important; }
+.op-cell .op-del.el-button.is-disabled { color: var(--soft) !important; }
 
 /* v2 小胶囊（19px）：ano = 说明性微标；pos-chip = 候补位次 */
 .ano {
