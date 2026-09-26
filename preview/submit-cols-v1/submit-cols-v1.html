@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>菁悠广播站 · 投稿列表 列调整方案 v1（新增「首选时段」列 + 投稿人居中）</title>
+<style>
+/* ============================================================
+   菁悠广播站 · 投稿列表 列调整方案 v1（静态预览，不改动任何业务代码）
+   设计系统继承 preview/admin-ui-v8/admin-ui-v8.html
+   三条硬规则：唯一强调色 #0066CC / 无渐变无彩色投影 / 深色卡是主角
+   ============================================================ */
+:root{
+  --ink:#1d1d1f; --ink-2:#333; --muted:#7a7a7a; --muted-2:#6e6e73;
+  --soft:#c7c7cc; --hairline:#e0e0e0; --divider:#f0f0f0;
+  --parchment:#f5f5f7; --canvas:#fff; --tile:#272729; --tile-2:#3a3a3c;
+  --accent:#0066cc; --acc-bg:#e6f0fa;
+  --amber-bg:#fef3c7; --amber-fg:#8a6100;
+  --green-bg:#e7f5ec; --green-fg:#1e7a46;
+  --red-bg:#fde8e8;   --red-fg:#b42318;
+  --r-card:18px; --r-input:12px; --r-tile:20px; --r-pill:9999px;
+  --fs-2xs:10.5px; --fs-xs:11.5px; --fs-sm:12.5px; --fs-md:13.5px;
+  --fs-lg:15px; --fs-xl:19px; --fs-2xl:24px;
+  --s1:4px; --s2:8px; --s3:13px; --s4:18px; --s5:26px; --s6:34px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#efeff1; color:var(--ink);
+  font:400 var(--fs-md)/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.num{font-variant-numeric:tabular-nums}
+
+/* ══════════ 预览外壳 ══════════ */
+.pv-top{
+  position:sticky; top:0; z-index:50;
+  display:flex; align-items:center; gap:var(--s4);
+  padding:0 var(--s5); height:54px;
+  background:rgba(255,255,255,.9); backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--hairline);
+}
+.pv-brand{font-size:var(--fs-sm); font-weight:600; letter-spacing:.3px; white-space:nowrap}
+.pv-brand span{color:var(--muted); font-weight:400}
+.pv-tabs{display:flex; gap:var(--s1); background:var(--parchment); padding:3px; border-radius:var(--r-pill)}
+.pv-tabs button{
+  border:none; background:transparent; cursor:pointer; font:inherit;
+  font-size:var(--fs-sm); color:var(--muted);
+  padding:5px 15px; border-radius:var(--r-pill); white-space:nowrap;
+  transition:background .18s var(--ease), color .18s var(--ease);
+}
+.pv-tabs button.on{background:var(--tile); color:#fff; font-weight:600}
+.pv-note{margin-left:auto; font-size:var(--fs-xs); color:var(--muted-2); white-space:nowrap}
+
+.pane{display:none; padding:var(--s5) var(--s5) 70px}
+.pane.on{display:block}
+.wrap{max-width:1180px; margin:0 auto}
+
+.pane-head{margin-bottom:var(--s5)}
+.pane-head h1{margin:0 0 6px; font-size:var(--fs-2xl); font-weight:600; letter-spacing:-.2px}
+.pane-head p{margin:0; color:var(--muted); font-size:var(--fs-md)}
+
+.blk{margin-bottom:var(--s6)}
+.blk > h3{
+  margin:0 0 var(--s3); font-size:var(--fs-sm); font-weight:600;
+  letter-spacing:.4px; color:var(--muted-2);
+  display:flex; align-items:center; gap:var(--s2);
+}
+.blk > h3::after{content:""; flex:1; height:1px; background:var(--hairline)}
+.card{background:var(--canvas); border:1px solid var(--hairline); border-radius:var(--r-card); padding:var(--s4)}
+.card + .card{margin-top:var(--s3)}
+.note{
+  display:flex; gap:9px; align-items:flex-start;
+  background:var(--parchment); border-radius:var(--r-input);
+  padding:11px 14px; font-size:var(--fs-sm); color:var(--muted); line-height:1.75;
+}
+.note b{color:var(--ink-2); font-weight:600}
+.note svg{flex:none; margin-top:3px}
+.two{display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:var(--s5); align-items:start}
+@media (max-width:900px){ .two{grid-template-columns:1fr} }
+.shot{border:1px solid var(--hairline); border-radius:var(--r-input); overflow:hidden; background:var(--parchment)}
+.shot img{display:block; width:100%}
+.shot figcaption{font-size:var(--fs-2xs); color:var(--muted-2); padding:6px 10px; background:#fafafa; border-top:1px solid var(--divider)}
+
+/* 数据行 */
+.dl{margin:0; border-top:1px solid var(--divider)}
+.dl div{display:flex; justify-content:space-between; gap:var(--s3); padding:9px 0; border-bottom:1px solid var(--divider); font-size:var(--fs-sm)}
+.dl dt{color:var(--muted)}
+.dl dd{margin:0; font-weight:600; white-space:nowrap}
+.hi-red{color:var(--red-fg)}
+.hi-green{color:var(--green-fg)}
+.hi-acc{color:var(--accent)}
+
+.h2-sm{font-size:var(--fs-lg); font-weight:600; margin:0 0 var(--s2)}
+.p{font-size:var(--fs-sm); color:var(--muted); line-height:1.8; margin:0 0 var(--s3)}
+.p b{color:var(--ink-2)}
+code{font:500 var(--fs-xs)/1.5 ui-monospace,Menlo,Consolas,monospace; background:var(--parchment); padding:1px 5px; border-radius:5px; color:var(--ink-2)}
+
+/* ══════════ 表格 mock（真实列宽比例，无 selection 列） ══════════ */
+.tbwrap{background:var(--canvas); border:1px solid var(--hairline); border-radius:var(--r-card); overflow:hidden}
+.tb{display:grid; grid-template-columns:238fr 152fr 152fr 118fr 142fr 148fr 236fr; min-width:900px}
+.tb .h,.tb .c{padding:11px 12px; border-bottom:1px solid var(--divider); min-width:0}
+.tb .h{background:#fafafa; font-size:var(--fs-xs); color:var(--muted-2); font-weight:600; letter-spacing:.2px; display:flex; align-items:center}
+.tb .h.new{background:var(--acc-bg); color:var(--accent)}
+.tb .c{font-size:var(--fs-xs); display:flex; align-items:center; gap:var(--s2)}
+.tb .h.ctr,.tb .c.ctr{justify-content:center; text-align:center}
+.tb .c.right,.tb .h.right{justify-content:flex-end}
+.tb .row{display:contents}
+.tb .row:hover .c{background:#fbfbfd}
+
+.tag{flex:none; font-size:var(--fs-2xs); padding:2px 7px; border-radius:var(--r-pill); border:1px solid var(--soft); color:var(--muted-2); background:#fff}
+.tag.song{border-color:#bcd4ec; color:var(--accent); background:var(--acc-bg)}
+.cell-c{min-width:0; display:flex; flex-direction:column; gap:3px}
+.c-strong{font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.c-note{font-size:var(--fs-2xs); color:var(--muted-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+.avt{flex:none; width:26px; height:26px; border-radius:50%; background:var(--parchment); border:1px solid var(--hairline);
+  display:flex; align-items:center; justify-content:center; font-size:var(--fs-xs); color:var(--ink-2); font-weight:600}
+.avt.sys{color:var(--muted); background:#fafafa}
+.stack{display:flex; flex-direction:column; gap:2px; min-width:0}
+.stack .n{font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.stack .s{font-size:var(--fs-2xs); color:var(--muted-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+
+.pill{font-size:var(--fs-2xs); padding:3px 10px; border-radius:var(--r-pill); white-space:nowrap; font-weight:600}
+.pill.wait{background:var(--parchment); color:var(--muted-2)}
+.pill.ok{background:var(--green-bg); color:var(--green-fg)}
+.pill.blue{background:var(--acc-bg); color:var(--accent)}
+.pill.red{background:var(--red-bg); color:var(--red-fg)}
+
+.ops{display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; width:100%}
+.btn{font-size:var(--fs-2xs); padding:4px 9px; border-radius:var(--r-pill); border:1px solid var(--hairline);
+  background:#fff; color:var(--ink-2); white-space:nowrap; cursor:default}
+.btn.pri{background:var(--accent); border-color:var(--accent); color:#fff}
+.btn.ghost{border-color:transparent; color:var(--muted); padding:4px 4px}
+.btn.disabled{color:var(--soft); border-color:var(--divider)}
+
+/* ══════════ 时段列（核心） ══════════ */
+.sec{display:flex; flex-direction:column; gap:2px; min-width:0}
+.sec .want{font-size:var(--fs-2xs); color:var(--muted-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.sec .want.strong{color:var(--ink-2); font-weight:600}
+.sec .real{display:flex; align-items:center; gap:3px; font-size:var(--fs-2xs); white-space:nowrap}
+.sec .real .arw{color:var(--soft)}
+/* ⚠️ 调剂标记：只有「时间段」本身是红的，箭头与任何前缀字都不上色 */
+.sec .real .t{color:var(--red-fg); font-weight:600}
+.sec .real.plain .t{color:var(--ink-2); font-weight:600}
+.sec .want.strike{text-decoration:line-through; color:var(--soft)}
+
+.cmp{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--s3)}
+@media (max-width:900px){ .cmp{grid-template-columns:1fr} }
+.opt{border:1px solid var(--hairline); border-radius:var(--r-input); overflow:hidden; background:#fff}
+.opt header{padding:9px 12px; border-bottom:1px solid var(--divider); font-size:var(--fs-xs); font-weight:600; display:flex; align-items:center; gap:6px}
+.opt header em{font-style:normal; font-weight:400; color:var(--muted-2)}
+.opt.pick{border-color:#bcd4ec; box-shadow:0 0 0 2px rgba(0,102,204,.08)}
+.opt.pick header{background:var(--acc-bg); color:var(--accent)}
+.opt .body{padding:12px}
+.opt .lbl{font-size:var(--fs-2xs); color:var(--muted-2); margin:0 0 6px}
+.cellbox{border:1px dashed var(--soft); border-radius:8px; padding:8px 10px; background:#fcfcfd; width:150px}
+.rec{display:inline-flex; align-items:center; gap:4px; margin-top:10px; font-size:var(--fs-2xs); color:var(--green-fg); font-weight:600}
+.rec::before{content:"✓"}
+
+.mx{width:100%; border-collapse:collapse; font-size:var(--fs-xs)}
+.mx th,.mx td{border-bottom:1px solid var(--divider); padding:9px 10px; text-align:left; vertical-align:middle}
+.mx th{color:var(--muted-2); font-weight:600; background:#fafafa}
+.mx td.st{font-weight:600; white-space:nowrap}
+.mx .ok{color:var(--green-fg); font-weight:600}
+.mx .mono{font-variant-numeric:tabular-nums; color:var(--muted-2)}
+
+.chg{list-style:none; margin:0; padding:0; font-size:var(--fs-sm)}
+.chg li{padding:9px 0; border-bottom:1px solid var(--divider); display:flex; gap:10px; align-items:flex-start}
+.chg li::before{content:"—"; color:var(--soft); flex:none}
+.chg b{color:var(--ink-2)}
+</style>
+</head>
+<body>
+
+<header class="pv-top">
+  <div class="pv-brand">菁悠广播站 <span>· 投稿列表 列调整方案</span></div>
+  <nav class="pv-tabs">
+    <button class="on" data-i="0">① 现状</button>
+    <button data-i="1">② 新列：首选时段</button>
+    <button data-i="2">③ 居中 + 操作列</button>
+    <button data-i="3">④ 落地后整表</button>
+  </nav>
+  <div class="pv-note">v1 · 静态预览，未改业务代码</div>
+</header>
+
+<!-- ══════════════ 屏 ① 现状 ══════════════ -->
+<section class="pane on" id="p0">
+<div class="wrap">
+  <div class="pane-head">
+    <h1>你圈的三处，各自的实测</h1>
+    <p>数据来源：本机最新代码，1920×1044 视口实测 —— 表格总宽 1640px。截图的旧版本另有说明。</p>
+  </div>
+
+  <div class="blk">
+    <h3>① 那块空白 —— 不是空列，是「内容」列被撑到 800px</h3>
+    <div class="card">
+      <div class="two">
+        <figure class="shot" style="margin:0">
+          <img src="shots/01-zoom-gap.png" alt="空白区放大">
+          <figcaption>你圈的位置（箭头落点）：表格中间这块只有行分隔线，没有任何内容</figcaption>
+        </figure>
+        <div>
+          <p class="p">表格一共只有 <b>7 列</b>，每列都有表头 —— 中间没有"空的列"。<br>
+             你圈到的其实是<b>「内容 · 排到的时段」列的右半截</b>：它是唯一按 <code>min-width:330</code> 弹性伸缩的列，
+             在宽屏下被撑到了 <b>800px</b>，占整张表的一半，而文字只用掉左边一小段。</p>
+          <dl class="dl">
+            <div><dt>表格总宽</dt><dd class="num">1640px</dd></div>
+            <div><dt>内容列实得宽度</dt><dd class="num hi-red">800px</dd></div>
+            <div><dt>它的设定最小宽</dt><dd class="num">330px</dd></div>
+            <div><dt>其余 6 列合计</dt><dd class="num">840px（固定）</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="blk">
+    <h3>② 「投稿人」列 —— 列头与内容都不在列中心</h3>
+    <div class="card">
+      <div class="two">
+        <figure class="shot" style="margin:0">
+          <img src="shots/02-zoom-user.png" alt="投稿人列放大">
+          <figcaption>你圈的表头「投稿人」+ 整列的「头像 + 姓名 / 学号」</figcaption>
+        </figure>
+        <div>
+          <p class="p">列宽 150px，但列头是<b>左对齐</b>（Element Plus 表头默认），单元格里的
+             「头像 + 姓名/学号」也是<b>靠左贴边</b>排的 —— 两边都不在列中心。</p>
+          <dl class="dl">
+            <div><dt>列中心</dt><dd class="num">x 1173</dd></div>
+            <div><dt>列头「投稿人」文字中心</dt><dd class="num hi-red">x 1128（偏左 45px）</dd></div>
+            <div><dt>内容块宽度</dt><dd class="num">97px（头像 34 + 姓名/学号 55 + 间距 8）</dd></div>
+            <div><dt>内容块右侧留白</dt><dd class="num hi-red">29px（左侧只留 12px 内边距）</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="blk">
+    <h3>③ 「操作」列 —— 你看到的裁切来自旧版本，本机已经修好</h3>
+    <div class="card">
+      <div class="two">
+        <figure class="shot" style="margin:0">
+          <img src="shots/03-zoom-ops.png" alt="操作列放大">
+          <figcaption>你的截图：「查看日志」只显示了「查看」，右边被列边界切掉</figcaption>
+        </figure>
+        <div>
+          <p class="p">这是<b>列宽 200px 的旧版本</b>（服务器上跑的那个）。那一行是「已排期」，超管同时渲染了
+             <b>改时段 66 + 标记播放 78 + 查看日志 46 + 间距 12 = 202px</b>，减去单元格左右内边距 20px，
+             可用只有 180px → 最后一个按钮被裁。</p>
+          <p class="p">本机最新代码做了两件事：列宽 <b>200 → 236</b>；<b>超管不再显示「查看日志」</b>
+             （指派弹窗里本来就带完整状态轨迹）。实测 7 种状态<b>零裁切</b>，见第 ③ 屏。</p>
+          <dl class="dl">
+            <div><dt>旧版可容宽度</dt><dd class="num hi-red">180px ＜ 需要 202px</dd></div>
+            <div><dt>本机列宽</dt><dd class="num hi-green">236px（可用 216px）</dd></div>
+            <div><dt>最长组合（指派时段+改驳回+删除）</dt><dd class="num">184px</dd></div>
+            <div><dt>兜底</dt><dd>flex-wrap：真放不下时换行，绝不裁切</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+    <div class="note" style="margin-top:var(--s3)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="#c7c7cc" stroke-width="1.2"/><path d="M7 4v3.4M7 9.6v.4" stroke="#c7c7cc" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <div>操作列的修正在<b>本机代码里已完成</b>，服务器上还是旧版本 —— 这一条不需要新改代码，<b>部署后即可见</b>。</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════ 屏 ② 新列 ══════════════ -->
+<section class="pane" id="p1">
+<div class="wrap">
+  <div class="pane-head">
+    <h1>新列：「首选时段」</h1>
+    <p>插在「内容」和「投稿人」之间 —— 就是你箭头指向的那块空白；有调剂时，在同一个格里用红色标出调剂到的时段。</p>
+  </div>
+
+  <div class="blk">
+    <h3>三种行形态（同一列，按数据自动切换）</h3>
+    <div class="tbwrap">
+      <div class="tb">
+        <div class="h">内容 · 排到的时段</div>
+        <div class="h new">首选时段</div>
+        <div class="h">投稿人</div>
+        <div class="h">提交时间</div>
+        <div class="h">审核人 / 时间</div>
+        <div class="h ctr">状态</div>
+        <div class="h right">操作</div>
+
+        <div class="row">
+          <div class="c"><span class="tag song">点歌</span><div class="cell-c"><span class="c-strong">天边外 · 孙燕姿</span><span class="c-note">该格已占 2/2 · 接受调剂</span></div></div>
+          <div class="c"><div class="sec"><span class="real plain"><span class="t">09-28 晚间 17:40</span></span></div></div>
+          <div class="c ctr"><span class="avt">李</span><div class="stack"><span class="n">李家阳</span><span class="s">20240301</span></div></div>
+          <div class="c"><span class="c-note num">09-25 00:18</span></div>
+          <div class="c"><span class="avt sys">指</span><div class="stack"><span class="s">指导老师</span><span class="s num">09-25 01:36</span></div></div>
+          <div class="c ctr"><span class="pill ok">已排期</span></div>
+          <div class="c right"><div class="ops"><span class="btn">改时段</span><span class="btn">标记播放</span><span class="btn ghost">删除</span></div></div>
+        </div>
+
+        <div class="row">
+          <div class="c"><span class="tag song">点歌</span><div class="cell-c"><span class="c-strong">几分之几 · 卢广仲</span><span class="c-note">该格已占 2/2 · 接受调剂</span></div></div>
+          <div class="c"><div class="sec">
+            <span class="real plain"><span class="t">09-28 晚间 17:40</span></span>
+            <span class="real"><span class="arw">→</span><span class="t">09-29 午间 13:00</span></span>
+          </div></div>
+          <div class="c ctr"><span class="avt">李</span><div class="stack"><span class="n">李小雨</span><span class="s">20240303</span></div></div>
+          <div class="c"><span class="c-note num">09-25 00:21</span></div>
+          <div class="c"><span class="avt sys">指</span><div class="stack"><span class="s">指导老师</span><span class="s num">09-25 01:36</span></div></div>
+          <div class="c ctr"><span class="pill ok">已排期</span></div>
+          <div class="c right"><div class="ops"><span class="btn">改时段</span><span class="btn">标记播放</span><span class="btn ghost">删除</span></div></div>
+        </div>
+      </div>
+    </div>
+    <p class="p" style="margin-top:10px">第一行<b>无调剂</b>（排到的 = 首选）→ 列里只有时段本身，不上色。<br>
+       第二行<b>被调剂过</b> → 首选照常显示，下一行用灰色箭头引出红色的实际时段。</p>
+    <div class="note" style="margin-top:var(--s3)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="#c7c7cc" stroke-width="1.2"/><path d="M7 4v3.4M7 9.6v.4" stroke="#c7c7cc" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <div>预览里「首选时段」表头是<b>蓝底</b>，只是为了标出这一列是新增的 —— 落地后它和其它表头一样是灰底，
+        只有<b>被调剂过的那一行时段文字</b>是红的。</div>
+    </div>
+  </div>
+
+  <div class="blk">
+    <h3>有调剂时怎么写 —— 三个写法，挑一个</h3>
+    <div class="cmp">
+      <div class="opt pick">
+        <header>A <em>两行 · 首选在上</em></header>
+        <div class="body">
+          <p class="lbl">首选时段保持正常颜色，下一行用灰色箭头引出红色的实际时段</p>
+          <div class="cellbox">
+            <div class="sec">
+              <span class="real plain"><span class="t">09-28 晚间 17:40</span></span>
+              <span class="real"><span class="arw">→</span><span class="t">09-29 晚间 17:40</span></span>
+            </div>
+          </div>
+          <div class="rec">推荐</div>
+        </div>
+      </div>
+
+      <div class="opt">
+        <header>B <em>两行 · 首选划掉</em></header>
+        <div class="body">
+          <p class="lbl">首选时段加删除线并压灰，明示"这个没用上"</p>
+          <div class="cellbox">
+            <div class="sec">
+              <span class="real plain"><span class="t want strike">09-28 晚间 17:40</span></span>
+              <span class="real"><span class="arw">→</span><span class="t">09-29 晚间 17:40</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="opt">
+        <header>C <em>红色结果在上</em></header>
+        <div class="body">
+          <p class="lbl">实际时段占据第一行（红色），首选降为下面一行小字</p>
+          <div class="cellbox">
+            <div class="sec">
+              <span class="real"><span class="t">09-29 晚间 17:40</span></span>
+              <span class="real plain"><span class="arw">首选</span><span class="t want">09-28 晚间 17:40</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:var(--s3)">
+      <p class="h2-sm">三种共用的红线</p>
+      <p class="p" style="margin:0">你强调的<b>「仅仅是时间段用红色标记」</b> —— 上色范围严格限定在时间串本身：<br>
+        灰色箭头 <span style="color:var(--soft)">→</span> 不上色、「首选」两个字不上色、格子没有红底、
+        也不加红边框。整列只有<b>被调剂过的那一行时段</b>是红的：<span class="num hi-red" style="font-weight:600">09-29 晚间 17:40</span>。</p>
+    </div>
+  </div>
+
+  <div class="blk">
+    <h3>这一列在哪些状态下是空的</h3>
+    <div class="card">
+      <div class="mx" style="display:block;border:0">
+        <table class="mx">
+          <tr><th>行状态</th><th>「首选时段」列显示</th><th>说明</th></tr>
+          <tr><td class="st">待审核</td><td>学生选的时段</td><td>还没排，就是他的首选</td></tr>
+          <tr><td class="st">候补中</td><td>学生选的时段</td><td>首选那格满了，在等空位</td></tr>
+          <tr><td class="st">已通过 · 待排期</td><td>学生选的时段</td><td>审核过了，还没落座</td></tr>
+          <tr><td class="st">已排期 / 已播放</td><td>首选时段（+ 红色实际）</td><td>两个时段不同时出现红色那一行</td></tr>
+          <tr><td class="st">已驳回（系统）</td><td>学生选的时段</td><td>排期锁定没排上，时段仍保留</td></tr>
+          <tr><td class="st">文稿（全部状态）</td><td class="mono">—</td><td>文稿不选时段，这一格是空的</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="note" style="margin-top:var(--s3)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="#c7c7cc" stroke-width="1.2"/><path d="M7 4v3.4M7 9.6v.4" stroke="#c7c7cc" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <div>新增这一列后，「内容」列第二行里的时段文字<b>会同步拿掉</b>（避免同一句话说两遍），
+        只保留「该格已占 N/M · 接受调剂」「第 2 位，前面还有 1 人」这类补充信息。</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════ 屏 ③ 居中 + 操作列 ══════════════ -->
+<section class="pane" id="p2">
+<div class="wrap">
+  <div class="pane-head">
+    <h1>投稿人居中 + 操作列全状态</h1>
+    <p>列头与单元格内容一起居中；操作列把 7 种状态逐一量过。</p>
+  </div>
+
+  <div class="blk">
+    <h3>投稿人列：改前 / 改后</h3>
+    <div class="cmp" style="grid-template-columns:1fr 1fr">
+      <div class="opt">
+        <header>改前 <em>列头左对齐 · 内容靠左</em></header>
+        <div class="body">
+          <div style="width:150px;border:1px dashed var(--soft);border-radius:8px;overflow:hidden">
+            <div style="padding:9px 12px;background:#fafafa;font-size:var(--fs-xs);color:var(--muted-2);font-weight:600;border-bottom:1px solid var(--divider)">投稿人</div>
+            <div style="padding:11px 12px;display:flex;align-items:center;gap:8px">
+              <span class="avt">李</span>
+              <div class="stack"><span class="n" style="font-size:var(--fs-xs)">李家阳</span><span class="s">20240301</span></div>
+            </div>
+          </div>
+          <p class="lbl" style="margin:10px 0 0">列头偏左 45px、内容块右侧空 29px</p>
+        </div>
+      </div>
+      <div class="opt pick">
+        <header>改后 <em>列头与内容一起居中</em></header>
+        <div class="body">
+          <div style="width:150px;border:1px dashed #bcd4ec;border-radius:8px;overflow:hidden">
+            <div style="padding:9px 12px;background:var(--acc-bg);color:var(--accent);font-size:var(--fs-xs);font-weight:600;border-bottom:1px solid var(--divider);text-align:center">投稿人</div>
+            <div style="padding:11px 12px;display:flex;align-items:center;gap:8px;justify-content:center">
+              <span class="avt">李</span>
+              <div class="stack"><span class="n" style="font-size:var(--fs-xs)">李家阳</span><span class="s">20240301</span></div>
+            </div>
+          </div>
+          <p class="lbl" style="margin:10px 0 0">列头与内容块中心 = 列中心 1173</p>
+        </div>
+      </div>
+    </div>
+    <div class="note" style="margin-top:var(--s3)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="#c7c7cc" stroke-width="1.2"/><path d="M7 4v3.4M7 9.6v.4" stroke="#c7c7cc" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <div>「审核人 / 时间」列和它结构完全一样（头像 + 两行小字）。<b>建议两列一起居中</b>，只改一列会左右不对称 —— 你定。</div>
+    </div>
+  </div>
+
+  <div class="blk">
+    <h3>操作列：7 种状态逐一实测（超管视角）</h3>
+    <div class="tbwrap">
+      <div class="tb" style="grid-template-columns:150fr 260fr 150fr 130fr 130fr 236fr">
+        <div class="h">行状态</div>
+        <div class="h">操作列渲染的按钮</div>
+        <div class="h">按钮总宽</div>
+        <div class="h">列内可用</div>
+        <div class="h">文字被裁</div>
+        <div class="h">结论</div>
+
+        <div class="row">
+          <div class="c"><span class="pill wait">待审核</span></div>
+          <div class="c"><div class="ops" style="justify-content:flex-start"><span class="btn">通过</span><span class="btn">驳回</span><span class="btn ghost">删除</span></div></div>
+          <div class="c num">148px</div><div class="c num">216px</div><div class="c num">0</div>
+          <div class="c ok" style="color:var(--green-fg);font-weight:600">不裁</div>
+        </div>
+        <div class="row">
+          <div class="c"><span class="pill blue">已通过</span></div>
+          <div class="c"><div class="ops" style="justify-content:flex-start"><span class="btn">指派时段</span><span class="btn">改驳回</span><span class="btn ghost">删除</span></div></div>
+          <div class="c num">184px</div><div class="c num">216px</div><div class="c num">0</div>
+          <div class="c" style="color:var(--green-fg);font-weight:600">不裁（最长）</div>
+        </div>
+        <div class="row">
+          <div class="c"><span class="pill wait">候补中</span></div>
+          <div class="c"><div class="ops" style="justify-content:flex-start"><span class="btn">指派时段</span><span class="btn">驳回</span><span class="btn ghost">删除</span></div></div>
+          <div class="c num">172px</div><div class="c num">216px</div><div class="c num">0</div>
+          <div class="c" style="color:var(--green-fg);font-weight:600">不裁</div>
+        </div>
+        <div class="row">
+          <div class="c"><span class="pill ok">已排期</span></div>
+          <div class="c"><div class="ops" style="justify-content:flex-start"><span class="btn">改时段</span><span class="btn">标记播放</span><span class="btn ghost">删除</span></div></div>
+          <div class="c num">184px</div><div class="c num">216px</div><div class="c num">0</div>
+          <div class="c" style="color:var(--green-fg);font-weight:600">不裁</div>
+        </div>
+        <div class="row">
+          <div class="c"><span class="pill ok">已播放</span></div>
+          <div class="c"><div class="ops" style="justify-content:flex-start"><span class="btn">取消播放</span><span class="btn ghost">查看日志</span><span class="btn ghost">删除</span></div></div>
+          <div class="c num">170px</div><div class="c num">216px</div><div class="c num">0</div>
+          <div class="c" style="color:var(--green-fg);font-weight:600">不裁</div>
+        </div>
+        <div class="row">
+          <div class="c"><span class="pill red">已驳回</span></div>
+          <div class="c"><div class="ops" style="justify-content:flex-start"><span class="btn">撤销</span><span class="btn ghost">查看日志</span><span class="btn ghost">删除</span></div></div>
+          <div class="c num">146px</div><div class="c num">216px</div><div class="c num">0</div>
+          <div class="c" style="color:var(--green-fg);font-weight:600">不裁</div>
+        </div>
+        <div class="row">
+          <div class="c"><span class="pill wait">已取消</span></div>
+          <div class="c"><div class="ops" style="justify-content:flex-start"><span class="btn ghost">查看日志</span><span class="btn ghost">删除</span></div></div>
+          <div class="c num">86px</div><div class="c num">216px</div><div class="c num">0</div>
+          <div class="c" style="color:var(--green-fg);font-weight:600">不裁</div>
+        </div>
+      </div>
+    </div>
+    <div class="note" style="margin-top:var(--s3)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.4l3 3 6-6.5" stroke="#1e7a46" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div><b>7 种状态全部不裁</b>：按钮右边界最多到列内 184px 处（可用 216px，还余 32px），
+        文字零裁切、无折行、无按钮超出视口。这张表是<b>量出来的</b>（逐行读 <code>getBoundingClientRect</code>），不是看截图估的。</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════ 屏 ④ 整表 ══════════════ -->
+<section class="pane" id="p3">
+<div class="wrap">
+  <div class="pane-head">
+    <h1>落地后整张表</h1>
+    <p>8 列 · 新列插在内容右侧 · 投稿人/审核人居中 · 操作列 236px。数据取自本地测试库的真实 10 条。</p>
+  </div>
+
+  <div class="blk">
+    <h3>新列已就位（高亮那列）</h3>
+    <div class="tbwrap">
+      <div class="tb">
+        <div class="h">内容 · 排到的时段</div>
+        <div class="h new">首选时段</div>
+        <div class="h ctr">投稿人</div>
+        <div class="h">提交时间</div>
+        <div class="h ctr">审核人 / 时间</div>
+        <div class="h ctr">状态</div>
+        <div class="h right">操作</div>
+
+        <!-- 1 文稿待审 -->
+        <div class="row">
+          <div class="c"><span class="tag">文稿</span><div class="cell-c"><span class="c-strong">秋日私语：写给十月的校园</span><span class="c-note">每当清晨的凉意漫上操场……</span></div></div>
+          <div class="c"><span class="c-note">—</span></div>
+          <div class="c ctr"><span class="avt">李</span><div class="stack"><span class="n">李家阳</span><span class="s">20240301</span></div></div>
+          <div class="c"><span class="c-note num">09-27 00:49</span></div>
+          <div class="c ctr"><span class="c-note">—</span></div>
+          <div class="c ctr"><span class="pill wait">待审核</span></div>
+          <div class="c right"><div class="ops"><span class="btn pri">通过</span><span class="btn">驳回</span><span class="btn ghost">删除</span></div></div>
+        </div>
+
+        <!-- 2 文稿已通过待排期 -->
+        <div class="row">
+          <div class="c"><span class="tag">文稿</span><div class="cell-c"><span class="c-strong">深色</span><span class="c-note">deepblueButtonBoundaryClass…</span></div></div>
+          <div class="c"><span class="c-note">—</span></div>
+          <div class="c ctr"><span class="avt">李</span><div class="stack"><span class="n">李小雨</span><span class="s">20240303</span></div></div>
+          <div class="c"><span class="c-note num">09-27 00:50</span></div>
+          <div class="c ctr"><span class="avt sys">指</span><div class="stack"><span class="s">指导老师</span><span class="s num">09-27 00:50</span></div></div>
+          <div class="c ctr"><span class="pill blue">已通过 · 待排期</span></div>
+          <div class="c right"><div class="ops"><span class="btn">改驳回</span><span class="btn ghost">删除</span></div></div>
+        </div>
+
+        <!-- 3 点歌待审（无时段数据） -->
+        <div class="row">
+          <div class="c"><span class="tag song">点歌</span><div class="cell-c"><span class="c-strong">遇见 · 孙燕姿</span><span class="c-note">未选时段 · 不占位，等审核 · 接受调剂</span></div></div>
+          <div class="c"><span class="c-note">—</span></div>
+          <div class="c ctr"><span class="avt">李</span><div class="stack"><span class="n">李家阳</span><span class="s">20240301</span></div></div>
+          <div class="c"><span class="c-note num">09-27 00:53</span></div>
+          <div class="c ctr"><span class="c-note">—</span></div>
+          <div class="c ctr"><span class="pill wait">待审核</span></div>
+          <div class="c right"><div class="ops"><span class="btn pri">通过</span><span class="btn">驳回</span><span class="btn ghost">删除</span></div></div>
+        </div>
+
+        <!-- 4 点歌候补 -->
+        <div class="row">
+          <div class="c"><span class="tag song">点歌</span><div class="cell-c"><span class="c-strong">几分之几 · 卢广仲</span><span class="c-note">首选已满 · 第 2 位，前面还有 1 人 · 接受调剂</span></div></div>
+          <div class="c"><div class="sec"><span class="real plain"><span class="t">09-30 午间 12:20</span></span></div></div>
+          <div class="c ctr"><span class="avt">李</span><div class="stack"><span class="n">李小雨</span><span class="s">20240303</span></div></div>
+          <div class="c"><span class="c-note num">09-27 00:54</span></div>
+          <div class="c ctr"><span class="avt sys">指</span><div class="stack"><span class="s">指导老师</span><span class="s num">09-27 00:54</span></div></div>
+          <div class="c ctr"><span class="pill wait">候补中</span></div>
+          <div class="c right"><div class="ops"><span class="btn">指派时段</span><span class="btn">驳回</span><span class="btn ghost">删除</span></div></div>
+        </div>
+
+        <!-- 5 点歌已排期 · 无调剂 -->
+        <div class="row">
+          <div class="c"><span class="tag song">点歌</span><div class="cell-c"><span class="c-strong">天边外 · 孙燕姿</span><span class="c-note">该格已占 2/2 · 接受调剂</span></div></div>
+          <div class="c"><div class="sec"><span class="real plain"><span class="t">09-28 晚间 17:40</span></span></div></div>
+          <div class="c ctr"><span class="avt">李</span><div class="stack"><span class="n">李家阳</span><span class="s">20240301</span></div></div>
+          <div class="c"><span class="c-note num">09-27 00:55</span></div>
+          <div class="c ctr"><span class="avt sys">指</span><div class="stack"><span class="s">指导老师</span><span class="s num">09-27 00:55</span></div></div>
+          <div class="c ctr"><span class="pill ok">已排期</span></div>
+          <div class="c right"><div class="ops"><span class="btn">改时段</span><span class="btn">标记播放</span><span class="btn ghost">删除</span></div></div>
+        </div>
+
+        <!-- 6 点歌已排期 · 有调剂（系统） -->
+        <div class="row">
+          <div class="c"><span class="tag song">点歌</span><div class="cell-c"><span class="c-strong">几分之几 · 卢广仲</span><span class="c-note">该格已占 2/2 · 接受调剂</span></div></div>
+          <div class="c"><div class="sec">
+            <span class="real plain"><span class="t">09-28 晚间 17:40</span></span>
+            <span class="real"><span class="arw">→</span><span class="t">09-29 午间 13:00</span></span>
+          </div></div>
+          <div class="c ctr"><span class="avt">李</span><div class="stack"><span class="n">李小雨</span><span class="s">20240303</span></div></div>
+          <div class="c"><span class="c-note num">09-27 00:56</span></div>
+          <div class="c ctr"><span class="avt sys">指</span><div class="stack"><span class="s">指导老师</span><span class="s num">09-27 00:56</span></div></div>
+          <div class="c ctr"><span class="pill ok">已排期</span></div>
+          <div class="c right"><div class="ops"><span class="btn">改时段</span><span class="btn">标记播放</span><span class="btn ghost">删除</span></div></div>
+        </div>
+
+        <!-- 7 点歌已播放 · 有调剂 -->
+        <div class="row">
+          <div class="c"><span class="tag song">点歌</span><div class="cell-c"><span class="c-strong">告白气球 · 周杰伦</span><span class="c-note">已播出 09-28 午间 12:30 · 接受调剂</span></div></div>
+          <div class="c"><div class="sec">
+            <span class="real plain"><span class="t">09-29 午间 13:00</span></span>
+            <span class="real"><span class="arw">→</span><span class="t">09-28 午间 12:30</span></span>
+          </div></div>
+          <div class="c ctr"><span class="avt">王</span><div class="stack"><span class="n">王梓涵</span><span class="s">20240201</span></div></div>
+          <div class="c"><span class="c-note num">09-27 00:57</span></div>
+          <div class="c ctr"><span class="avt sys">指</span><div class="stack"><span class="s">指导老师</span><span class="s num">09-27 00:57</span></div></div>
+          <div class="c ctr"><span class="pill ok">已播放</span></div>
+          <div class="c right"><div class="ops"><span class="btn">取消播放</span><span class="btn ghost">查看日志</span><span class="btn ghost">删除</span></div></div>
+        </div>
+
+        <!-- 8 点歌自动驳回 -->
+        <div class="row">
+          <div class="c"><span class="tag song">点歌</span><div class="cell-c"><span class="c-strong">孤勇者 · 陈奕迅</span><span class="c-note">系统未排上：排期已锁定，没有可用位置</span></div></div>
+          <div class="c"><div class="sec"><span class="real plain"><span class="t">10-01 晚间 17:30</span></span></div></div>
+          <div class="c ctr"><span class="avt">陈</span><div class="stack"><span class="n">陈思远</span><span class="s">20250101</span></div></div>
+          <div class="c"><span class="c-note num">09-27 00:58</span></div>
+          <div class="c ctr"><span class="avt sys">系</span><div class="stack"><span class="s">系统</span><span class="s num">09-27 00:58</span></div></div>
+          <div class="c ctr"><span class="pill red">已驳回</span></div>
+          <div class="c right"><div class="ops"><span class="btn">撤销</span><span class="btn ghost">查看日志</span><span class="btn ghost">删除</span></div></div>
+        </div>
+      </div>
+    </div>
+    <p class="p" style="margin-top:10px">⚠️ 预览里「内容」列被压窄了（真实宽度 650px），好让 8 列全部入镜。真实比例见第 ① 屏的量值。</p>
+  </div>
+
+  <div class="blk">
+    <h3>落地要改的东西</h3>
+    <div class="card">
+      <ul class="chg">
+        <li><b>SubmitList.vue · 模板</b>：新增 1 个 <code>&lt;el-table-column label="首选时段" width="150"&gt;</code>，插在「内容」与「投稿人」之间；投稿人、审核人两列的表头与单元格加居中。</li>
+        <li><b>SubmitList.vue · rowNote()</b>：把时段片段从「内容」列第二行摘掉（改由新列承载），保留占位/候补位次/调剂意愿。</li>
+        <li><b>SubmitList.vue · 样式</b>：新增 <code>.sec / .sec .real .t</code> 等规则 —— 红色只落在时间串上；投稿人列 <code>justify-content: center</code>。</li>
+        <li><b>后端</b>：<b>零改动</b>。首选时段与实排时段两个字段本来就在列表接口里（<code>wantBroadcastTime</code> / <code>scheduledSlot</code>）。</li>
+        <li><b>顺带</b>：内容列最小宽可以从 330 收到 300（时段段文字搬走后不会挤）。</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="blk">
+    <h3>要你拍板的两件事</h3>
+    <div class="card">
+      <ul class="chg">
+        <li>调剂标记用 <b>A / B / C</b> 哪个写法（第 ② 屏，我推荐 A：首选保持可读、红色结果在下一行）。</li>
+        <li>居中是否<b>连「审核人 / 时间」列一起</b>改（两列结构相同，只改一列会不对称）。</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</section>
+
+<script>
+(function(){
+  var tabs = document.querySelectorAll('.pv-tabs button');
+  var panes = document.querySelectorAll('.pane');
+  function go(i){
+    for (var k = 0; k < tabs.length; k++) tabs[k].classList.toggle('on', k === i);
+    for (var j = 0; j < panes.length; j++) panes[j].classList.toggle('on', j === i);
+    window.scrollTo(0, 0);
+  }
+  for (var i = 0; i < tabs.length; i++) {
+    (function(i){ tabs[i].addEventListener('click', function(){ go(i); }); })(i);
+  }
+})();
+</script>
+</body>
+</html>
