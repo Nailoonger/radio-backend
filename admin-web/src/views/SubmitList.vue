@@ -196,8 +196,28 @@
             </div>
           </template>
         </el-table-column>
-        <!-- 投稿人 + 学号（协议版把「谁的投稿」压成两行，省一列宽度留给内容） -->
-        <el-table-column label="投稿人" width="150">
+        <!-- 首选时段（2026-09-27 新增 —— 学生提交时选的那一格）
+             ⚠️ 被调剂过（实排 ≠ 首选）时按陛下裁定的 B 方案表达：
+               · 首选那一行加删除线并压灰（明示"这个没用上"）
+               · 下一行用灰色箭头引出红色实排时段
+             ⚠️⚠️ 红色严格只落在**时间串本身** —— 箭头、任何前缀字都不上色，
+                 也没有红底红框（陛下原话：「切记仅仅是时间段用红色标记」）。
+             文稿不选时段 → 这一格恒为「—」。 -->
+        <el-table-column label="首选时段" width="150">
+          <template #default="{ row }">
+            <div class="slot-cell" v-if="Number(row.type) !== 2">
+              <span class="slot-want" :class="{ 'is-stale': slotMoved(row) }">
+                {{ shortSlot(row.wantBroadcastTime) || '未选时段' }}
+              </span>
+              <span v-if="slotMoved(row)" class="slot-real"><span class="slot-arw">→</span><b class="slot-t">{{ shortSlot(row.scheduledSlot) }}</b></span>
+            </div>
+            <span v-else class="slot-empty">—</span>
+          </template>
+        </el-table-column>
+        <!-- 投稿人 + 学号（协议版把「谁的投稿」压成两行，省一列宽度留给内容）
+             ⚠️ 表头与单元格一起居中（2026-09-27 陛下要求）——「审核人 / 时间」列同款处理，
+             两列结构一致（头像 + 两行小字），必须一起改，否则左右不对称。 -->
+        <el-table-column label="投稿人" width="150" align="center">
           <template #default="{ row }">
             <div class="user-cell">
               <span class="avatar-fallback">{{ (row.nickname || '?').charAt(0) }}</span>
@@ -211,8 +231,9 @@
         <el-table-column label="提交时间" width="118">
           <template #default="{ row }"><span class="c-time">{{ fmt(row.createTime).slice(5) }}</span></template>
         </el-table-column>
-        <!-- ⚠️ 审核人 ≠ 投稿人：投稿人在上一列，这里显示是谁审的、什么时候审的 -->
-        <el-table-column label="审核人 / 时间" width="142">
+        <!-- ⚠️ 审核人 ≠ 投稿人：投稿人在上一列，这里显示是谁审的、什么时候审的。
+             居中口径与「投稿人」列一致（2026-09-27 一起改）。 -->
+        <el-table-column label="审核人 / 时间" width="142" align="center">
           <template #default="{ row }">
             <span class="micro" v-if="row.status === 0">—</span>
             <div class="user-cell" v-else>
@@ -1580,6 +1601,26 @@ function badgeClass(kind) {
  * ⚠️ 「是否接受调剂」必须出现在每一行 —— 这是协议版新增的关键信息，
  *    不接受调剂的人只在首选时段空出来时才排得上，审核员看不到就会误判。
  */
+/** 「首选时段」列用的两个小工具（2026-09-27 新增）
+ *  slotMoved：这一行是否被调剂过 —— 判据是**实排时段 ≠ 首选时段**（两者都非空）。
+ *             文稿永远 false（不选时段）。
+ *  shortSlot：时段串去掉年份，省列宽。`2026-09-28 晚间 17:40` → `09-28 晚间 17:40`。
+ *             ⚠️ 不去年份的话整串 ≈125px，150 的列宽减掉单元格内边距只剩 126px 可用，
+ *             会正好卡在折行边缘（实测）。 */
+function slotMoved(row) {
+  if (Number(row.type) === 2) return false;
+  const w = row.wantBroadcastTime || '';
+  const s = row.scheduledSlot || '';
+  return !!(w && s && w !== s);
+}
+function shortSlot(s) {
+  const v = String(s || '');
+  return /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(5) : v;
+}
+
+/** 内容列第二行 —— 只说「内容列自己该说的话」。
+ *  ⚠️ 2026-09-27 起**时段整体搬到独立的「首选时段」列**（含调剂红色标记），
+ *  这里不再重复任何时段串，只留占位 / 候补位次 / 调剂意愿 / 驳回原因 / 播出标记。 */
 function rowNote(row) {
   if (Number(row.type) === 2) return esc(row.articleContent || '—');
 
@@ -1587,44 +1628,32 @@ function rowNote(row) {
   const want = row.wantBroadcastTime || '';
   const cell = cellOf(want);
   const occ = cell
-    ? ` · 该格已占 ${cell.scheduled ?? cell.seated ?? 0}/${cell.capacity || '不限'}`
+    ? `该格已占 ${cell.scheduled ?? cell.seated ?? 0}/${cell.capacity || '不限'}`
     : '';
   const resched = Number(row.allowReschedule) === 0
-    ? ' · <b class="is-red">不接受调剂</b>'
-    : ' · 接受调剂';
+    ? '<b class="is-red">不接受调剂</b>'
+    : '接受调剂';
+  /** 用 · 串起非空片段（空片段直接跳过，避免出现 "· · "） */
+  const line = (...xs) => xs.filter(Boolean).join(' · ');
 
-  if (st === ST.PENDING) {
-    return `首选 ${esc(want || '—')} · 不占位，等审核${resched}`;
-  }
-  if (st === ST.APPROVE_WAIT) {
-    return `首选 ${esc(want || '—')} · 审核已过、还没落座，执行排期时落座${occ}${resched}`;
-  }
+  if (st === ST.PENDING) return line('不占位，等审核', resched);
+  if (st === ST.APPROVE_WAIT) return line('审核已过、还没落座，执行排期时落座', occ, resched);
   if (st === ST.QUEUED) {
     const ahead = row.queueAhead != null ? row.queueAhead : Math.max((Number(row.queuePos) || 1) - 1, 0);
-    return `首选 ${esc(want || '—')}（已满）· 第 ${row.queuePos || '?'} 位，前面还有 <b>${ahead}</b> 人${resched}`;
+    return line(`首选已满 · 第 ${row.queuePos || '?'} 位，前面还有 <b>${ahead}</b> 人`, resched);
   }
-  if (st === ST.SCHEDULED) {
-    const moved = want && row.scheduledSlot && want !== row.scheduledSlot;
-    return moved
-      ? `排到 <b class="acc">${esc(row.scheduledSlot)}</b> <span class="arrow">←</span> 首选 <span class="strike">${esc(want)}</span>（系统调剂）${occ}`
-      : `排到 <b class="acc">${esc(row.scheduledSlot || want || '—')}</b>${occ}`;
-  }
+  if (st === ST.SCHEDULED) return line(occ, resched);
   if (st === ST.PLAYED) {
-    return `已播出 ${esc(row.scheduledSlot || want || '—')}${row.playedAt ? ` · ${fmt(row.playedAt)} 标记` : ''}`;
+    return line(row.playedAt ? `已播出 · ${fmt(row.playedAt)} 标记` : '已播出', occ, resched);
   }
   if (st === ST.REJECTED) {
     return row.autoRejected
       ? `系统未排上：${esc(row.rejectReason || '排期已锁定，没有可用位置')}`
       : `驳回：${esc(row.rejectReason || '—')}`;
   }
-  if (st === ST.CANCELLED) {
-    return '学生已撤销 / 放弃候补（行保留，只改状态）';
-  }
-  if (st === ST.PROMOTED) {
-    return `首选 <span class="strike">${esc(want || '—')}</span> <span class="arrow">→</span> 实际 <b class="acc">${esc(row.scheduledSlot || '—')}</b>（v2 遗留状态）`;
-  }
-  const slot = row.scheduledSlot || want;
-  return `${esc(slot || '未选时段')}${occ}`;
+  if (st === ST.CANCELLED) return '学生已撤销 / 放弃候补（行保留，只改状态）';
+  if (st === ST.PROMOTED) return line('v2 遗留状态 · 已从候补补位', occ);
+  return line(occ, resched) || '—';
 }
 /** 副行用 innerHTML 渲染（要画删除线/强调色），所有来源文本先转义 */
 function esc(s) {
@@ -2142,7 +2171,31 @@ onBeforeUnmount(() => {
 .rownote b { color: var(--ink-2); font-weight: 600; }
 .c-time { color: var(--ink-2); font-variant-numeric: tabular-nums; font-size: var(--fs-sm); }
 .c-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.user-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* ══════════ 首选时段（2026-09-27 新增）══════════
+   两行形态：首选在上（被调剂过则划掉 + 压灰）、调剂后的实排在下一行。
+   ⚠️ 红色只上在**时间串**（.slot-t）上 —— 箭头 .slot-arw 保持灰、没有红底红框，
+   这是陛下原话「切记仅仅是时间段用红色标记」的字面落实。
+   ⚠️ 字号取 fs-xs（11.5px）：`09-28 晚间 17:40` 实测 ≈111px，
+   150 的列宽减掉单元格左右内边距只剩 ≈126px 可用，用 fs-sm（12.5px，≈121px）会贴到折行边缘。 */
+.slot-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.slot-want {
+  font-size: var(--fs-xs); color: var(--ink-2);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+/* ⚠️ 划掉的首选压灰到 --muted（#7a7a7a）而不是 --soft（#c7c7cc）：
+   soft 在浅色表格底上对比度只有 ≈1.9:1，实测截图里几乎读不出来 ——
+   管理员还是得看清"他原本想播哪一格"，只是不该和红色实排抢眼。 */
+.slot-want.is-stale { color: var(--muted); text-decoration: line-through; }
+.slot-real {
+  display: flex; align-items: center; gap: 3px;
+  font-size: var(--fs-xs); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.slot-arw { color: var(--soft); }
+.slot-t { color: var(--red-fg); font-weight: 600; }
+.slot-empty { color: var(--soft); }
+/* ⚠️ justify-content:center ——「投稿人」与「审核人 / 时间」两列结构相同（头像 + 两行小字），
+   必须一起居中，只改一列会左右不对称（2026-09-27 陛下裁定"一起"）。 */
+.user-cell { display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; }
 .avatar-fallback {
   width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
   background: var(--canvas); border: 1px solid var(--hairline); color: var(--ink-2);
