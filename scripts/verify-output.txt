@@ -1,7 +1,7 @@
 === 通过 107 项 ===
   ok   周 key 形如 YYYY-Www  [2026-W39]
   ok   上限写入并读出  [{"daily":3,"weekly":5}]
-  ok   初始快照 daily 0/3  [{"limit":3,"used":0,"remaining":3,"exhausted":false,"periodKey":"2026-09-25"}]
+  ok   初始快照 daily 0/3  [{"limit":3,"used":0,"remaining":3,"exhausted":false,"periodKey":"2026-09-27"}]
   ok   前 3 次占位成功
   ok   第 4 次被拒（日名额已满）  [{"ok":false,"scope":"daily","limit":3,"used":3}]
   ok   日计数器 used=3  [3]
@@ -101,17 +101,17 @@
   ok   管理端已挂载 GET /submit/rules
   ok   管理端已挂载 PUT /submit/rules
   ok   管理端已挂载 DELETE /submit/songs
-  ok   DELETE /submit/songs 排在 /submit/:id 之前  [23<31]
+  ok   DELETE /submit/songs 排在 /submit/:id 之前  [24<32]
   ok   用户端 /submit/quota 排在 /submit/:id 之前  [6<12]
   ok   用户端 /submit/notice 排在 /submit/:id 之前  [9<12]
   ok   用户端 /submit/timeslots 排在 /submit/:id 之前  [11<12]
-  ok   管理端字面量路由排在 /submit/:id 之前  [5<24]
+  ok   管理端字面量路由排在 /submit/:id 之前  [5<25]
 
 sync ok（自动建表：submit / song_quota / notice_ack / system_setting …）
 
 --- A. 点歌名额 ---
-periodKey  day=2026-09-25  week=2026-W39
-dayRange   2026-09-24T16:00:00.000Z → 2026-09-25T16:00:00.000Z
+periodKey  day=2026-09-27  week=2026-W39
+dayRange   2026-09-26T16:00:00.000Z → 2026-09-27T16:00:00.000Z
 并发 10 次 claim（上限 2）→ 成功 2 异常 0 计数器 2
 
 --- B. 点歌注意事项 ---

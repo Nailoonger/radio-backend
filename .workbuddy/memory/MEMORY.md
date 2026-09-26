@@ -12,7 +12,8 @@
 ## 部署（服务器 `~/radio`）
 - `docker compose build <svc>` + `up -d --force-recreate <svc>`（restart 不换镜像）。admin-web 改 views：`docker compose build admin-web` → `up -d --force-recreate --no-deps admin-web`。
   （`admin-web/Dockerfile` 是**多阶段构建**，容器内自己 `npm ci + npm run build`，注释明写「不再依赖主机预构建」→ 服务器上**不需要**先跑 `npm run build`；本机 `npm run build` 只用于自检。）
-- **加表靠启动 `sync({alter:false})`**（只建缺失的表）；**加列 / 索引必须跑 `scripts/db-repair.js`**（幂等、只加不改不删）。`sql/schema.sql` 只在数据卷首次初始化时执行。
+- **加表靠启动 `sync({alter:false})`**（只建缺失的表）；**加列 / 索引必须跑 `scripts/db-repair.js`**（幂等、只加不改不删，按模型 `rawAttributes` 与 information_schema 比对，**通用**——新列写进模型即自动覆盖，不用改脚本）。`sql/schema.sql` 只在数据卷首次初始化时执行。
+  ℹ️ 2026-09-26 新增 `weekly_schedule.lock_paused` 属此列 → **上线前必须跑一次 db-repair**。
 - 固定顺序：备份 → build → `run --rm radio-backend node scripts/db-repair.js` → `up -d --force-recreate radio-backend` → 只跑幂等回填 UPDATE → `POST /api/admin/submit/queue/sweep`。
 - ⚠️ MySQL `ALTER TABLE ADD COLUMN` **不幂等**（重跑 1060 并中断后续语句）。
 - ⚠️ **关联一律显式 `constraints: false`**：Sequelize `hasMany`/`belongsTo` 默认建物理外键，类型不一致（`BIGINT UNSIGNED` vs `INTEGER`）→ `sync()` 抛 3780 中断 → 半建表 + 进程退出 + nginx 502。
@@ -30,6 +31,10 @@
 - 静态预览搬小程序样式：**rpx 折 px（1rpx=0.52px）**，折完别再套 scale；固定高手机框里 `vh` 换固定 px。
 - **改前端后先跑两个源码自检**（秒级，比截图便宜）：`node scripts/check-vue-bindings.js`（未声明的 `_ctx.` 引用 —— 构建不报错、运行时只渲染空白；默认清单＝SubmitList + SongSettings + StatusTag）、`node scripts/check-wxml-classes.js`。写自检脚本必须先故意注入错误确认它抓得到 —— ⚠️ 注入用例**必须写成文本插值**，静态属性 `data-x="{{ x }}"` 不参与编译＝等于没注入（踩过两次）。
 - admin-web 构建撞 `SAFE_DELETE_BULK_CONFIRM_REQUIRED`：`NODE_OPTIONS` 里挂着 `node-language-shim.cjs`，**`fs.rmSync` 会被 safe-delete 垫片拦**。解法＝清掉垫片再删再 build：`NODE_OPTIONS="" node -e "require('fs').rmSync('admin-web/dist',{recursive:true,force:true})"`，build 也用 `NODE_OPTIONS=""` 跑。
+- ⚠️ **深色卡里的尾部提示会被 flex-shrink 压扁折行**（SubmitList `.tile-act-hint`）：弹窗里那处被压到
+  **w=62px → 折 3 行**（h=48，正常单行 h=16）。改文案没用（62px 什么都折），要改布局：
+  `.tile-actions { flex-wrap: wrap; row-gap: 8px }` + `.tile-act-hint { flex: none }`。
+  **判据用量不用看**：`getBoundingClientRect().height`，单行 ~16px。同一类在窄容器里必折 —— 新加提示先量。
 - 截图验证配方见 skill `web-ui-screenshot-verify`（agent-browser：stdio 用文件 fd 不能管道、`set viewport` 在 `open` 前、一次会话 ≤3 张、首张热身丢弃）。
 - 不开 Docker 的整链路验证：`DB_STORAGE=./data/_shot.db` + `npm run db:init` + seed + `node src/app.js`；admin-web vite dev（URL 是 `/student` 非 `/#/student`）；`localStorage` 存 `admin_token` + `admin_info`(role:0)。
 - jest 基线：56 条里 15 条失败全是已删 member 模块的（member.test 14 + switch.test 1），别当新回归。
@@ -45,7 +50,10 @@
 - 容器 UTC、MySQL 北京时间；按天/周逻辑禁裸 `dayjs()`，统一 `src/utils/bjTime.js`。
 - 路由顺序：字面量段（`/submit/quota`）在参数路由（`/submit/:id`）之前。
 - ⚠️ `toast.push({icon:X})` 的图标必须确认已 import（漏导入会炸成功路径，被当成"操作失败"）。
-- 验证脚本（SQLite 内存库，改相关代码先跑）：`verify-song-protocol.js`(**161 项**)、`verify-song-submit.js`(107)、`verify-student-account.js`(174)。`verify-song-queue.js` 已作废。
+- 验证脚本（SQLite 内存库，改相关代码先跑）：`verify-song-protocol.js`(**187 项**)、`verify-song-submit.js`(107)、`verify-student-account.js`(174)。`verify-song-queue.js` 已作废。
+- **三维状态保持数字**（陛下 2026-09-26 裁决，不改字符串）：接口同时下发数字 + 名字
+  （`reviewStatus` + `reviewStatusName` 等，见 `songStatusService.statusView()`）。
+  ⚠️ 唯一约束：**数字 ↔ 常量名只允许在 `songStatusService` 有一处定义，别在别处写裸数字**。
 - **新开关不进 seed.js**（switch.test 断言恰好 4 条）：走 `switchService.KNOWN_SWITCHES` + 管理端补默认行；缺行视为 on。
 - `/admin/submit/list` 排序＝**先提交先审**：`create_time ASC, id ASC`（id 兜同秒，防分页重复/漏）。
 
@@ -54,7 +62,12 @@
 - **⛔ 收歌截止前 `reschedule` 只做原位递补、绝不跨时段**：判据 `canCrossSlot()` = `now >= applicationEndAt`；`crossSlot` 默认 `null` 自动判断，只有 `lockWeek()` 与超管手动「执行排期」传 `true`。
 - 选址＝成本表（`songRescheduleCost.js`）：同天其他时段 10 / 前后一天同时段 20 / 前后一天其他时段 30 / 更远 50 / 跨周 ∞；同 cost 按下标升序。
 - 占位口径唯一化：`review=APPROVED AND schedule=APPROVED`（驳回自动释放）。`status` 是**派生镜像**（5 已播放 / 6 已通过待排期 / 7 已取消），改状态一律走 `songStatusService.applyChange()`；它是带条件 UPDATE，影响 0 行 = 没抢到 → 返回**空 `logs`**，调用方用 `if (r.logs.length)` 判断。
-- **权限**：普通管理员只能看 / 通过 / 驳回 / 看候补；排期、锁定、人工调整（指派/改时段/标记播放/撤销）、时段容量/规则配置、改窗口**仅超管**。前端显隐已落地，**两套口径别统一**：列表页（SubmitList）写操作**隐藏** + 只读虚线块；设置页（SongSettings）4 个保存按钮**置灰**。`unlock` 接口未做。
+- **权限**：普通管理员只能看 / 通过 / 驳回 / 看候补；排期、锁定、**解锁**、人工调整（指派/改时段/标记播放/撤销）、时段容量/规则配置、改窗口**仅超管**。前端显隐已落地，**两套口径别统一**：列表页（SubmitList）写操作**隐藏** + 只读虚线块；设置页（SongSettings）4 个保存按钮**置灰**。
+- **解锁（`POST /submit/schedule/unlock`，仅超管，2026-09-26）**：①周退回 `SCHEDULING` + 清 `locked_at`
+  ②锁定时被系统自动驳回的候补退回 `WAITING`（只动仍原封不动的；`restore:false` 可跳过）
+  ③**`lock_paused = 1`（新增列）** —— ⚠️ 不能省：`sweep()` 只按 `now >= schedule_lock_at` 自动锁，
+  解锁必然发生在锁定时刻之后，不拦住下一轮 sweep 立刻锁回去＝解锁白做。
+  恢复自动锁定只能**手动重新锁定**（`lockWeek()` 清 0）。解锁不动锚点（`SCHEDULING` 冻结）。
 - **时间窗口（2026-09-25 改版）**：星期**任选 周一→周日**，最长可铺满整周（旧「五/六/日 + 72h」白名单废除）。
   ⚠️⚠️ 锚点＝**收歌周的周一 00:00**（= 播出周 − 7 天），`offMon(d) = (d===0?7:d)-1`。
   **旧 `offBack(d)=(1-d+7)%7` 对 `周一` 给 0 → 窗口落到播出周本身 → `nextWeekRange(now)` 跳周**；

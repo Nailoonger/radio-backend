@@ -301,6 +301,10 @@ function weekView(week, now = Date.now()) {
     secondsToLock: lock ? Math.max(0, Math.round((lock - now) / 1000)) : null,
     canApply: week.status === WEEK_STATUS.APPLICATION,
     locked: week.status === WEEK_STATUS.LOCKED,
+    /** 已解锁 → 自动锁定暂停中（`sweep()` 不会把它锁回去），只有超管手动锁能恢复 */
+    lockPaused: Number(week.lockPaused) === 1,
+    /** 能不能解锁：只有真正锁定中的周才有意义 */
+    unlockable: week.status === WEEK_STATUS.LOCKED,
   };
 }
 
@@ -606,9 +610,69 @@ async function lockWeek(weekStartMs, { now = Date.now(), operatorId = null, forc
     if (r.logs.length) rejected += 1;
   }
 
-  await week.update({ status: WEEK_STATUS.LOCKED, lockedAt: new Date(now) });
+  await week.update({ status: WEEK_STATUS.LOCKED, lockedAt: new Date(now), lockPaused: 0 });
   logger.info(`[songSchedule] 周 ${week.weekStartDate} 已锁定：最后调度 ${alloc.promoted + alloc.rescheduled} 条，无位自动驳回 ${rejected} 条`);
   return { ...weekView(await WeeklySchedule.findByPk(week.id), now), already: false, rejected, lastAlloc: alloc };
+}
+
+/**
+ * 解锁（撤销锁定）—— 超管专用，给「锁错了 / 锁完发现还要改」兜底。
+ *
+ * 做三件事：
+ *   ① 周退回 `SCHEDULING`（可继续人工调整、可重跑排期）；
+ *   ② **恢复本次锁定时被系统自动驳回的候补** —— 退回 `WAITING`，清掉 `reject_reason`
+ *      与 `auto_rejected` 标记。只恢复「当时是系统驳回、且现在仍原封不动」的那些
+ *      （`schedule_status` 还是 AUTO_REJECTED），管理员后来手动动过的一概不碰。
+ *      不想恢复就传 `restore: false`（此时这些人会永久停在已驳回，慎用）。
+ *   ③ `lock_paused = 1` —— ⚠️ 这一步不能省：`sweep()` 的自动锁定只看
+ *      `now >= schedule_lock_at`，而解锁发生在锁定时刻之后，不拦住的话
+ *      下一轮 sweep（定时器/手动）会立刻把它锁回去，解锁等于没做。
+ *      恢复自动锁定只能靠超管**手动**重新锁定（`lockWeek` 里会清 0）。
+ *
+ * ⚠️ 锚点不动：解锁后状态是 SCHEDULING，而 SCHEDULING 属于 `ANCHOR_FROZEN_STATUS`，
+ * `refreshAnchors()` 不会拿新配置覆盖它 —— 这一周的调度依据必须保持原样。
+ */
+async function unlockWeek(weekStartMs, { now = Date.now(), operatorId = null, restore = true } = {}) {
+  const week = await ensureWeek(weekStartMs, { now });
+  if (week.status !== WEEK_STATUS.LOCKED) {
+    throw Object.assign(new Error('这一周没有锁定，无需解锁'), { code: 40001 });
+  }
+
+  // ② 恢复被自动驳回的候补
+  let restored = 0;
+  if (restore) {
+    const values = await slotValuesOfWeek(weekStartMs);
+    const rows = await Submit.findAll({
+      where: {
+        type: 1,
+        reviewStatus: S.REVIEW.APPROVED,
+        scheduleStatus: S.SCHEDULE.AUTO_REJECTED,
+        autoRejected: 1,
+        rejectReason: S.SYSTEM_REASON.lockedNoSlot,
+        [Op.or]: [
+          { wantBroadcastTime: { [Op.in]: values } },
+          { scheduledSlot: { [Op.in]: values } },
+        ],
+      },
+    });
+    for (const row of rows) {
+      const r = await S.applyChange(row, {
+        scheduleStatus: S.SCHEDULE.WAITING,
+        rejectReason: null,
+        autoRejected: 0,
+      }, { operatorId, reason: 'WEEK_UNLOCKED_RESTORE_WAITING' });
+      if (r.logs.length) restored += 1;
+    }
+  }
+
+  await week.update({ status: WEEK_STATUS.SCHEDULING, lockedAt: null, lockPaused: 1 });
+  logger.info(`[songSchedule] 周 ${week.weekStartDate} 已解锁：恢复候补 ${restored} 条，自动锁定暂停`);
+  return {
+    ...weekView(await WeeklySchedule.findByPk(week.id), now),
+    already: false,
+    restored,
+    lockPaused: true,
+  };
 }
 
 /** 取消某一周的排期（管理员操作，未开始播出的周） */
@@ -733,6 +797,16 @@ async function sweep({ now = Date.now(), operatorId = null } = {}) {
       entry.skipped = 'CANCELLED';
     } else if (week.status === WEEK_STATUS.LOCKED) {
       entry.skipped = 'LOCKED';
+    } else if (lockAt && now >= lockAt && Number(week.lockPaused) === 1) {
+      // ⚠️ 已解锁的周：到点了也**不自动锁**，否则解锁后一眨眼又锁回去。
+      // 仍然跑一遍排期（空位照补），只是不再走「锁定 + 自动驳回」那一步。
+      entry.lockPaused = true;
+      const a = await initialAllocate(wsMs, { now, operatorId });
+      const b = await reschedule(wsMs, { now, operatorId });
+      entry.assigned = a.assigned;
+      entry.waiting = a.waiting;
+      entry.promoted = b.promoted;
+      entry.rescheduled = b.rescheduled;
     } else if (lockAt && now >= lockAt) {
       const r = await lockWeek(wsMs, { now, operatorId });
       entry.locked = !r.already;
@@ -852,6 +926,7 @@ module.exports = {
   runAllocators,
   afterRelease,
   lockWeek,
+  unlockWeek,
   cancelWeek,
   markPlayed,
   setPlayed,

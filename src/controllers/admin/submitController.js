@@ -819,6 +819,34 @@ exports.lock = async (req, res, next) => {
   }
 };
 
+/**
+ * 解锁（撤销锁定，协议 §18 的反向操作）—— 仅超管。
+ *
+ * 用途：锁定之后才发现还要改（自动驳回错人了、漏排了、时段容量要调），
+ * 原来只能去库里改 `weekly_schedule.status`，现在有正门了。
+ *
+ * body: { weekStart?, restore? }
+ *   restore 省略/true = 把本次锁定时被系统自动驳回的候补退回「候补中」；
+ *   显式传 false = 不解冻那批人（他们会永久停在已驳回，慎用）。
+ */
+exports.unlock = async (req, res, next) => {
+  try {
+    const now = Date.now();
+    const body = req.body || {};
+    const ms = body.weekStart
+      ? new Date(`${body.weekStart}T00:00:00+08:00`).getTime()
+      : await targetWeekMs(now);
+    const restore = body.restore === undefined || body.restore === null ? true : !!body.restore;
+    const r = await sched.unlockWeek(ms, { now, operatorId: req.admin.id, restore });
+    const tail = r.restored
+      ? `，锁定时被自动驳回的 ${r.restored} 条已退回候补`
+      : '';
+    return success(res, r, `已解锁${tail}；自动锁定已暂停，确认无误后请手动「锁定本周」`);
+  } catch (e) {
+    return next(e);
+  }
+};
+
 /** 人工指定时段（协议 §20） */
 exports.assign = async (req, res, next) => {
   try {

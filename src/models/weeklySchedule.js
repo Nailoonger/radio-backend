@@ -74,6 +74,19 @@ module.exports = (sequelize, DataTypes) => {
         field: 'locked_at',
         comment: '实际锁定时刻（手动提前锁会与 schedule_lock_at 不同）',
       },
+      /**
+       * ⚠️ 解锁必须「记住」自己解过锁，否则毫无意义：
+       * `sweep()` 的自动锁定只看 `now >= schedule_lock_at`，
+       * 解锁后那一刻早已过锁定时刻 → 下一轮 sweep 立刻又锁回去。
+       * 置 1 = 本周暂停自动锁定，只能由超管**手动**重新锁（锁成功即清 0）。
+       */
+      lockPaused: {
+        type: DataTypes.TINYINT,
+        allowNull: false,
+        defaultValue: 0,
+        field: 'lock_paused',
+        comment: '1 = 已解锁，暂停本周自动锁定（手动重新锁定会清 0）',
+      },
       createdBy: {
         type: DataTypes.INTEGER,
         allowNull: true,

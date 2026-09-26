@@ -116,6 +116,37 @@ DRAFT ──发布──> APPLICATION ──申请截止──> REVIEW ──已
   不再被配置改动改写 —— 那时锚点已被用作调度依据。
   没有这条会出现「学生已经能按新窗口提交了，但这一周的锁定时刻还是旧的」这种自相矛盾的状态。
 
+### 2.1 解锁（撤销锁定，2026-09-26）
+
+`LOCKED` **不是单向的**：超管可以 `POST /admin/submit/schedule/unlock` 撤销锁定
+（原来只能去库里改 `weekly_schedule.status`，现在有正门）。
+
+做三件事：
+
+| # | 动作 | 为什么 |
+|---|---|---|
+| ① | 周状态退回 `SCHEDULING`，`locked_at` 清空 | 可继续人工调整、重跑排期 |
+| ② | 本次锁定时被**系统自动驳回**的候补退回 `WAITING`（清 `reject_reason` / `auto_rejected`） | 「锁错了」通常就是这批人。只恢复 `schedule_status` 仍是 `AUTO_REJECTED` 且 `review_status=APPROVED` 的；管理员后来手动动过的一概不碰。传 `restore: false` 可不恢复（那批人会永久停在已驳回） |
+| ③ | `lock_paused = 1` | ⚠️ **这一步不能省** |
+
+⚠️ 为什么必须有 ③：`sweep()` 的自动锁定判据只有 `now >= schedule_lock_at`，而解锁**必然发生在锁定时刻之后**
+—— 不拦住的话下一轮 sweep（定时器或手动兜底）会立刻把它锁回去，解锁等于没做。
+`lock_paused = 1` 的周在 sweep 里**跳过锁定分支**（仍然跑排期补空位，只是不再自动驳回 + 置 `LOCKED`）。
+恢复自动锁定的唯一途径是超管**手动**重新锁定（`lockWeek()` 会把 `lock_paused` 清 0）。
+
+解锁**不动时间锚点**：退回后的状态是 `SCHEDULING`，属于 `ANCHOR_FROZEN_STATUS`，
+`refreshAnchors()` 不会拿新配置覆盖它 —— 这一周的调度依据保持原样。
+
+前/后对比：
+
+```
+锁定前 → 锁定（sweep 自动 / 超管手动 force） → LOCKED，剩余候补 AUTO_REJECTED
+                                                 ↓ 超管「解锁本周」
+        SCHEDULING + lock_paused=1（自动锁定暂停）+ 那批候补退回 WAITING
+                                                 ↓ 改格子 / 重跑排期 / 人工指派
+        确认无误 → 手动「锁定本周」 → LOCKED，lock_paused 清 0（自动锁定恢复）
+```
+
 ---
 
 ## 3. 完整流程与算法
@@ -273,6 +304,7 @@ curl -X POST http://<host>/api/admin/submit/queue/sweep -H "Authorization: Beare
 | `GET /submit/week` 🆕 | 目标周的排期状态、时间锚点、已占 / 剩余 |
 | `POST /submit/schedule/run` 🆕 | 执行第一轮排期 + 全局调剂（协议 §16/§17） |
 | `POST /submit/schedule/lock` 🆕 | 正式锁定（协议 §18）；`force: true` 提前锁 |
+| `POST /submit/schedule/unlock` 🆕 | **解锁（撤销锁定）**：退回 `SCHEDULING` + 恢复锁定时被自动驳回的候补 + `lock_paused=1` 暂停自动锁定；`restore: false` 可只解状态不解冻候补。**仅超管** |
 | `POST /submit/:id/assign` 🆕 | 人工指定时段（协议 §20），写 `MANUAL` 日志 |
 | `PUT /submit/:id/played` 🆕 | 标记已播放 / 取消 |
 | `GET /submit/:id/status-logs` 🆕 | 状态变更历史 |
@@ -284,11 +316,13 @@ curl -X POST http://<host>/api/admin/submit/queue/sweep -H "Authorization: Beare
 
 ## 7. 验证
 
-`node scripts/verify-song-protocol.js` → **86 项全过**（结果同时写 `scripts/verify-song-protocol-output.txt`）。
+`node scripts/verify-song-protocol.js` → **187 项全过**（结果同时写 `scripts/verify-song-protocol-output.txt`）。
 
 覆盖：模型与索引 / 周懒创建与时间锚点 / 周状态推进与锁定不可逆 /
 提交不判容量 / 第一轮排期（按提交时间取前 capacity）/ 原位递补 / 全局调剂 /
-调剂三级优先级 / 锁定与 AUTO_REJECTED / 播放标记 / 人工调整 / 两类日志 /
+调剂三级优先级 / 锁定与 AUTO_REJECTED / **解锁（退状态 + 恢复候补 + 暂停自动锁定 + 手动重锁可恢复）** /
+播放标记 / 人工调整 / 两类日志 / 权限守卫（写排期类接口仅超管）/
+点歌窗口（周内任选 + 审核截止独立 + 锚点跟随配置刷新）/
 镜像不变量（库内每行的 status 都与三维一致）/ 三条保留规则 / 兜底 sweep。
 
 回归：`npx jest` 15 失败 —— 全部是早已删除的「风采 / member」模块（基线值），点歌相关 41 项全过。

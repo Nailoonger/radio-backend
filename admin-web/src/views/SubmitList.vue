@@ -15,10 +15,12 @@
             播出周 {{ weekRangeText }}
             · {{ week.statusText || '—' }}<template v-if="week.status">（{{ week.status }}）</template>
             <template v-if="week.locked"> · 已锁定，排期只读</template>
+            <template v-else-if="week.lockPaused"> · 已解锁，<b>自动锁定已暂停</b></template>
           </span>
         </div>
         <div class="tile-cd">
           <template v-if="week.locked">本周排期已锁定</template>
+          <template v-else-if="week.lockPaused">已解锁 · 自动锁定已暂停</template>
           <template v-else-if="lockMs === null">锁定时刻未定</template>
           <template v-else>距排期锁定 {{ fmtDur(lockMs) }}</template>
         </div>
@@ -41,11 +43,19 @@
           >模拟排期</el-button>
           <span class="tile-sep" />
           <el-button
+            v-if="!weekLocked"
             class="tile-btn tile-btn--ghost" size="small"
-            :loading="locking" :disabled="weekLocked"
+            :loading="locking"
             @click="lockWeek"
           >锁定本周</el-button>
-          <span class="tile-act-hint">{{ weekLocked ? '已锁定 · 进入查看日志' : '模拟排期只算不写库' }}</span>
+          <el-button
+            v-else
+            class="tile-btn tile-btn--ghost" size="small"
+            :loading="unlocking"
+            @click="unlockWeek"
+          >解锁本周</el-button>
+          <span class="tile-act-hint">{{ weekLocked ? '已锁定 · 解锁后才能改'
+            : (week.lockPaused ? '已解锁 · 改完请手动锁' : '模拟排期只算不写库') }}</span>
         </div>
         <div class="tile-readonly" v-else>
           <i class="t-dot2 idle" />
@@ -690,6 +700,7 @@
           <div class="micro">距排期锁定</div>
           <div class="wkcd-v num">
             <template v-if="week.locked">已锁定</template>
+            <template v-else-if="week.lockPaused">已解锁</template>
             <template v-else-if="lockMs === null">—</template>
             <template v-else>{{ fmtDur(lockMs) }}</template>
           </div>
@@ -714,8 +725,16 @@
             <el-button class="tile-btn tile-btn--primary" size="small" :loading="running" :disabled="weekLocked" @click="runSchedule">执行排期</el-button>
             <el-button class="tile-btn tile-btn--ghost" size="small" :disabled="weekLocked" @click="openPreview">模拟排期</el-button>
             <span class="tile-sep" />
-            <el-button class="tile-btn tile-btn--ghost" size="small" :loading="locking" :disabled="weekLocked" @click="lockWeek">锁定本周</el-button>
-            <span class="tile-act-hint">模拟排期只算不写库</span>
+            <el-button
+              v-if="!weekLocked"
+              class="tile-btn tile-btn--ghost" size="small" :loading="locking" @click="lockWeek"
+            >锁定本周</el-button>
+            <el-button
+              v-else
+              class="tile-btn tile-btn--ghost" size="small" :loading="unlocking" @click="unlockWeek"
+            >解锁本周</el-button>
+            <span class="tile-act-hint">{{ weekLocked ? '已锁定 · 解锁后才能改'
+              : (week.lockPaused ? '已解锁 · 改完请手动锁' : '模拟排期只算不写库') }}</span>
           </div>
           <div class="tile-readonly" v-else>
             <i class="t-dot2 idle" />
@@ -1124,6 +1143,7 @@ const scheduleVisible = ref(false);
 const week = ref({});
 const running = ref(false);   // 执行排期 in-flight
 const locking = ref(false);   // 锁定本周 in-flight
+const unlocking = ref(false); // 解锁本周 in-flight
 
 const lockMs = computed(() => {
   const iso = week.value.scheduleLockAt;
@@ -1281,6 +1301,37 @@ async function lockWeek() {
       await refreshAll();
     }
   } finally { locking.value = false; }
+}
+
+/**
+ * 解锁本周（撤销锁定）—— 超管专用，给「锁错了 / 锁完发现还要改」兜底。
+ *
+ * 服务端做三件事：退回 SCHEDULING、把锁定时被系统自动驳回的候补退回「候补中」、
+ * **暂停本周的自动锁定**（否则下一轮 sweep 会立刻按 schedule_lock_at 把它锁回去，
+ * 解锁就等于没做）。所以恢复自动锁定的唯一办法是重新点一次「锁定本周」。
+ */
+async function unlockWeek() {
+  try {
+    await ElMessageBox.confirm(
+      '解锁后这一周退回「排期已定稿」，可以继续改格子、重跑排期。\n'
+      + '锁定时被系统自动驳回的候补会退回「候补中」。\n'
+      + '⚠️ 本周的自动锁定会被暂停 —— 改完请手动点「锁定本周」，否则它不会自己锁。',
+      '解锁本周排期',
+      { type: 'warning', confirmButtonText: '确认解锁' },
+    );
+  } catch { return; }
+
+  unlocking.value = true;
+  try {
+    const r = await http.post('/admin/submit/schedule/unlock', {});
+    ElMessage.success(
+      r?.restored
+        ? `已解锁，锁定时被自动驳回的 ${r.restored} 条已退回候补`
+        : '已解锁（自动锁定已暂停）',
+    );
+    await refreshAll();
+  } catch { /* 拦截器已提示 */ }
+  finally { unlocking.value = false; }
 }
 
 /* ══════════ 人工指派（协议版新增：排到哪交给了系统，所以必须留手动兜底） ══════════ */
@@ -2320,8 +2371,11 @@ onBeforeUnmount(() => {
 
 /* ══════════ 协议版：深色 tile 里的强调文字与动作组 ══════════ */
 .tile-strong { color: #fff; font-weight: 600; }
-.tile-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
-.tile-act-hint { font-size: var(--fs-xs); color: rgba(255, 255, 255, 0.42); letter-spacing: var(--ls-wide-sm); }
+/* ⚠️ flex-wrap 必须有：弹窗里的 sched-tile 被 4 个指标列挤窄，动作行放不下时
+   尾部提示会被 flex-shrink 压成 ~60px 宽 → 折成 3 行（实测 h=48 而非 16）。
+   允许换行 + flex:none 后，提示会整条掉到第二行，保持单行。 */
+.tile-actions { display: flex; align-items: center; gap: 8px; row-gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.tile-act-hint { flex: none; font-size: var(--fs-xs); color: rgba(255, 255, 255, 0.42); letter-spacing: var(--ls-wide-sm); }
 /* 深色底上的按钮：element-plus 默认白底深字，在深色卡里会糊掉，整组覆盖。
    强调色仍只有一个（--accent / --accent-dark），不用渐变、不用彩色投影。 */
 .tile-btn { border-radius: var(--r-pill) !important; height: 30px; padding: 0 14px; font-size: var(--fs-sm) !important; }

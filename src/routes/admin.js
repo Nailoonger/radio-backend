@@ -332,6 +332,9 @@ router.post('/submit/schedule/preview', adminAuth, requireSuperAdmin, submit.pre
 router.post('/submit/schedule/run', adminAuth, requireSuperAdmin, submit.runSchedule);
 /** 正式锁定：最后调度 + 无位自动驳回（协议 §18）；body.force 可提前锁 —— 仅超管 */
 router.post('/submit/schedule/lock', adminAuth, requireSuperAdmin, submit.lock);
+/** 解锁（撤销锁定）：退回 SCHEDULING + 恢复锁定时被自动驳回的候补 + 暂停自动锁定 —— 仅超管
+ *  ⚠️ 必须挂在 `/submit/:id` 之前的字面量段 */
+router.post('/submit/schedule/unlock', adminAuth, requireSuperAdmin, submit.unlock);
 
 /**
  * @swagger

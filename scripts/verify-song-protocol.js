@@ -20,6 +20,10 @@
  *   K. 日志：request_status_log / assignment_log 都留了痕
  *   L. 不变量：镜像 status 与三维永远一致
  *   M. 保留规则：窗口 / 每人每周次数 / 同曲去重仍然生效
+ *   N. 兜底 sweep（排期 + 锁定 + 播放标记）
+ *   O. 路由挂载与顺序   P. 权限守卫（写排期类接口仅超管）
+ *   Q. 点歌窗口：周内任选 + 审核截止独立 + 锚点跟随配置刷新（2026-09-25）
+ *   R. 解锁：退状态 + 恢复候补 + 暂停自动锁定 + 手动重锁可恢复（2026-09-26）
  *
  * 结果同时写到 stdout 与同目录的 verify-song-protocol-output.txt。
  */
@@ -514,6 +518,7 @@ const DAY = 24 * 60 * 60 * 1000;
 
     const wantAdmin = [
       'POST /submit/schedule/preview', 'POST /submit/schedule/run', 'POST /submit/schedule/lock',
+      'POST /submit/schedule/unlock',
       'GET /submit/week',
       'POST /submit/:id/assign', 'PUT /submit/:id/played', 'GET /submit/:id/status-logs',
     ];
@@ -532,6 +537,8 @@ const DAY = 24 * 60 * 60 * 1000;
       literalBefore(adminRoutes, 'GET /submit/week', 'GET /submit/:id'));
     check('POST /submit/schedule/run 排在 POST /submit/:id/assign 之前',
       literalBefore(adminRoutes, 'POST /submit/schedule/run', 'POST /submit/:id/assign'));
+    check('POST /submit/schedule/unlock 排在 POST /submit/:id/assign 之前',
+      literalBefore(adminRoutes, 'POST /submit/schedule/unlock', 'POST /submit/:id/assign'));
     check('GET /submit/window 排在 GET /submit/:id 之前（用户端）',
       literalBefore(userRoutes, 'GET /submit/window', 'GET /submit/:id'));
 
@@ -541,6 +548,7 @@ const DAY = 24 * 60 * 60 * 1000;
     const mustSuper = [
       'PUT /submit/quota', 'PUT /submit/slots', 'PUT /submit/rules', 'PUT /submit/window',
       'POST /submit/schedule/preview', 'POST /submit/schedule/run', 'POST /submit/schedule/lock',
+      'POST /submit/schedule/unlock',
       'POST /submit/:id/assign', 'PUT /submit/:id/played', 'PUT /submit/:id/revoke',
       'DELETE /submit/songs',
     ];
@@ -726,6 +734,93 @@ const DAY = 24 * 60 * 60 * 1000;
       && +new Date(frozenWeek.applicationEndAt) === reRng.end.getTime()
       && +new Date(frozenWeek.scheduleLockAt) === reRng.reviewAt.getTime(),
       `${frozenWeek.status} / ${fmt(+new Date(frozenWeek.applicationEndAt))}`);
+
+    await win.setConfig(win.DEFAULT_WINDOW, null);
+
+    /* ══════════ R. 解锁（撤销锁定）2026-09-26 ══════════ */
+    say('');
+    say('--- R. 解锁（撤销锁定）---');
+    await Submit.destroy({ where: {} });          // 本节只用自己造的用例
+    const uwMs = weekStart + 28 * DAY;            // 全新一周，不被前面的锁定状态影响
+    const UV = await sched.slotValuesOfWeek(uwMs);
+    const uwDate = bj.ymd(bj.shifted(uwMs));
+    const uwWeek0 = await sched.ensureWeek(uwMs, { now });
+    check('新周 lockPaused 默认 0（自动锁定正常）', Number(uwWeek0.lockPaused) === 0, uwWeek0.lockPaused);
+    check('新周 weekView.unlockable = false（没锁就没什么可解）',
+      sched.weekView(uwWeek0, now).unlockable === false);
+
+    // 一格占住（capacity=1）+ 一个排不上的候补
+    // ⚠️ 候补必须 allow_reschedule=0：否则锁定时的「跨时段调剂」会把他塞进别的空格，
+    //    他就不会被自动驳回了（这里要的是「真的排不上」）。
+    const uwT = (d) => uwMs + d * DAY + 3600000;   // 本节时间线一律落在该周锁定时刻之后
+    const seatR = await mkSeated(UV[0], { song: '解锁后仍落座', minutesAgo: 120 });
+    const candR = await mk(UV[0], { song: '候补甲', minutesAgo: 60, allowReschedule: 0 });
+    await candR.update({
+      reviewStatus: S.REVIEW.APPROVED,
+      scheduleStatus: S.SCHEDULE.WAITING,
+      status: S.deriveStatus(S.REVIEW.APPROVED, S.SCHEDULE.WAITING, S.PLAY.NOT_PLAYED),
+    });
+
+    // ① 未锁定 → 拒绝
+    let uwErr = null;
+    try { await sched.unlockWeek(uwMs, { now, operatorId: 1 }); } catch (e) { uwErr = e; }
+    check('未锁定的周解锁被拒（40001）', !!uwErr && uwErr.code === 40001, uwErr && uwErr.message);
+
+    // ② 锁定
+    const rLockR = await sched.lockWeek(uwMs, { now: uwT(1), operatorId: 1, force: true });
+    check('锁定成功', rLockR.status === 'LOCKED', rLockR.status);
+    check('锁定成功时 lockPaused 归 0（自动锁定生效）',
+      Number((await WeeklySchedule.findByPk(uwWeek0.id)).lockPaused) === 0);
+    check('锁定时排不上的候补被自动驳回',
+      Number((await Submit.findByPk(candR.id)).scheduleStatus) === S.SCHEDULE.AUTO_REJECTED,
+      S.scheduleName((await Submit.findByPk(candR.id)).scheduleStatus));
+
+    // ③ 解锁：退状态 + 恢复候补 + 暂停自动锁定
+    const rUnlock = await sched.unlockWeek(uwMs, { now: uwT(2), operatorId: 1 });
+    check('解锁后周状态退回 SCHEDULING', rUnlock.status === 'SCHEDULING', rUnlock.status);
+    check('解锁后 lockedAt 清空', rUnlock.lockedAt === null, rUnlock.lockedAt);
+    check('解锁后 lockPaused = 1（暂停自动锁定）', rUnlock.lockPaused === true);
+    check('解锁后 weekView.unlockable = false', rUnlock.unlockable === false);
+    check('解锁时报告恢复了 1 条候补', rUnlock.restored === 1, rUnlock.restored);
+    const candR2 = await Submit.findByPk(candR.id);
+    check('被自动驳回的候补退回「候补中」',
+      Number(candR2.scheduleStatus) === S.SCHEDULE.WAITING, S.scheduleName(candR2.scheduleStatus));
+    check('恢复候补清掉了驳回理由', candR2.rejectReason === null, candR2.rejectReason);
+    check('恢复候补清掉了 auto_rejected 标记', Number(candR2.autoRejected) === 0, candR2.autoRejected);
+    check('恢复候补的镜像 status 回到「候补中」', Number(candR2.status) === S.ST.QUEUED, candR2.status);
+    check('已落座的不受解锁影响（位子还在）',
+      Number((await Submit.findByPk(seatR.id)).scheduleStatus) === S.SCHEDULE.APPROVED
+      && (await Submit.findByPk(seatR.id)).scheduledSlot === UV[0]);
+
+    // ④ 解锁的核心价值：到点了 sweep 也不会把它锁回去
+    const sweepR = await sched.sweep({ now: uwT(3), operatorId: 1 });
+    const uwEntry = sweepR.weeks.find((w) => w.weekStartDate === uwDate) || {};
+    check('sweep 不再自动锁回已解锁的周（lockPaused 生效）',
+      uwEntry.lockPaused === true && !uwEntry.locked && uwEntry.skipped !== 'LOCKED',
+      JSON.stringify(uwEntry));
+    check('sweep 之后周仍是 SCHEDULING',
+      (await sched.ensureWeek(uwMs, { now: uwT(3) })).status === 'SCHEDULING');
+
+    // ⑤ 手动重新锁定 → 自动锁定恢复
+    const rRelock = await sched.lockWeek(uwMs, { now: uwT(4), operatorId: 1, force: true });
+    check('解锁后仍可手动重新锁定', rRelock.status === 'LOCKED', rRelock.status);
+    check('重新锁定后 lockPaused 清 0（自动锁定恢复）',
+      Number((await WeeklySchedule.findByPk(uwWeek0.id)).lockPaused) === 0);
+
+    // ⑥ restore:false = 不解冻那批人（他们会永久停在已驳回）
+    const rUnlock2 = await sched.unlockWeek(uwMs, { now: uwT(5), operatorId: 1, restore: false });
+    check('restore:false 时不恢复候补', rUnlock2.restored === 0, rUnlock2.restored);
+    check('restore:false 时候补仍停在已驳回',
+      Number((await Submit.findByPk(candR.id)).scheduleStatus) === S.SCHEDULE.AUTO_REJECTED,
+      S.scheduleName((await Submit.findByPk(candR.id)).scheduleStatus));
+
+    // ⑦ 解锁不动时间锚点（调度依据必须保持原样）
+    const uwNow = await sched.ensureWeek(uwMs, { now: uwT(5) });
+    await win.setConfig({ enabled: 1, startDay: 3, startTime: '05:00', endDay: 0, endTime: '21:00', reviewDay: 0, reviewTime: '23:30' }, null);
+    const uwAfter = await sched.ensureWeek(uwMs, { now: uwT(5) });
+    check('解锁后锚点仍冻结（不被新配置改写）',
+      +new Date(uwAfter.scheduleLockAt) === +new Date(uwNow.scheduleLockAt),
+      fmt(+new Date(uwAfter.scheduleLockAt)));
 
     await win.setConfig(win.DEFAULT_WINDOW, null);
 

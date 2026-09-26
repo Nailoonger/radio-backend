@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>菁悠广播站 · 点歌模块 V1.2 方案</title>
+  <style>
+    :root {
+      --ink:#1d1d1f; --ink-2:#333; --muted:#73737a; --muted-2:#8a8a90;
+      --line:#e4e4e7; --line-soft:#efeff1; --canvas:#fff; --paper:#f5f5f7;
+      --tile:#272729; --tile-2:#3a3a3c; --blue:#0066cc; --blue-soft:#eaf3ff;
+      --green:#197548; --green-bg:#e7f5ec; --amber:#8a6100; --amber-bg:#fff3cf;
+      --red:#b42318; --red-bg:#fde8e8; --purple:#6650a4; --purple-bg:#f1edfb;
+      --r-lg:18px; --r-md:12px; --r-pill:999px;
+      --shadow:0 12px 34px rgba(24,24,28,.12);
+      --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","HarmonyOS Sans SC","MiSans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:#f7f7f9;color:var(--ink);font:14px/1.5 var(--font);-webkit-font-smoothing:antialiased}
+    button,input{font:inherit} button{cursor:pointer}
+    .preview-bar{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+    .preview-title{display:flex;align-items:center;gap:10px;font-size:13px;color:#53535a}
+    .preview-title strong{color:var(--ink);font-weight:650}
+    .version{font:600 10px/1 var(--font);letter-spacing:.08em;color:#fff;background:var(--ink);padding:6px 9px;border-radius:var(--r-pill)}
+    .demo-note{font-size:11px;color:var(--muted-2)}
+    .app{display:flex;min-height:calc(100vh - 54px)}
+    .sidebar{width:222px;flex:0 0 222px;background:#fff;border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column}
+    .brand{display:flex;align-items:center;gap:10px;padding:0 6px 18px}
+    .brand img{width:38px;height:38px;object-fit:contain;border:1px solid #e7e7eb;border-radius:50%}
+    .brand b{display:block;font-size:14px;letter-spacing:-.2px}
+    .brand small{display:block;color:#8b8b91;font-size:10px;margin-top:1px}
+    .search-menu{height:34px;border-radius:10px;background:var(--paper);color:#9999a0;display:flex;align-items:center;padding:0 11px;font-size:12px;margin-bottom:22px}
+    .nav-label{color:#9999a0;font-size:10px;letter-spacing:.08em;padding:0 9px 7px;margin-top:10px}
+    .nav-item{height:38px;padding:0 10px;border-radius:10px;display:flex;align-items:center;gap:10px;color:#57575e;font-size:12px;margin:2px 0}
+    .nav-item .ico{width:17px;text-align:center;font-size:15px;color:#85858b}
+    .nav-item.selected{background:var(--tile);color:#fff;font-weight:600}
+    .nav-item.selected .ico{color:#fff}
+    .nav-count{margin-left:auto;border-radius:var(--r-pill);background:#ef4444;color:#fff;min-width:19px;text-align:center;font-size:10px;padding:2px 6px}
+    .side-bottom{margin-top:auto;border:1px solid var(--line);border-radius:13px;padding:10px;display:flex;align-items:center;gap:9px}
+    .avatar{width:29px;height:29px;border-radius:50%;background:var(--tile);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:650;flex:none}
+    .side-bottom b{font-size:11px;display:block}.side-bottom small{font-size:10px;color:#8b8b91;display:block}
+    .main{min-width:0;flex:1}
+    .topbar{height:58px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 26px;gap:10px}
+    .topbar-mark{width:4px;height:18px;background:var(--ink);border-radius:4px}
+    .topbar h1{font-size:16px;margin:0;font-weight:650;letter-spacing:-.3px}
+    .topbar .crumb{font-size:11px;color:#9999a0;margin-left:3px}
+    .top-actions{margin-left:auto;display:flex;align-items:center;gap:7px}
+    .view-switch{display:flex;background:#f0f0f2;padding:3px;border-radius:10px;gap:2px}
+    .view-switch button{border:0;background:transparent;padding:6px 11px;border-radius:8px;font-size:11px;color:#6e6e74}
+    .view-switch button.active{background:#fff;color:var(--ink);font-weight:650;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+    .content{padding:22px 26px 36px;max-width:1600px;margin:0 auto}
+    .page{display:none}.page.active{display:block;animation:fade .2s ease-out}
+    @keyframes fade{from{opacity:.45;transform:translateY(3px)}to{opacity:1;transform:none}}
+    .page-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:15px}
+    .eyebrow{font-size:10px;letter-spacing:.08em;color:#888890;text-transform:uppercase;margin-bottom:4px}
+    .page-heading h2{font-size:22px;line-height:1.25;margin:0;letter-spacing:-.5px}
+    .page-heading p{font-size:11px;color:var(--muted);margin:5px 0 0}
+    .btn{border:1px solid var(--line);background:#fff;color:#35353b;border-radius:10px;padding:8px 12px;font-size:11px;font-weight:550;white-space:nowrap}
+    .btn:hover{border-color:#bfc0c6;background:#fcfcfd}
+    .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+    .btn.primary:hover{background:#005bb7}
+    .btn.ghost{background:transparent}
+    .btn.danger{color:var(--red);border-color:#f0c6c3}
+    .hero{background:var(--tile);color:#fff;border-radius:var(--r-lg);padding:18px 21px;display:flex;align-items:center;gap:24px;margin-bottom:14px;min-height:105px}
+    .hero-mark{width:42px;height:42px;border:1px solid #545459;border-radius:14px;display:grid;place-items:center;color:#fff;font-size:20px;flex:none}
+    .hero-main{min-width:200px;flex:1}
+    .hero-kicker{color:#c2c2c6;font-size:10px;letter-spacing:.08em;margin-bottom:4px}
+    .hero-main h3{font-size:17px;margin:0;font-weight:650;letter-spacing:-.2px}
+    .hero-main p{font-size:11px;color:#c2c2c6;margin:5px 0 0}
+    .hero-divider{height:43px;width:1px;background:#4b4b50}
+    .hero-metric{min-width:112px}.hero-metric .label{display:block;color:#aaaab0;font-size:10px;margin-bottom:4px}.hero-metric strong{font-size:18px;font-weight:650;font-variant-numeric:tabular-nums}.hero-metric small{font-size:10px;color:#b8b8bd;margin-left:3px}
+    .hero .btn{background:#fff;color:var(--ink);border-color:#fff;padding:9px 14px}
+    .hero .btn:hover{background:#efeff1}
+    .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin-bottom:14px}
+    .metric-card{background:#fff;border:1px solid var(--line);border-radius:15px;padding:13px 15px;min-height:78px;display:flex;align-items:center;gap:12px}
+    .metric-icon{width:34px;height:34px;border-radius:11px;background:var(--paper);display:grid;place-items:center;font-size:14px;color:#505057;flex:none}
+    .metric-label{color:#77777e;font-size:10px;margin-bottom:2px}.metric-number{font-size:21px;line-height:1;font-weight:650;font-variant-numeric:tabular-nums;letter-spacing:-.5px}.metric-note{font-size:10px;color:#9999a0;margin-top:4px}
+    .metric-card.attention{border-color:#f0dfae}.metric-card.attention .metric-icon{background:var(--amber-bg);color:var(--amber)}
+    .layout{display:grid;grid-template-columns:minmax(0,1fr) 286px;gap:14px;align-items:start}
+    .panel{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+    .panel-head{padding:15px 17px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .panel-head h3{font-size:14px;margin:0;font-weight:650}
+    .panel-head p{margin:3px 0 0;color:#888890;font-size:10px}
+    .micro-link{font-size:10px;color:var(--blue);font-weight:550;white-space:nowrap}
+    .list-controls{padding:0 16px 12px;border-bottom:1px solid var(--line-soft)}
+    .type-tabs{display:flex;gap:4px;padding:3px;background:var(--paper);border-radius:10px;width:max-content;margin-bottom:10px}
+    .type-tabs button{border:0;background:transparent;color:#7c7c83;border-radius:8px;padding:6px 12px;font-size:10px}
+    .type-tabs button.active{background:#fff;color:var(--ink);font-weight:650;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+    .toolbar-row{display:flex;align-items:center;gap:7px;min-width:0}
+    .filters{display:flex;align-items:center;gap:5px;overflow:auto;flex:1;min-width:0;scrollbar-width:none}
+    .filters::-webkit-scrollbar{display:none}
+    .filter{border:1px solid transparent;background:transparent;border-radius:var(--r-pill);padding:6px 9px;color:#73737a;font-size:10px;white-space:nowrap}
+    .filter b{font-weight:550;color:#9999a0;margin-left:3px}
+    .filter.active{background:var(--tile);color:#fff}.filter.active b{color:#c6c6ca}
+    .search{width:188px;flex:none;height:31px;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;padding:0 9px;gap:6px;color:#9a9aa0}
+    .search input{width:100%;border:0;outline:0;background:transparent;font-size:10px;color:var(--ink)}
+    .search input::placeholder{color:#a0a0a6}
+    .table-wrap{padding:0 10px 8px;overflow-x:auto}
+    table{border-collapse:collapse;width:100%;min-width:760px;table-layout:fixed}
+    th{text-align:left;background:#f6f6f8;color:#77777e;font-size:9px;font-weight:550;padding:10px 9px;white-space:nowrap}
+    th:first-child{border-radius:7px 0 0 7px}th:last-child{border-radius:0 7px 7px 0;text-align:right}
+    td{padding:12px 9px;border-bottom:1px solid #f0f0f2;vertical-align:middle;font-size:10px;color:#515158}
+    tr:last-child td{border-bottom:0}tbody tr:hover{background:#fbfbfc}
+    .content-cell{display:flex;align-items:center;gap:8px;min-width:0}
+    .song-cover{width:31px;height:31px;border-radius:9px;background:#272729;color:#fff;display:grid;place-items:center;font-size:11px;flex:none}
+    .content-text{min-width:0}.content-text strong{font-size:11px;color:#25252a;font-weight:620;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.content-text small{font-size:9px;color:#9999a0;display:block;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .contributor{display:flex;align-items:center;gap:6px}.contributor .avatar{width:24px;height:24px;font-size:9px}.contributor span{white-space:nowrap}
+    .slot-cell{line-height:1.4}.slot-cell b{display:block;font-size:10px;color:#4e4e55;font-weight:550;white-space:nowrap}.slot-cell small{font-size:9px;color:#9a9aa0;white-space:nowrap}
+    .status{display:inline-flex;align-items:center;gap:5px;border-radius:var(--r-pill);padding:4px 8px;font-size:9px;white-space:nowrap;font-weight:550}
+    .status:before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+    .status.pending{color:var(--amber);background:var(--amber-bg)}.status.ready{color:var(--purple);background:var(--purple-bg)}.status.queued{color:#5d6877;background:#eef1f5}.status.placed{color:var(--green);background:var(--green-bg)}
+    .time{font:10px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;color:#7e7e85;white-space:nowrap}
+    .row-action{text-align:right}.row-action .btn{padding:6px 9px;font-size:9px}
+    .table-foot{padding:10px 16px 13px;border-top:1px solid var(--line-soft);display:flex;align-items:center;justify-content:space-between;color:#9999a0;font-size:9px}
+    .pagination{display:flex;align-items:center;gap:9px}.pagination button{border:1px solid var(--line);background:#fff;border-radius:7px;width:25px;height:24px;color:#666;font-size:10px}
+    .side-stack{display:grid;gap:12px}
+    .side-panel{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:15px}
+    .side-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:11px}.side-title b{font-size:12px;font-weight:650}.side-title span{font-size:9px;color:#9999a0}
+    .capacity-hero{background:var(--paper);border-radius:12px;padding:12px;margin-bottom:11px;display:flex;align-items:center;justify-content:space-between}
+    .capacity-hero small{font-size:9px;color:#85858c;display:block}.capacity-hero strong{display:block;font-size:20px;line-height:1.15;margin-top:3px;font-variant-numeric:tabular-nums}.capacity-hero em{font-style:normal;font-size:10px;color:#888;margin-left:2px}
+    .capacity-mark{width:36px;height:36px;display:grid;place-items:center;border-radius:50%;background:#fff;color:var(--blue);font-size:11px;font-weight:650}
+    .progress{height:5px;border-radius:5px;background:#e9e9ed;overflow:hidden;margin:10px 0 6px}.progress i{display:block;height:100%;width:71%;background:var(--blue);border-radius:5px}
+    .progress-copy{display:flex;justify-content:space-between;color:#9999a0;font-size:9px}
+    .slot-summary{display:grid;gap:8px;margin-top:14px}
+    .slot-row{display:flex;align-items:center;gap:8px;font-size:9px;color:#77777e}.slot-row .slot-time{width:89px;color:#55555b;white-space:nowrap}.slot-bar{height:5px;flex:1;background:#efeff1;border-radius:5px;overflow:hidden}.slot-bar i{height:100%;display:block;border-radius:5px;background:#77777e}.slot-row small{font:9px ui-monospace,monospace;color:#86868c;width:28px;text-align:right}
+    .rule-list{display:grid;gap:0}.rule{padding:9px 0;border-top:1px solid var(--line-soft);display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.rule:first-child{border-top:0;padding-top:0}.rule span{font-size:10px;color:#7f7f86}.rule b{font-size:10px;text-align:right;font-weight:600}.rule b.on{color:var(--green)}
+    .helper-box{border:1px solid #d9e8fa;background:#f5f9ff;border-radius:12px;padding:11px 12px;color:#5b6b7e;font-size:10px;line-height:1.65}.helper-box b{color:#34475d}
+    .settings-grid{display:grid;grid-template-columns:205px minmax(0,1fr);gap:14px;align-items:start}
+    .settings-nav{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:9px}
+    .settings-nav .nav-caption{font-size:9px;color:#9999a0;letter-spacing:.06em;padding:7px 9px 8px}
+    .settings-nav button{width:100%;display:flex;align-items:center;gap:9px;border:0;background:transparent;text-align:left;color:#686870;border-radius:9px;padding:10px 9px;font-size:10px;margin-bottom:2px}
+    .settings-nav button.active{background:var(--tile);color:#fff;font-weight:600}
+    .settings-nav .nav-icon{width:16px;text-align:center}
+    .settings-content{display:grid;gap:12px}
+    .settings-card{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+    .settings-card-head{padding:15px 18px 12px;border-bottom:1px solid var(--line-soft);display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+    .settings-card-head h3{font-size:13px;margin:0;font-weight:650}.settings-card-head p{font-size:10px;color:#909097;margin:4px 0 0}
+    .settings-body{padding:16px 18px}
+    .rule-setting{display:grid;grid-template-columns:minmax(0,1fr) 145px;gap:18px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line-soft)}.rule-setting:first-child{padding-top:0}.rule-setting:last-child{border-bottom:0;padding-bottom:0}
+    .setting-label{font-size:11px;font-weight:600}.setting-help{font-size:9px;color:#92929a;margin-top:4px;line-height:1.6;max-width:540px}
+    .number-input{height:36px;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;justify-content:space-between;overflow:hidden;width:128px;margin-left:auto}
+    .number-input button{height:100%;width:32px;border:0;background:#fafafc;color:#5c5c63}.number-input strong{font-size:12px;font-weight:600}
+    .suffix{font-size:9px;color:#8d8d94;margin-left:5px}
+    .input-wrap{display:flex;align-items:center;justify-content:flex-end}
+    .switch{width:38px;height:22px;border:0;border-radius:20px;background:var(--blue);padding:2px;display:flex;justify-content:flex-end;margin-left:auto}.switch i{width:18px;height:18px;background:#fff;border-radius:50%;display:block}
+    .inline-state{font-size:9px;color:var(--green);margin-left:8px;white-space:nowrap}
+    .save-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;background:#fbfbfc;border-top:1px solid var(--line-soft)}
+    .save-row small{font-size:9px;color:#9999a0}
+    .preview-callout{display:flex;gap:10px;align-items:flex-start;padding:12px 13px;border:1px solid #dce9f8;border-radius:12px;background:#f6faff;color:#647287;font-size:10px;line-height:1.6}
+    .preview-callout strong{color:#33475e}
+    .secondary-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+    .mini-stat{background:var(--paper);border-radius:11px;padding:11px 12px}.mini-stat span{display:block;color:#8d8d94;font-size:9px}.mini-stat b{font-size:15px;display:block;margin-top:4px;font-variant-numeric:tabular-nums}
+    .window-preview{background:var(--tile);color:#fff;padding:15px 17px;border-radius:13px;display:flex;align-items:center;justify-content:space-between;gap:15px}
+    .window-preview small{display:block;color:#b9b9bf;font-size:9px;margin-bottom:4px}.window-preview b{font-size:13px}.window-preview .sub{font-size:9px;color:#c3c3c7;margin-top:4px}
+    .slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+    .slot-pill{padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff}.slot-pill b{font:11px ui-monospace,monospace;display:block}.slot-pill small{font-size:9px;color:#8b8b92;display:block;margin-top:4px}
+    .notice-text{border:1px solid var(--line);background:#fcfcfd;border-radius:11px;padding:13px;min-height:115px;font-size:10px;color:#66666d;line-height:1.8}
+    .danger-card{border-color:#efd0ce}.danger-card .settings-card-head h3{color:var(--red)}
+    .danger-row{display:flex;justify-content:space-between;align-items:center;gap:16px}.danger-row b{display:block;font-size:11px}.danger-row small{display:block;color:#9999a0;font-size:9px;margin-top:5px;max-width:530px;line-height:1.6}
+    .overlay{position:fixed;inset:0;background:rgba(21,21,24,.38);z-index:50;display:none;align-items:flex-start;justify-content:center;padding:7vh 20px 20px}.overlay.show{display:flex}
+    .modal{width:min(660px,100%);background:#fff;border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
+    .modal-head{padding:17px 20px;border-bottom:1px solid var(--line-soft);display:flex;justify-content:space-between;align-items:center}.modal-head h3{margin:0;font-size:15px}.modal-close{border:0;background:var(--paper);width:28px;height:28px;border-radius:8px;font-size:17px;color:#777}
+    .modal-body{padding:18px 20px}.modal-song{background:var(--tile);color:#fff;border-radius:13px;padding:15px;display:flex;gap:13px;align-items:center}.modal-song .song-cover{width:43px;height:43px;border:1px solid #535358}.modal-song strong{font-size:14px}.modal-song small{display:block;color:#c4c4c8;font-size:10px;margin-top:4px}
+    .modal-facts{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:13px 0}.fact{background:var(--paper);border-radius:10px;padding:10px}.fact small{display:block;font-size:9px;color:#8b8b92}.fact b{display:block;font-size:10px;margin-top:4px}.modal-note{font-size:10px;color:#77777e;line-height:1.7}.modal-foot{padding:13px 20px;border-top:1px solid var(--line-soft);display:flex;justify-content:flex-end;gap:8px}
+    /* V1.1：审核弹窗恢复为 v8 原处理台结构 */
+    .legacy-console{width:min(1010px,calc(100vw - 34px));max-height:86vh;display:flex;flex-direction:column;border-radius:20px}
+    .legacy-head{padding:13px 22px 10px;border-bottom:1px solid var(--line-soft);flex:none}
+    .legacy-head-main{display:flex;align-items:center;justify-content:space-between;gap:14px}
+    .legacy-head-left{display:flex;align-items:baseline;gap:11px;min-width:0}
+    .legacy-type{border:1px solid var(--line);border-radius:var(--r-pill);padding:3px 10px;font-size:9px;color:#77777e;white-space:nowrap}
+    .legacy-head h3{font-size:16px;margin:0;font-weight:650;white-space:nowrap}
+    .legacy-step{font-size:10px;color:#818188;white-space:nowrap}
+    .legacy-meta{font:9px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;color:#8b8b92;margin-top:5px}
+    .legacy-close{border:0;background:var(--paper);border-radius:50%;width:29px;height:29px;color:#65656c;font-size:16px;flex:none}
+    .legacy-body{display:grid;grid-template-columns:minmax(0,1fr) 306px;gap:16px;padding:16px 22px;background:var(--paper);overflow:auto;min-height:0}
+    .legacy-left,.legacy-right{display:flex;flex-direction:column;gap:13px;min-width:0}
+    .legacy-person{background:var(--tile);color:#fff;border-radius:16px;padding:14px 17px;display:flex;flex-direction:column;gap:10px}
+    .legacy-person-top{display:flex;align-items:center;gap:11px;min-width:0}
+    .legacy-avatar{width:39px;height:39px;border-radius:50%;background:rgba(255,255,255,.15);display:grid;place-items:center;font-size:14px;font-weight:650;flex:none}
+    .legacy-person-info{min-width:0}.legacy-person-info strong{display:block;font-size:13px}.legacy-person-info small{display:block;color:#c4c4c8;font-size:9px;margin-top:3px}
+    .legacy-person-tags{margin-left:auto;display:flex;gap:5px;align-items:center;flex:none}.legacy-person-tags span{border-radius:var(--r-pill);padding:4px 8px;background:#424246;color:#e0e0e3;font-size:8px;white-space:nowrap}
+    .legacy-person-stats{border-top:1px solid rgba(255,255,255,.2);padding-top:10px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .legacy-person-stats small{display:block;font-size:9px;color:#c9c9cd}.legacy-person-stats b{display:block;font-size:17px;margin-top:2px;font-variant-numeric:tabular-nums}
+    .legacy-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px 17px;min-width:0}
+    .legacy-card-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding-bottom:10px;margin-bottom:11px;border-bottom:1px solid var(--line-soft)}
+    .legacy-card-head strong{font-size:11px}.legacy-card-head small{font-size:8px;color:#898990;text-align:right}
+    .legacy-field{display:grid;grid-template-columns:84px minmax(0,1fr);gap:11px;padding:8px 0;border-bottom:1px solid #f2f2f4;font-size:10px}
+    .legacy-field:last-child{border-bottom:0;padding-bottom:0}.legacy-field label{color:#85858c}.legacy-field b{font-weight:550;color:#35353a;line-height:1.6}.legacy-field .muted-value{color:#96969d}
+    .legacy-schedule{border:1px solid #d5e5f7;background:#fff;border-radius:15px;padding:13px 15px}
+    .legacy-statusline{display:flex;align-items:center;gap:8px;margin-bottom:9px}.legacy-statusline small{font-size:9px;color:#818188}
+    .legacy-schedule p{font-size:9px;color:#74747b;line-height:1.65;margin:0}.legacy-schedule p+p{margin-top:5px}
+    .legacy-action-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .legacy-action-row .btn{height:37px;font-size:11px;font-weight:600}.legacy-action-row .btn.primary{background:var(--blue)}.legacy-action-row .btn.reject-active{border-color:var(--red);color:var(--red);background:var(--red-bg)}
+    .legacy-info-section{padding-top:11px;margin-top:11px;border-top:1px solid var(--line-soft)}
+    .legacy-info-title{font-size:9px;color:#77777e;margin-bottom:7px}.legacy-info-numbers{display:flex;align-items:baseline;justify-content:space-between;gap:8px}.legacy-info-numbers b{font-size:16px;font-variant-numeric:tabular-nums}.legacy-info-numbers span{font-size:9px;color:#85858c}
+    .legacy-info-section p{font-size:8px;color:#8a8a91;line-height:1.6;margin:7px 0 0}
+    .legacy-reject{opacity:.6;transition:opacity .15s}.legacy-reject.enabled{opacity:1}
+    .legacy-presets{display:flex;flex-wrap:wrap;gap:5px;margin:7px 0}
+    .legacy-presets button{border:1px solid var(--line);border-radius:var(--r-pill);background:#fff;padding:5px 8px;font-size:8px;color:#5f5f66}
+    .legacy-presets button.selected{background:var(--ink);color:#fff;border-color:var(--ink)}
+    .legacy-textarea{width:100%;min-height:62px;border:1px solid var(--line);border-radius:9px;padding:8px 9px;font:9px/1.55 var(--font);resize:vertical;outline-color:var(--blue)}
+    .legacy-warn{font-size:8px;color:var(--red);background:var(--red-bg);padding:7px 9px;border-radius:8px;margin-top:7px;line-height:1.5}
+    .legacy-history{padding-top:10px;border-top:1px solid var(--line-soft);margin-top:10px}
+    .legacy-history h4{font-size:10px;margin:0 0 7px}.legacy-history-box{background:var(--paper);padding:9px 10px;border-radius:9px;color:#707078;font-size:8px;line-height:1.8}
+    .legacy-history-box b{color:#39393f;font-weight:600;margin-right:8px}
+    .legacy-foot{min-height:52px;display:flex;align-items:center;gap:10px;padding:8px 20px;border-top:1px solid var(--line-soft);background:#fff;flex:none}
+    .legacy-foot .btn{border-radius:var(--r-pill);padding:7px 14px;font-size:9px}.legacy-keyhint{flex:1;text-align:center;font-size:8px;color:#9999a0}.legacy-foot-actions{display:flex;gap:7px}
+    .legacy-foot .btn.approve-next{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+    .legacy-foot .btn.reject-next{background:var(--red);border-color:var(--red);color:#fff;font-weight:600}
+    .legacy-note{font-size:8px;color:#9999a0;margin-left:8px}
+    /* V1.2：更聚焦的双栏审核台，操作常驻，拒绝原因按需展开 */
+    .v12-dialog{width:min(1010px,calc(100vw - 34px));max-height:86vh}
+    .v12-head{padding:13px 22px 11px;background:#fff;border-bottom:1px solid var(--line-soft);flex:none}
+    .v12-head-top{display:flex;align-items:center;gap:11px;min-width:0}
+    .v12-head-top h3{font-size:16px;margin:0;font-weight:650;white-space:nowrap}
+    .v12-counter{font-size:9px;color:#63636a;background:var(--paper);border-radius:var(--r-pill);padding:5px 9px;white-space:nowrap}
+    .v12-hotkeys{margin-left:auto;font-size:8px;color:#92929a;white-space:nowrap}
+    .v12-hotkeys kbd{font:8px ui-monospace,monospace;background:#f4f4f6;border:1px solid #e9e9ec;border-radius:4px;padding:2px 4px;color:#666}
+    .v12-meta{font-size:8px;color:#8b8b92;margin-top:6px}
+    .v12-body{display:grid;grid-template-columns:minmax(0,1fr) 316px;gap:13px;padding:14px 18px;background:var(--paper);overflow:auto;min-height:0;max-height:64vh}
+    .v12-left,.v12-right{display:flex;flex-direction:column;gap:11px;min-width:0}
+    .v12-person{padding:12px 15px;gap:9px;border-radius:14px}
+    .v12-person .legacy-person-top{gap:10px}
+    .v12-person .legacy-avatar{width:36px;height:36px}
+    .v12-person .legacy-person-stats{padding-top:8px;gap:8px}
+    .v12-person .legacy-person-stats b{font-size:15px}
+    .v12-content{padding:14px 16px}
+    .v12-content .legacy-card-head{padding-bottom:9px;margin-bottom:9px}
+    .v12-song-title{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:1px 0 10px}
+    .v12-song-title strong{font-size:20px;letter-spacing:-.4px;font-weight:650;color:#222228}
+    .v12-song-title span{font-size:11px;color:#77777e}
+    .v12-wish{background:#f6f6f8;border-radius:10px;padding:10px 12px;color:#4c4c53;font-size:10px;line-height:1.7;white-space:pre-wrap}
+    .v12-wish label{display:block;font-size:8px;color:#909097;margin-bottom:3px}
+    .v12-schedule{padding:11px 14px;border-radius:13px}
+    .v12-state-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .v12-state{border:1px solid #ececf0;background:#fff;border-radius:9px;padding:8px 10px}
+    .v12-state small{display:block;font-size:8px;color:#8e8e95}.v12-state b{display:block;font-size:10px;margin-top:3px}
+    .v12-schedule .state-hint{margin-top:8px;color:#7d7d84;font-size:8px;line-height:1.6}
+    .v12-right-card{padding:13px 14px;border-radius:14px}
+    .v12-right-card .legacy-card-head{padding-bottom:9px;margin-bottom:10px}
+    .v12-decision{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+    .v12-decision .btn{height:34px;font-size:10px;font-weight:600}
+    .v12-decision .approve-mode{background:var(--blue);border-color:var(--blue);color:#fff}
+    .v12-decision .reject-mode{color:#595960}
+    .v12-decision .reject-mode.active{background:var(--red-bg);border-color:#efc1bd;color:var(--red)}
+    .v12-info{border-top:1px solid var(--line-soft);margin-top:10px;padding-top:9px}
+    .v12-info-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:8px;color:#7e7e85}
+    .v12-info-head b{font-size:9px;color:#36363c;font-weight:600}
+    .v12-info .progress{height:4px;margin:7px 0 5px}
+    .v12-info-note{font-size:8px;color:#919198;line-height:1.5;margin-top:4px}
+    .v12-reject-panel{display:none;border-top:1px solid var(--line-soft);margin-top:10px;padding-top:10px}
+    .v12-reject-panel.open{display:block}
+    .v12-reject-title{font-size:9px;font-weight:600;color:#595960;display:flex;justify-content:space-between;align-items:center}
+    .v12-reject-title span{font-size:8px;color:var(--red);font-weight:500}
+    .v12-reject-panel .legacy-presets{margin:7px 0 6px;gap:5px}
+    .v12-reject-panel .legacy-presets button{padding:5px 7px}
+    .v12-reject-panel .legacy-textarea{min-height:52px;font-size:8px}
+    .v12-history{border-top:1px solid var(--line-soft);margin-top:10px;padding-top:9px}
+    .v12-history summary{font-size:9px;font-weight:600;color:#55555c;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between}
+    .v12-history summary::-webkit-details-marker{display:none}.v12-history summary:after{content:'＋';font-weight:400;color:#93939a}
+    .v12-history[open] summary:after{content:'−'}
+    .v12-history .legacy-history-box{margin-top:7px}
+    .v12-foot{min-height:52px;padding:8px 18px;gap:10px}
+    .v12-foot-context{font-size:8px;color:#92929a;white-space:nowrap}
+    .v12-foot .btn{padding:7px 12px}
+    .v12-foot .btn.primary{font-weight:600}
+    .v12-foot .btn:disabled{opacity:.45;cursor:default}
+    @media(max-width:1050px){.v12-body{grid-template-columns:1fr;max-height:70vh}.v12-right{position:static}.v12-dialog{max-height:93vh}}
+    @media(max-width:650px){.v12-head{padding:11px 13px}.v12-head-top{flex-wrap:wrap;gap:7px}.v12-head-top h3{font-size:14px}.v12-hotkeys{display:none}.v12-body{padding:10px;gap:9px}.v12-content{padding:12px}.v12-right-card{padding:11px}.v12-foot{padding:8px 10px;flex-wrap:wrap}.v12-foot-context{display:none}.v12-foot .legacy-keyhint{order:3;flex-basis:100%}.v12-state-grid{gap:6px}}
+    @media(max-width:1050px){.legacy-body{grid-template-columns:1fr}.legacy-console{max-height:92vh}.legacy-body{max-height:72vh}}
+    @media(max-width:650px){.legacy-head{padding:11px 13px 9px}.legacy-head-left{gap:7px;flex-wrap:wrap}.legacy-head h3{font-size:14px}.legacy-body{padding:11px;gap:10px}.legacy-foot{padding:8px 11px;flex-wrap:wrap}.legacy-keyhint{order:3;flex-basis:100%}.legacy-foot-actions{margin-left:auto}.legacy-person-tags{display:none}.legacy-card,.legacy-person{padding:12px}.legacy-field{grid-template-columns:75px 1fr}.legacy-note{display:none}}
+    @media(max-width:1120px){.sidebar{width:190px;flex-basis:190px}.content{padding:18px}.layout{grid-template-columns:minmax(0,1fr) 250px}.hero{gap:15px}.hero-metric{min-width:90px}}
+    @media(max-width:900px){.sidebar{width:62px;flex-basis:62px;padding:14px 8px}.brand{justify-content:center;padding:0 0 18px}.brand div,.nav-label,.nav-item span:not(.ico),.search-menu,.side-bottom div{display:none}.brand img{width:34px;height:34px}.nav-item{justify-content:center;padding:0}.nav-count{position:absolute;margin:-23px 0 0 28px}.side-bottom{justify-content:center;padding:7px}.layout{grid-template-columns:1fr}.side-stack{grid-template-columns:repeat(2,minmax(0,1fr))}.hero{flex-wrap:wrap}.hero-divider{display:none}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.settings-grid{grid-template-columns:170px minmax(0,1fr)}}
+    @media(max-width:650px){.preview-bar{padding:0 12px}.demo-note{display:none}.topbar{padding:0 14px}.content{padding:15px 12px}.sidebar{display:none}.page-heading{align-items:flex-start}.page-heading h2{font-size:19px}.hero{padding:15px;gap:10px}.hero-mark{display:none}.hero-main{flex-basis:100%}.hero-metric{flex:1;min-width:0}.hero .btn{width:100%}.metrics{gap:8px}.metric-card{padding:11px;gap:8px}.metric-icon{width:30px;height:30px}.layout{gap:10px}.side-stack{grid-template-columns:1fr}.toolbar-row{flex-wrap:wrap}.filters{order:1;flex-basis:100%}.search{flex:1;width:auto}.settings-grid{grid-template-columns:1fr}.settings-nav{display:flex;overflow:auto;gap:3px}.settings-nav .nav-caption{display:none}.settings-nav button{width:auto;white-space:nowrap;padding:8px 10px;margin:0}.settings-nav button .nav-icon{display:none}.settings-card-head,.settings-body{padding-left:14px;padding-right:14px}.rule-setting{grid-template-columns:minmax(0,1fr) 135px;gap:10px}.secondary-stats{gap:6px}.slots{grid-template-columns:repeat(2,minmax(0,1fr))}.window-preview{align-items:flex-start;flex-direction:column}.modal-facts{grid-template-columns:1fr}.modal-body{padding:14px}.modal-head,.modal-foot{padding:13px 14px}}
+  </style>
+</head>
+<body>
+  <div class="preview-bar">
+    <div class="preview-title"><strong>菁悠广播站 · 点歌模块方案</strong><span class="version">V1.2 · 小改版</span></div>
+    <div class="demo-note">独立静态原型 · 示例数据 · 不连接后端</div>
+  </div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><img src="../miniprogram/assets/station-badge.png" alt="菁悠广播站徽标"><div><b>菁悠广播站</b><small>管理后台</small></div></div>
+      <div class="search-menu">⌕　搜索菜单 <span style="margin-left:auto">Ctrl K</span></div>
+      <div class="nav-label">内容运营</div>
+      <div class="nav-item"><span class="ico">⌁</span><span>数据概览</span></div>
+      <div class="nav-item selected"><span class="ico">▣</span><span>投稿 &amp; 点歌</span><span class="nav-count">18</span></div>
+      <div class="nav-item"><span class="ico">▦</span><span>栏目管理</span></div>
+      <div class="nav-item"><span class="ico">◖</span><span>公告管理</span></div>
+      <div class="nav-item"><span class="ico">◌</span><span>留言审核</span></div>
+      <div class="nav-label">系统管理</div>
+      <div class="nav-item"><span class="ico">♙</span><span>学生账号</span></div>
+      <div class="nav-item"><span class="ico">◇</span><span>风采展示</span></div>
+      <div class="nav-item"><span class="ico">⚙</span><span>模块开关</span></div>
+      <div class="side-bottom"><span class="avatar">指</span><div><b>指导老师</b><small>超级管理员</small></div><span style="margin-left:auto;color:#999">⌄</span></div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <span class="topbar-mark"></span><h1 id="topTitle">点歌工作台</h1><span class="crumb">内容运营 / 投稿与点歌</span>
+        <div class="top-actions">
+          <div class="view-switch" aria-label="原型页面切换">
+            <button class="active" data-page="workbench">审核工作台</button>
+            <button data-page="settings">点歌设置</button>
+          </div>
+        </div>
+      </header>
+      <div class="content">
+        <section class="page active" id="workbench">
+          <div class="page-heading">
+            <div><div class="eyebrow">SONG OPERATIONS</div><h2>点歌工作台</h2><p>先处理待审核投稿，再查看排期与候补。时间与状态分开展示，避免把“审核通过”误看成“已排期”。</p></div>
+            <button class="btn" onclick="switchPage('settings')">⚙　点歌设置</button>
+          </div>
+          <div class="hero">
+            <div class="hero-mark">♫</div>
+            <div class="hero-main"><div class="hero-kicker">本期收歌窗口 · 示例状态</div><h3>收歌中</h3><p>目标播出周　2026.09.28 周一 — 10.02 周五　·　收歌截止 周日 18:00</p></div>
+            <div class="hero-divider"></div>
+            <div class="hero-metric"><span class="label">待我处理</span><strong>18</strong><small>条待审核</small></div>
+            <button class="btn" onclick="document.getElementById('pendingList').scrollIntoView({behavior:'smooth'})">开始审核　→</button>
+          </div>
+          <div class="metrics">
+            <div class="metric-card attention"><div class="metric-icon">◷</div><div><div class="metric-label">待审核</div><div class="metric-number">18</div><div class="metric-note">优先处理 · 到审核截止前</div></div></div>
+            <div class="metric-card"><div class="metric-icon">↗</div><div><div class="metric-label">已通过 · 待排期</div><div class="metric-number">4</div><div class="metric-note">已通过审核，尚未获得位置</div></div></div>
+            <div class="metric-card"><div class="metric-icon">▦</div><div><div class="metric-label">已排期</div><div class="metric-number">32<span style="font-size:12px;color:#999"> / 45</span></div><div class="metric-note">只统计已审核且已排上</div></div></div>
+            <div class="metric-card"><div class="metric-icon">⋯</div><div><div class="metric-label">候补中</div><div class="metric-number">6</div><div class="metric-note">空位释放后按规则递补</div></div></div>
+          </div>
+          <div class="layout">
+            <section class="panel" id="pendingList">
+              <div class="panel-head"><div><h3>投稿队列</h3><p>默认按待处理优先；点开一条查看详情和审核记录</p></div><a class="micro-link" href="#" onclick="event.preventDefault();alert('V1 原型：此处预留排期矩阵入口')">查看排期矩阵　→</a></div>
+              <div class="list-controls">
+                <div class="type-tabs"><button class="active">点歌</button><button>文稿</button></div>
+                <div class="toolbar-row">
+                  <div class="filters">
+                    <button class="filter active">待审核 <b>18</b></button>
+                    <button class="filter">已通过待排期 <b>4</b></button>
+                    <button class="filter">候补 <b>6</b></button>
+                    <button class="filter">已排期 <b>32</b></button>
+                    <button class="filter">全部 <b>60</b></button>
+                  </div>
+                  <label class="search"><span>⌕</span><input placeholder="搜歌名、歌手或投稿人"></label>
+                  <button class="btn">导出</button>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <colgroup><col style="width:25%"><col style="width:14%"><col style="width:16%"><col style="width:16%"><col style="width:15%"><col style="width:14%"></colgroup>
+                  <thead><tr><th>歌曲</th><th>投稿人</th><th>首选时段</th><th>实际排期</th><th>状态 · 提交时间</th><th>操作</th></tr></thead>
+                  <tbody>
+                    <tr>
+                      <td><div class="content-cell"><span class="song-cover">♫</span><div class="content-text"><strong>晴天</strong><small>周杰伦 · 祝毕业班一路顺风</small></div></div></td>
+                      <td><div class="contributor"><span class="avatar">林</span><span>林晓</span></div></td>
+                      <td><div class="slot-cell"><b>周一 · 午间</b><small>09/28　12:20</small></div></td>
+                      <td><div class="slot-cell"><b style="color:#aaa">—</b><small>审核后排期</small></div></td>
+                      <td><span class="status pending">待审核</span><div class="time" style="margin-top:5px">09/26 18:03</div></td>
+                      <td class="row-action"><button class="btn primary" onclick="openReview('晴天','周杰伦','林晓','周一 · 午间 12:20','待审核')">审核详情</button></td>
+                    </tr>
+                    <tr>
+                      <td><div class="content-cell"><span class="song-cover">♫</span><div class="content-text"><strong>夏夜晚风</strong><small>伍佰 · 祝社团招新顺利</small></div></div></td>
+                      <td><div class="contributor"><span class="avatar">周</span><span>周一</span></div></td>
+                      <td><div class="slot-cell"><b>周二 · 午间</b><small>09/29　12:20</small></div></td>
+                      <td><div class="slot-cell"><b style="color:#aaa">—</b><small>审核后排期</small></div></td>
+                      <td><span class="status pending">待审核</span><div class="time" style="margin-top:5px">09/26 18:05</div></td>
+                      <td class="row-action"><button class="btn primary" onclick="openReview('夏夜晚风','伍佰','周一','周二 · 午间 12:20','待审核')">审核详情</button></td>
+                    </tr>
+                    <tr>
+                      <td><div class="content-cell"><span class="song-cover">♫</span><div class="content-text"><strong>那些花儿</strong><small>朴树 · 祝老师教师节快乐</small></div></div></td>
+                      <td><div class="contributor"><span class="avatar">陈</span><span>陈悦</span></div></td>
+                      <td><div class="slot-cell"><b>周一 · 午间</b><small>09/28　12:20</small></div></td>
+                      <td><div class="slot-cell"><b style="color:#aaa">—</b><small>审核后排期</small></div></td>
+                      <td><span class="status pending">待审核</span><div class="time" style="margin-top:5px">09/26 18:09</div></td>
+                      <td class="row-action"><button class="btn primary" onclick="openReview('那些花儿','朴树','陈悦','周一 · 午间 12:20','待审核')">审核详情</button></td>
+                    </tr>
+                    <tr>
+                      <td><div class="content-cell"><span class="song-cover">♫</span><div class="content-text"><strong>稻香</strong><small>周杰伦 · 愿大家都能找到自己的方向</small></div></div></td>
+                      <td><div class="contributor"><span class="avatar">赵</span><span>赵一</span></div></td>
+                      <td><div class="slot-cell"><b>周三 · 早间</b><small>09/30　07:20</small></div></td>
+                      <td><div class="slot-cell"><b>周三 · 早间</b><small>09/30　07:20</small></div></td>
+                      <td><span class="status ready">已通过 · 待排期</span><div class="time" style="margin-top:5px">09/26 17:52</div></td>
+                      <td class="row-action"><button class="btn" onclick="openReview('稻香','周杰伦','赵一','周三 · 早间 07:20','已通过 · 待排期')">查看详情</button></td>
+                    </tr>
+                    <tr>
+                      <td><div class="content-cell"><span class="song-cover">♫</span><div class="content-text"><strong>平凡之路</strong><small>朴树 · 新学期也请多多关照</small></div></div></td>
+                      <td><div class="contributor"><span class="avatar">吴</span><span>吴桐</span></div></td>
+                      <td><div class="slot-cell"><b>周二 · 午间</b><small>09/29　12:20</small></div></td>
+                      <td><div class="slot-cell"><b style="color:#6a7280">候补 · 第 2 位</b><small>等待空位或调剂</small></div></td>
+                      <td><span class="status queued">候补中</span><div class="time" style="margin-top:5px">09/26 17:41</div></td>
+                      <td class="row-action"><button class="btn" onclick="openReview('平凡之路','朴树','吴桐','周二 · 午间 12:20','候补中 · 第 2 位')">查看详情</button></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="table-foot"><span>显示 1–5 条　·　共 60 条点歌投稿</span><div class="pagination"><span>每页 10 条</span><button>‹</button><b style="color:var(--blue)">1</b><button>›</button></div></div>
+            </section>
+            <aside class="side-stack">
+              <section class="side-panel">
+                <div class="side-title"><b>下周排期概览</b><span>09/28 — 10/02</span></div>
+                <div class="capacity-hero"><div><small>正式位置已安排</small><strong>32<em>/ 45</em></strong></div><div class="capacity-mark">71%</div></div>
+                <div class="progress"><i></i></div><div class="progress-copy"><span>已安排 32 首</span><span>剩余 13 个位置</span></div>
+                <div class="slot-summary">
+                  <div class="slot-row"><span class="slot-time">周一 12:20</span><span class="slot-bar"><i style="width:100%"></i></span><small>3/3</small></div>
+                  <div class="slot-row"><span class="slot-time">周二 12:20</span><span class="slot-bar"><i style="width:66%"></i></span><small>2/3</small></div>
+                  <div class="slot-row"><span class="slot-time">周三 07:20</span><span class="slot-bar"><i style="width:33%"></i></span><small>1/3</small></div>
+                  <div class="slot-row"><span class="slot-time">其余时段</span><span class="slot-bar"><i style="width:48%"></i></span><small>26</small></div>
+                </div>
+              </section>
+              <section class="side-panel">
+                <div class="side-title"><b>规则速览</b><a class="micro-link" href="#" onclick="event.preventDefault();switchPage('settings')">修改 →</a></div>
+                <div class="rule-list">
+                  <div class="rule"><span>每人每周</span><b>最多 2 次</b></div>
+                  <div class="rule"><span>同曲重复</span><b class="on">已开启</b></div>
+                  <div class="rule"><span>单格容量</span><b>3 首</b></div>
+                  <div class="rule"><span>候补调剂</span><b>收歌截止后</b></div>
+                </div>
+              </section>
+              <div class="helper-box"><b>排期口径</b><br>待审核和已通过待排期都不会占正式位。候补优先等首选时段空位；收歌截止后，符合设置的投稿可调剂到其他时段。</div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="page" id="settings">
+          <div class="page-heading">
+            <div><div class="eyebrow">SONG CONFIGURATION</div><h2>点歌设置</h2><p>按设置目的分组；保存范围和当前生效值放在同一张卡片里。</p></div>
+            <button class="btn" onclick="switchPage('workbench')">←　返回点歌工作台</button>
+          </div>
+          <div class="settings-grid">
+            <nav class="settings-nav">
+              <div class="nav-caption">点歌规则与配置</div>
+              <button class="active" data-setting="rules"><span class="nav-icon">✓</span>提交规则</button>
+              <button data-setting="capacity"><span class="nav-icon">▦</span>排期容量</button>
+              <button data-setting="window"><span class="nav-icon">◷</span>收歌与审核时间</button>
+              <button data-setting="slots"><span class="nav-icon">♫</span>播出时段</button>
+              <button data-setting="notice"><span class="nav-icon">▤</span>注意事项</button>
+              <button data-setting="danger"><span class="nav-icon">!</span>清空点歌数据</button>
+            </nav>
+            <div class="settings-content">
+              <div class="setting-panel" data-panel="rules">
+                <section class="settings-card">
+                  <div class="settings-card-head"><div><h3>提交规则</h3><p>保存后生效；规则只限制新提交，不会改变已经进入排期的记录。</p></div><span class="status placed">当前已生效</span></div>
+                  <div class="settings-body">
+                    <div class="rule-setting"><div><div class="setting-label">每人每周最多点歌次数</div><div class="setting-help">按北京时间自然周统计该学生的点歌记录。因系统排期失败自动驳回的投稿不计入；设为 0 表示不限。</div></div><div class="input-wrap"><div class="number-input"><button>−</button><strong>2</strong><button>＋</button></div><span class="suffix">次 / 周</span></div></div>
+                    <div class="rule-setting"><div><div class="setting-label">同一首歌一周内不可重复</div><div class="setting-help">比较时忽略大小写、全半角和空白。人工驳回的歌曲不占用重复限制。</div></div><div class="input-wrap"><button class="switch" aria-label="同曲限制已开启"><i></i></button><span class="inline-state">开启</span></div></div>
+                  </div>
+                  <div class="save-row"><small>修改规则不会清除已有投稿，也无需重启服务。</small><button class="btn primary" onclick="this.textContent='已保存 ✓';setTimeout(()=>this.textContent='保存提交规则',1200)">保存提交规则</button></div>
+                </section>
+                <div class="preview-callout"><span>ⓘ</span><span><strong>学生端提示</strong>　投稿页会显示本周剩余次数；同曲或次数规则未通过时，服务端会说明原因。</span></div>
+                <section class="settings-card">
+                  <div class="settings-card-head"><div><h3>当前使用中的其他规则</h3><p>集中查看容量与收歌状态；具体配置在左侧对应栏目调整。</p></div><a class="micro-link" href="#" onclick="event.preventDefault();selectSetting('capacity')">查看容量设置　→</a></div>
+                  <div class="settings-body"><div class="secondary-stats"><div class="mini-stat"><span>每个播出时段</span><b>3 首</b></div><div class="mini-stat"><span>下周正式位置</span><b>45 个</b></div><div class="mini-stat"><span>候补人数上限</span><b>不限</b></div></div></div>
+                </section>
+              </div>
+              <div class="setting-panel" data-panel="capacity" hidden>
+                <section class="settings-card"><div class="settings-card-head"><div><h3>排期容量</h3><p>容量按每个播出时段统一设置；候补队列不设人数上限。</p></div><span class="status placed">超管可修改</span></div><div class="settings-body"><div class="rule-setting"><div><div class="setting-label">每个时段正式位置</div><div class="setting-help">下周一至周五共有 15 个时段。容量设为 0 表示每格不限。</div></div><div class="input-wrap"><div class="number-input"><button>−</button><strong>3</strong><button>＋</button></div><span class="suffix">首 / 时段</span></div></div><div class="rule-setting"><div><div class="setting-label">下周可安排总数</div><div class="setting-help">按当前 3 个每日时段计算：5 天 × 3 时段 × 每格 3 首。</div></div><strong style="font-size:17px">45 <span style="font-size:10px;color:#888;font-weight:400">首</span></strong></div></div><div class="save-row"><small>改容量会重新计算尚未锁定周的排期。</small><button class="btn primary">保存容量</button></div></section>
+                <div class="preview-callout"><span>ⓘ</span><span><strong>权限提示</strong>　容量会影响正式位置和候补结果；普通管理员可以查看，只有超级管理员可以修改与执行排期。</span></div>
+              </div>
+              <div class="setting-panel" data-panel="window" hidden>
+                <section class="settings-card"><div class="settings-card-head"><div><h3>收歌与审核时间</h3><p>收歌截止后停止新提交；审核截止时才做最后排期并锁定本周。</p></div><span class="status pending">开放窗口已启用</span></div><div class="settings-body"><div class="window-preview"><div><small>收歌窗口</small><b>每周六 18:00　—　周日 18:00</b><div class="sub">窗口外不能提交点歌 · 文稿不受此限制</div></div><div><small>审核截止</small><b>周一 00:00</b><div class="sub">窗口结束后留给管理员审核和调剂</div></div></div><div class="rule-setting" style="margin-top:13px"><div><div class="setting-label">收歌窗口</div><div class="setting-help">可设置为周一至周日内的一段连续时间，不跨越目标播出周的周一。</div></div><button class="btn">编辑窗口</button></div><div class="rule-setting"><div><div class="setting-label">审核截止</div><div class="setting-help">可单独指定审核截止；未指定时，按收歌结束后 6 小时计算。</div></div><button class="btn">编辑审核截止</button></div></div><div class="save-row"><small>时间统一按北京时间计算。</small><button class="btn primary">保存时间设置</button></div></section>
+              </div>
+              <div class="setting-panel" data-panel="slots" hidden>
+                <section class="settings-card"><div class="settings-card-head"><div><h3>播出时段</h3><p>学生从系统生成的下周工作日列表中选择，无法手输时段。</p></div><span class="status placed">当前来源：后台发布</span></div><div class="settings-body"><div class="slots"><div class="slot-pill"><b>07:20</b><small>早间</small></div><div class="slot-pill"><b>12:20</b><small>午间</small></div><div class="slot-pill"><b>17:30</b><small>晚间</small></div></div><div class="rule-setting" style="margin-top:12px"><div><div class="setting-label">当前可选范围</div><div class="setting-help">2026.09.28 周一 — 10.02 周五　·　共 15 个播出时段</div></div><button class="btn">编辑时段</button></div></div><div class="save-row"><small>修改后新提交立即按新时段校验；历史首选时段会保留。</small><button class="btn primary">发布时段</button></div></section>
+              </div>
+              <div class="setting-panel" data-panel="notice" hidden>
+                <section class="settings-card"><div class="settings-card-head"><div><h3>点歌注意事项</h3><p>修改正文会让所有学生重新确认新版本。</p></div><span class="status ready">第 3 版 · 已配置</span></div><div class="settings-body"><div class="notice-text">1. 请确认歌曲名称和歌手填写准确。<br>2. 点歌祝福语应遵守校园文明规范。<br>3. 每人每周最多点歌 2 次，同一首歌一周内不可重复。<br>4. 请选择系统提供的播出日期和时段。<br><br>请阅读完毕后，滑动到页面底部点击“我已知晓”。</div><div class="rule-setting"><div><div class="setting-label">当前确认进度</div><div class="setting-help">学生确认新版本后才可以提交点歌。</div></div><strong style="font-size:12px">1,248 / 1,302 人</strong></div></div><div class="save-row"><small>点歌和文稿的注意事项相互独立。</small><button class="btn primary">保存注意事项</button></div></section>
+              </div>
+              <div class="setting-panel" data-panel="danger" hidden>
+                <section class="settings-card danger-card"><div class="settings-card-head"><div><h3>清空点歌数据</h3><p>此操作会永久删除全部点歌记录，且无法恢复。</p></div><span class="status pending">仅超级管理员</span></div><div class="settings-body"><div class="danger-row"><div><b>清空全部点歌投稿</b><small>点歌记录与点歌名额计数会被清除。文稿投稿、学生账号和注意事项确认记录不会受影响。</small></div><button class="btn danger" onclick="alert('原型演示：实际操作需要二次确认并输入 DELETE')">清空点歌数据</button></div></div></section>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <div class="overlay show" id="reviewOverlay" onclick="if(event.target===this)closeReview()">
+    <section class="modal legacy-console v12-dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header class="v12-head">
+        <div class="v12-head-top"><span class="legacy-type">点歌</span><h3 id="modalTitle">审核处理台</h3><span class="v12-counter" id="consoleStep">第 1 / 18 条待处理</span><span class="v12-hotkeys"><kbd>J</kbd>/<kbd>K</kbd> 切换　<kbd>Enter</kbd> 通过</span><button class="legacy-close" onclick="closeReview()">×</button></div>
+        <div class="v12-meta">#1024　·　2026-09-27 18:03 提交　·　来自小程序投稿页　·　V1.2 静态预览</div>
+      </header>
+      <div class="v12-body">
+        <div class="v12-left">
+          <section class="legacy-person v12-person">
+            <div class="legacy-person-top"><span class="legacy-avatar" id="modalAvatar">林</span><div class="legacy-person-info"><strong id="modalUser">林晓</strong><small>高一（3）班　·　本次第 2 次投稿</small></div><div class="legacy-person-tags"><span>学号账号</span><span>在用</span></div></div>
+            <div class="legacy-person-stats"><div><small>历史通过</small><b>3</b></div><div><small>历史驳回</small><b>0</b></div><div><small>首次投稿</small><b style="font-size:13px">08-28</b></div></div>
+          </section>
+          <section class="legacy-card v12-content">
+            <div class="legacy-card-head"><strong>投稿内容</strong><small>完整内容</small></div>
+            <div class="v12-song-title"><strong id="modalSong">晴天</strong><span>·</span><span id="modalSinger">周杰伦</span></div>
+            <div class="legacy-field" style="padding-top:0"><label>首选时段</label><b id="modalSlot">周一 · 午间 12:20</b></div>
+            <div class="v12-wish"><label>想说的话</label>祝毕业班一路顺风，希望大家都能奔向自己喜欢的未来。</div>
+          </section>
+          <section class="legacy-schedule v12-schedule">
+            <div class="v12-state-grid"><div class="v12-state"><small>审核状态</small><b><span class="status pending" id="modalStatus">待审核</span></b></div><div class="v12-state"><small>排期状态</small><b>尚未排期</b></div></div>
+            <div class="state-hint">审核通过后进入排期候选池。通过审核不代表已经获得正式位置；系统会按首选时段、容量和提交时间分配。</div>
+          </section>
+        </div>
+        <aside class="v12-right">
+          <section class="legacy-card v12-right-card">
+            <div class="legacy-card-head"><strong>选择处理方式</strong><small id="decisionCaption">待审核稿件</small></div>
+            <div class="v12-decision"><button class="btn approve-mode" id="approveModeButton" onclick="setDecision('approve')">✓　通过</button><button class="btn reject-mode" id="rejectModeButton" onclick="setDecision('reject')">驳回</button></div>
+            <div class="v12-info"><div class="v12-info-head"><span>首选时段 · 周一午间</span><b>2 / 3　还可排 1 首</b></div><div class="progress"><i style="width:66%"></i></div><div class="v12-info-note">只计算审核通过并已排到此时段的投稿。</div></div>
+            <div class="v12-info"><div class="v12-info-head"><span>全局候补队列</span><b>6 条　·　无人数上限</b></div><div class="v12-info-note">空位释放后自动递补；收歌截止后，符合条件的投稿也可调剂到其他时段。</div></div>
+            <div class="v12-info"><div class="v12-info-head"><span>点歌时间窗口</span><b style="color:var(--green)">● 收歌中</b></div><div class="v12-info-note">收歌截止：周日 18:00　·　审核锁定：周一 00:00</div></div>
+            <div class="v12-reject-panel" id="rejectPanel">
+              <div class="v12-reject-title">驳回原因 <span>必填，学生端可见</span></div>
+              <div class="legacy-presets"><button onclick="chooseReason(this,'内容不适合播出')">内容不适合播出</button><button onclick="chooseReason(this,'信息不完整')">信息不完整</button><button onclick="chooseReason(this,'重复投稿')">重复投稿</button></div>
+              <textarea class="legacy-textarea" id="rejectReason" placeholder="补充说明，帮助投稿人理解" oninput="updatePrimary()"></textarea>
+              <div class="v12-info-note">选择常用原因后仍可补充说明。</div>
+            </div>
+            <details class="v12-history"><summary>审核记录与提交信息</summary><div class="legacy-history-box">本条目尚未处理。<br>提交时间　<b>2026-09-27 18:03</b><br>本周点歌　<b>1 / 2 次</b><br>账号状态　<b>正常</b></div></details>
+          </section>
+        </aside>
+      </div>
+      <footer class="legacy-foot v12-foot">
+        <div><button class="btn" onclick="shiftConsole(-1)">‹ 上一条</button> <button class="btn" onclick="shiftConsole(1)">下一条 ›</button></div>
+        <div class="v12-foot-context">按学生投稿顺序处理　·　完成后自动打开下一条</div>
+        <div class="legacy-foot-actions"><button class="btn" onclick="closeReview()">取消</button><button class="btn primary approve-next" id="consolePrimary" onclick="consoleDecision()">通过并取下一条</button></div>
+      </footer>
+    </section>
+  </div>
+  <script>
+    const title = document.getElementById('topTitle');
+    function switchPage(name){
+      document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===name));
+      document.querySelectorAll('.view-switch button').forEach(b=>b.classList.toggle('active',b.dataset.page===name));
+      title.textContent=name==='settings'?'点歌设置':'点歌工作台';
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
+    document.querySelectorAll('.view-switch button').forEach(b=>b.addEventListener('click',()=>switchPage(b.dataset.page)));
+    function selectSetting(name){
+      document.querySelectorAll('.settings-nav button').forEach(b=>b.classList.toggle('active',b.dataset.setting===name));
+      document.querySelectorAll('.setting-panel').forEach(p=>p.hidden=p.dataset.panel!==name);
+    }
+    document.querySelectorAll('.settings-nav button').forEach(b=>b.addEventListener('click',()=>selectSetting(b.dataset.setting)));
+    document.querySelectorAll('.filter').forEach(b=>b.addEventListener('click',()=>{
+      document.querySelectorAll('.filter').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+    }));
+    document.querySelectorAll('.type-tabs button').forEach(b=>b.addEventListener('click',()=>{
+      document.querySelectorAll('.type-tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+    }));
+    let consolePosition=1, decisionMode='approve';
+    function openReview(song,singer,user,slot,status){
+      document.getElementById('modalSong').textContent=song;
+      document.getElementById('modalSinger').textContent=singer;
+      document.getElementById('modalUser').textContent=user;
+      document.getElementById('modalSlot').textContent=slot;
+      document.getElementById('modalStatus').textContent=status;
+      document.getElementById('modalAvatar').textContent=(user||'?').charAt(0);
+      consolePosition=1;
+      document.getElementById('consoleStep').textContent='第 '+consolePosition+' / 18 条待处理';
+      setDecision('approve');
+      document.getElementById('reviewOverlay').classList.add('show');
+    }
+    function closeReview(){document.getElementById('reviewOverlay').classList.remove('show')}
+    function setDecision(mode){
+      decisionMode=mode;
+      document.getElementById('rejectPanel').classList.toggle('open',mode==='reject');
+      document.getElementById('approveModeButton').classList.toggle('approve-mode',mode==='approve');
+      document.getElementById('rejectModeButton').classList.toggle('active',mode==='reject');
+      document.getElementById('decisionCaption').textContent=mode==='reject'?'需要填写驳回原因':'待审核稿件';
+      const primary=document.getElementById('consolePrimary');
+      primary.textContent=mode==='reject'?'驳回并取下一条':'通过并取下一条';
+      primary.classList.toggle('reject-next',mode==='reject');primary.classList.toggle('approve-next',mode==='approve');
+      updatePrimary();
+    }
+    function chooseReason(button,reason){
+      document.querySelectorAll('.v12-reject-panel .legacy-presets button').forEach(x=>x.classList.remove('selected'));
+      button.classList.add('selected');document.getElementById('rejectReason').value=reason;setDecision('reject');updatePrimary();
+    }
+    function updatePrimary(){document.getElementById('consolePrimary').disabled=decisionMode==='reject'&&!document.getElementById('rejectReason').value.trim()}
+    function consoleDecision(){
+      const reject=decisionMode==='reject';
+      if(reject&&!document.getElementById('rejectReason').value.trim()){alert('请先填写驳回原因');return}
+      alert('V1.2 原型演示：审核操作暂不连接后端');
+    }
+    function shiftConsole(delta){consolePosition=Math.min(18,Math.max(1,consolePosition+delta));document.getElementById('consoleStep').textContent='第 '+consolePosition+' / 18 条待处理'}
+    document.addEventListener('keydown',e=>{
+      if(!document.getElementById('reviewOverlay').classList.contains('show'))return;
+      if(e.key==='Escape')closeReview();if(e.key.toLowerCase()==='j')shiftConsole(1);if(e.key.toLowerCase()==='k')shiftConsole(-1);if(e.key==='Enter')consoleDecision();
+    });
+  </script>
+</body>
+</html>

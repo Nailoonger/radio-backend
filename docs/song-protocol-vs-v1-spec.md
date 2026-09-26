@@ -16,11 +16,12 @@
 | 条目 | 内容 | 状态 |
 | --- | --- | --- |
 | 2.1 | 权限锁死：6 个越权接口 → 超管，另收 `played` / `revoke` / 两个 sweep | ✅ 已修 |
-| 2.2 | `preview` 模拟排期（`POST /submit/schedule/preview` + `dryRun` 不写库） | ✅ 已修（`unlock` 仍未做 —— V1 说可先不提供，但要求「锁定后真的不能改」，见 2.3） |
+| 2.2 | `preview` 模拟排期（`POST /submit/schedule/preview` + `dryRun` 不写库） | ✅ 已修 |
+| 2.2b | **`unlock` 解锁（撤销锁定）** —— `POST /submit/schedule/unlock`，见文末第九节 | ✅ 已做（2026-09-26 陛下裁决） |
 | 2.3 | 锁定守卫：approve / reject / remove / revoke / batch / assign / played / runSchedule | ✅ 已修 |
 | 2.4 | 调剂成本表：10 / 20 / 30 / 50 / ∞，独立成 `songRescheduleCost.js` | ✅ 已修 |
 | 2.5 | 并发保护：`applyChange` 改带条件 UPDATE（影响 0 行即放弃） | ✅ 已修 |
-| 2.6 | 三维状态数字 → 字符串 | ⬜ 待陛下裁决 |
+| 2.6 | 三维状态数字 → 字符串 | ✅ **陛下裁决：保持数字**（2026-09-26）—— 不改列类型、不做数据迁移，`TINYINT` + 常量名对照（见下方 2.6） |
 | 2.7 | 角色模型 2 个 → 3 个 | ⬜ 待陛下裁决 |
 | 3.1 / 3.3 / 3.4 | `schedule_slots` 表、逐格容量、周创建方式 | ⬜ 保留现状（有意偏离） |
 
@@ -28,7 +29,7 @@
 > `reschedule()` 增加 `crossSlot` 闸门，**收歌窗口内只做「原位递补」**，
 > 收歌截止后才允许跨时段调剂。
 >
-> 验证：`node scripts/verify-song-protocol.js` → **158 项全过**（97 → 130 → 158，新增 G2 / G3 / P / Q 四节）。
+> 验证：`node scripts/verify-song-protocol.js` → **187 项全过**（97 → 130 → 158 → 161 → 187）。
 
 > **点歌时间窗口改版（2026-09-25，陛下裁决）** —— 见文末第八节：
 > ① 星期**任选 周一→周日**（废除「开始限五/六/日、结束限六/日、最长 72h」白名单）；
@@ -135,13 +136,30 @@ V1 点名：「必须 `BEGIN TRANSACTION` → `LOCK schedule_slot` → `SELECT c
 单进程定时器下几乎撞不上，但**管理端手动触发 + 定时器重叠时理论可超卖**。  
 → 需要补一条「带条件的 UPDATE」（`WHERE id=? AND schedule_status=?` 之类）或 `SELECT ... FOR UPDATE`。
 
-### 2.6 三维状态存的是数字，V1 要求字符串
+### 2.6 三维状态存的是数字，V1 要求字符串 —— ✅ 已裁决：**保持数字**
 
 V1：`review_status VARCHAR(30) / schedule_status VARCHAR(30) / play_status VARCHAR(30)`，值就是 `PENDING` / `WAITING` 这样的**字符串**。  
 现状：三列都是 **`TINYINT`**（0/1/2/3），常量名一致但**落库是数字**；`status` 派生镜像也是 `INTEGER`。
 
-**这条要陛下定**：改存字符串 = 要改列类型 + 全量数据迁移 + 所有查询条件（`reviewStatus: 1` → `'APPROVED'`），  
-成本不小但一劳永逸；不改 = 与规格书长期不一致，以后交接/排障要一直查对照表。
+**陛下裁决（2026-09-26）：不改，保持数字。** 理由与代价：
+
+- 改存字符串 = 改列类型 + 全量数据迁移 + 所有查询条件（`reviewStatus: 1` → `'APPROVED'`）逐处替换，
+  风险全在「改错一处条件 → 状态筛选静默漏行」。
+- 数字不是「没有语义」：**接口同时下发数字与名字**（`reviewStatus` + `reviewStatusName`，
+  同理 `scheduleStatusName` / `playStatusName`，见 `songStatusService.statusView()`），
+  排障与交接照名字看即可，不需要靠对照表。
+- 唯一需要长期守住的约束：**数字 ↔ 常量名只允许有一处定义**（`songStatusService`），
+  任何地方都别自己写 `if (status === 1)` 这种裸数字。
+
+对照表（`src/services/songStatusService.js`，**唯一真值**）：
+
+| 维度 | 0 | 1 | 2 | 3 |
+|---|---|---|---|---|
+| `review_status` | `PENDING` | `APPROVED` | `REJECTED` | `CANCELLED` |
+| `schedule_status` | `UNASSIGNED` | `APPROVED` | `WAITING` | `AUTO_REJECTED` |
+| `play_status` | `NOT_PLAYED` | `PLAYED` | — | — |
+
+派生镜像 `status`：`0 待审核 / 1 已排期 / 2 已驳回 / 3 候补中 / 4 已补位待审核 / 5 已播放 / 6 已通过待排期 / 7 已取消`。
 
 ### 2.7 角色模型是 2 个，V1 是 3 个
 
@@ -281,4 +299,48 @@ V1 这份规格相比上一版协议，真正的增量就是「**权限锁死 + 
 7 天任选、跨周不成立、三类报错、整周铺满、窗口内不跳变、锁定时 = 审核截止、
 未配置退回偏移、关闭窗口兜底、`describe` 下发口径）。
 `verify-song-submit.js` 107 项 + `verify-student-account.js` 174 项均全过。
+
+---
+
+## 九、2026-09-26 收尾（陛下裁决：`unlock` 要做 + 状态保持数字）
+
+三条裁决：① 小程序「我的投稿」第三格定名 **「已播出」**；② 三维状态**保持数字**（见 2.6）；
+③ **`unlock` 要做**。
+
+### 9.1 `unlock` 解锁（新增）
+
+`POST /admin/submit/schedule/unlock`（**仅超管**），body `{ weekStart?, restore? }`。
+
+| # | 服务端动作 |
+| --- | --- |
+| ① | 周状态 `LOCKED → SCHEDULING`，`locked_at` 清空 |
+| ② | 本次锁定时被**系统自动驳回**的候补 → 退回 `WAITING`，清 `reject_reason` / `auto_rejected`（只动 `schedule_status` 仍是 `AUTO_REJECTED` 且 `review_status=APPROVED` 的；`restore: false` 可跳过） |
+| ③ | `lock_paused = 1`（新列，`weekly_schedule.lock_paused TINYINT`） |
+
+⚠️ **③ 是这版的关键**：`sweep()` 的自动锁定判据只有 `now >= schedule_lock_at`，
+而解锁必然发生在锁定时刻之后 —— 不拦住的话下一轮 sweep 立刻把它锁回去，解锁等于没做。
+`lock_paused = 1` 的周在 sweep 里**跳过锁定分支**（仍跑排期补空位）。
+恢复自动锁定的唯一途径是**手动重新锁定**（`lockWeek()` 清 `lock_paused = 0`）。
+
+解锁**不动时间锚点**（退回后是 `SCHEDULING` ∈ `ANCHOR_FROZEN_STATUS`，`refreshAnchors()` 不覆盖）。
+
+前端：`SubmitList.vue` 深色状态条在 `week.locked` 时把「锁定本周」换成「解锁本周」（带影响说明的二次确认），
+`week.lockPaused` 时状态行显示「已解锁，**自动锁定已暂停**」，按钮提示「改完手动锁」。
+
+⚠️ **上线要补列**：新增 `weekly_schedule.lock_paused` → 必须先跑
+`docker compose run --rm radio-backend node scripts/db-repair.js`（幂等，只加不改不删）
+再 `up -d --force-recreate radio-backend`。
+
+### 9.2 「已播出」第三格（无需改动）
+
+`miniprogram/pages/mySubmit/mySubmit.wxml` 的三格筛选本来就是
+「全部 / 待审核 / **已播出**」（`statusFilter ∈ {'', pending, played}`），
+本桶 = 点歌 `status ∈ {1 已排期, 5 已播放}`（文稿按 `type===2` 文案覆盖成「已通过」）。
+陛下确认定名 → **代码零改动**，记为口径。
+
+### 9.3 验证
+
+`node scripts/verify-song-protocol.js` → **187 项全过**（新增 R 节 26 项 + O/P 各 1 项：
+未锁定不能解、解锁后退状态且清 `locked_at`、候补退 `WAITING` 并清标记、
+**sweep 到点也不锁回去**、手动重锁可恢复自动锁定、`restore:false` 不解冻、解锁后锚点仍冻结）。
 

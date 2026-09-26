@@ -39,8 +39,10 @@ sync ok（submit / weekly_schedule / assignment_log / request_status_log …）
 
 --- Q. 点歌窗口：周内任选 + 审核截止独立 ---
 
+--- R. 解锁（撤销锁定）---
+
 ══════════════════════════════════
-通过 161 项
+通过 187 项
 ✅ 全部通过
 
   ✓ 下周格子数 = 5 × 时段数  [n=15]
@@ -115,7 +117,7 @@ sync ok（submit / weekly_schedule / assignment_log / request_status_log …）
   ✓ 审核维度保持 APPROVED（没被人为驳回）  [1]
   ✓ 已拿到位置的不受锁定影响
   ✓ 重复锁定幂等  [true]
-  ✓ 未到锁定时刻且没传 force → 不锁  [{"id":3,"weekStartDate":"2026-10-05","status":"DRAFT","statusText":"未发布","applicationStartAt":"2026-10-03T18:00:00+08:00","applicationEndAt":"2026-10-04T18:00:00+08:00","reviewStartAt":"2026-10-04T18:00:00+08:00","reviewEndAt":"2026-10-05T00:00:00+08:00","scheduleLockAt":"2026-10-05T00:00:00+08:00","lockedAt":null,"lockText":"2026-10-05T00:00:00+08:00","secondsToLock":626340,"canApply":false,"locked":false,"already":false,"tooEarly":true,"rejected":0}]
+  ✓ 未到锁定时刻且没传 force → 不锁  [{"id":3,"weekStartDate":"2026-10-05","status":"DRAFT","statusText":"未发布","applicationStartAt":"2026-10-03T18:00:00+08:00","applicationEndAt":"2026-10-04T18:00:00+08:00","reviewStartAt":"2026-10-04T18:00:00+08:00","reviewEndAt":"2026-10-05T00:00:00+08:00","scheduleLockAt":"2026-10-05T00:00:00+08:00","lockedAt":null,"lockText":"2026-10-05T00:00:00+08:00","secondsToLock":626340,"canApply":false,"locked":false,"lockPaused":false,"unlockable":false,"already":false,"tooEarly":true,"rejected":0}]
   ✓ 传 force 可以提前锁定  [LOCKED]
   ✓ 锁定状态不回退（ensureWeek 不覆盖 LOCKED）  [LOCKED]
   ✓ 播出时刻已过的被标记已播放
@@ -141,13 +143,14 @@ sync ok（submit / weekly_schedule / assignment_log / request_status_log …）
   ✓ 同曲一周去重仍生效  [{"ok":false,"songName":"同名歌"}]
   ✓ 不同歌名不受影响
   ✓ 每人每周次数仍生效（默认 2 次已用完）  [{"ok":false,"used":2,"limit":2,"remaining":0}]
-  ✓ 点歌时间窗口仍在（enabled 且给出起止）  [每周六 18:00 – 周日 18:00 open=false]
+  ✓ 点歌时间窗口仍在（enabled 且给出起止）  [每周六 18:00 – 周日 18:00 open=true]
   ✓ sweep 覆盖到了目标周  [[{"weekStartDate":"2026-09-28","weekId":4,"assigned":1,"waiting":0,"promoted":0,"rescheduled":0}]]
   ✓ sweep 把审核通过的人排上了位  [1]
   ✓ sweep 到锁定时刻自动锁定  [[{"weekStartDate":"2026-09-28","weekId":4,"locked":true,"rejected":0}]]
   ✓ 管理端已挂载 POST /submit/schedule/preview
   ✓ 管理端已挂载 POST /submit/schedule/run
   ✓ 管理端已挂载 POST /submit/schedule/lock
+  ✓ 管理端已挂载 POST /submit/schedule/unlock
   ✓ 管理端已挂载 GET /submit/week
   ✓ 管理端已挂载 POST /submit/:id/assign
   ✓ 管理端已挂载 PUT /submit/:id/played
@@ -156,6 +159,7 @@ sync ok（submit / weekly_schedule / assignment_log / request_status_log …）
   ✓ GET /submit/schedule 排在 GET /submit/:id 之前
   ✓ GET /submit/week 排在 GET /submit/:id 之前
   ✓ POST /submit/schedule/run 排在 POST /submit/:id/assign 之前
+  ✓ POST /submit/schedule/unlock 排在 POST /submit/:id/assign 之前
   ✓ GET /submit/window 排在 GET /submit/:id 之前（用户端）
   ✓ 仅超管：PUT /submit/quota
   ✓ 仅超管：PUT /submit/slots
@@ -164,6 +168,7 @@ sync ok（submit / weekly_schedule / assignment_log / request_status_log …）
   ✓ 仅超管：POST /submit/schedule/preview
   ✓ 仅超管：POST /submit/schedule/run
   ✓ 仅超管：POST /submit/schedule/lock
+  ✓ 仅超管：POST /submit/schedule/unlock
   ✓ 仅超管：POST /submit/:id/assign
   ✓ 仅超管：PUT /submit/:id/played
   ✓ 仅超管：PUT /submit/:id/revoke
@@ -204,3 +209,26 @@ sync ok（submit / weekly_schedule / assignment_log / request_status_log …）
   ✓ 配置改动后：已有周行「收歌截止」自动刷新  [2026-09-27T09:00:00+08:00（期望 2026-09-27T09:00:00+08:00）]
   ✓ 配置改动后：已有周行「锁定时刻」跟着改成新审核截止  [2026-09-27T10:00:00+08:00（期望 2026-09-27T10:00:00+08:00）]
   ✓ 已排期(SCHEDULING)的周行锚点冻结，不被新配置改写  [SCHEDULING / 2026-09-27T09:00:00+08:00]
+  ✓ 新周 lockPaused 默认 0（自动锁定正常）  [0]
+  ✓ 新周 weekView.unlockable = false（没锁就没什么可解）
+  ✓ 未锁定的周解锁被拒（40001）  [这一周没有锁定，无需解锁]
+  ✓ 锁定成功  [LOCKED]
+  ✓ 锁定成功时 lockPaused 归 0（自动锁定生效）
+  ✓ 锁定时排不上的候补被自动驳回  [AUTO_REJECTED]
+  ✓ 解锁后周状态退回 SCHEDULING  [SCHEDULING]
+  ✓ 解锁后 lockedAt 清空  [null]
+  ✓ 解锁后 lockPaused = 1（暂停自动锁定）
+  ✓ 解锁后 weekView.unlockable = false
+  ✓ 解锁时报告恢复了 1 条候补  [1]
+  ✓ 被自动驳回的候补退回「候补中」  [WAITING]
+  ✓ 恢复候补清掉了驳回理由  [null]
+  ✓ 恢复候补清掉了 auto_rejected 标记  [0]
+  ✓ 恢复候补的镜像 status 回到「候补中」  [3]
+  ✓ 已落座的不受解锁影响（位子还在）
+  ✓ sweep 不再自动锁回已解锁的周（lockPaused 生效）  [{"weekStartDate":"2026-10-26","weekId":6,"lockPaused":true,"assigned":0,"waiting":0,"promoted":0,"rescheduled":0}]
+  ✓ sweep 之后周仍是 SCHEDULING
+  ✓ 解锁后仍可手动重新锁定  [LOCKED]
+  ✓ 重新锁定后 lockPaused 清 0（自动锁定恢复）
+  ✓ restore:false 时不恢复候补  [0]
+  ✓ restore:false 时候补仍停在已驳回  [AUTO_REJECTED]
+  ✓ 解锁后锚点仍冻结（不被新配置改写）  [2026-10-26T00:00:00+08:00]
