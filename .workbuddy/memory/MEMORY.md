@@ -7,6 +7,7 @@
 - **admin-web 按 v8 落地**（权威 `preview/admin-ui-v8/admin-ui-v8.html`）：唯一强调色 **#0066CC**、无渐变无彩色投影、深色卡为主角。**登录页是唯一例外**（用户 v4 分栏版），勿动。改前备份 `admin-web/_backup/<时间戳>-src/`。
 - **绝不用 `git checkout --`**：工作树全是未提交成果。
 - **UI/视觉需求先出静态 HTML 预览（标 v1/v2…），点头前不写业务代码**；版本只增不删（只新增 `preview/<主题>-v<N>/`，渲染图进 `shots/`）。需求含糊或被否 → 先问清形态再动手。
+  📌 **待裁决**：`preview/song-admin-ui-v1/`（状态链中英双行 + 完成转绿；点歌设置 8 板块 → 5 分组 + 保存状态化）。**陛下点头前不动 `SubmitList.vue` / `SongSettings.vue`**。
 - **别在本机构建/部署**：改完 → 本地 commit → 交陛下 push + 服务器更新步骤。提交身份用全局 `Nailoonger <1493586497@qq.com>`，别写仓库级 user.email/name。
 
 ## 部署（服务器 `~/radio`）
@@ -83,6 +84,10 @@
 - 保留不变：每人每周 2 次、同曲一周去重。
 - 有意偏离协议：不建 `schedule_slots` 表（格子由 `broadcastSlotService` 派生）；容量仍是全局 KV；`song_queue_limit` 废弃。
 - 前端已落地（commit `9b07026`）：两端都按派生 `status`；**已排期 = Σ 各格 seated**；文稿 `schedule` 恒 UNASSIGNED → 派生 status 也是 6，文案按 `type===2` 覆盖成「已通过」。
+- ⚠️ **两个「周」必须分清**（页面文案/label 要标归属）：点歌窗口的星期**任选 周一→周日**、锚定**收歌周**；播出时段固定**下一周周一~周五**（`broadcastSlotService`）、锚定**播出周**。
+- **提交路径实际只有 5 个拦截码**：`40303` 注意事项未确认 / `40907` 窗口外 / `40001` 时段非系统下发 / `40903` 同曲重复·次数用完 / `40901` 一分钟内重提。**`40902 / 40904 / 40906` 已无任何生产路径抛出**（仅存 `utils/response.js` 定义），文档与页面里别再引用；`SLOT_FULL_REASON` 是**排期阶段**的自动驳回理由，不是提交拦截码。
+- ⚠️ `WEEK_FLOW`（SongSettings 无、`SubmitList.vue` 里）**缺 `CANCELLED`** → `findIndex` 返回 −1，4 个状态胶囊全落到「未到」。改状态链时一并处理。
+- ⚠️ 操作列实体按钮宽：通过/驳回 54、撤销 54、改时段 66、标记播放 78、指派时段 78、改驳回 66；文字链 `.op-log`≈52 / `.op-del`≈28；gap 6。列宽 **236**（原 200 本就溢出）。**量折行看 height 不看 width**（`flex-wrap` 后宽度=占满）。
 
 ## 学生账号（细则 `docs/student-account.md`）
 - 账号＝年级(4)+班级(2)+序号(2)；初始密码 `user`+学号（`initPasswordFor` 唯一出口）；复用 user 表。

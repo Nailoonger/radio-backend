@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>菁悠广播站 · 点歌管理 UI 方案 v1（状态链 + 点歌设置）</title>
+<style>
+/* ============================================================
+   菁悠广播站 · 点歌管理 UI 方案 v1（静态预览，不改动任何业务代码）
+   设计系统继承 preview/admin-ui-v8/admin-ui-v8.html
+   三条硬规则：唯一强调色 #0066CC / 无渐变无彩色投影 / 深色卡是主角
+   ============================================================ */
+:root{
+  --ink:#1d1d1f; --ink-2:#333; --muted:#7a7a7a; --muted-2:#6e6e73;
+  --soft:#c7c7cc; --hairline:#e0e0e0; --divider:#f0f0f0;
+  --parchment:#f5f5f7; --canvas:#fff; --tile:#272729; --tile-2:#3a3a3c;
+  --accent:#0066cc; --acc-bg:#e6f0fa;
+  --amber-bg:#fef3c7; --amber-fg:#8a6100;
+  --green-bg:#e7f5ec; --green-fg:#1e7a46;
+  --red-bg:#fde8e8;   --red-fg:#b42318;
+  --r-card:18px; --r-input:12px; --r-tile:20px; --r-pill:9999px;
+  --fs-2xs:10.5px; --fs-xs:11.5px; --fs-sm:12.5px; --fs-md:13.5px;
+  --fs-lg:15px; --fs-xl:19px; --fs-2xl:24px;
+  --s1:4px; --s2:8px; --s3:13px; --s4:18px; --s5:26px; --s6:34px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#efeff1; color:var(--ink);
+  font:400 var(--fs-md)/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.num{font-variant-numeric:tabular-nums}
+svg{display:block}
+
+/* ══════════ 预览外壳 ══════════ */
+.pv-top{
+  position:sticky; top:0; z-index:50;
+  display:flex; align-items:center; gap:var(--s4);
+  padding:0 var(--s5); height:54px;
+  background:rgba(255,255,255,.88); backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--hairline);
+}
+.pv-brand{font-size:var(--fs-sm); font-weight:600; letter-spacing:.3px; white-space:nowrap}
+.pv-brand span{color:var(--muted); font-weight:400}
+.pv-tabs{display:flex; gap:var(--s1); background:var(--parchment); padding:3px; border-radius:var(--r-pill)}
+.pv-tabs button{
+  border:none; background:transparent; cursor:pointer; font:inherit;
+  font-size:var(--fs-sm); color:var(--muted);
+  padding:5px 15px; border-radius:var(--r-pill);
+  transition:background .18s var(--ease), color .18s var(--ease);
+}
+.pv-tabs button.on{background:var(--tile); color:#fff; font-weight:600}
+.pv-note{margin-left:auto; font-size:var(--fs-xs); color:var(--muted-2)}
+
+.pane{display:none; padding:var(--s5) var(--s5) 60px}
+.pane.on{display:block}
+.wrap{max-width:1180px; margin:0 auto}
+
+.pane-head{margin-bottom:var(--s5)}
+.pane-head h1{margin:0 0 6px; font-size:var(--fs-2xl); font-weight:600; letter-spacing:-.2px}
+.pane-head p{margin:0; color:var(--muted); font-size:var(--fs-md)}
+
+/* 区块通用 */
+.blk{margin-bottom:var(--s6)}
+.blk > h3{
+  margin:0 0 var(--s3); font-size:var(--fs-sm); font-weight:600;
+  letter-spacing:.4px; color:var(--muted-2);
+  display:flex; align-items:center; gap:var(--s2);
+}
+.blk > h3::after{content:""; flex:1; height:1px; background:var(--hairline)}
+.card{
+  background:var(--canvas); border:1px solid var(--hairline);
+  border-radius:var(--r-card); padding:var(--s4);
+}
+.note{
+  display:flex; gap:9px; align-items:flex-start;
+  background:var(--parchment); border-radius:var(--r-input);
+  padding:11px 14px; font-size:var(--fs-sm); color:var(--muted);
+  line-height:1.75;
+}
+.note b{color:var(--ink-2); font-weight:600}
+.note svg{flex:none; margin-top:3px; color:var(--soft)}
+
+/* ══════════ 屏 1 · 状态链 ══════════ */
+.ba{display:grid; grid-template-columns:1fr; gap:var(--s4)}
+.ba-row{background:var(--canvas); border:1px solid var(--hairline); border-radius:var(--r-card); padding:var(--s4) var(--s5)}
+.ba-label{
+  font-size:var(--fs-2xs); letter-spacing:.1em; text-transform:uppercase;
+  color:var(--muted-2); margin-bottom:var(--s3); font-weight:600;
+}
+.ba-label.dep{color:var(--amber-fg)}
+.ba-label.new{color:var(--green-fg)}
+
+/* —— 现状（v8）：中文英文同一行 —— */
+.oldflow{display:flex; align-items:center; flex-wrap:wrap}
+.oldstep{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:6px 12px; border-radius:var(--r-pill);
+  background:var(--parchment); font-size:var(--fs-sm); color:var(--muted);
+  white-space:nowrap;
+}
+.oldstep i{font-style:normal; font-size:var(--fs-2xs); opacity:.7}
+.oldstep.on{background:var(--ink); color:#fff; font-weight:600}
+.oldstep.done{background:var(--acc-bg); color:var(--accent)}
+.oldarrow{width:16px; flex:none; height:1px; background:var(--hairline); margin:0 5px}
+
+/* —— 提案 v1：中英双行 + 绿 / 深 / 羊皮纸 —— */
+.wkflow{display:flex; align-items:center; flex-wrap:wrap}
+.wkstep{
+  display:inline-flex; flex-direction:column; align-items:flex-start;
+  gap:0; padding:5px 14px 6px; border-radius:var(--r-pill);
+  background:var(--parchment); color:var(--muted); white-space:nowrap;
+  transition:background .2s var(--ease), color .2s var(--ease);
+}
+.wkstep .cn{font-size:var(--fs-sm); font-weight:600; line-height:1.3; letter-spacing:.2px}
+.wkstep .en{
+  font-size:var(--fs-2xs); line-height:1.3; letter-spacing:.08em;
+  font-weight:500; opacity:.85; text-transform:uppercase;
+}
+.wkstep.done{background:var(--green-bg); color:var(--green-fg)}
+.wkstep.done .en{opacity:.72}
+.wkstep.on{background:var(--tile); color:#fff; box-shadow:0 0 0 3px rgba(39,39,41,.09)}
+.wkstep.on .en{opacity:.62}
+.wkstep.cancel{background:var(--parchment); color:#a1a1a6}
+.wkstep.done .cn::before{
+  content:"✓"; display:inline-block; margin-right:4px;
+  font-size:var(--fs-xs); font-weight:700;
+}
+.wkarrow{width:16px; flex:none; height:2px; background:var(--hairline); margin:0 5px; border-radius:2px}
+.wkarrow.done{background:#b9dcc7}
+
+/* 弹窗实景 */
+.wkbar-demo{
+  display:flex; align-items:center; gap:22px; flex-wrap:wrap;
+  background:var(--canvas); border:1px solid var(--hairline);
+  border-radius:var(--r-card); padding:14px 18px;
+}
+.wkbar-demo .right{margin-left:auto; text-align:right}
+.wkbar-demo .right .lbl{font-size:var(--fs-xs); color:var(--muted)}
+.wkbar-demo .right .val{font-size:var(--fs-xl); font-weight:600; line-height:1.3}
+.wkbar-demo .right .sub{font-size:var(--fs-xs); color:var(--muted); max-width:230px; line-height:1.6}
+
+/* 尺寸表 */
+table.m{width:100%; border-collapse:collapse; font-size:var(--fs-sm)}
+table.m th,table.m td{padding:9px 12px; text-align:left; border-bottom:1px solid var(--divider)}
+table.m th{color:var(--muted-2); font-size:var(--fs-xs); font-weight:600; letter-spacing:.04em}
+table.m tr:last-child td{border-bottom:none}
+table.m td.n{font-variant-numeric:tabular-nums; color:var(--ink)}
+
+/* ══════════ 屏 2 · 点歌设置 ══════════ */
+.chg{display:grid; gap:var(--s2)}
+.chg-i{
+  display:flex; gap:11px; align-items:flex-start;
+  background:var(--canvas); border:1px solid var(--hairline);
+  border-radius:var(--r-input); padding:11px 14px; font-size:var(--fs-sm);
+}
+.chg-i .no{
+  flex:none; width:19px; height:19px; border-radius:50%;
+  background:var(--tile); color:#fff; font-size:var(--fs-2xs);
+  display:flex; align-items:center; justify-content:center; font-weight:600; margin-top:1px;
+}
+.chg-i .bad{border-color:#f3d6d6; background:#fffafa}
+.chg-i .no.bad{background:var(--red-fg)}
+.chg-i b{color:var(--ink)}
+.chg-i .dim{color:var(--muted); display:block; margin-top:2px; line-height:1.7}
+
+/* 页首时间线 */
+.tl{
+  background:var(--canvas); border:1px solid var(--hairline);
+  border-radius:var(--r-card); padding:var(--s4) var(--s5);
+  display:flex; align-items:stretch; gap:var(--s4); flex-wrap:wrap;
+}
+.tl-side{flex:1; min-width:330px; display:flex; flex-direction:column; gap:9px}
+.tl-flag{
+  align-self:flex-start; font-size:var(--fs-2xs); font-weight:600;
+  letter-spacing:.1em; padding:3px 10px; border-radius:var(--r-pill);
+}
+.tl-flag.a{background:var(--acc-bg); color:var(--accent)}
+.tl-flag.b{background:var(--tile); color:#fff}
+.tl-big{font-size:var(--fs-lg); font-weight:600; letter-spacing:-.1px}
+.tl-big em{font-style:normal; color:var(--muted); font-weight:400; font-size:var(--fs-sm)}
+.tl-sub{font-size:var(--fs-sm); color:var(--muted); line-height:1.75}
+.tl-mid{
+  flex:none; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:6px; padding:0 var(--s2); min-width:130px;
+}
+.tl-mid .ln{width:100%; height:2px; background:linear-gradient(90deg,var(--acc-bg),var(--soft))}
+.tl-mid .ln{background:var(--soft)}
+.tl-mid .tagline{font-size:var(--fs-xs); color:var(--muted-2); text-align:center; line-height:1.6}
+
+/* 分组标题 */
+.grp{margin-bottom:var(--s6)}
+.grp-head{display:flex; align-items:flex-end; gap:11px; margin-bottom:var(--s3); padding-left:12px; border-left:3px solid var(--ink); }
+.grp-head .gt{font-size:var(--fs-lg); font-weight:600}
+.grp-head .gd{font-size:var(--fs-sm); color:var(--muted); padding-bottom:2px}
+.grp.danger .grp-head{border-left-color:var(--red-fg)}
+
+/* 配置卡 */
+.cfg{
+  background:var(--canvas); border:1px solid var(--hairline);
+  border-radius:var(--r-card); padding:var(--s4) var(--s5); margin-bottom:var(--s3);
+}
+.cfg-head{display:flex; align-items:center; gap:10px; margin-bottom:var(--s4); flex-wrap:wrap}
+.cfg-t{font-size:var(--fs-md); font-weight:600}
+.pill{
+  font-size:var(--fs-xs); padding:2px 9px; border-radius:var(--r-pill);
+  background:var(--parchment); color:var(--muted); white-space:nowrap;
+}
+.pill.pass{background:var(--acc-bg); color:var(--accent)}
+.pill.green{background:var(--green-bg); color:var(--green-fg)}
+.pill.amber{background:var(--amber-bg); color:var(--amber-fg)}
+.pill.tile{background:var(--tile); color:#fff}
+.cfg-head .sp{margin-left:auto; display:flex; align-items:center; gap:9px}
+
+/* 行式字段 */
+.frow{display:flex; align-items:center; gap:var(--s3); padding:11px 0; border-bottom:1px solid var(--divider); flex-wrap:wrap}
+.frow:last-child{border-bottom:none}
+.frow .fk{width:132px; flex:none; font-size:var(--fs-sm); color:var(--muted-2)}
+.frow .fv{display:flex; align-items:center; gap:9px; flex-wrap:wrap}
+.hint{font-size:var(--fs-sm); color:var(--muted)}
+
+/* 假控件 */
+.inp{
+  height:32px; min-width:74px; padding:0 11px; border:1px solid var(--hairline);
+  border-radius:var(--r-input); background:var(--canvas);
+  font:inherit; font-size:var(--fs-sm); color:var(--ink);
+  display:inline-flex; align-items:center; gap:6px;
+}
+.inp.sel::after{
+  content:""; width:0; height:0; margin-left:auto;
+  border-left:4px solid transparent; border-right:4px solid transparent;
+  border-top:5px solid var(--soft);
+}
+.inp.off{background:var(--parchment); color:var(--muted); border-color:var(--divider)}
+.inp.w106{width:106px} .inp.w120{width:120px} .inp.w158{width:158px}
+.sw{width:38px; height:22px; border-radius:var(--r-pill); background:var(--tile); position:relative; flex:none}
+.sw::after{content:""; position:absolute; top:2px; right:2px; width:18px; height:18px; border-radius:50%; background:#fff}
+.sw.off{background:var(--soft)}
+.sw.off::after{right:auto; left:2px}
+.sw.hold{background:var(--tile)}
+
+/* 统计块 */
+.stats{display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s3)}
+.stat{background:var(--parchment); border-radius:var(--r-input); padding:12px 14px}
+.stat .sl{font-size:var(--fs-xs); color:var(--muted-2)}
+.stat .sv{font-size:var(--fs-xl); font-weight:600; line-height:1.35; font-variant-numeric:tabular-nums}
+.stat .sv small{font-size:var(--fs-sm); font-weight:400; color:var(--muted)}
+.stat .bar{height:4px; border-radius:2px; background:#e6e6e9; margin-top:8px; overflow:hidden}
+.stat .bar i{display:block; height:100%; background:var(--tile); border-radius:2px}
+.div-line{height:1px; background:var(--divider); margin:var(--s4) 0}
+
+/* 深色状态卡（点歌窗口） */
+.tile{
+  background:var(--tile); color:#fff; border-radius:var(--r-tile);
+  padding:var(--s4) var(--s5);
+}
+.tile .t-row{display:flex; gap:var(--s5); align-items:flex-start; flex-wrap:wrap}
+.tile .t-main{flex:1; min-width:280px}
+.tile .t-status{display:flex; align-items:center; gap:8px; font-size:var(--fs-md); font-weight:600}
+.dot{width:7px; height:7px; border-radius:50%; background:#34c759; flex:none}
+.dot.idle{background:#8e8e93}
+.tile .t-cd{margin-top:7px; font-size:var(--fs-lg); font-weight:600; letter-spacing:-.2px}
+.tile .t-meta{display:flex; flex-direction:column; gap:5px; font-size:var(--fs-sm); color:rgba(255,255,255,.72); text-align:right}
+.tile .t-note{
+  margin-top:var(--s4); padding-top:var(--s3); border-top:1px solid rgba(255,255,255,.12);
+  font-size:var(--fs-sm); color:rgba(255,255,255,.72); line-height:1.75;
+}
+
+/* 时段编辑 */
+.slot-row{display:flex; align-items:center; gap:11px; flex-wrap:wrap}
+.lnk{font-size:var(--fs-sm); color:var(--red-fg); cursor:pointer}
+.lnk.dis{color:var(--soft); cursor:not-allowed}
+.lnk.blue{color:var(--accent)}
+.chip-pick{
+  font-size:var(--fs-sm); padding:4px 11px; border-radius:var(--r-pill);
+  background:var(--parchment); color:var(--muted-2);
+}
+.chip-pick.on{background:var(--acc-bg); color:var(--accent); font-weight:600}
+.dayrow{display:flex; align-items:center; gap:11px; padding:6px 0}
+.dayrow .dl{width:52px; flex:none; font-size:var(--fs-sm); color:var(--muted)}
+.two-col{display:grid; grid-template-columns:1fr 1fr; gap:var(--s5)}
+@media (max-width:980px){.two-col{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+
+/* 按钮 */
+.btns{display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:var(--s4)}
+.btn{
+  font:inherit; font-size:var(--fs-sm); font-weight:600;
+  height:32px; padding:0 16px; border-radius:var(--r-input);
+  border:1px solid transparent; cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px;
+}
+.btn.primary{background:var(--accent); color:#fff}
+.btn.ghost{background:var(--canvas); border-color:var(--hairline); color:var(--ink-2)}
+.btn.danger{background:var(--red-fg); color:#fff}
+.btn[disabled]{background:var(--parchment); color:var(--soft); cursor:not-allowed}
+.save-state{margin-left:auto; display:flex; align-items:center; gap:7px; font-size:var(--fs-sm)}
+.save-state.ok{color:var(--green-fg)}
+.save-state.dirty{color:var(--amber-fg)}
+
+/* 危险区 */
+.dz{
+  background:var(--canvas); border:1px solid #f0d6d6; border-radius:var(--r-card);
+  padding:var(--s4) var(--s5); display:flex; align-items:flex-start; gap:var(--s5);
+}
+.dz .dzt{font-size:var(--fs-md); font-weight:600; color:var(--red-fg)}
+.dz .dzd{font-size:var(--fs-sm); color:var(--muted); margin-top:6px; line-height:1.8; max-width:760px}
+.dz .dzd b{color:var(--ink-2)}
+.dz .act{margin-left:auto; text-align:right; flex:none}
+.dz .act .h{font-size:var(--fs-xs); color:var(--muted-2); margin-top:7px}
+
+/* 脚注 */
+.pv-foot{max-width:1180px; margin:var(--s6) auto 0; padding:0 var(--s5);
+  font-size:var(--fs-xs); color:var(--muted-2); line-height:1.9}
+</style>
+</head>
+<body>
+
+<header class="pv-top">
+  <div class="pv-brand">菁悠广播站 · 管理后台 <span>/ 点歌管理 UI 方案 v1</span></div>
+  <div class="pv-tabs">
+    <button data-tab="flow" class="on">① 状态链</button>
+    <button data-tab="settings">② 点歌设置</button>
+  </div>
+  <div class="pv-note">静态预览 · 未改动任何业务代码</div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     屏 ① 状态链
+     ═══════════════════════════════════════════════════════════════ -->
+<section class="pane on" id="pane-flow">
+<div class="wrap">
+
+  <div class="pane-head">
+    <h1>状态链重设计</h1>
+    <p>投稿审核 → 下周排期弹窗顶部的周状态机。三项改动：英文移到中文下方 · 已完成转绿 · 进行中用深色胶囊。</p>
+  </div>
+
+  <div class="blk">
+    <h3>前后对比（同一时刻：当前处于「审核中」）</h3>
+    <div class="ba">
+
+      <div class="ba-row">
+        <div class="ba-label dep">现状 v8 · 中英同行 / 已完成用浅蓝</div>
+        <div class="oldflow">
+          <span class="oldstep done">收歌中 <i>APPLICATION</i></span>
+          <span class="oldarrow"></span>
+          <span class="oldstep on">审核中 <i>REVIEW</i></span>
+          <span class="oldarrow"></span>
+          <span class="oldstep">排期已生成 <i>SCHEDULING</i></span>
+          <span class="oldarrow"></span>
+          <span class="oldstep">已锁定 <i>LOCKED</i></span>
+        </div>
+      </div>
+
+      <div class="ba-row">
+        <div class="ba-label new">提案 v1 · 中英双行 / 已完成转绿 / 进行中深色</div>
+        <div class="wkflow">
+          <span class="wkstep done"><span class="cn">收歌中</span><span class="en">Application</span></span>
+          <span class="wkarrow done"></span>
+          <span class="wkstep on"><span class="cn">审核中</span><span class="en">Review</span></span>
+          <span class="wkarrow"></span>
+          <span class="wkstep"><span class="cn">排期已生成</span><span class="en">Scheduling</span></span>
+          <span class="wkarrow"></span>
+          <span class="wkstep"><span class="cn">已锁定</span><span class="en">Locked</span></span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="blk">
+    <h3>逐态全览（5 种周状态，含 v8 遗漏的「已取消」）</h3>
+    <div class="card" style="display:grid;gap:16px">
+
+      <div>
+        <div class="ba-label">周状态 = 收歌中（第 1 阶段进行中）</div>
+        <div class="wkflow">
+          <span class="wkstep on"><span class="cn">收歌中</span><span class="en">Application</span></span>
+          <span class="wkarrow"></span>
+          <span class="wkstep"><span class="cn">审核中</span><span class="en">Review</span></span>
+          <span class="wkarrow"></span>
+          <span class="wkstep"><span class="cn">排期已生成</span><span class="en">Scheduling</span></span>
+          <span class="wkarrow"></span>
+          <span class="wkstep"><span class="cn">已锁定</span><span class="en">Locked</span></span>
+        </div>
+      </div>
+
+      <div>
+        <div class="ba-label">周状态 = 排期已生成（前 3 阶段已完成）</div>
+        <div class="wkflow">
+          <span class="wkstep done"><span class="cn">收歌中</span><span class="en">Application</span></span>
+          <span class="wkarrow done"></span>
+          <span class="wkstep done"><span class="cn">审核中</span><span class="en">Review</span></span>
+          <span class="wkarrow done"></span>
+          <span class="wkstep on"><span class="cn">排期已生成</span><span class="en">Scheduling</span></span>
+          <span class="wkarrow"></span>
+          <span class="wkstep"><span class="cn">已锁定</span><span class="en">Locked</span></span>
+        </div>
+      </div>
+
+      <div>
+        <div class="ba-label">周状态 = 已锁定（全流程走完）</div>
+        <div class="wkflow">
+          <span class="wkstep done"><span class="cn">收歌中</span><span class="en">Application</span></span>
+          <span class="wkarrow done"></span>
+          <span class="wkstep done"><span class="cn">审核中</span><span class="en">Review</span></span>
+          <span class="wkarrow done"></span>
+          <span class="wkstep done"><span class="cn">排期已生成</span><span class="en">Scheduling</span></span>
+          <span class="wkarrow done"></span>
+          <span class="wkstep on"><span class="cn">已锁定</span><span class="en">Locked</span></span>
+        </div>
+      </div>
+
+      <div>
+        <div class="ba-label">周状态 = 已解锁（锁定后又退回排期）</div>
+        <div class="wkflow">
+          <span class="wkstep done"><span class="cn">收歌中</span><span class="en">Application</span></span>
+          <span class="wkarrow done"></span>
+          <span class="wkstep done"><span class="cn">审核中</span><span class="en">Review</span></span>
+          <span class="wkarrow done"></span>
+          <span class="wkstep on"><span class="cn">排期已生成</span><span class="en">Scheduling</span></span>
+          <span class="wkarrow"></span>
+          <span class="wkstep"><span class="cn">已锁定</span><span class="en">Locked</span></span>
+        </div>
+      </div>
+
+      <div>
+        <div class="ba-label" style="color:var(--red-fg)">周状态 = 已取消（v8 遗漏：4 个阶段会全部显示成「未到」）</div>
+        <div class="wkflow">
+          <span class="wkstep cancel"><span class="cn">收歌中</span><span class="en">Application</span></span>
+          <span class="wkarrow"></span>
+          <span class="wkstep cancel"><span class="cn">审核中</span><span class="en">Review</span></span>
+          <span class="wkarrow"></span>
+          <span class="wkstep cancel"><span class="cn">排期已生成</span><span class="en">Scheduling</span></span>
+          <span class="wkarrow"></span>
+          <span class="wkstep cancel"><span class="cn">已锁定</span><span class="en">Locked</span></span>
+          <span class="pill" style="background:var(--red-bg);color:var(--red-fg);margin-left:12px">本周已取消，排期不再推进</span>
+        </div>
+      </div>
+
+    </div>
+    <div class="note" style="margin-top:12px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <span>
+        <b>已取消</b>不再套用绿色 —— 已取消的周不该显示成"一路顺利完成"。提案把它整条压成浅灰，并在右侧补一句红字说明。
+        这是 v8 的一处真实缺口：<b>WEEK_FLOW 里没有 CANCELLED</b>，命中时下标为 −1，4 个胶囊会全部落到"未到"态。
+      </span>
+    </div>
+  </div>
+
+  <div class="blk">
+    <h3>放进「下周排期」弹窗里的实际观感</h3>
+    <div class="wkbar-demo">
+      <div class="wkflow">
+        <span class="wkstep done"><span class="cn">收歌中</span><span class="en">Application</span></span>
+        <span class="wkarrow done"></span>
+        <span class="wkstep done"><span class="cn">审核中</span><span class="en">Review</span></span>
+        <span class="wkarrow done"></span>
+        <span class="wkstep on"><span class="cn">排期已生成</span><span class="en">Scheduling</span></span>
+        <span class="wkarrow"></span>
+        <span class="wkstep"><span class="cn">已锁定</span><span class="en">Locked</span></span>
+      </div>
+      <div class="right">
+        <div class="lbl">距排期锁定</div>
+        <div class="val num">2 天 6 小时</div>
+        <div class="sub">20:00 = 审核截止（收歌截止 18:00 → 留白 120 分钟）</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="blk">
+    <h3>量值（与现状逐项对齐，只有高度变了）</h3>
+    <div class="card" style="padding:0">
+      <table class="m">
+        <thead><tr><th>项</th><th>现状 v8</th><th>提案 v1</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>胶囊高度</td><td class="n">30 px</td><td class="n">38 px</td><td>单行 → 双行，<b>+8px</b>；整条状态栏 58 → 66px</td></tr>
+          <tr><td>中文</td><td class="n">12.5px / 同行 10.5px</td><td class="n">12.5px / 600</td><td>字号不变，只把英文挪走</td></tr>
+          <tr><td>英文</td><td class="n">10.5px 斜体感</td><td class="n">10.5px / 字距 .08em</td><td>首字母大写，小字距拉开，像标签不像注释</td></tr>
+          <tr><td>已完成</td><td class="n" style="color:var(--accent)">#e6f0fa 浅蓝</td><td class="n" style="color:var(--green-fg)">#e7f5ec 绿 + ✓</td><td>沿用主题里已有的成功色，不引入新颜色</td></tr>
+          <tr><td>进行中</td><td class="n">#272729 深色</td><td class="n">#272729 深色</td><td>不变，加一圈 3px 淡描边把当前从已完成里拎出来</td></tr>
+          <tr><td>未到</td><td class="n">#f5f5f7 羊皮纸</td><td class="n">#f5f5f7 羊皮纸</td><td>不变</td></tr>
+          <tr><td>连接线</td><td class="n">1px 灰</td><td class="n">2px 灰 / 绿</td><td>已走过的线段转浅绿，视线能顺着"到哪了"读</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     屏 ② 点歌设置
+     ═══════════════════════════════════════════════════════════════ -->
+<section class="pane" id="pane-settings">
+<div class="wrap">
+
+  <div class="pane-head">
+    <h1>点歌设置重新设计</h1>
+    <p>现在 8 个板块平铺直下、说明文字和输入框混在一起、4 个保存按钮各在一处。重排为 5 个分组 + 统一保存状态。</p>
+  </div>
+
+  <div class="blk">
+    <h3>改了什么（6 条）</h3>
+    <div class="chg">
+
+      <div class="chg-i">
+        <span class="no">1</span>
+        <span><b>页首加「一个播出周期」时间线</b>
+          <span class="dim">收歌周与播出周是两条不同的时间轴，页面上到处出现"周"却从不说明是哪一个。新增一条总览，把「收歌周六 18:00 → 周日 18:00」「审核截止 周日 20:00」「周一~周五 × 3 场」按顺序串起来，进页面先看到全貌，再去改局部。</span>
+        </span>
+      </div>
+
+      <div class="chg-i bad">
+        <span class="no bad">2</span>
+        <span><b>删掉三段已经不成立的说明文字</b>
+          <span class="dim">
+            ① 容量卡里「学生<b>提交即占位</b>：格子满了就进全局候补队列…全部格子占满时整个候补队列由系统自动驳回」—— 这是 v2 口径，协议版<b>提交时完全不判容量</b>，一律先落待审核，能不能排上是审核通过后才算的。<br>
+            ② 「学生提交被拦下时看到的是」里的 <code>40906 这个时段已经排满了</code>、<code>40904 时段和候补队列都满了</code> —— 这两个码在协议版<b>已无任何生产路径抛出</b>，只剩 response.js 里的常量定义。<br>
+            ③ 该卡括号里写死的「每周六 18:00 – 周日 18:00」—— 现在窗口可配，写死的时刻会跟实际不符。
+          </span>
+        </span>
+      </div>
+
+      <div class="chg-i">
+        <span class="no">3</span>
+        <span><b>8 个平铺板块 → 5 个分组，按「一次点歌要经过什么」排列</b>
+          <span class="dim">收歌与审核（什么时候能点 / 能点几首）→ 排期（审核通过后谁能排上）→ 播出安排（播在哪几天哪几场）→ 学生端文案 → 危险区。每组带一句人话副标题。</span>
+        </span>
+      </div>
+
+      <div class="chg-i">
+        <span class="no">4</span>
+        <span><b>保存按钮状态化：每个卡右侧显示「已保存 / 有未保存的改动」</b>
+          <span class="dim">现在 4 个保存按钮分散在 4 个卡里，改完两处再挨个找按钮容易漏。提案在每个卡的头部右侧固定一个保存位：没改动是绿色「已保存 ✓」，一改动就变琥珀「有未保存的改动」，按钮始终可点（不清空你的操作习惯）。</span>
+        </span>
+      </div>
+
+      <div class="chg-i">
+        <span class="no">5</span>
+        <span><b>说明文字与输入区分离，统一收进卡底「提示条」</b>
+          <span class="dim">羊皮纸底色的一整条，视觉上明确"这段不是给你填的"。现在说明是裸文字直接跟在输入控件后面，读起来分不清哪句是规则、哪句是操作提示。</span>
+        </span>
+      </div>
+
+      <div class="chg-i">
+        <span class="no">6</span>
+        <span><b>容量卡：统计与编辑分区</b>
+          <span class="dim">上半 4 格只读统计（正式位 / 已占位 / 候补 / 补位待审），一条分隔线，下半才是两个输入框 + 动作按钮。现在两者混在一个卡里靠间距区分。</span>
+        </span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ 提案页面 ══ -->
+  <div class="blk">
+    <h3>提案页面（超管视角 · 数据为示例值）</h3>
+
+    <!-- 页首时间线 -->
+    <div class="tl">
+      <div class="tl-side">
+        <span class="tl-flag a">收歌周</span>
+        <div class="tl-big">收歌 周六 18:00 → 周日 18:00 <em>· 星期任选，最长可铺满整周</em></div>
+        <div class="tl-sub">到点停止收新歌，已提交的继续审核。审核截止 <b>周日 20:00</b>（收歌结束后留白 120 分钟）。<br>到审核截止：自动排期 → 驳回剩余候补 → 锁定本周。</div>
+      </div>
+      <div class="tl-mid">
+        <div class="ln"></div>
+        <div class="tagline">到点自动排期<br>按首选时段 + 提交时间</div>
+        <div class="ln"></div>
+      </div>
+      <div class="tl-side" style="text-align:right;align-items:flex-end">
+        <span class="tl-flag b">播出周</span>
+        <div class="tl-big">周一 ~ 周五 <em>· 3 场 / 天</em></div>
+        <div class="tl-sub">早间 07:20 · 午间 12:20 · 晚间 18:00<br>每格 3 首正式位，共 <b>45</b> 个正式位。</div>
+      </div>
+    </div>
+
+    <!-- ══ 组 ① 收歌与审核 ══ -->
+    <div class="grp" style="margin-top:26px">
+      <div class="grp-head">
+        <span class="gt">① 收歌与审核</span>
+        <span class="gd">决定「什么时候能点」和「一个人能点几首」</span>
+      </div>
+
+      <!-- 点歌时间窗口 -->
+      <div class="cfg">
+        <div class="cfg-head">
+          <span class="cfg-t">点歌时间窗口</span>
+          <span class="pill pass">仅超管可改</span>
+          <span class="sp"><span class="save-state ok">已保存 ✓</span></span>
+        </div>
+
+        <div class="tile">
+          <div class="t-row">
+            <div class="t-main">
+              <div class="t-status"><i class="dot"></i>开放中 · 周六 18:00 → 周日 18:00</div>
+              <div class="t-cd num">距收歌截止 6 小时 24 分</div>
+            </div>
+            <div class="t-meta">
+              <div>本周收歌 周六 18:00 → 周日 18:00</div>
+              <div>审核截止 周日 20:00</div>
+            </div>
+          </div>
+          <div class="t-note">收歌截止只停止新提交；到审核截止才自动排期、驳回剩余候补并锁定本周。</div>
+        </div>
+
+        <div style="margin-top:18px">
+          <div class="frow">
+            <span class="fk">启用窗口限制</span>
+            <span class="fv"><i class="sw"></i><span class="hint">关掉 = 学生任何时间都能提交（容量与候补仍照常生效）</span></span>
+          </div>
+          <div class="frow">
+            <span class="fk">收歌开始</span>
+            <span class="fv"><span class="inp sel w106">周六</span><span class="inp w120">18:00</span><span class="hint">从这里开始可以点歌</span></span>
+          </div>
+          <div class="frow">
+            <span class="fk">收歌结束</span>
+            <span class="fv"><span class="inp sel w106">周日</span><span class="inp w120">18:00</span><span class="hint">到点停止收新歌，已提交的继续审核</span></span>
+          </div>
+          <div class="frow">
+            <span class="fk">审核截止</span>
+            <span class="fv">
+              <span class="inp sel w158">跟随「收歌结束 + 120 分钟」</span>
+              <span class="inp w120 off">20:00</span>
+              <span class="pill green">已单独配置</span>
+              <span class="hint">到点自动排期 + 驳回剩余候补 + 锁定本周</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="note">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <span>星期任选 <b>周一 → 周日</b>，最长可铺满整周。审核截止不得早于收歌结束、不得晚于<b>播出周周一 00:00</b>。<br>
+          注意与下面的「播出时段」区分：<b>这里配的是收歌周</b>（学生什么时候能投），<b>播出时段配的是播出周</b>（歌播在哪几天）。</span>
+        </div>
+
+        <div class="btns">
+          <button class="btn primary">保存窗口</button>
+        </div>
+      </div>
+
+      <!-- 提交规则 -->
+      <div class="cfg">
+        <div class="cfg-head">
+          <span class="cfg-t">提交规则</span>
+          <span class="pill pass">仅超管可改</span>
+          <span class="sp"><span class="save-state dirty">有未保存的改动</span></span>
+        </div>
+        <div>
+          <div class="frow">
+            <span class="fk">每人每周上限</span>
+            <span class="fv"><span class="inp" style="width:78px">2</span><span class="hint">次 · 填 0 = 不限</span></span>
+          </div>
+          <div class="frow">
+            <span class="fk">同曲一周去重</span>
+            <span class="fv"><i class="sw"></i><span class="hint">开：同一首歌一周内只能点一次</span></span>
+          </div>
+          <div class="frow">
+            <span class="fk">生效范围</span>
+            <span class="fv"><span class="hint">只算点歌（文稿不受影响）；<b>候补中的歌也算占用</b>；因窗口截止被系统驳回的不占个人次数</span></span>
+          </div>
+        </div>
+        <div class="btns">
+          <button class="btn primary">保存规则</button>
+        </div>
+      </div>
+
+      <!-- 学生被拦下时看到什么（口径已按协议版订正） -->
+      <div class="cfg">
+        <div class="cfg-head">
+          <span class="cfg-t">学生被拦下时看到什么</span>
+          <span class="pill">只读</span>
+          <span class="sp"><span class="hint">协议版实际会出现的拦截</span></span>
+        </div>
+        <div>
+          <div class="frow"><span class="fk">未确认注意事项</span><span class="fv"><span class="hint">「请先阅读并确认点歌注意事项」</span><span class="pill amber">40303</span></span></div>
+          <div class="frow"><span class="fk">不在窗口内</span><span class="fv"><span class="hint">「现在不在点歌时间段」+ 下次开放时刻（前端据此显示倒计时）</span><span class="pill amber">40907</span></span></div>
+          <div class="frow"><span class="fk">时段不是系统下发的</span><span class="fv"><span class="hint">「播出时段只能选下周一到周日内的可选时段，请重新选择」</span><span class="pill amber">40001</span></span></div>
+          <div class="frow"><span class="fk">同曲重复 / 次数用完</span><span class="fv"><span class="hint">「本周已经有人点过《晴天》了，换一首吧」／「本周点歌次数已用完」</span><span class="pill amber">40903</span></span></div>
+          <div class="frow"><span class="fk">一分钟内重复提交</span><span class="fv"><span class="hint">「请勿重复提交」</span><span class="pill amber">40901</span></span></div>
+        </div>
+        <div class="note">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <span>已移除 <b>40906 时段已排满</b> 与 <b>40904 时段和候补队列都满了</b> —— 协议版提交时不再判容量，这两个码不会再出现。<br>
+          容量相关的自动驳回发生在<b>排期阶段</b>（驳回理由「该播出时段已排满，系统自动驳回」），不在提交那一刻。</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══ 组 ② 排期 ══ -->
+    <div class="grp">
+      <div class="grp-head">
+        <span class="gt">② 排期</span>
+        <span class="gd">审核通过后，谁排上正式位、谁进候补</span>
+      </div>
+
+      <div class="cfg">
+        <div class="cfg-head">
+          <span class="cfg-t">排期容量与候补</span>
+          <span class="pill pass">仅超管可改</span>
+          <span class="sp"><span class="save-state ok">已保存 ✓</span></span>
+        </div>
+
+        <!-- 上半：只读统计 -->
+        <div class="stats">
+          <div class="stat">
+            <div class="sl">下周正式位总数</div>
+            <div class="sv num">45 <small>= 3 × 15 格</small></div>
+          </div>
+          <div class="stat">
+            <div class="sl">已占位</div>
+            <div class="sv num">28 <small>/ 45</small></div>
+            <div class="bar"><i style="width:62%"></i></div>
+          </div>
+          <div class="stat">
+            <div class="sl">候补队列</div>
+            <div class="sv num">6 <small>/ 45（自动）</small></div>
+            <div class="bar"><i style="width:13%"></i></div>
+          </div>
+          <div class="stat">
+            <div class="sl">补位待审（最优先处理）</div>
+            <div class="sv num">2</div>
+          </div>
+        </div>
+
+        <div class="div-line"></div>
+
+        <!-- 下半：编辑 -->
+        <div class="two-col" style="max-width:380px">
+          <div>
+            <div class="hint" style="margin-bottom:7px">每格正式位</div>
+            <span class="inp" style="width:100%">3</span>
+          </div>
+          <div>
+            <div class="hint" style="margin-bottom:7px">候补队列上限</div>
+            <span class="inp" style="width:100%">0</span>
+          </div>
+        </div>
+
+        <div class="note" style="margin-top:18px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <span>
+            每格正式位填 <b>0</b> = 不限；候补上限填 <b>0</b> = 自动（= 下周正式位总数）。<br>
+            <b>提交不判容量</b>：谁都能投，一律先进待审核。审核通过只拿到候选资格，到审核截止由系统按「首选时段 + 提交时间」统一排；首选时段满了进全局候补（先进先出，跨所有时段），锁定时刻还没排上的才被自动驳回（不占学生周次数）。
+          </span>
+        </div>
+
+        <div class="btns">
+          <button class="btn primary">保存</button>
+          <button class="btn ghost">递补 + 定稿检查</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 组 ③ 播出安排 ══ -->
+    <div class="grp">
+      <div class="grp-head">
+        <span class="gt">③ 播出安排</span>
+        <span class="gd">播在哪几天、哪几场 · 学生端能看到什么</span>
+      </div>
+
+      <div class="cfg">
+        <div class="cfg-head">
+          <span class="cfg-t">播出时段</span>
+          <span class="pill pass">后台发布</span>
+          <span class="sp"><span class="hint">用户只能从这儿选 · 当前来源：后台发布</span></span>
+        </div>
+        <div class="two-col">
+          <div>
+            <div class="hint" style="margin-bottom:11px">每天开放的场次（最多 6 个）</div>
+            <div style="display:grid;gap:11px">
+              <div class="slot-row"><span class="inp w120">07:20</span><span class="inp sel" style="width:110px">早间</span><span class="lnk">删除</span></div>
+              <div class="slot-row"><span class="inp w120">12:20</span><span class="inp sel" style="width:110px">午间</span><span class="lnk">删除</span></div>
+              <div class="slot-row"><span class="inp w120">18:00</span><span class="inp sel" style="width:110px">晚间</span><span class="lnk">删除</span></div>
+            </div>
+            <div class="btns">
+              <button class="btn ghost">+ 加一个时段</button>
+            </div>
+          </div>
+          <div>
+            <div class="hint" style="margin-bottom:11px">用户会看到（2026-09-28 ~ 10-02）</div>
+            <div>
+              <div class="dayrow"><span class="dl">周一</span><span style="display:flex;gap:8px"><span class="chip-pick on">早间 07:20</span><span class="chip-pick on">午间 12:20</span><span class="chip-pick on">晚间 18:00</span></span></div>
+              <div class="dayrow"><span class="dl">周二</span><span style="display:flex;gap:8px"><span class="chip-pick on">早间 07:20</span><span class="chip-pick on">午间 12:20</span><span class="chip-pick on">晚间 18:00</span></span></div>
+              <div class="dayrow"><span class="dl">周三</span><span style="display:flex;gap:8px"><span class="chip-pick on">早间 07:20</span><span class="chip-pick on">午间 12:20</span><span class="chip-pick on">晚间 18:00</span></span></div>
+              <div class="dayrow"><span class="dl">周四</span><span style="display:flex;gap:8px"><span class="chip-pick on">早间 07:20</span><span class="chip-pick on">午间 12:20</span><span class="chip-pick on">晚间 18:00</span></span></div>
+              <div class="dayrow"><span class="dl">周五</span><span style="display:flex;gap:8px"><span class="chip-pick on">早间 07:20</span><span class="chip-pick on">午间 12:20</span><span class="chip-pick on">晚间 18:00</span></span></div>
+            </div>
+          </div>
+        </div>
+        <div class="note" style="margin-top:18px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <span>可选日期范围固定为<b>下一周的周一 ~ 周五</b>，不在这里改。留空则退回解析「开播时间」设置，再退回默认三个。<br>每格能排几首在 <b>② 排期</b> 里设（当前每格 <b>3</b> 首 · 共 45 个正式位）。</span>
+        </div>
+        <div class="btns">
+          <button class="btn primary">发布时段</button>
+        </div>
+      </div>
+
+      <div class="cfg">
+        <div class="cfg-head">
+          <span class="cfg-t">小程序首页</span>
+          <span class="pill green">即时生效</span>
+          <span class="sp"><span class="hint">模块开关 home_song_schedule · 缺行视为开</span></span>
+        </div>
+        <div class="frow">
+          <span class="fk">展示本周点歌排期</span>
+          <span class="fv"><i class="sw"></i><span class="hint">开：首页展示「本周点歌排期」（<b>只显示已排期的歌名，不含点歌人信息</b>）；关：区块整体不渲染，接口不下发数据</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 组 ④ 学生端文案 ══ -->
+    <div class="grp">
+      <div class="grp-head">
+        <span class="gt">④ 学生端文案</span>
+        <span class="gd">两份互相独立，改内容才会让学生重新确认</span>
+      </div>
+      <div class="two-col">
+        <div class="cfg" style="margin-bottom:0">
+          <div class="cfg-head">
+            <span class="cfg-t">点歌注意事项</span>
+            <span class="sp"><span class="save-state ok">已保存 ✓</span><span class="hint">v3 · 已确认 <b class="num">412</b> 人</span></span>
+          </div>
+          <div style="background:var(--parchment);border-radius:var(--r-input);padding:13px;font-size:var(--fs-sm);color:var(--muted-2);line-height:1.9;min-height:108px">
+            一、点歌前请确认歌曲名与歌手填写正确。<br>
+            二、每人每周最多点 2 次。<br>
+            三、请勿提交含敏感内容的歌曲。
+          </div>
+          <div class="note" style="margin-top:13px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            <span>内容有改动才 +1 版本，<b>所有用户需重新确认</b>；只改排版不打扰用户。</span>
+          </div>
+          <div class="btns">
+            <button class="btn primary">保存</button>
+            <button class="btn ghost">预览用户端</button>
+          </div>
+        </div>
+
+        <div class="cfg" style="margin-bottom:0">
+          <div class="cfg-head">
+            <span class="cfg-t">文稿注意事项</span>
+            <span class="pill pass">与点歌独立</span>
+            <span class="sp"><span class="save-state ok">已保存 ✓</span><span class="hint">v1 · 已确认 <b class="num">0</b> 人</span></span>
+          </div>
+          <div style="background:var(--parchment);border-radius:var(--r-input);padding:13px;font-size:var(--fs-sm);color:var(--muted-2);line-height:1.9;min-height:108px">
+            一、文稿须为原创，禁止抄袭转载。<br>
+            二、篇幅 300~1500 字，请勿提交纯图片内容。
+          </div>
+          <div class="note" style="margin-top:13px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            <span>两份内容、版本号、确认记录<b>互相独立</b>：改文稿这份不会让点歌那批人重新确认。</span>
+          </div>
+          <div class="btns">
+            <button class="btn primary">保存</button>
+            <button class="btn ghost">预览用户端</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 组 ⑤ 危险区 ══ -->
+    <div class="grp danger">
+      <div class="grp-head">
+        <span class="gt" style="color:var(--red-fg)">⑤ 危险区</span>
+        <span class="gd">仅超级管理员 · 服务端 40301 把关</span>
+      </div>
+      <div class="dz">
+        <div>
+          <div class="dzt">一键清空全部点歌数据</div>
+          <div class="dzd">
+            删除<b>全部点歌记录</b>，<b>不可恢复</b>；文稿、注意事项确认记录、学生账号一概不动。<br>
+            容量与候补都是<b>实时统计</b>（直接数投稿记录），所以清空数据 = 容量占用与候补队列自然归零，个人每周次数随之归零。
+          </div>
+        </div>
+        <div class="act">
+          <button class="btn danger">清空全部点歌数据</button>
+          <div class="h">点击后需输入 DELETE 二次确认</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="pv-foot">
+    预览 v1 · 两屏可切换 · 数据均为示例值 · 不含任何真实业务代码改动。<br>
+    确认方向后我再落到 <code>SubmitList.vue</code>（状态链）与 <code>SongSettings.vue</code>（设置页）。
+  </div>
+
+</div>
+</section>
+
+<script>
+(function(){
+  var btns = document.querySelectorAll('.pv-tabs button');
+  var panes = document.querySelectorAll('.pane');
+  btns.forEach(function(b){
+    b.addEventListener('click', function(){
+      btns.forEach(function(x){ x.classList.toggle('on', x === b); });
+      panes.forEach(function(p){ p.classList.toggle('on', p.id === 'pane-' + b.dataset.tab); });
+      window.scrollTo(0, 0);
+    });
+  });
+})();
+</script>
+</body>
+</html>
