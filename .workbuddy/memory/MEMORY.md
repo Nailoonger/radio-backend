@@ -7,7 +7,7 @@
 - **admin-web 按 v8 落地**（权威 `preview/admin-ui-v8/admin-ui-v8.html`）：唯一强调色 **#0066CC**、无渐变无彩色投影、深色卡为主角。**登录页是唯一例外**（用户 v4 分栏版），勿动。改前备份 `admin-web/_backup/<时间戳>-src/`。
 - **绝不用 `git checkout --`**：工作树全是未提交成果。
 - **UI/视觉需求先出静态 HTML 预览（标 v1/v2…），点头前不写业务代码**；版本只增不删（只新增 `preview/<主题>-v<N>/`，渲染图进 `shots/`）。需求含糊或被否 → 先问清形态再动手。
-  📌 **待裁决**：`preview/song-admin-ui-v2/`（最新）—— 状态链**中英双行·水平居中·已完成绿（无任何图标）·未到羊皮纸**，**「进行中」用蓝 #0066CC（A）还是深 #272729（B）待陛下指**；点歌设置 8 板块 → 5 分组 + 保存状态化（陛下暂未提意见）。另修：前端 `WEEK_FLOW` 漏 `CANCELLED`（后端 6 个状态、前端只有 5 个）。**陛下点头前不动 `SubmitList.vue` / `SongSettings.vue`**。
+  📌 **待裁决**：`preview/song-admin-ui-v3/`（最新）—— 状态链规则已定：**进行中 = 深色胶囊 + 「××中」，已完成 / 未到 = 同写「××」不带「中」，状态只靠颜色区分**（深 #272729 / 绿 `--green-bg` / 羊皮纸）。**待陛下挑：APPLICATION 阶段改叫什么 —— ① 点播（推荐）② 点歌 ③ 许愿 ④ 征歌**（只换展示名，常量仍 `APPLICATION`）。另：点歌设置 8 板块 → 5 分组（陛下暂未表态）；`WEEK_FLOW` 漏 `CANCELLED` 要补。**陛下点头前不动 `SubmitList.vue` / `SongSettings.vue`**。
 - **别在本机构建/部署**：改完 → 本地 commit → 交陛下 push + 服务器更新步骤。提交身份用全局 `Nailoonger <1493586497@qq.com>`，别写仓库级 user.email/name。
 
 ## 部署（服务器 `~/radio`）
