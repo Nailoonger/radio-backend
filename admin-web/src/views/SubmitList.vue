@@ -5,7 +5,7 @@
          「提交只进审核队列 → 审核通过才拿到候选资格 → 系统按首选时段分组、组内按提交先后统一排期
           → 排不上的进候补 → 到 schedule_lock_at 跑最后一次调度并锁定」。
          所以主角从「窗口定稿时刻」换成「周状态 + 排期锁定倒计时」。
-         锁定时刻 = **独立的「审核截止」**（2026-09-25 起与收歌截止拆开：收歌结束只停止收新歌，
+         锁定时刻 = **独立的「审核截止」**（2026-09-25 起与点播截止拆开：点播结束只停止收新歌，
          到审核截止才自动排期 + 驳回候补 + 锁定）。所有时刻一律由服务端字段下发，前端不硬编码。 ══════════ -->
     <div class="tile summary-tile">
       <div class="tile-main">
@@ -26,7 +26,7 @@
         </div>
         <div class="tile-meta">
           锁定时刻 <b class="tile-strong">{{ hhmm(week.scheduleLockAt) }}</b>
-          = 审核截止（收歌截止 {{ hhmm(week.applicationEndAt) }} → 留白 {{ lockOffsetMin }} 分钟）。<br>
+          = 审核截止（点播截止 {{ hhmm(week.applicationEndAt) }} → 留白 {{ lockOffsetMin }} 分钟）。<br>
           到点系统跑最后一次调度：排不上的候补转「未排上」，该周置为已锁定。
         </div>
         <!-- 写数据的动作仅超管（后端 requireSuperAdmin 已经拦死，前端给出一致的观感） -->
@@ -112,7 +112,7 @@
       </div>
     </div>
 
-    <!-- 锁定提醒（协议版：窗口结束只是停止收歌，真正的死线是排期锁定时刻） -->
+    <!-- 锁定提醒（协议版：窗口结束只是停止点播，真正的死线是排期锁定时刻） -->
     <div class="slot-remind" v-if="todoCounts.total > 0">
       <IconInfo :size="15" />
       <span>
@@ -597,7 +597,7 @@
                 <template v-if="win.closesAt"> · 结束时刻 {{ hhmm(win.closesAt) }}</template>
               </div>
               <div class="hint">
-                窗口结束只是<b>停止收歌</b>。真正的死线是<b>排期锁定时刻</b> {{ hhmm(week.scheduleLockAt) }} —— 到点系统跑最后一次调度，
+                窗口结束只是<b>停止点播</b>。真正的死线是<b>排期锁定时刻</b> {{ hhmm(week.scheduleLockAt) }} —— 到点系统跑最后一次调度，
                 排不上的候补才转「未排上」；没审完的会停在待审，不会自动驳回。
               </div>
             </div>
@@ -710,9 +710,13 @@
       <div class="wkbar">
         <div class="wkflow">
           <template v-for="(w, i) in weekFlow" :key="w.key">
-            <span v-if="i" class="wkarrow"></span>
-            <span class="wkstep" :class="w.state">{{ w.cn }} <i>{{ w.key }}</i></span>
+            <span v-if="i" class="wkarrow" :class="{ done: weekFlow[i - 1].state === 'done' }"></span>
+            <span class="wkstep" :class="w.state">
+              <span class="cn">{{ w.cn }}</span>
+              <span class="en">{{ w.en }}</span>
+            </span>
           </template>
+          <span v-if="weekCancelled" class="wk-cancel-tip">本周已取消，排期不再推进</span>
         </div>
         <div class="wkcd">
           <div class="micro">距排期锁定</div>
@@ -722,7 +726,7 @@
             <template v-else-if="lockMs === null">—</template>
             <template v-else>{{ fmtDur(lockMs) }}</template>
           </div>
-          <div class="micro">{{ hhmm(week.scheduleLockAt) }} = 审核截止（收歌截止 {{ hhmm(week.applicationEndAt) }} → 留白 {{ lockOffsetMin }} 分钟）</div>
+          <div class="micro">{{ hhmm(week.scheduleLockAt) }} = 审核截止（点播截止 {{ hhmm(week.applicationEndAt) }} → 留白 {{ lockOffsetMin }} 分钟）</div>
         </div>
       </div>
 
@@ -731,12 +735,12 @@
         <div class="grow" style="flex:1;min-width:200px">
           <div class="tile-status">
             <i class="t-dot" :class="{ idle: !win.open }"></i>
-            收歌 {{ hhmm(win.start || week.applicationStartAt) }} ~ {{ hhmm(week.applicationEndAt || win.closesAt) }} · {{ win.open ? '收歌中' : '已截止' }}
+            点播 {{ hhmm(win.start || week.applicationStartAt) }} ~ {{ hhmm(week.applicationEndAt || win.closesAt) }} · {{ win.open ? '点播中' : '已截止' }}
           </div>
           <div class="tile-meta" style="margin-top:8px">
             占位口径：<b class="tile-strong">审核通过 且 已排期</b>。待审与待排期都<b class="tile-strong">不占位</b>，
             所以「已排期」会小于「已提交」。<br>
-            审核截止 <b class="tile-strong">{{ hhmm(week.scheduleLockAt) }}</b> —— 收歌结束后到这一刻之前，都还能慢慢审、手动调格子。
+            审核截止 <b class="tile-strong">{{ hhmm(week.scheduleLockAt) }}</b> —— 点播结束后到这一刻之前，都还能慢慢审、手动调格子。
           </div>
           <!-- 排期执行 / 模拟 / 锁定 = 写数据，仅超管（后端 requireSuperAdmin 已锁） -->
           <div class="tile-actions" v-if="canWrite">
@@ -957,12 +961,12 @@
           <span class="pp-title">模拟排期结果</span>
           <span class="micro">只算不写库 · {{ preview.week?.weekStartDate || week.weekStartDate || '—' }} 那一周</span>
           <span class="tag" :class="preview.crossSlot ? 'tag-pass' : 'tag-amber'">
-            {{ preview.crossSlot ? '已放开跨时段调剂' : '收歌中 · 只做原位递补' }}
+            {{ preview.crossSlot ? '已放开跨时段调剂' : '点播中 · 只做原位递补' }}
           </span>
         </div>
         <div class="pp-modes">
           <el-radio-group v-model="previewMode" size="small" @change="loadPreview">
-            <el-radio-button value="auto">按闸门（收歌中只原位递补）</el-radio-button>
+            <el-radio-button value="auto">按闸门（点播中只原位递补）</el-radio-button>
             <el-radio-button value="force">模拟「立即执行排期」</el-radio-button>
           </el-radio-group>
           <span class="micro">{{ preview.crossSlotReason || '' }}</span>
@@ -1001,8 +1005,8 @@
             </div>
             <div class="pp-empty" v-if="!(preview.plan?.rescheduled || []).length">
               <template v-if="!preview.crossSlot">
-                <span class="tag tag-mute">收歌未截止</span>
-                空位<b>不外借</b> —— 要留给首选那一格的申请者。收歌截止后再看，这一栏才会有内容。
+                <span class="tag tag-mute">点播未截止</span>
+                空位<b>不外借</b> —— 要留给首选那一格的申请者。点播截止后再看，这一栏才会有内容。
               </template>
               <template v-else>没有需要跨时段调剂的人（要么都在首选位上了，要么不接受调剂）</template>
             </div>
@@ -1169,7 +1173,7 @@ const lockMs = computed(() => {
   return new Date(iso).getTime() - nowTs.value;
 });
 
-/** 收歌截止 → 审核截止的留白（分钟）。锁定时刻 = 审核截止，所以这个差值就是「审稿窗口」 */
+/** 点播截止 → 审核截止的留白（分钟）。锁定时刻 = 审核截止，所以这个差值就是「审稿窗口」 */
 const lockOffsetMin = computed(() => {
   const a = week.value.applicationEndAt;
   const b = week.value.scheduleLockAt;
@@ -1179,7 +1183,7 @@ const lockOffsetMin = computed(() => {
 
 /**
  * 跨时段闸门（与后端 `songSchedulingService.canCrossSlot()` 同口径）：
- * 收歌截止前，别处的空位**不外借** —— 要留给首选那一格的原申请者。
+ * 点播截止前，别处的空位**不外借** —— 要留给首选那一格的原申请者。
  * 只用来切文案，真正拦人的是服务端。
  */
 const crossSlotAllowed = computed(() => {
@@ -1187,7 +1191,7 @@ const crossSlotAllowed = computed(() => {
   if (!end) return false;
   return nowTs.value >= new Date(end).getTime();
 });
-/** 空位格子的说法：收歌中「不外借」 / 已截止「可填」 */
+/** 空位格子的说法：点播中「不外借」 / 已截止「可填」 */
 const freeSlotLabel = computed(() => (crossSlotAllowed.value ? '可填' : '不外借'));
 const freeSlotWhy = computed(() => (crossSlotAllowed.value
   ? '执行排期时会被填上'
@@ -1208,22 +1212,35 @@ const weekRangeText = computed(() => {
   return e ? `${dayjs(s).format('MM-DD')} ~ ${dayjs(e).format('MM-DD')}` : dayjs(s).format('MM-DD');
 });
 
-/** 周状态机（week.status 的中文镜像，与后端 WEEK_STATUS_CN 同口径；只用于画状态带） */
+/** 周状态机（week.status 的中文镜像，与后端 WEEK_STATUS_CN 同口径；只用于画状态带）
+ *  ⚠️ 文案规则（2026-09-27 陛下定）：**只有「进行中」带「中」字** ——
+ *     进行中 =「点播中」/「审核中」/「排期中」，已完成与未到都只写「点播」/「审核」/「排期」。
+ *     状态由胶囊颜色表达（深＝当前 / 绿＝已走过 / 羊皮纸＝未到），文字只负责说"这是哪个阶段"。
+ *  ⚠️ 后端 WEEK_STATUS 有 6 个（多一个 CANCELLED，前端曾漏掉 → 命中时 findIndex 返回 −1，
+ *     整条链会全落「未到」，看起来像"这一周还没开始"）。这里补上 cancel 态。 */
 const WEEK_FLOW = [
-  { key: 'DRAFT', cn: '未发布' },
-  { key: 'APPLICATION', cn: '收歌中' },
-  { key: 'REVIEW', cn: '审核中' },
-  { key: 'SCHEDULING', cn: '排期已生成' },
-  { key: 'LOCKED', cn: '已锁定' },
+  { key: 'DRAFT', cn: '未开放', on: '未开放' },
+  { key: 'APPLICATION', cn: '点播', on: '点播中' },
+  { key: 'REVIEW', cn: '审核', on: '审核中' },
+  { key: 'SCHEDULING', cn: '排期', on: '排期中' },
+  { key: 'LOCKED', cn: '锁定', on: '已锁定' },
 ];
 const weekFlow = computed(() => {
   const cur = week.value.status;
+  const cancelled = cur === 'CANCELLED';
   const ci = WEEK_FLOW.findIndex((x) => x.key === cur);
-  return WEEK_FLOW.map((x, i) => ({
-    ...x,
-    state: x.key === cur ? 'on' : (ci >= 0 && i < ci ? 'done' : ''),
-  }));
+  return WEEK_FLOW.map((x, i) => {
+    const isOn = x.key === cur;
+    return {
+      key: x.key,
+      cn: isOn ? x.on : x.cn,
+      en: x.key.charAt(0) + x.key.slice(1).toLowerCase(),
+      state: cancelled ? 'cancel' : (isOn ? 'on' : (ci >= 0 && i < ci ? 'done' : '')),
+    };
+  });
 });
+/** 本周是否已取消（状态带整条压灰 + 右侧红字说明） */
+const weekCancelled = computed(() => week.value.status === 'CANCELLED');
 
 /** 锁定前要盯的两类：还没审的、审过但还没落座的 */
 const todoCounts = computed(() => ({
@@ -1255,7 +1272,7 @@ async function runSchedule() {
 
 /* ══════════ 模拟排期（只算不写库，超管专用）
      接 POST /admin/submit/schedule/preview —— dryRun 不落库，算法出问题也不污染正式数据。
-     twoMode：「自动路径」= 受收歌闸门约束（收歌中只做原位递补）；
+     twoMode：「自动路径」= 受点播闸门约束（点播中只做原位递补）；
                「立即执行」= 等同于点「执行排期」（放开跨时段调剂）。 ══════════ */
 const previewVisible = ref(false);
 const previewLoading = ref(false);
@@ -2487,7 +2504,9 @@ onBeforeUnmount(() => {
   border-radius: 10px; font-size: var(--fs-xs); color: var(--muted-2); line-height: 1.8;
 }
 
-/* ══════════ 周状态机（排期矩阵顶部 · 展示用） ══════════ */
+/* ══════════ 周状态机（排期矩阵顶部 · 展示用） ══════════
+   中英双行 · 水平居中；颜色分状态 —— 深＝当前 / 绿＝已走过 / 羊皮纸＝未到 / 浅灰＝已取消
+   ⚠️ 文字只有两种形态：进行中带「中」，其余不带（2026-09-27 陛下定） */
 .wkbar {
   display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
   background: #fff; border: 1px solid var(--hairline);
@@ -2495,15 +2514,25 @@ onBeforeUnmount(() => {
 }
 .wkflow { display: flex; align-items: center; flex-wrap: wrap; gap: 0; }
 .wkstep {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 12px; border-radius: var(--r-pill);
-  background: var(--parchment); font-size: var(--fs-sm); color: var(--muted);
-  letter-spacing: var(--ls-wide-sm); white-space: nowrap;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1px; padding: 6px 14px 7px; border-radius: var(--r-pill);
+  background: var(--parchment); color: var(--muted);
+  white-space: nowrap; text-align: center;
+  transition: background 0.2s, color 0.2s;
 }
-.wkstep.on { background: var(--ink); color: #fff; font-weight: 600; }
-.wkstep.done { background: var(--acc-bg); color: var(--accent); }
-.wkstep i { font-style: normal; font-size: var(--fs-2xs); opacity: 0.7; letter-spacing: 0; }
-.wkarrow { width: 16px; flex: none; height: 1px; background: var(--hairline); margin: 0 5px; }
+.wkstep .cn { font-size: var(--fs-sm); font-weight: 600; line-height: 1.3; letter-spacing: 0.2px; }
+.wkstep .en { font-size: var(--fs-2xs); font-weight: 500; line-height: 1.3; letter-spacing: 0.08em; opacity: 0.85; }
+.wkstep.on { background: var(--ink); color: #fff; box-shadow: 0 0 0 3px rgba(39, 39, 41, 0.09); }
+.wkstep.on .en { opacity: 0.62; }
+.wkstep.done { background: var(--green-bg); color: var(--green-fg); }
+.wkstep.done .en { opacity: 0.72; }
+.wkstep.cancel { background: var(--parchment); color: #a1a1a6; }
+.wkarrow { width: 16px; flex: none; height: 2px; background: var(--hairline); margin: 0 5px; border-radius: 2px; }
+.wkarrow.done { background: #b9dcc7; }
+.wk-cancel-tip {
+  margin-left: 12px; padding: 3px 10px; border-radius: var(--r-pill);
+  background: var(--red-bg); color: var(--red-fg); font-size: var(--fs-2xs); white-space: nowrap;
+}
 .wkcd { margin-left: auto; text-align: right; }
 .wkcd-v { font-size: var(--fs-xl); font-weight: 600; color: var(--ink); line-height: 1.3; }
 

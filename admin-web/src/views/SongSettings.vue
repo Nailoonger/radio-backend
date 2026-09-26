@@ -154,7 +154,7 @@
           <span class="tag" :class="auth.isSuperAdmin ? 'tag-pass' : ''">
             {{ auth.isSuperAdmin ? '仅超管可改' : '只读 · 仅超管可改' }}
           </span>
-          <span class="micro">收歌截止 ≠ 审核截止（本版拆开）</span>
+          <span class="micro">点播截止 ≠ 审核截止（本版拆开）</span>
         </span>
       </div>
       <div class="card" style="padding:18px 20px">
@@ -168,18 +168,18 @@
               </div>
               <div class="win-cd">
                 <template v-if="win.enabled === false">一直开放</template>
-                <template v-else-if="win.open">开放中 · 距收歌截止 {{ fmtDur(winCd?.ms) }}</template>
+                <template v-else-if="win.open">开放中 · 距点播截止 {{ fmtDur(winCd?.ms) }}</template>
                 <template v-else>未开放 · 距开放 {{ fmtDur(winCd?.ms) }}</template>
               </div>
             </div>
             <div class="win-meta">
-              <div>本周收歌 {{ hhmm(win.start) }} → {{ hhmm(win.end) }}</div>
+              <div>本周点播 {{ hhmm(win.start) }} → {{ hhmm(win.end) }}</div>
               <div v-if="win.reviewAt">审核截止 {{ hhmm(win.reviewAt) }}</div>
               <div v-else-if="win.opensAt">下次开放 {{ hhmm(win.opensAt) }}</div>
             </div>
           </div>
           <div class="win-note">
-            {{ win.note || '收歌截止只停止新提交；到审核截止才自动排期、驳回剩余候补并锁定本周' }}
+            {{ win.note || '点播截止只停止新提交；到审核截止才自动排期、驳回剩余候补并锁定本周' }}
           </div>
         </div>
 
@@ -193,7 +193,7 @@
             </span>
           </div>
           <div class="kv">
-            <span class="k" style="width:132px">收歌开始</span>
+            <span class="k" style="width:132px">点播开始</span>
             <span class="rowc gap8 wrap">
               <el-select v-model="winForm.startDay" style="width:106px" :disabled="winDisabled">
                 <el-option v-for="d in win.allowedDays || []" :key="d.day" :label="d.name" :value="d.day" />
@@ -206,7 +206,7 @@
             </span>
           </div>
           <div class="kv">
-            <span class="k" style="width:132px">收歌结束</span>
+            <span class="k" style="width:132px">点播结束</span>
             <span class="rowc gap8 wrap">
               <el-select v-model="winForm.endDay" style="width:106px" :disabled="winDisabled">
                 <el-option v-for="d in win.allowedDays || []" :key="d.day" :label="d.name" :value="d.day" />
@@ -218,7 +218,7 @@
               <span class="micro">到点停止收新歌，已提交的继续审核</span>
             </span>
           </div>
-          <!-- 审核截止（2026-09-25 与收歌截止拆开）：null = 跟随「收歌结束 + 偏移」，保住升级前的行为 -->
+          <!-- 审核截止（2026-09-25 与点播截止拆开）：null = 跟随「点播结束 + 偏移」，保住升级前的行为 -->
           <div class="kv">
             <span class="k" style="width:132px">审核截止</span>
             <span class="rowc gap8 wrap">
@@ -246,7 +246,7 @@
               </el-button>
               <span class="micro">
                 {{ auth.isSuperAdmin
-                  ? '星期任选 周一 → 周日（最长可铺满整周）；审核截止不得早于收歌结束、不得晚于播出周周一 00:00'
+                  ? '星期任选 周一 → 周日（最长可铺满整周）；审核截止不得早于点播结束、不得晚于播出周周一 00:00'
                   : '只有超级管理员能修改点歌时间窗口（后端 40301 把关）' }}
               </span>
             </span>
@@ -551,19 +551,19 @@ async function sweepQueue() {
 const win = ref({});
 const winForm = reactive({
   enabled: 0, startDay: 6, startTime: '18:00', endDay: 0, endTime: '18:00',
-  // null = 「跟随收歌结束 + 偏移」档位（升级前的旧行为，保持不变）
+  // null = 「跟随点播结束 + 偏移」档位（升级前的旧行为，保持不变）
   reviewDay: null, reviewTime: '22:00',
 });
 const winSaving = ref(false);
 /** 非超管或未启用窗口 → 表单只读 */
 const winDisabled = computed(() => !auth.isSuperAdmin || !Number(winForm.enabled));
 
-/** 「跟随收歌结束 + 偏移」档位的文案：偏移分钟数由服务端下发，前端不硬编码 360 */
+/** 「跟随点播结束 + 偏移」档位的文案：偏移分钟数由服务端下发，前端不硬编码 360 */
 const followLabel = computed(() => {
   const m = Number(win.value?.followOffsetMinutes);
-  if (!Number.isFinite(m) || m <= 0) return '跟随收歌结束';
+  if (!Number.isFinite(m) || m <= 0) return '跟随点播结束';
   const h = m / 60;
-  return `跟随收歌结束 + ${Number.isInteger(h) ? `${h} 小时` : `${m} 分钟`}`;
+  return `跟随点播结束 + ${Number.isInteger(h) ? `${h} 小时` : `${m} 分钟`}`;
 });
 
 const winCd = computed(() => {
@@ -582,7 +582,7 @@ function fillWinForm(d) {
   winForm.endDay = Number(cfg.endDay ?? 0);
   winForm.endTime = cfg.endTime || '18:00';
   // ⚠️ 未单独配置时必须回 null（下拉落在「跟随…」档），不能拿服务端推导出的生效值冒充配置值 ——
-  //    否则管理员只是改了收歌时间、顺手保存，就把「收歌结束 + 偏移」固化成具体时刻，行为悄悄变了
+  //    否则管理员只是改了点播时间、顺手保存，就把「点播结束 + 偏移」固化成具体时刻，行为悄悄变了
   winForm.reviewDay = cfg.reviewDay === null || cfg.reviewDay === undefined ? null : Number(cfg.reviewDay);
   winForm.reviewTime = cfg.reviewTime || '22:00';
 }
@@ -592,7 +592,7 @@ async function fetchWindow() {
 }
 async function saveWindow() {
   if (Number(winForm.enabled) && (!winForm.startTime || !winForm.endTime)) {
-    ElMessage.warning('请填写收歌开始与结束时刻（HH:mm）');
+    ElMessage.warning('请填写点播开始与结束时刻（HH:mm）');
     return;
   }
   if (Number(winForm.enabled) && winForm.reviewDay !== null && !winForm.reviewTime) {
@@ -607,7 +607,7 @@ async function saveWindow() {
       startTime: winForm.startTime,
       endDay: Number(winForm.endDay),
       endTime: winForm.endTime,
-      // null 是合法档位（跟随收歌结束 + 偏移），后端不会当非法值拒掉
+      // null 是合法档位（跟随点播结束 + 偏移），后端不会当非法值拒掉
       reviewDay: winForm.reviewDay === null ? null : Number(winForm.reviewDay),
       reviewTime: winForm.reviewTime || null,
     });

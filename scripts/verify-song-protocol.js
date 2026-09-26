@@ -240,7 +240,7 @@ const DAY = 24 * 60 * 60 * 1000;
       await S.applyChange(row, { reviewStatus: S.REVIEW.APPROVED, reviewerId: 1, reviewTime: new Date() });
     }
     await sched.initialAllocate(weekStart, { now });
-    // 全局调剂属于「收歌截止后 / 超管手动执行 / 锁定前」的动作 → 显式放开跨时段
+    // 全局调剂属于「点播截止后 / 超管手动执行 / 锁定前」的动作 → 显式放开跨时段
     await sched.reschedule(weekStart, { now: now + 1000, crossSlot: true });
 
     const rf = await Submit.findByPk(flex.id);
@@ -292,21 +292,21 @@ const DAY = 24 * 60 * 60 * 1000;
       `schedule=${ry.scheduleStatus} slot=${ry.scheduledSlot}`);
     check('不接受调剂且首选已满的 Z 继续等待', Number(rz.scheduleStatus) === S.SCHEDULE.WAITING, rz.scheduleStatus);
 
-    /* ══════════ G2. 收歌未截止 → 不许跨时段 ══════════ */
+    /* ══════════ G2. 点播未截止 → 不许跨时段 ══════════ */
     say('');
-    say('--- G2. 收歌未截止：只做原位递补，别处的空位不外借 ---');
+    say('--- G2. 点播未截止：只做原位递补，别处的空位不外借 ---');
     // 这是「保证每个时段原先申请者的排期」的核心回归：
-    // 收歌窗口还没结束（application_end_at 之前）时，别的格子空着也不能占 ——
+    // 点播窗口还没结束（application_end_at 之前）时，别的格子空着也不能占 ——
     // 那个空位要留给「首选那一格」的原申请者（他可能还没被审核通过）。
     // 用一个更远的播出周跑这一节 —— 不 destroy、不碰 weekStart 的数据，
     // 免得把 G 节的 X/Y/Z 和下面 H 节的断言搞坏。
     const gateWeekMs = weekStart + 14 * DAY;
     const GV = await sched.slotValuesOfWeek(gateWeekMs);
     const gateWeek = await sched.ensureWeek(gateWeekMs, { now });
-    const openAt = +new Date(gateWeek.applicationStartAt) + 3600 * 1000;    // 收歌中
-    const closedAt = +new Date(gateWeek.applicationEndAt) + 3600 * 1000;   // 收歌已截止
-    check('闸门：收歌中不允许跨时段', sched.canCrossSlot(gateWeek, openAt) === false);
-    check('闸门：收歌截止后允许跨时段', sched.canCrossSlot(gateWeek, closedAt) === true);
+    const openAt = +new Date(gateWeek.applicationStartAt) + 3600 * 1000;    // 点播中
+    const closedAt = +new Date(gateWeek.applicationEndAt) + 3600 * 1000;   // 点播已截止
+    check('闸门：点播中不允许跨时段', sched.canCrossSlot(gateWeek, openAt) === false);
+    check('闸门：点播截止后允许跨时段', sched.canCrossSlot(gateWeek, closedAt) === true);
 
     await mkSeated(GV[1], { minutesAgo: 90, song: '占住首选' });
     const flexEarly = await mk(GV[1], { minutesAgo: 40, song: '早段候补' });
@@ -317,14 +317,14 @@ const DAY = 24 * 60 * 60 * 1000;
 
     const noCross = await sched.reschedule(gateWeekMs, { now: openAt });
     const rfEarly = await Submit.findByPk(flexEarly.id);
-    check('收歌中：候补的人不会被塞到别的空位',
+    check('点播中：候补的人不会被塞到别的空位',
       Number(rfEarly.scheduleStatus) === S.SCHEDULE.WAITING && noCross.rescheduled === 0,
       `schedule=${rfEarly.scheduleStatus} rescheduled=${noCross.rescheduled}`);
-    check('收歌中：返回值标明 crossSlot=false', noCross.crossSlot === false, String(noCross.crossSlot));
+    check('点播中：返回值标明 crossSlot=false', noCross.crossSlot === false, String(noCross.crossSlot));
 
     const withCross = await sched.reschedule(gateWeekMs, { now: closedAt });
     const rfLate = await Submit.findByPk(flexEarly.id);
-    check('收歌截止后才跨时段调剂',
+    check('点播截止后才跨时段调剂',
       Number(rfLate.scheduleStatus) === S.SCHEDULE.APPROVED && rfLate.scheduledSlot !== GV[1] && withCross.rescheduled === 1,
       `schedule=${rfLate.scheduleStatus} slot=${rfLate.scheduledSlot} rescheduled=${withCross.rescheduled}`);
     check('跨时段后首选（意愿数据）仍是原值', rfLate.wantBroadcastTime === GV[1], rfLate.wantBroadcastTime);
@@ -570,10 +570,10 @@ const DAY = 24 * 60 * 60 * 1000;
     const songWeekMs = rngNow.songWeek.getTime();
     const weekStartMsQ = rngNow.weekStart.getTime();
 
-    // ① 锚点：窗口整体落在「收歌周」内（旧公式把 startDay=周一 算到播出周本身）
-    check('窗口锚点 = 目标播出周 − 7 天（收歌周周一 00:00）',
+    // ① 锚点：窗口整体落在「点播周」内（旧公式把 startDay=周一 算到播出周本身）
+    check('窗口锚点 = 目标播出周 − 7 天（点播周周一 00:00）',
       weekStartMsQ - songWeekMs === 7 * DAY, `${fmt(songWeekMs)} → ${fmt(weekStartMsQ)}`);
-    check('默认窗口（周六 18:00 → 周日 18:00）起止都落在收歌周内',
+    check('默认窗口（周六 18:00 → 周日 18:00）起止都落在点播周内',
       rngNow.start.getTime() >= songWeekMs && rngNow.end.getTime() <= weekStartMsQ,
       `${fmt(rngNow.start.getTime())} → ${fmt(rngNow.end.getTime())}`);
 
@@ -583,7 +583,7 @@ const DAY = 24 * 60 * 60 * 1000;
     check('旧白名单（五/六/日）新公式与旧 offBack 完全等价', legacySame,
       [5, 6, 0].map((d) => `${d}:offMon=${win.offMon(d)}/offBack=${offBackOld(d)}`).join(' '));
 
-    // ③ 周一 → 周日 任选：逐日作起止都合法，且不跨收歌周周一 00:00
+    // ③ 周一 → 周日 任选：逐日作起止都合法，且不跨点播周周一 00:00
     let allDaysOk = true;
     let crossOffender = '';
     for (const d of [1, 2, 3, 4, 5, 6, 0]) {
@@ -627,9 +627,9 @@ const DAY = 24 * 60 * 60 * 1000;
       { enabled: 1, startDay: 5, startTime: '18:00', endDay: 3, endTime: '18:00' }, '必须晚于');
     await rejects('同一天结束早于开始 → 报错',
       { enabled: 1, startDay: 6, startTime: '18:00', endDay: 6, endTime: '12:00' }, '必须晚于');
-    await rejects('审核截止早于收歌结束 → 报错',
+    await rejects('审核截止早于点播结束 → 报错',
       { enabled: 1, startDay: 6, startTime: '18:00', endDay: 0, endTime: '18:00', reviewDay: 0, reviewTime: '12:00' },
-      '不得早于收歌结束');
+      '不得早于点播结束');
     await rejects('起点到达 24:00 的非法时刻 → 报错',
       { enabled: 1, startDay: 1, startTime: '24:00' }, 'HH:mm');
 
@@ -640,7 +640,7 @@ const DAY = 24 * 60 * 60 * 1000;
     check('整周全天开放放行：周一 00:00 → 周日 23:59',
       fullRng.start.getTime() === songWeekMs && fullRng.end.getTime() === weekStartMsQ - 60000,
       `${fmt(fullRng.start.getTime())} → ${fmt(fullRng.end.getTime())}`);
-    check('整周窗口仍在收歌周内（不跨周一 00:00）', fullRng.end.getTime() < weekStartMsQ);
+    check('整周窗口仍在点播周内（不跨周一 00:00）', fullRng.end.getTime() < weekStartMsQ);
 
     // ⑥ 不跳变：窗口内任意时刻算出的都是同一个播出周 + 同一组起止
     const probes = [
@@ -656,15 +656,15 @@ const DAY = 24 * 60 * 60 * 1000;
     check('窗口内任意时刻：目标播出周与窗口起止恒定（不跳变）', stable,
       `${probes.length} 个探针`);
 
-    // ⑦ 审核截止独立：锁定时刻 = 审核截止，且与收歌截止解耦
+    // ⑦ 审核截止独立：锁定时刻 = 审核截止，且与点播截止解耦
     await win.setConfig({ enabled: 1, startDay: 1, startTime: '00:00', endDay: 0, endTime: '12:00', reviewDay: 0, reviewTime: '22:00' }, null);
     const indCfg = await win.getConfig(now);
     const indRng = await win.anchorRangeAt(indCfg, now);
     check('审核截止 = 配置值（周日 22:00）',
       indRng.reviewAt.getTime() === songWeekMs + 6 * DAY + 22 * 3600000,
       fmt(indRng.reviewAt.getTime()));
-    check('审核截止 ≠ 收歌截止（两者已解耦）', indRng.reviewAt.getTime() !== indRng.end.getTime(),
-      `收歌 ${fmt(indRng.end.getTime())} / 审核 ${fmt(indRng.reviewAt.getTime())}`);
+    check('审核截止 ≠ 点播截止（两者已解耦）', indRng.reviewAt.getTime() !== indRng.end.getTime(),
+      `点播 ${fmt(indRng.end.getTime())} / 审核 ${fmt(indRng.reviewAt.getTime())}`);
 
     await WeeklySchedule.destroy({ where: { weekStartDate: bj.ymd(bj.shifted(weekStartMsQ)) } });
     const indWeek = await sched.ensureWeek(weekStartMsQ, { now });
@@ -672,20 +672,20 @@ const DAY = 24 * 60 * 60 * 1000;
       +new Date(indWeek.scheduleLockAt) === indRng.reviewAt.getTime(), fmt(+new Date(indWeek.scheduleLockAt)));
     check('周行 reviewEndAt = scheduleLockAt',
       +new Date(indWeek.reviewEndAt) === +new Date(indWeek.scheduleLockAt));
-    check('周行 scheduleLockAt ≠ applicationEndAt（锁定不再挂在收歌截止上）',
+    check('周行 scheduleLockAt ≠ applicationEndAt（锁定不再挂在点播截止上）',
       +new Date(indWeek.scheduleLockAt) !== +new Date(indWeek.applicationEndAt));
     const indView = sched.weekView(indWeek, now);
-    check('weekView 暴露 reviewEndAt 给前端（不必再拿 lockAt − 收歌截止反算）',
+    check('weekView 暴露 reviewEndAt 给前端（不必再拿 lockAt − 点播截止反算）',
       indView.reviewEndAt === win.toBjsIso(new Date(indRng.reviewAt.getTime())), indView.reviewEndAt);
-    check('收歌截止到审核截止之间 = 留白（仍处收歌已关、未锁定）',
+    check('点播截止到审核截止之间 = 留白（仍处点播已关、未锁定）',
       indWeek.status === 'REVIEW' || indWeek.status === 'DRAFT' || indWeek.status === 'APPLICATION',
       indWeek.status);
 
-    // ⑧ 未配置审核截止 → 退回「收歌结束 + 偏移」，且升级不改行为
+    // ⑧ 未配置审核截止 → 退回「点播结束 + 偏移」，且升级不改行为
     await win.setConfig({ startDay: 6, startTime: '18:00', endDay: 0, endTime: '18:00', reviewDay: null, reviewTime: null }, null);
     const fbCfg = await win.getConfig(now);
     const fbRng = await win.anchorRangeAt(fbCfg, now);
-    check('未配置审核截止 → 收歌结束 + 偏移（默认 6h = 播出周周一 00:00）',
+    check('未配置审核截止 → 点播结束 + 偏移（默认 6h = 播出周周一 00:00）',
       fbRng.reviewAt.getTime() === fbRng.end.getTime() + 6 * 3600000
       && fbRng.reviewAt.getTime() === weekStartMsQ,
       fmt(fbRng.reviewAt.getTime()));
@@ -706,7 +706,7 @@ const DAY = 24 * 60 * 60 * 1000;
     check('describe 不再有 72h 上限（已放宽到 168h）', desc.maxSpanHours === 168, desc.maxSpanHours);
     check('describe 暴露审核截止（reviewAt / reviewText）',
       !!desc.reviewAt && !!desc.reviewText, `${desc.windowText} / ${desc.reviewText}`);
-    check('describe 文案改为「收歌截止 ≠ 审核截止」',
+    check('describe 文案改为「点播截止 ≠ 审核截止」',
       String(desc.note).includes('审核截止') && !String(desc.note).includes('窗口结束时刻 = 审核截止'),
       desc.note);
     const stQ = await win.status(now);
@@ -718,7 +718,7 @@ const DAY = 24 * 60 * 60 * 1000;
     const reCfg = await win.getConfig(now);
     const reRng = await win.anchorRangeAt(reCfg, now);
     const reWeek = await sched.ensureWeek(weekStartMsQ, { now });
-    check('配置改动后：已有周行「收歌截止」自动刷新',
+    check('配置改动后：已有周行「点播截止」自动刷新',
       +new Date(reWeek.applicationEndAt) === reRng.end.getTime(),
       `${fmt(+new Date(reWeek.applicationEndAt))}（期望 ${fmt(reRng.end.getTime())}）`);
     check('配置改动后：已有周行「锁定时刻」跟着改成新审核截止',

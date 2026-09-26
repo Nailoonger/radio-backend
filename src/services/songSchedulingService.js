@@ -51,11 +51,15 @@ const WEEK_STATUS = {
   LOCKED: 'LOCKED',
   CANCELLED: 'CANCELLED',
 };
+/** 周状态中文名（下发到前端的 statusText）
+ *  ⚠️ 命名规则（2026-09-27 陛下定）：状态本身 = "进行中" 形态，带「中」；
+ *     前端状态带的"已完成 / 未到"胶囊直接去掉「中」（点播中 → 点播）。
+ *     DRAFT 用「未开放」，与前端 WEEK_FLOW 对齐。 */
 const WEEK_STATUS_CN = {
-  DRAFT: '未发布',
-  APPLICATION: '收歌中',
+  DRAFT: '未开放',
+  APPLICATION: '点播中',
   REVIEW: '审核中',
-  SCHEDULING: '排期已生成',
+  SCHEDULING: '排期中',
   LOCKED: '已锁定',
   CANCELLED: '已取消',
 };
@@ -180,9 +184,9 @@ async function getLockOffsetMinutes() {
 
 /**
  * 时间锚点全部由 KV 点歌窗口派生（2026-09-25 改版后含独立审核截止）。
- *   applicationEndAt = 收歌截止（只停止收新歌）
+ *   applicationEndAt = 点播截止（只停止收新歌）
  *   scheduleLockAt   = 审核截止（到点自动排期 + 驳回候补 + 锁定本周）
- * 两者不再相等 —— 收歌结束后到审核截止之间，管理员仍可慢慢审、手动调格子。
+ * 两者不再相等 —— 点播结束后到审核截止之间，管理员仍可慢慢审、手动调格子。
  */
 async function anchorOf(weekStartMs, now = Date.now()) {
   const cfg = await songWindow.getConfig(now);
@@ -191,7 +195,7 @@ async function anchorOf(weekStartMs, now = Date.now()) {
   return {
     applicationStartAt: rng.start,
     applicationEndAt: rng.end,
-    reviewStartAt: rng.end,          // 收歌截止 = 审核开始
+    reviewStartAt: rng.end,          // 点播截止 = 审核开始
     scheduleLockAt: rng.reviewAt,    // 锁定时刻 = 独立审核截止
     reviewEndAt: rng.reviewAt,
   };
@@ -396,14 +400,14 @@ async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = nul
  * ② 全局调剂 RescheduleAllocator
  * ------------------------------------------------------------------ */
 /**
- * 收歌是否已截止 —— 决定这一周能不能**跨时段**调剂。
+ * 点播是否已截止 —— 决定这一周能不能**跨时段**调剂。
  *
  * ⚠️ 这是「保证每个时段原先申请者的排期」的关键闸门。
- *   收歌窗口内（`applicationEndAt` 之前）还有新申请在进来、还有人没审完，
+ *   点播窗口内（`applicationEndAt` 之前）还有新申请在进来、还有人没审完，
  *   此时周内任何一个空位都**可能**属于某个「首选那一格」的原申请者。
  *   若此刻就把候补的人跨时段排过去，等那个人审完就没位置了 ——
  *   而且被挪走的人已变成 APPROVED，再也回不到首选格。
- *   → 收歌截止前只允许**原位递补**，截止后才放开跨时段。
+ *   → 点播截止前只允许**原位递补**，截止后才放开跨时段。
  *
  * `lockWeek()`（锁定前最后调度）与超管手动「执行排期」显式传 `crossSlot: true`，
  * 不受这个闸门限制。
@@ -425,7 +429,7 @@ function canCrossSlot(week, now = Date.now()) {
  *
  * @param {object}  [opts]
  * @param {boolean} [opts.crossSlot] true=允许跨时段，false=只做原位递补，
- *                                   null / 省略 = 按「收歌是否已截止」自动判断
+ *                                   null / 省略 = 按「点播是否已截止」自动判断
  * @param {boolean} [opts.dryRun]    只算不写库（模拟排期预览），动作清单在 actions 里
  * @returns {Promise<{weekId, promoted, rescheduled, left, crossSlot, actions}>}
  */
@@ -539,7 +543,7 @@ async function reschedule(weekStartMs, { now = Date.now(), operatorId = null, tr
   }
 
   if (!dryRun && (res.promoted || res.rescheduled)) {
-    logger.info(`[songSchedule] 调剂 周${week.weekStartDate}${allowCross ? '' : '（收歌未截止·仅原位递补）'}：原位递补 ${res.promoted}、跨时段调剂 ${res.rescheduled}、仍未安排 ${res.left}`);
+    logger.info(`[songSchedule] 调剂 周${week.weekStartDate}${allowCross ? '' : '（点播未截止·仅原位递补）'}：原位递补 ${res.promoted}、跨时段调剂 ${res.rescheduled}、仍未安排 ${res.left}`);
   }
   return res;
 }
@@ -582,7 +586,7 @@ async function lockWeek(weekStartMs, { now = Date.now(), operatorId = null, forc
   }
 
   // 最后一次调度：把还能塞进空位的人都塞进去
-  // 锁定时**显式**放开跨时段 —— 到了这一步收歌早已截止，不可能再有新申请者
+  // 锁定时**显式**放开跨时段 —— 到了这一步点播早已截止，不可能再有新申请者
   await initialAllocate(weekStartMs, { now, operatorId });
   const alloc = await reschedule(weekStartMs, { now, operatorId, crossSlot: true });
 
@@ -856,7 +860,7 @@ async function waitingSnapshot(weekStartMs, now = Date.now()) {
       allowReschedule: Number(r.allowReschedule) !== 0,
       submittedAt: r.createTime,
       pos: i + 1,
-      // 收歌未截止时即使「接受调剂」也去不了别处 —— 只能等首选格自己空出来
+      // 点播未截止时即使「接受调剂」也去不了别处 —— 只能等首选格自己空出来
       canAccept: free.includes(r.wantBroadcastTime)
         ? 1
         : (Number(r.allowReschedule) !== 0 && allowCross ? free.length : 0),

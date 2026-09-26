@@ -681,7 +681,7 @@ exports.runSchedule = async (req, res, next) => {
     await assertWeekNotLocked(ms, '这一周');    // 锁定后不允许重跑排期
 
     // 超管手动执行 = 完整调度，**显式**放开跨时段调剂：
-    // 自动路径要等收歌截止才跨时段，手动执行是管理员的明确意图，不受该闸门限制。
+    // 自动路径要等点播截止才跨时段，手动执行是管理员的明确意图，不受该闸门限制。
     const a = await sched.initialAllocate(ms, { now, operatorId: req.admin.id });
     const b = await sched.reschedule(ms, { now, operatorId: req.admin.id, crossSlot: true });
     const week = await sched.ensureWeek(ms, { now });
@@ -706,7 +706,7 @@ exports.runSchedule = async (req, res, next) => {
  * 算法出问题时**不污染正式数据** —— 这正是 V1 特意要求它的原因。
  *
  * body: { weekStart?, crossSlot? }
- *   crossSlot 省略 = 按「收歌是否已截止」自动判断（与自动路径一致）；
+ *   crossSlot 省略 = 按「点播是否已截止」自动判断（与自动路径一致）；
  *   传 true 可预览「如果现在放开跨时段会怎样」。
  */
 exports.previewSchedule = async (req, res, next) => {
@@ -721,7 +721,7 @@ exports.previewSchedule = async (req, res, next) => {
     const capacity = await sched.getCapacity();
     const counters = await sched.countSeatedBySlot(values);
     const crossSlot = body.crossSlot === undefined || body.crossSlot === null
-      ? null                                  // null = 交给算法按收歌截止时间判断
+      ? null                                  // null = 交给算法按点播截止时间判断
       : !!body.crossSlot;
 
     const a = await sched.initialAllocate(ms, { now, dryRun: true });
@@ -770,8 +770,8 @@ exports.previewSchedule = async (req, res, next) => {
       week: sched.weekView(week, now),
       crossSlot: b.crossSlot,
       crossSlotReason: b.crossSlot
-        ? '收歌已截止（或手动指定），允许跨时段调剂'
-        : '收歌未截止，只做原位递补 —— 别处的空位要留给首选那一格的原申请者',
+        ? '点播已截止（或手动指定），允许跨时段调剂'
+        : '点播未截止，只做原位递补 —— 别处的空位要留给首选那一格的原申请者',
       slots: values.map((v) => ({
         value: v,
         seated: counters[v] || 0,

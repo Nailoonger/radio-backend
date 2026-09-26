@@ -58,7 +58,7 @@ Page({
     winOpen: true,          // 此刻是否开放（默认 true：拉不到数据时不把用户锁死，服务端仍会拦）
     winLine1: '',           // 规则行：每周六 18:00 – 周日 18:00
     winLine2: '',           // 状态行：开放中 · 距截止 2 小时 15 分
-    winClosesAt: '',        // 本次收歌截止（MM-DD HH:mm）
+    winClosesAt: '',        // 本次点播截止（MM-DD HH:mm）
     ctaClosed: false,       // 未开放 → 提交按钮置灰
     hintText: '',           // 按钮上方提示
 
@@ -395,7 +395,7 @@ Page({
         + (card.queueLimit > 0 ? ' · 候补上限 ' + card.queueLimit + ' 人' : ''));
     }
     if (card.finalizeAt) lines.push(card.hint || '下周任意时段有空位时按提交先后自动补位');
-    if (card.finalizeAt) lines.push('收歌截止 ' + fmtIso(card.finalizeAt) + '，没补上会自动告诉你');
+    if (card.finalizeAt) lines.push('点播截止 ' + fmtIso(card.finalizeAt) + '，没补上会自动告诉你');
     return new Promise((resolve) => {
       wx.showModal({
         title: '已进入候补队列',
@@ -492,8 +492,8 @@ Page({
   /**
    * 提交成功回执（协议版新增）
    * 讲清三步：已提交 → 等待审核 → 统一排期，并点明「最晚什么时候有结果」。
-   * ⚠️ 2026-09-25 起「收歌截止 ≠ 审核截止」：回执里的审核截止取 win.reviewAt（服务端下发），
-   *    不再拿收歌截止顶替；锁定时刻取这条投稿的 card.lockAt（= 审核截止），
+   * ⚠️ 2026-09-25 起「点播截止 ≠ 审核截止」：回执里的审核截止取 win.reviewAt（服务端下发），
+   *    不再拿点播截止顶替；锁定时刻取这条投稿的 card.lockAt（= 审核截止），
    *    取不到就退回相对说法，不编一个假时刻给学生。
    */
   showReceipt(r) {
