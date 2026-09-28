@@ -52,6 +52,7 @@ const SUITE = [
   ['test-admin-routes.js', false],
   ['test-gateway.js', true],
   ['test-migration.js', true],
+  ['test-http-bridge.js', true],
   ['test-bundle.js', false],
   ['selfcheck.js', false],
 ];

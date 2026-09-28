@@ -74,6 +74,30 @@ exports.main = async (event = {}, context) => {
     };
   }
 
+  /**
+   * ── HTTP 访问服务（阶段 9：给 admin-web 用）──────────────────────────
+   * 网页没有 wx 环境，只能走云函数的 HTTP 触发，此时 event 是**集成请求**
+   * （`{ path, httpMethod, headers, queryStringParameters, body, isBase64Encoded }`）。
+   *
+   * ⚠️⚠️ 必须在**解构 event 之前**把它还原成我们自己的形状 ——
+   *    这样下面所有逻辑（路由 / handler / 鉴权）一行都不用为 admin-web 改。
+   *    `normalizeHttpEvent` 对非 HTTP 事件（小程序 callFunction / 定时触发）返回 null，
+   *    所以这条分支对原有两条通道**零影响**。
+   */
+  let httpVia = null;
+  try {
+    const info = require('./httpBridge').normalizeHttpEvent(event);
+    if (info) {
+      // 浏览器预检（OPTIONS）：没有业务语义，直接放行，别让它落到「接口不存在」
+      if (info.method === 'OPTIONS') return { code: 0, message: 'ok', data: null };
+      httpVia = info.via;
+      event = { method: info.method, path: info.path, body: info.body, token: info.token, query: info.query };
+    }
+  } catch (e) {
+    // 适配层自身出错不能把整个云函数拖挂：记一行日志后按原样继续（等价于没开 HTTP 通道）
+    console.error('[http] 集成请求适配失败', (e && e.message) || e);
+  }
+
   const started = Date.now();
   const { method = 'GET', path: rawPath = '', body = {}, token = '', query: eventQuery = {} } = event || {};
   const { cloud, ApiError, Codes, match } = b;
@@ -174,6 +198,7 @@ exports.main = async (event = {}, context) => {
       },
     };
   } finally {
-    console.log('[api]', method, reqPath, `${Date.now() - started}ms`, wxContext.OPENID || '-');
+    // `httpVia` 只有 HTTP 访问服务来的请求才有（'envelope' / 'rest'），日志里带上便于分辨通道
+    console.log('[api]', httpVia ? `http:${httpVia}` : 'cloud', method, reqPath, `${Date.now() - started}ms`, wxContext.OPENID || '-');
   }
 };

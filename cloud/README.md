@@ -46,14 +46,14 @@
 | 6 | 定时触发器（原 60s sweep → 云函数定时器） | ✅ 完成（+廉价闸门把空转从 32% 额度压到 ~2%；**函数超时已配 30s**） |
 | 7 | 管理端接口移植（含学生名册 Excel） | ✅ 完成（**93/93 路由**，仍就绪未 0；本地 670 项管理端断言全绿） |
 | 8 | 数据迁移脚本 + 双向校验 | ✅ 完成（导出只读原库 / `_id` 规则 / `unique_keys` 补登记 / `sequence` 预置 / 双向校验 + 4 类反向用例，75 项断言全绿；**真机导入与校验待跑**） |
-| 9 | admin-web 接云开发 | ⏳ 最后一步 |
+| 9 | admin-web 接云开发（HTTP 访问服务 + 可切换请求层） | ✅ 完成（`httpBridge` 适配 + 32 项断言；**控制台配触发路径 + 部署待陛下跑**） |
 
 ### 本地验证（每次改完必跑，秒级）
 
 **一键跑完全部（源码 + 打包产物各一轮）：**
 
 ```bash
-node cloud/scripts/regression.js            # 14 套件 × 两轮，合计 3049 项
+node cloud/scripts/regression.js            # 15 套件 × 两轮，合计 3107 项
 node cloud/scripts/regression.js --source   # 只跑源码目录
 node cloud/scripts/regression.js --selftest # 只自检「结论行解析器」（不依赖子进程）
 ```
@@ -78,14 +78,15 @@ node cloud/scripts/test-admin-submit.js    # 点歌 30 条 + 排期算法整链�
 node cloud/scripts/test-admin-student.js   # 学生账号 19 条 + roster/sheet 服务（263 项）
 node cloud/scripts/test-admin-routes.js    # 路由 ↔ handler 就绪性守门（19 项，**仅源码目录**）
 node cloud/scripts/test-migration.js       # ★ 阶段 8 数据迁移：_id 规则 / 唯一键补登记 / 双向校验 + 反向用例（75 项）
+node cloud/scripts/test-http-bridge.js     # ★ 阶段 9 HTTP 访问服务适配 + 既有通道不受影响（32 项）
 node cloud/scripts/test-bundle.js          # 打包产物冒烟（24 项）
 ```
 
 | 轮次 | 断言数 |
 |---|---|
-| 源码目录（14 套件） | **1587 项** |
-| 打包产物（12 套件，`test-bundle`/`selfcheck`/`test-admin-routes` 不参与） | **1462 项** |
-| 合计 | **3049 项 / 失败 0** |
+| 源码目录（15 套件） | **1616 项** |
+| 打包产物（13 套件，`test-bundle`/`selfcheck`/`test-admin-routes` 不参与） | **1491 项** |
+| 合计 | **3107 项 / 失败 0** |
 
 ⚠️ **产物行为必须与源码一致**：`HARNESS_API_DIR=miniprogram/cloudfunctions/api` 再跑一遍
 （打包器是自研的，必须能自证 —— 它漏收一条 `require` 就是线上 `Cannot find module`）。
@@ -260,6 +261,33 @@ $env:HARNESS_API_DIR="$PWD/miniprogram/cloudfunctions/api"; node cloud/scripts/t
     → `export.js` 用 `snakeDupesOf(Model)` 生成映射，transform 里**只在驼峰版本确实存在时**才删
     （宁可脏，也不能误删真字段）。防回归：`test-migration.js` A28–A30。
 
+### 阶段 9：admin-web 怎么调云函数（两条路都不需要备案）
+
+网页没有 wx 环境，只能走云函数的 **HTTP 访问服务**。选它的理由：零新增依赖、
+适配层是我们自己的代码（能被回归网钉住）。
+
+> ⚠️ 「要不要备案」的答案：**都不需要** —— 用腾讯云给的官方默认域名
+> （`<env>.service.tcloudbase.com`）即可；只有绑**自有域名**才需要备案。
+> 代价是默认域名有**有效期**，到期在控制台点「续期」（5 分钟生效）。
+> 另一条路（`@cloudbase/js-sdk`）没有有效期问题，但要新增 npm 依赖 + 开匿名登录，
+> 且通道本身在本地测不了 —— 若嫌续期麻烦可换。
+
+云函数收到的是「集成请求」，由 `api/httpBridge.js` 还原成我们自己的 event 形状：
+
+| 形态 | 请求 | 判据 |
+|---|---|---|
+| **信封**（admin-web 用） | `POST /api`，body = `{ method, path, body, token, query }` | 请求体里有 `path` |
+| RESTful（兜底） | `GET /api/xxx?page=1`（需控制台开**路径透传**） | 否则 |
+
+⚠️ 适配必须放在 `index.js` **解构 event 之前**（放错位置完全不生效，且不报错）。
+⚠️ 判据只认 `httpMethod || requestContext` —— 收窄是刻意的，否则小程序请求
+（同样有 `path`/`body`）会被误判成 HTTP 事件。`test-http-bridge.js` E 段钉了这条。
+
+admin-web 侧 `src/utils/http.js` 做成**门面**：`VITE_REQUEST_MODE=direct` 时导出原 axios 实例
+（行为逐字不变），`=cloud` 时导出同形状门面 → 全站 114 处 `http.get/post/...` **零改动**。
+xlsx 下载在 cloud 模式下把 `{ filename, base64, mime }` 用 `atob` 还原成 Blob，
+调用方 `URL.createObjectURL(blob)` 的写法一行不改。
+
 ### 阶段 8：数据迁移的三个「不报错」陷阱
 
 1. **`unique_keys` 不补登记 = 云端能建重名管理员且不报错**。文档库没有 UNIQUE 索引，
@@ -322,6 +350,7 @@ cloud/
 │   └── api/                       # 主网关云函数（唯一对外函数）
 │       ├── index.js               # 入口：解析入参 + 分发 + 统一异常（含定时事件分支）
 │       ├── router.js              # 路由表 127 条（数组顺序即优先级）
+│       ├── httpBridge.js          # ★ 阶段 9：HTTP 访问服务的「集成请求」→ 现有 event 形状
 │       ├── config.json            # ★ 定时触发器配置（阶段 6）—— 随函数一起部署
 │       ├── package.json           # 依赖：wx-server-sdk / jsonwebtoken / bcryptjs / axios / exceljs
 │       ├── handlers/              # 按接口分文件，一个 handlerKey 对应一个方法
@@ -375,6 +404,7 @@ cloud/
     ├── test-admin-student.js      # ★ 学生账号 19 条 + roster/sheet
     ├── test-admin-routes.js       # ★ 路由 ↔ handler 就绪性守门（仅源码目录）
     ├── test-migration.js          # ★ 阶段 8 数据迁移 + 双向校验（含 4 类反向用例）
+    ├── test-http-bridge.js        # ★ 阶段 9 HTTP 访问服务适配 + 既有通道不受影响
 ├── migration/                     # ★ 阶段 8 数据迁移（只读原库）
 │   ├── README.md                  #   操作手册（导出 → 导入 → 校验 三步）
 │   ├── tables.js                  #   表级规则唯一声明处（_id 规则 / 唯一键 scope）

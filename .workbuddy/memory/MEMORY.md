@@ -9,26 +9,33 @@
 - UI/视觉需求**先出静态 HTML 预览（标 v1/v2…），点头前不写业务代码**；版本只增不删（新增 `preview/<主题>-v<N>/`，图进 `shots/`）。需求含糊或被否 → 先问清形态。
 - 提交身份用全局 `Nailoonger <1493586497@qq.com>`，不写仓库级 user.email/name。
 
-## 云开发迁移（`cloud/`，主线 · 阶段 0–7 已完成，8/9 待做）
+## 云开发迁移（`cloud/`，主线 · 阶段 0–9 **全部做完**，只剩真机导入与部署）
 - **起因**：小程序正式版 `url not in domain list`（合法域名需 ICP 备案）→ 陛下裁决**不续费服务器、整体走云开发**。免费额度：调用 20 万次/月、资源使用量 10 万 GBs/月、容量 2GB。
 - 环境 `jy-radio-d1gdwmptl816ee6a9`。总纲 `cloud/README.md`；字段映射 `cloud/docs/data-model-mapping.md`；方案 `stage5-scheduling-plan.md` / `stage6-timer-plan.md` / `stage7-admin-plan.md`；skill `express-to-cloudfunction-migration`（**23 条静默漂移**）。
-- **进度**：0 盘点 / 1 骨架 / 2 数据层+harness / 3 配置类 / 4 用户端 32 / 5 排期 12 函数 / 6 定时触发器 / **7 管理端 93 条** / **8 数据迁移 + 双向校验**（75 项断言，真机导入待陛下跑）✅；9 admin-web 待做。回归 **3049 项 / 0 失败**（源码 14 套件 1587 + 产物 12 套件 1462）。
+- **进度**：0–9 **全部完成**（真机导入/部署待陛下跑）。回归 **3107 项 / 0 失败**（源码 15 套件 1616 + 产物 13 套件 1491）。产物 50 模块 / 394.9 KB。
+- **阶段 9（admin-web 接云）= HTTP 访问服务通道**：⚠️ 「要不要备案」的答案是**都不需要**（用官方默认域名即可；只有绑自有域名才要）。A（HTTP 访问服务）默认域名有**有效期需续期**；B（Web SDK）无此问题但多一个 npm 依赖 + 要开匿名登录 ⇒ **选 A**。
+  - 云函数侧 `api/httpBridge.js`：把「集成请求」还原成 `{method,path,body,token,query}`，适配必须放在 index.js **解构 event 之前**（放错完全不生效）；判据只认 `httpMethod || requestContext`（收窄，否则误伤小程序请求）。两种形态：信封模式（admin-web 用，不依赖「路径透传」）+ RESTful 兜底。
+  - admin-web `src/utils/http.js` 改成**门面**：`VITE_REQUEST_MODE=direct` 导出原 axios 实例（行为逐字不变），`=cloud` 导出同形状门面 → 全站 114 处调用零改动。xlsx 走 `{filename,base64,mime}` → `atob` 还原 Blob。
+  - `cloud/scripts/test-http-bridge.js` 32 项；关键反向保护：E 段钉死「小程序 callFunction 与定时触发照旧」。
 - **阶段 8（`cloud/migration/`，手册 `cloud/migration/README.md`）**：只 SELECT 原库 → JSON Lines → 控制台导入 → 控制台导出 → `verify.js` 双向校验。⚠️ 官方三约束：JSON **Lines**、时间必须 `{"$date": "<ISO>"}`（写成裸 ISO 串 → 导入后是字符串，时间条件**静默失效**）、Upsert 可重复。三个陷阱：① **`unique_keys` 必须补登记**（文档库无 UNIQUE，不补＝能建重名管理员**且不报错**），**NULL 不登记**（MySQL UNIQUE 允许多行 NULL）② **`sequence` 预置 = `max(id)` 不是 +1**（nextId 是「先 inc 再返回」）③ `weekStartDate` 是 DATEONLY，**保持字符串**（转 Date 会把 `_id` 拼成 `week:Mon Oct 05 2026…`）。
 - **陛下已裁决的两处源实现瑕疵（2026-09-29）**：
   - `stats.overview.approved` 口径 `status:1` → **`status ∈ {1,5,6}`** ✅。⚠️ 孪生位置 `topSongs()` 仍是 `status:1`（进 Dashboard 可见榜，未授权）→ **新待办**，陛下点头才改。
   - `previewSchedule(dryRun)` 的 `promoted/rescheduled/stillWaiting` 恒 0 → 已修（`reschedule` 新增 dryRun 专用 `extraWaiting`/`seatedOverride`，**按 id 去重**）；顺带修 `autoRejectedIfLocked` 虚高（原复用当前闸门下的 `left`，而 `lockWeek` 显式 `crossSlot:true` → 预览说驳回 1、真锁定 0，**主结论都错**）。→ 漂移 #23。
   - 教训：**「把恒 X 改成真实值」的修复必须补反向用例**（造「值该不为 X」的场景）；自检 `git diff --stat` 里测试脚本必须同时在列。
-- **架构**：源在 `cloud/cloudfunctions/api/`，**运行目录** `miniprogram/cloudfunctions/api/`。⚠️⚠️ **Windows CLI 传子目录必坏**（`\` 写进压缩包条目名 → 云端解压出扁平文件，`require('./lib/x')` 必败）→ `sync.js` 把 **49 模块打成单文件 index.js**，只传根文件 + `config.json`。⇒ `handlers/index.js` 必须是**静态 `() => require('./x')` 注册表**，动态拼路径打包器看不见。
+- **架构**：源在 `cloud/cloudfunctions/api/`，**运行目录** `miniprogram/cloudfunctions/api/`。⚠️⚠️ **Windows CLI 传子目录必坏**（`\` 写进压缩包条目名 → 云端解压出扁平文件，`require('./lib/x')` 必败）→ `sync.js` 把 **50 模块打成单文件 index.js**，只传根文件 + `config.json`。⇒ `handlers/index.js` 必须是**静态 `() => require('./x')` 注册表**，动态拼路径打包器看不见。
 - **部署**：`node cloud/scripts/deploy-cloud.js`（默认只打印）→ 手动 `cli.bat cloud functions deploy --env <env> --names api --project <miniprogram> -r </dev/null`；**等 1~2 分钟**再验。
 - **会话速查**：改完跑 `node cloud/scripts/regression.js`（一键双轮）；⚠️ 本机沙箱**禁止子进程**（`spawnSync` 返 `EBUSY`）→ 只能手工双跑，脚本会列出命令。⚠️ 产物模式 `HARNESS_API_DIR=miniprogram/cloudfunctions/api` **项数必须与源码模式一致**。打包/删 dist 一律 `NODE_OPTIONS=""`（safe-delete 拦 `fs.rmSync`）。云端验收 `MSYS_NO_PATHCONV=1 node cloud/scripts/verify-user.js ws://127.0.0.1:9420`。
 - **口径**：业务查询一律用**数字 `id`**（`parseId` 收敛）；4 张表用业务键当 `_id`（`setting:`/`switch:`/`ack:`/`week:`）；字段名一律**驼峰**；⚠️ `insertOne` 之后改这一行必须用**返回的 `_id`**，不能用数字 id。
-- **需陛下动手**：云开发控制台确认触发器页签有 `songSweepTick`。（超时 3s → **30s ✅ 已配**）
+- **需陛下动手**：① 控制台确认触发器页签有 `songSweepTick`（超时 3s → **30s ✅ 已配**）② HTTP 访问服务给 `api` 配触发路径 `/api` 并在 `.env.local` 填 `VITE_REQUEST_MODE=cloud` + `VITE_CLOUD_API_URL`（默认域名**有有效期**，到期控制台点「续期」）。
 
-## 阶段 8 真机收尾（陛下动手）
-1. 对生产 MySQL 跑 `node cloud/migration/export.js` → `out/`（**已 gitignore**，含密码哈希）
-2. 控制台逐集合导入（16 表 + `unique_keys` + `sequence`，Upsert）
-3. 控制台逐集合导出 JSON → `cloud/migration/cloud-dump/<集合名>.json`
-4. `node cloud/migration/verify.js` 看双向报告（文件名必须＝集合名）
+## 真机收尾（陛下动手，顺序不能乱）
+1. 云开发控制台 → HTTP 访问服务 → 给 `api` 云函数配触发路径 `/api`，记下默认域名
+2. 部署云函数（产物已含 httpBridge）：`node cloud/scripts/deploy-cloud.js` 看命令 → 手动跑，等 1~2 分钟
+3. 对生产 MySQL 跑 `node cloud/migration/export.js` → `out/`（**已 gitignore**，含密码哈希）
+4. 控制台逐集合导入（16 表 + `unique_keys` + `sequence`，Upsert）
+5. 控制台逐集合导出 JSON → `cloud/migration/cloud-dump/<集合名>.json`
+6. `node cloud/migration/verify.js` 看双向报告（文件名必须＝集合名）
+7. admin-web `.env.local` 填 `VITE_REQUEST_MODE=cloud` + `VITE_CLOUD_API_URL` → 重新 build
 
 ## 部署（服务器 `~/radio`）
 - `build <svc>` + `up -d --force-recreate <svc>`（restart 不换镜像）。admin-web 只改 views：`build admin-web` → `up -d --force-recreate --no-deps admin-web`；其 Dockerfile 容器内自己 build，服务器**不需要**先 `npm run build`。
