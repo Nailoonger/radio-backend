@@ -37,44 +37,72 @@
 
 | 阶段 | 内容 | 状态 |
 |---|---|---|
-| 0 | 后端接口/模型/服务全量盘点 | ✅ 完成（126 条路由 / 17 表 / 19 服务） |
+| 0 | 后端接口/模型/服务全量盘点 | ✅ 完成（原 Express 后端 126 条路由 / 17 表 / 19 服务） |
 | 1 | `cloud/` 骨架 + 核心库移植 + 小程序双通道 | ✅ 完成 |
 | 2 | 数据层（`lib/db.js`）+ 本地测试 harness（内存假库跑真网关） | ✅ 完成 |
 | 3 | 配置类集合（system_setting / system_switch）+ 首批接口（switch、station） | ✅ 完成 |
-| 4 | 用户端接口移植（登录/改密/投稿/点歌/留言/节目/公告/风采） | ✅ 完成（33/33 接口，云端实测 31 条全绿） |
-| 5 | 点歌状态机（songStatusService + songSchedulingService）重写 | ✅ 完成（12/12 算法函数，本地 783 项全绿；**云端待阶段 7 验收**，见下） |
+| 4 | 用户端接口移植（登录/改密/投稿/点歌/留言/节目/公告/风采） | ✅ 完成（32/32 接口 + 2 条 system 路由，云端实测 31 条全绿） |
+| 5 | 点歌状态机（songStatusService + songSchedulingService）重写 | ✅ 完成（12/12 算法函数，本地 783 项全绿；**整链路云端验收已在阶段 7 由 `test-admin-submit.js` 完成**） |
 | 6 | 定时触发器（原 60s sweep → 云函数定时器） | ✅ 完成（+廉价闸门把空转从 32% 额度压到 ~2%；**上线前需人工把函数超时 3s → 20s**） |
-| 7 | 管理端接口移植（含学生名册 Excel） | ⏳ |
+| 7 | 管理端接口移植（含学生名册 Excel） | ✅ 完成（**93/93 路由**，仍就绪未 0；本地 670 项管理端断言全绿） |
 | 8 | 数据迁移脚本 + 双向校验 | ⏳ |
 | 9 | admin-web 接云开发 | ⏳ 最后一步 |
 
 ### 本地验证（每次改完必跑，秒级）
 
+**一键跑完全部（源码 + 打包产物各一轮）：**
+
 ```bash
-node cloud/scripts/selfcheck.js        # 静态自检：路由优先级 / 时间工具逐位一致 / 错误码逐值一致 / 触发器配置（82 项）
-node cloud/scripts/test-system.js      # /health + 建集合 + 开关（21 项）
-node cloud/scripts/test-gateway.js     # 网关 + lib/db 原语（26 项）
-node cloud/scripts/test-user-readonly.js  # 用户端只读（76 项）
-node cloud/scripts/test-user-auth.js      # 登录 / 改密 / me（62 项）
-node cloud/scripts/test-user-submit.js    # 投稿 / 点歌 11 个接口（206 项）
-node cloud/scripts/test-scheduling-cost.js # 调剂选址成本表（63 项）
-node cloud/scripts/test-scheduling.js      # 排期算法 12 个函数 + 定时闸门（273 项）
-node cloud/scripts/test-bundle.js          # 打包产物冒烟（20 项）
+node cloud/scripts/regression.js            # 13 套件 × 两轮，合计 2883 项
+node cloud/scripts/regression.js --source   # 只跑源码目录
+node cloud/scripts/regression.js --selftest # 只自检「结论行解析器」（不依赖子进程）
 ```
 
-合计 **829 项**，全绿才算过。
+⚠️ `regression.js` 靠**创建子进程**跑套件（只有子进程能给每个套件干净的模块实例 ——
+`HARNESS_API_DIR` 是 harness 加载时读一次的，同进程里换不了源码/产物）。
+若所在沙箱禁止创建子进程，它会直接说明并列出需要手工执行的命令（不会打出一片 `??`）。
+
+**逐条跑（出问题时定位用）：**
+
+```bash
+node cloud/scripts/selfcheck.js            # 静态自检：路由优先级 / 时间工具逐位一致 / 错误码逐值一致 / 产物与源码一致（82 项）
+node cloud/scripts/test-system.js          # /health + 建集合 + 开关（21 项）
+node cloud/scripts/test-gateway.js         # 网关 + lib/db 原语（27 项）
+node cloud/scripts/test-user-readonly.js   # 用户端只读（76 项）
+node cloud/scripts/test-user-auth.js       # 登录 / 改密 / me（62 项）
+node cloud/scripts/test-user-submit.js     # 投稿 / 点歌 11 个接口（206 项）
+node cloud/scripts/test-scheduling-cost.js # 调剂选址成本表（63 项）
+node cloud/scripts/test-scheduling.js      # 排期算法 12 个函数 + 定时闸门（273 项）
+node cloud/scripts/test-admin-core.js      # 管理端非点歌 63 条 + 93 路由权限矩阵（163 项）
+node cloud/scripts/test-admin-submit.js    # 点歌 30 条 + 排期算法整链路（225 项）
+node cloud/scripts/test-admin-student.js   # 学生账号 19 条 + roster/sheet 服务（263 项）
+node cloud/scripts/test-admin-routes.js    # 路由 ↔ handler 就绪性守门（19 项）
+node cloud/scripts/test-bundle.js          # 打包产物冒烟（24 项）
+```
+
+| 轮次 | 断言数 |
+|---|---|
+| 源码目录（13 套件） | **1504 项** |
+| 打包产物（11 套件，`test-bundle`/`selfcheck` 本就自看产物） | **1379 项** |
+| 合计 | **2883 项 / 失败 0** |
 
 ⚠️ **产物行为必须与源码一致**：`HARNESS_API_DIR=miniprogram/cloudfunctions/api` 再跑一遍
-`test-scheduling.js` / `test-scheduling-cost.js` / `test-user-submit.js`
-（打包器是自研的，必须能自证）。
+（打包器是自研的，必须能自证 —— 它漏收一条 `require` 就是线上 `Cannot find module`）。
+PowerShell 等价写法：
+
+```powershell
+$env:HARNESS_API_DIR="$PWD/miniprogram/cloudfunctions/api"; node cloud/scripts/test-admin-student.js
+```
 
 `cloud/scripts/harness.js` 把 `wx-server-sdk` 替换成内存假数据库（Map 存集合），
-并**刻意模拟**了五个真实行为，否则测不出问题：
+并**刻意模拟**了六个真实行为，否则测不出问题：
 `add()` 撞 `_id` 抛错（等价 UNIQUE 冲突）、`doc().get()/update()` 不存在抛错、
 `where().update()` 返回 `stats.updated`（等价 affectedRows）、
 **多键排序按「值」比较 Date**（不同实例同一时刻必须判等，否则排序退化成插入顺序）、
-**`where()` 支持顶层 `_.and([...])` / `_.or([...])`**（子项是 where 子句，可嵌套）。
-→ 新增 handler 时在 `test-gateway.js` 里加断言，不要只靠「部署后手点」。
+**`where()` 支持顶层 `_.and([...])` / `_.or([...])`**（子项是 where 子句，可嵌套）、
+**`clone()` 保留 Date 实例**（用 `JSON.stringify` 会把 Date 变成 ISO 串 →
+`_.gte(某Date)` 在假库里永远不匹配，时间类条件静默失效）。
+→ 新增 handler 时在 `test-gateway.js` / `test-admin-routes.js` 里加断言，不要只靠「部署后手点」。
 
 ### 阶段 5 的两个重要结论
 
@@ -86,9 +114,43 @@ node cloud/scripts/test-bundle.js          # 打包产物冒烟（20 项）
    `review===PENDING || (APPROVED && schedule===WAITING)`，而 `cancelRequest` 里
    触发 `afterRelease` 的条件是 `isSeated()`（`APPROVED && APPROVED`）—— 两者**互斥**。
    → 阶段 5 **无法用用户端接口做云端验收**，真实入口全在管理端（阶段 7）。
-   当下最强证据 = 本地 harness 783 项全绿 + 产物自证。
+   ✅ **已于阶段 7 补齐**：`test-admin-submit.js` 让 `initialAllocate` / `reschedule`
+   （含跨时段与 `crossSlot` 闸门）/ `lockWeek`（含满周自动驳回）/ `unlockWeek`
+   （含 `lockPaused` 与 `restore`）/ `manualAssign` / `setPlayed` / `sweep`
+   **第一次被真实调用**并逐条断言。
 
-### 已跑通的接口（用户端 33/33）
+### 阶段 7 的关键结论
+
+1. **云端没有中间件层 → 鉴权必须散落到 93 个 handler 的第一行**（`asAdmin` / `asSuper`）。
+   漏写不会报错，只会「没登录也能调」或「普管也能调」。为此建了**93 条路由 × 三种身份**
+   的权限矩阵，当场抓到 `cadre` / `staff` / `showcase` 三个模块权限写错（普管可写）。
+   ⚠️ 权限规范**必须双向显式声明**（`SUPER_ONLY` + `PLAIN_ONLY` 两个 Set，
+   并断言 `|SUPER_ONLY| + |PLAIN_ONLY| === 去重后的 handlerKey 数`）。
+   只写「超管专属」、用「不在集合里就算普管」隐式推另一半，会让「本该超管却漏写的 key」
+   静默降级成普管 —— **而矩阵全绿**。
+   ⚠️ 93 条路由 → **91 个 handlerKey**（`admin.submit.capacity` 与 `sweepQueue`
+   各有一 key 两路由）；超管 55 key / 56 路由，普管 36 key / 37 路由。
+2. **就绪性要单独测**：权限矩阵判「普管可调路由」时只要求「不是 40101 / 40301」，
+   于是**加载失败（50001）会静默通过**。→ 新增 `test-admin-routes.js` 单独钉死
+   「每个 handler 文件都登记了 / 每条路由都解析到真实函数 / 诊断文案能分辨未登记与未导出」。
+3. **二进制文件的传输契约改了**（云函数只走 JSON，没有 multipart、没有二进制响应体）：
+   - 上传：`{ filename, fileBase64 }`
+   - 下载：`{ filename, mime, base64 }`（前端 atob → Blob → 触发下载）
+   ⚠️ 云函数单次请求/响应体约 **1MB**，xlsx 转 base64 再 +33% → 超大名册需改走云存储。
+   这是**有意偏离**，前端（阶段 9）必须相应改造。
+4. 未搬 `loginLimiter` / `submitLimiter` / `messageLimiter`（Express 内存限流，
+   云函数多实例下天然失效；改用「时间窗口 + 唯一键」业务级防刷，已由断言覆盖）。
+5. 未搬 `uploadController`（未被任何路由引用）。
+6. **两处「源实现瑕疵」已显式钉住，不擅自改**（留给陛下定夺，见 `docs/stage7-admin-plan.md`）：
+   - `stats.overview` 的 `approved` 口径仍是 `status:1`（协议改版后 `1 = 已排期`）
+   - `previewSchedule(dryRun)` 的 `promoted/rescheduled/stillWaiting` 恒 0（诊断归零）
+7. **有意的缺陷修正**（已标注，因为改的是「显示」而不是「语义」）：
+   `formatTime` / `stamp` 从容器本地时间（= UTC，导出时间早 8 小时）改成北京时间。
+
+### 已跑通的接口（用户端 32/32 · 系统 2 · **管理端 93/93**）
+
+> 合计 **127 条路由**（`ADMIN_ROUTES` 93 + `USER_ROUTES` 32 + `system` 2），
+> `test-admin-routes.js` 断言「每一条都解析到真实导出的函数」。
 
 | 分组 | 接口 |
 |---|---|
@@ -103,7 +165,26 @@ node cloud/scripts/test-bundle.js          # 打包产物冒烟（20 项）
 | 我的 | `GET /user/profile` |
 | **投稿/点歌** | `POST /user/submit`、`GET /user/submit/my`、`quota`、`window`、`week`、`notice`、`timeslots`、`/:id`、`POST /user/submit/notice/ack`、`DELETE /user/submit/:id`、`POST /user/submit/:id/leave-queue` |
 
-### ⚠️ 五个「不报错」的静默漂移（移植时务必对照）
+**管理端 93 条（阶段 7）** —— 全部仅管理端；其中**超管 56 路由 / 普管 37 路由**：
+
+| 模块 | 条数 | 说明 |
+|---|---|---|
+| `admin.auth` | 4 | 登录 / me / 改密 |
+| `admin.setting` | 3 | 系统设置 CRUD（普管只读） |
+| `admin.switch` | 2 | 模块开关（普管只读） |
+| `admin.program` | 5 | 节目（含 `set-live`，全表仅一个 live） |
+| `admin.notice` | 5 | 公告 |
+| `admin.message` | 4 | 留言审核（普管可审） |
+| `admin.stats` | 3 | 概览 / 投稿趋势 / 热门歌曲 |
+| `admin.cadre` | 6 | 社干（**超管专属**，支持增删改） |
+| `admin.staff` | 6 | 部员（**超管专属**） |
+| `admin.showcase` | 2 | 风采排序 / 显隐（**超管专属**） |
+| `admin.adminMgr` | 4 | 管理员账号（超管专属，含「不能删自己 / 至少留一个超管」） |
+| `admin.student` | 19 | 学生名册（导入 / 导出 / 统计 / 整届清理 / 批次回滚），**全部超管专属** |
+| `admin.submit` | 30 | 点歌：列表 / 审核 / 排期 / 锁定解锁 / 容量 / 规则 / 窗口 / 注意事项 / 一键清空 |
+| **合计** | **93** | 超管 56 路由 / 普管 37 路由（同一 handlerKey 可挂多条路由） |
+
+### ⚠️ 九个「不报错」的静默漂移（移植时务必对照）
 
 1. **`ApiError` 是 4 参**：`(code, message, httpStatus = 200, data = null)`，与 `src/utils/response.js` 一致。
    从 src 逐字移植过来的 service 会写 `new ApiError(code, msg, 200, { opensAt })` ——
@@ -124,6 +205,24 @@ node cloud/scripts/test-bundle.js          # 打包产物冒烟（20 项）
    第 11 位开始比 `早`(U+65E9) vs `2`(0x32) → **当天被判为「不小于」，静默漏掉当天**。
    → 一律写成 `_.lt('<明天日期>')`（日期定长零填充 → 时间序 == 字典序）。
    踩点见 `cloud/docs/stage6-timer-plan.md` §4，防回归断言 `test-scheduling.js` `W5-0/W5a`。
+6. **`logAssignment` 写的字段是 `assignmentType`，不是 `type`**。
+   断言写成 `x.type === 'RELEASED'` 会**恒为 false 且不报错**（字段根本不存在），
+   表现为「撤销了但测试说没写日志」→ 白白怀疑业务代码。照抄源 `assignment_log` 属性名。
+7. **权限规范不能用「隐式推另一半」**。只声明「超管专属」、其余默认当普管，
+   则「本该超管却漏写的 key」静默降级成普管而矩阵全绿。
+   → 两个 Set 双向显式声明 + 断言并集恰好等于路由表、交集为空。
+8. **裸 `Error + code: 40001` 的待遇**取决于**源控制器有没有 catch**：
+   - `songNotice.save` / `broadcastSlot.setSlotTimes` / `scheduling.assign` → **有** catch
+     → 云端必须补 `paramError(e)` 把它翻成 `40001`（漏了会退化成 `50001 服务器繁忙`）
+   - `scheduling.unlockWeek` → **源控制器没有 catch** → 源后端返回 **500**
+     → 云端**保持 50001 同口径**，不擅自「修好」线上既有行为
+9. **`insertOne` 之后要改这一行，必须用返回的 `_id`，不能用数字业务 `id`**。
+   云文档 `_id` 是自动生成的字符串（`auto_N`），数字 `id` 只是业务主键。
+   写 `updateById(coll, batchId, ...)` 会抛 `document does not exist`
+   ——**只在「导入成功」路径上炸**，测试不覆盖就是线上第一次导入才发现。
+   （唯一例外：`system_setting` / `system_switch` / `notice_ack` / `weekly_schedule`
+   这 4 张表用 `insertWithId` 把业务键当 `_id`。）
+   踩点：`services/roster.js` 的 `commit()`，防回归断言 `test-admin-student.js` C 段。
 
 ### 阶段 6：定时器为什么不直接每分钟裸跑 `sweep()`
 
@@ -167,46 +266,71 @@ node cloud/scripts/test-bundle.js          # 打包产物冒烟（20 项）
 cloud/
 ├── README.md                      # 本文件：总纲与进度
 ├── docs/
-│   └── data-model-mapping.md      # 17 张 MySQL 表 → 云数据库集合映射
+│   ├── data-model-mapping.md      # 17 张 MySQL 表 → 云数据库集合映射
+│   ├── stage5-scheduling-plan.md  # 排期算法重写方案
+│   ├── stage6-timer-plan.md       # 定时触发器 + 「日期串字典序」踩坑
+│   └── stage7-admin-plan.md       # ★ 管理端移植方案 + 待陛下定夺事项
 ├── cloudfunctions/
 │   └── api/                       # 主网关云函数（唯一对外函数）
 │       ├── index.js               # 入口：解析入参 + 分发 + 统一异常（含定时事件分支）
-│       ├── router.js              # 路由表 126 条（数组顺序即优先级）
+│       ├── router.js              # 路由表 127 条（数组顺序即优先级）
 │       ├── config.json            # ★ 定时触发器配置（阶段 6）—— 随函数一起部署
-│       ├── package.json
+│       ├── package.json           # 依赖：wx-server-sdk / jsonwebtoken / bcryptjs / axios / exceljs
 │       ├── handlers/              # 按接口分文件，一个 handlerKey 对应一个方法
-│       │   ├── index.js           #   惰性解析 + 未移植兜底
+│       │   ├── index.js           #   REGISTRY 静态表（24 条）+ 未移植兜底诊断
 │       │   ├── system.js          #   /health · init-collections
-│       │   └── user/
-│       │       ├── switch.js      #   /user/switch/*
-│       │       ├── profile.js     #   /user/station/*
-│       │       ├── auth.js        #   登录 / 改密 / me
-│       │       ├── content.js     #   公告 / 节目 / 风采 / 留言
-│       │       └── submit.js      #   投稿 / 点歌 11 个接口
+│       │   ├── user/              #   10 个模块，32 条路由
+│       │   │   ├── auth.js        #     登录 / 改密 / me / 资料
+│       │   │   ├── submit.js      #     投稿 / 点歌 11 个接口
+│       │   │   ├── notice.js  program.js  showcase.js  cadre.js  staff.js
+│       │   │   ├── message.js     #     留言
+│       │   │   ├── switch.js      #     开关（含模块开关闸门）
+│       │   │   └── profile.js     #     站务信息
+│       │   └── admin/             #   13 个模块，93 条路由（阶段 7）
+│       │       ├── _kit.js        #     ★ 公共件：asAdmin/asSuper、likeHit/anyLike、
+│       │       │                  #       sortRows/cmpValue、pick、pagedList、paramError
+│       │       ├── _people.js     #     ★ 社干/部员/风采的 CRUD 工厂（guard 必传）
+│       │       ├── auth.js  setting.js  switch.js  program.js  notice.js
+│       │       ├── message.js  stats.js
+│       │       ├── cadre.js  staff.js  showcase.js  adminMgr.js
+│       │       ├── student.js     #     学生名册 19 条（全超管，含 xlsx base64 契约）
+│       │       └── submit.js      #     点歌 30 条（排期算法唯一真实入口）
 │       ├── services/              # 业务服务（从 src/services 移植）
 │       │   ├── kv.js              #   系统设置 KV
 │       │   ├── switch.js          #   模块开关（含云函数用的 isEnabledAsync）
-│       │   ├── studentAccount.js  #   学生账号
+│       │   ├── studentAccount.js  #   学生账号（初始密码 / 状态缓存 / pv 新鲜度）
 │       │   ├── songWindow.js      #   点播时间窗口（逐字移植）
-│       │   ├── broadcastSlot.js   #   播出时段派生
+│       │   ├── broadcastSlot.js   #   播出时段派生（15 格/周）
 │       │   ├── submitRule.js      #   提交规则 / 配额
-│       │   ├── songNotice.js      #   点歌注意事项
+│       │   ├── songNotice.js      #   点歌注意事项 + 已读回执
 │       │   ├── songStatus.js      #   三维状态 + applyChange（乐观锁唯一入口）
 │       │   ├── songQueue.js       #   候选池门面 / 状态卡
-│       │   ├── songRescheduleCost.js  # 调剂选址成本表（纯函数，阶段 5）
-│       │   └── scheduling.js      #   ★ 排期算法 12 函数 + 定时闸门（阶段 5/6 已完成）
+│       │   ├── songRescheduleCost.js  # 调剂选址成本表（纯函数）
+│       │   ├── scheduling.js      #   ★ 排期算法 12 函数 + 定时闸门 + 周行锚点
+│       │   ├── sheet.js           #   ★ xlsx / csv 读写（exceljs；MAX_ROWS=5000）
+│       │   ├── roster.js          #   ★ 学生名册：解析 / 归一化 / 落库 / 整届清理
+│       │   ├── accessToken.js     #   微信 access_token 缓存
+│       │   └── wechat.js          #   微信接口封装
 │       └── lib/
 │           ├── response.js         # 错误码与统一响应（原样移植）
 │           ├── bjTime.js           # 北京时间工具（原样移植）
 │           ├── auth.js             # JWT 校验 + pv 新鲜度 + 角色
 │           └── db.js               # 数据层：唯一键模拟 / 数字主键 / 条件更新
 └── scripts/
+    ├── regression.js              # ★ 一键全量回归（源码 + 产物各一轮）
     ├── selfcheck.js               # 静态自检 + 产物一致性
     ├── harness.js                 # 内存假数据库（stub 掉 wx-server-sdk）
     ├── sync.js                    # 自研零依赖打包器（产物 = 单文件 index.js）
     ├── test-gateway.js            # 网关 + db 原语
-    ├── test-scheduling.js         # ★ 排期算法 12 函数 + 定时闸门（273 项）
-    ├── test-scheduling-cost.js    # ★ 调剂成本表（63 项）
+    ├── test-admin-core.js         # ★ 管理端 63 条 + 93 路由权限矩阵
+    ├── test-admin-submit.js       # ★ 点歌 30 条 + 排期算法整链路
+    ├── test-admin-student.js      # ★ 学生账号 19 条 + roster/sheet
+    ├── test-admin-routes.js       # ★ 路由 ↔ handler 就绪性守门
+    ├── test-scheduling.js         # 排期算法 12 函数 + 定时闸门（273 项）
+    ├── test-scheduling-cost.js    # 调剂成本表（63 项）
+    ├── test-user-*.js             # 用户端（只读 / 登录 / 投稿）
+    ├── test-system.js             # /health + 建集合 + 开关
+    ├── test-bundle.js             # 打包产物冒烟
     ├── verify-user.js             # 云端真实调用验收（需 IDE 自动化端口）
     └── deploy-cloud.js            # 部署（单文件产物）
 ```

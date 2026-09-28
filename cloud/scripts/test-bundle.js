@@ -84,10 +84,44 @@ const bundleFile = path.join(BUNDLE_DIR, 'index.js');
   const pf = await H.call(H.req('GET', '/user/profile'));
   eq('handlers/user/profile.js 已打进产物（未登录 → 40101）', pf.code, 40101);
 
-  // 3. 未移植的模块要给出明确原因（而不是笼统 50001）
-  const admin = await H.call(H.req('GET', '/admin/submit/list'));
-  eq('未移植模块 → 50001', admin.code, 50001);
-  eq('且带出真实原因', admin.message.indexOf('模块未登记') >= 0, true);
+  /**
+   * 3. 阶段 7 新增的管理端模块必须**真被打了进去**。
+   *
+   * ⚠️ 不能拿「某个还没实现的接口」当「未移植」样本 —— 阶段 7 起管理端 93 条已全部落地，
+   *    那种样本会随移植进度不断失效（原先用 `/admin/submit/list`，实现后就变成
+   *    「未登录 → 40101」，断言静默变成假红）。
+   * ⚠️ 也不能 `require(BUNDLE_DIR + '/handlers')` —— 产物是**单文件**，没有 handlers 目录，
+   *    且只导出 `main`，拿不到 `resolveHandler`。
+   *    所以判据改成**功能级**：模块没打进去 → `resolveHandler` 抛 50001「模块未登记」；
+   *    打进去了 → 第一行 `asSuper/asAdmin` 抛 40101。**两者不会混淆**。
+   *    （`resolveHandler` 自身的诊断文案契约在 `test-gateway.js` 里对源码目录断言。）
+   */
+  const noToken = [
+    ['GET', '/admin/student/list'],
+    ['PUT', '/admin/student/1'],
+    ['POST', '/admin/student/import/commit'],
+    ['DELETE', '/admin/student/grade/2024'],
+    ['GET', '/admin/submit/list'],
+    ['GET', '/admin/stats/overview'],
+  ];
+  let embedded = 0;
+  for (const [m, p] of noToken) {
+    const rr = await H.call(H.req(m, p));
+    if (rr.code === 40101) embedded++;
+    else lines.push(`      ↳ ${m} ${p} → ${rr.code} ${rr.message}`);
+  }
+  eq('阶段 7 的 6 条管理端入口都已打进产物（未登录 → 40101，而非 50001）', embedded, 6);
+
+  // 产物文本层面再确认 services/roster.js 与 handlers/admin/student.js 的内容确实在
+  const bundleText = fs.readFileSync(bundleFile, 'utf8');
+  eq('产物内含 services/roster.js 的实现（抓「账号 = 年级+班级+序号」注释）',
+    bundleText.indexOf('账号 = 年级') >= 0, true);
+  eq('产物内含 handlers/admin/student.js 的实现（抓「学生账号」标签）',
+    bundleText.indexOf('学生账号') >= 0, true);
+  eq('产物内含 handlers/admin/submit.js 的实现（抓 purgeSongs 的 confirm 文案）',
+    bundleText.indexOf('高危操作：请传 confirm') >= 0, true);
+  eq('产物内已登记 admin.student 模块', bundleText.indexOf('admin.student') >= 0, true);
+  eq('产物内已登记 admin.submit 模块', bundleText.indexOf('admin.submit') >= 0, true);
 
   lines.push('');
   lines.push(`结论：${lines.length} 行 / 失败 ${failed} 项`);

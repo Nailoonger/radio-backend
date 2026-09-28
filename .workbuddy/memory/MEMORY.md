@@ -1,19 +1,23 @@
 # 菁悠广播站 · 项目长期备忘
 
-> 域外细则在 `docs/`（song-protocol / song-protocol-vs-v1-spec / student-account / admin-permissions）与 skills。
-> 本文件只留：铁律、必须按顺序做的操作、会反复踩的坑。
+> 域外细则在 `docs/`（song-protocol / song-protocol-vs-v1-spec / student-account / admin-permissions）、
+> `cloud/README.md` 与 `cloud/docs/*`，以及 skills。本文件只留：铁律、必须按顺序做的操作、会反复踩的坑。
 > 口径：**「收歌」已全站改名「点播」**（只改展示名，常量仍 `APPLICATION`）。
 
-## 云开发迁移（`cloud/`，阶段 0–6 已完成，7/8/9 待做）
-- **铁律：只做加法** —— 原 Express `src/` + `admin-web/` + Docker 链路一行不删，保留 `requestMode: 'direct'|'cloud'` 开关，随时可切回。陛下原则：「不要删除原来的，以防我想换回来」。
-- **动机**：不再续费服务器，全部走云开发（免费额度：调用 20 万次/月、**资源使用量 10 万 GBs/月**、容量 2GB）。
-- **进度**：0 盘点 / 1 骨架 / 2 数据层+harness / 3 配置类 / 4 用户端 33 接口 / 5 排期算法 12 函数 / 6 定时触发器 —— 全 ✅。回归 **829 项**（`cloud/README.md` 有清单，秒级）。
-- **架构**：源在 `cloud/cloudfunctions/api/`，**运行目录** `miniprogram/cloudfunctions/api/`（微信 `cloudfunctionRoot` 必须在项目内）。`sync.js` 把 33 个模块打成**单文件 index.js**（Windows 上 CLI 会把 `\` 写进压缩包条目名，子目录必坏，只传根文件）+ `config.json`。
+## 云开发迁移（`cloud/`，主线 · 阶段 0–7 已完成，8/9 待做）
+- **起因**：小程序正式版报 `url not in domain list`，合法域名要 ICP 备案 → 陛下裁决**不续费服务器、整体走云开发**（`wx.cloud.callFunction` 免备案）。免费额度：调用 20 万次/月、**资源使用量 10 万 GBs/月**、容量 2GB。
+- **铁律：只做加法** —— 原 Express `src/` + `admin-web/` + Docker 链路一行不删，保留 `requestMode: 'direct'|'cloud'` 开关，随时可切回。陛下原话：「不要删除原来的，以防我想换回来」。
+- **环境** `jy-radio-d1gdwmptl816ee6a9`。总纲 `cloud/README.md`；字段映射 `cloud/docs/data-model-mapping.md`；方案 `cloud/docs/stage5-scheduling-plan.md` / `stage6-timer-plan.md` / `stage7-admin-plan.md`；skill `express-to-cloudfunction-migration`（**22 条「不报错的静默漂移」**）。
+- **进度**：0 盘点 / 1 骨架 / 2 数据层+harness / 3 配置类 / 4 用户端 32 / 5 排期算法 12 函数 / 6 定时触发器 / **7 管理端 93 条** —— 全 ✅。回归 **2883 项 / 0 失败**（源码 13 套件 1504 + 打包产物 11 套件 1379，秒级）。
+- **架构**：源在 `cloud/cloudfunctions/api/`，**运行目录** `miniprogram/cloudfunctions/api/`（微信 `cloudfunctionRoot` 必须在项目内）。⚠️⚠️ **Windows CLI 传子目录必坏**（`\` 被写进压缩包条目名 → 云端解压出一堆「名字里带反斜杠」的扁平文件，`require('./lib/x')` 必失败）→ `sync.js` 把 **49 个模块打成单文件 index.js**，只传根文件 + `config.json`。⇒ **`handlers/index.js` 必须写静态 `() => require('./x')` 注册表**，动态拼路径打包器看不见。
+- **部署**：`node cloud/scripts/deploy-cloud.js`（默认只打印命令）→ 手动跑 `cli.bat cloud functions deploy --env <env> --names api --project <miniprogram> -r </dev/null`；**等 1~2 分钟**再验（云端 npm install 未完会报 Cannot find module）。
 - **会话内速查**：
-  - 改完必跑：`selfcheck` + 8 个 test 脚本；打包产物模式 `HARNESS_API_DIR=miniprogram/cloudfunctions/api` 再跑一遍，**项数必须一致**。
+  - 改完必跑 `node cloud/scripts/regression.js`（一键双轮）；出问题逐条跑 `selfcheck` + 12 个 test 脚本。⚠️ 产物模式 `HARNESS_API_DIR=miniprogram/cloudfunctions/api` 的**项数必须与源码模式一致**（打包器是自研的，漏收一条 `require` = 线上 `Cannot find module`）。
+  - ⚠️ `regression.js` 靠 `spawnSync` 起子进程，而**本机沙箱禁止创建任何子进程**（`EBUSY`）→ 本机只能手工双跑，脚本会自己说明并列出命令。
   - 打包/删 dist 一律 `NODE_OPTIONS=""`（safe-delete 拦截）。
-  - **上报清单（`cloud/README.md` §三）+ `cloud/docs/stage5-scheduling-plan.md` / `stage6-timer-plan.md`** 是权威细节；skill `express-to-cloudfunction-migration` 有 17 条「不报错的静默漂移」。
-- **需陛下动手**：云开发控制台把云函数**超时 3s → 20s**（CLI 无此能力）。
+  - 云端验收：`MSYS_NO_PATHCONV=1 node cloud/scripts/verify-user.js ws://127.0.0.1:9420`（需先 `cli.bat auto`）。
+- **口径**：业务查询一律用**数字 `id`**（`parseId` 收敛）；4 张表用业务键当 `_id`（`setting:` / `switch:` / `ack:` / `week:`）；字段名一律**驼峰**；⚠️ `insertOne` 之后改这一行必须用**返回的 `_id`**，不能用数字 id。
+- **需陛下动手**：云开发控制台把云函数**超时 3s → 20s**（CLI 无此能力）；确认触发器页签有 `songSweepTick`。
 
 ## 铁律
 - **admin-web 按 v8 落地**（权威 `preview/admin-ui-v8/admin-ui-v8.html`）：唯一强调色 **#0066CC**、无渐变无彩色投影、深色卡为主角。**登录页是唯一例外**（用户 v4 分栏版），勿动。改前备份 `admin-web/_backup/<时间戳>-src/`。
@@ -30,17 +34,6 @@
 - ⚠️ **SQLite 全绿证明不了 MySQL 能建表**（不校验外键类型、不认 UNSIGNED）。判据必须是 MySQL 实测 → skill `sequelize-schema-rollout`。
 - ℹ️ 2026-09-26 新增 `weekly_schedule.lock_paused`：上线前必须跑一次 db-repair。
 - radio-nginx 会莫名自退（Exited 0）→ 80 全拒，排障先看它。
-
-## 云开发迁移（2026-09-28 起，主线）
-- 起因：小程序正式版报 `url not in domain list`，合法域名要 ICP 备案 → 陛下裁决**不续费服务器，整体走云开发**（`wx.cloud.callFunction` 免备案）。铁律：**原 `src/`、`admin-web/`、Docker 链路一行不动**，只做加法；`app.js` 的 `requestMode` 保留 `'direct' | 'cloud'` 可随时切回。
-- 云环境 `jy-radio-d1gdwmptl816ee6a9`（校园额度账号，换绑已完成）。总纲 `cloud/README.md`，字段映射 `cloud/docs/data-model-mapping.md`。
-- ⚠️⚠️ **Windows CLI 传子目录必坏**（`\` 被写进压缩包条目名 → 云端解压出扁平文件）→ **整个云函数打成单文件**，只传根文件 `index.js` + `package.json`。打包器 `cloud/scripts/sync.js`（零依赖、静态分析字面量 require）→ **`handlers/index.js` 必须写静态 `() => require('./x')` 注册表**，动态拼路径打包器看不见。
-- 部署：`node cloud/scripts/deploy-cloud.js`（默认只打印命令）→ 手动跑 `cli.bat cloud functions deploy --env <env> --names api --project <miniprogram> -r </dev/null`；**等 1~2 分钟**再验（云端 npm install 未完会报 Cannot find module）。
-- 验证必须本机跑（481 项）：`selfcheck` 75 / `test-system` 21 / `test-gateway` 26 / `test-user-readonly` 76 / `test-user-auth` 62 / `test-user-submit` 206 / `test-bundle` 20。云端验收：`MSYS_NO_PATHCONV=1 node cloud/scripts/verify-user.js ws://127.0.0.1:9420`（需先 `cli.bat auto`）。
-- ⚠️ **两个「不报错」的静默漂移**：① `ApiError` 是 **4 参** `(code, message, httpStatus=200, data)`，与 src 一致 —— 改成 3 参会把 `200` 当 data，附加数据静默丢失（40907 的 `opensAt` 就这么丢过）。② **鉴权在路由层**（`router.get(x, userAuth, ctrl)`），controller 不读 `req.user` 也可能要登录 —— 移植只搬 controller 就会漏，漏了只是「未登录也能看」。⇒ 逐条对照 `src/routes/*.js`。
-- ⚠️ **云函数超时默认仅 3 秒**，CLI 改不了（只有 list/info/deploy/inc-deploy/download）→ 必须去控制台改（建议 20s）。
-- 主键口径：业务查询一律用**数字 `id`**（`parseId` 收敛），4 张表用业务键当 `_id`（`setting:` / `switch:` / `ack:` / `week:`）。字段名一律**驼峰**。
-- 进度：阶段 0~4 完成（用户端 33/33 接口）；**阶段 5 = 排期算法重写（最高风险，动工前先出方案）**。
 
 ## 给陛下的服务器命令
 - 他在自己的 PowerShell 里跑。SQL 用 `docker exec -e MYSQL_PWD="$DB_PASSWORD" -i radio-mysql mysql -uroot "$DB_NAME"`；`-p<密码>` 必打印无害的 password warning（stderr，不是失败）。

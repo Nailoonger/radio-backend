@@ -69,18 +69,28 @@ function ok(name, cond, extra = '') {
   eq('未配置 KV → 40401', r.code, 40401);
   eq('未配置 KV → 文案', r.message, '未配置');
 
-  // ============ 4. 未移植接口优雅降级（不能把网关打崩） ============
+  // ============ 4. 未登记模块优雅降级（不能把网关打崩） ============
   //
-  // ⚠️ 挑样本的原则：必须是**当前确实还没登记**的模块。
-  //    这里用 admin.*（管理端 93 个接口属阶段 7）—— 阶段 7 落地后这条会跟着失效，
-  //    届时换成仍未被 REGISTRY 登记的那个模块，别直接删掉这段（降级路径本身要一直在测）。
-  r = await H.call(H.req('GET', '/admin/submit/list'));
-  eq('未移植接口 → 50001', r.code, 50001);
-  ok('未移植接口 → 提示含「未就绪」', /未就绪/.test(r.message), r.message);
+  // ⚠️ 阶段 7 落地后 93 条管理端路由**全部登记完毕**，原先拿 `/admin/submit/list`
+  //    当「未移植样本」的写法已经失效（那条现在会正常走 40101 未登录）。
+  //    降级路径本身仍必须一直在测 —— 改成**直接调用解析器**，用一个永不会登记的 key
+  //    来钉住 `todoHandler` 的行为，不再依赖「恰好还有个模块没移植」这种临时状态。
+  const { resolveHandler } = require(path.join(API_DIR, 'handlers'));
+  const todo = resolveHandler('admin.noSuchModule.noSuchMethod');
+  let todoErr = null;
+  try { await todo({ method: 'GET', path: '/x', params: {}, query: {}, body: {} }); } catch (e) { todoErr = e; }
+  ok('未登记 handler → 抛 ApiError', !!todoErr && todoErr.code === 50001, todoErr && String(todoErr.message));
+  ok('未登记 handler → 提示含「未就绪」', !!todoErr && /未就绪/.test(todoErr.message), todoErr && todoErr.message);
   // 文案从「接口迁移中」改成「接口未就绪 · 原因：xxx」是**有意**的：
   // 原来只给一句笼统提示，「模块名写错 / 依赖缺失 / 模块不存在」长得一模一样，无法定位。
   // 现在必须带出真实原因（见 handlers/index.js 的 todoHandler）。
-  ok('未移植接口 → 带出真实原因', /模块未登记|Cannot find module|未导出/.test(r.message), r.message);
+  ok('未登记 handler → 带出真实原因', !!todoErr && /模块未登记/.test(todoErr.message), todoErr && todoErr.message);
+
+  // 已登记模块的**方法名写错**是另一条分支（模块在、导出不在）→ 原因不同，也要能分辨
+  const badMethod = resolveHandler('admin.submit.nopeMethod');
+  let bmErr = null;
+  try { await badMethod({ method: 'GET', path: '/x', params: {}, query: {}, body: {} }); } catch (e) { bmErr = e; }
+  ok('已登记模块 + 错方法名 → 提示「未导出」', !!bmErr && /未导出/.test(bmErr.message), bmErr && bmErr.message);
 
   // ============ 5. 路由兜底 ============
   r = await H.call(H.req('GET', '/user/nope/x/y'));

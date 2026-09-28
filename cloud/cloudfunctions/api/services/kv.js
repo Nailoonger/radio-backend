@@ -11,7 +11,7 @@
  *  - set(key, value) 不存在则建，value 一律转字符串
  */
 
-const { C, coll } = require('../lib/db');
+const { C, coll, nextId } = require('../lib/db');
 
 const docId = (key) => `setting:${key}`;
 
@@ -37,12 +37,21 @@ async function get(key, fallback = '') {
 
 /** 写入（不存在则建） */
 async function set(key, value, desc) {
-  const data = { key, value: String(value), desc: desc || null, update_time: new Date() };
+  // ⚠️ 时间列一律**驼峰**（`createTime` / `updateTime`），与 docs/data-model-mapping.md 第 18 行一致。
+  //    这里曾经写成 `create_time` / `update_time` —— 那不在 `system_setting` 模型的属性名里
+  //    （模型属性是 `updateTime`，DB 列名才是 `update_time`），管理端 `setting/list` 直接把文档
+  //    返回给前端时就会多出两个**前端不认识的**字段、却少了它期望的 `updateTime`。
+  const data = { key, value: String(value), desc: desc || null, updateTime: new Date() };
   try {
     await coll(C.SETTING).doc(docId(key)).update({ data });
   } catch (e) {
     // 文档不存在 → 新建（固定 _id，天然充当唯一键）
-    await coll(C.SETTING).add({ data: { _id: docId(key), ...data, create_time: new Date() } });
+    // ⚠️ 顺带补上数字 `id`：映射文档里 `system_setting` 的字段是
+    //    `id, key, value, desc, updateTime`，管理端 `GET /admin/setting/list`
+    //    在 direct 模式下是真的会返回 `id` 的 —— 不补就是一处静默的字段缺失。
+    //    只在**新建**时取号（更新路径不碰），成本可忽略。
+    const id = await nextId(C.SETTING);
+    await coll(C.SETTING).add({ data: { _id: docId(key), id, ...data, createTime: new Date() } });
   }
   return { key, value: data.value, desc: data.desc };
 }

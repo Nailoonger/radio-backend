@@ -224,9 +224,17 @@ async function findMany(name, where, opts) {
   return r.data || [];
 }
 
-/** 计数（等价 Sequelize count） */
+/**
+ * 计数（等价 Sequelize count）
+ *
+ * ⚠️ `where` 为空时**不下 `.where({})`**，直接用 `collection.count()`。
+ *    与 `findMany` 的口径保持一致；`where({})` 在部分 SDK 版本上语义不明，
+ *    而「统计全表」在管理端概览里是常见调用（14 个 count 里有好几个不带条件）。
+ */
 async function count(name, where) {
-  const r = await coll(name).where(where || {}).count();
+  let q = coll(name);
+  if (where && Object.keys(where).length) q = q.where(where);
+  const r = await q.count();
   return (r && r.total) || 0;
 }
 

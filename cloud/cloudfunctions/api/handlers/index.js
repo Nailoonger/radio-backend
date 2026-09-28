@@ -9,7 +9,7 @@
  *
  *     const mod = require('./' + segs.join('/'));     // ❌ 已废弃
  *
- * ⚠️⚠️ 但云函数是**单文件打包**上线的（见 cloud/scripts/bundle.js —— 因为 Windows 下
+ * ⚠️⚠️ 但云函数是**单文件打包**上线的（见 cloud/scripts/sync.js —— 因为 Windows 下
  *    开发者工具 CLI 会把路径分隔符 `\` 写进压缩包条目名，子目录文件根本传不上去）。
  *    打包器靠**静态分析**找依赖，动态拼接的路径它看不见 → 目标文件不会进产物
  *    → 线上报 `Cannot find module ...`。
@@ -41,8 +41,20 @@ const REGISTRY = {
   'user.submit': () => require('./user/submit'),
   'user.switch': () => require('./user/switch'),
 
-  // ---- 管理端（阶段 7：模块建好后逐条登记）----
-  // 'admin.auth': () => require('./admin/auth'),
+  // ---- 管理端（阶段 7）----
+  'admin.auth': () => require('./admin/auth'),
+  'admin.setting': () => require('./admin/setting'),
+  'admin.switch': () => require('./admin/switch'),
+  'admin.program': () => require('./admin/program'),
+  'admin.notice': () => require('./admin/notice'),
+  'admin.message': () => require('./admin/message'),
+  'admin.stats': () => require('./admin/stats'),
+  'admin.cadre': () => require('./admin/cadre'),
+  'admin.staff': () => require('./admin/staff'),
+  'admin.showcase': () => require('./admin/showcase'),
+  'admin.adminMgr': () => require('./admin/adminMgr'),
+  'admin.student': () => require('./admin/student'),
+  'admin.submit': () => require('./admin/submit'),
 };
 
 const cache = new Map();

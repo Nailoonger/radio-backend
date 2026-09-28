@@ -527,7 +527,7 @@ __mods["handlers/index.js"] = function (module, exports, require) {
  *
  *     const mod = require('./' + segs.join('/'));     // ❌ 已废弃
  *
- * ⚠️⚠️ 但云函数是**单文件打包**上线的（见 cloud/scripts/bundle.js —— 因为 Windows 下
+ * ⚠️⚠️ 但云函数是**单文件打包**上线的（见 cloud/scripts/sync.js —— 因为 Windows 下
  *    开发者工具 CLI 会把路径分隔符 `\` 写进压缩包条目名，子目录文件根本传不上去）。
  *    打包器靠**静态分析**找依赖，动态拼接的路径它看不见 → 目标文件不会进产物
  *    → 线上报 `Cannot find module ...`。
@@ -559,8 +559,20 @@ const REGISTRY = {
   'user.submit': () => require('./user/submit'),
   'user.switch': () => require('./user/switch'),
 
-  // ---- 管理端（阶段 7：模块建好后逐条登记）----
-  // 'admin.auth': () => require('./admin/auth'),
+  // ---- 管理端（阶段 7）----
+  'admin.auth': () => require('./admin/auth'),
+  'admin.setting': () => require('./admin/setting'),
+  'admin.switch': () => require('./admin/switch'),
+  'admin.program': () => require('./admin/program'),
+  'admin.notice': () => require('./admin/notice'),
+  'admin.message': () => require('./admin/message'),
+  'admin.stats': () => require('./admin/stats'),
+  'admin.cadre': () => require('./admin/cadre'),
+  'admin.staff': () => require('./admin/staff'),
+  'admin.showcase': () => require('./admin/showcase'),
+  'admin.adminMgr': () => require('./admin/adminMgr'),
+  'admin.student': () => require('./admin/student'),
+  'admin.submit': () => require('./admin/submit'),
 };
 
 const cache = new Map();
@@ -976,9 +988,17 @@ async function findMany(name, where, opts) {
   return r.data || [];
 }
 
-/** 计数（等价 Sequelize count） */
+/**
+ * 计数（等价 Sequelize count）
+ *
+ * ⚠️ `where` 为空时**不下 `.where({})`**，直接用 `collection.count()`。
+ *    与 `findMany` 的口径保持一致；`where({})` 在部分 SDK 版本上语义不明，
+ *    而「统计全表」在管理端概览里是常见调用（14 个 count 里有好几个不带条件）。
+ */
 async function count(name, where) {
-  const r = await coll(name).where(where || {}).count();
+  let q = coll(name);
+  if (where && Object.keys(where).length) q = q.where(where);
+  const r = await q.count();
   return (r && r.total) || 0;
 }
 
@@ -1681,23 +1701,81 @@ __mods["services/roster.js"] = function (module, exports, require) {
 'use strict';
 
 /**
- * 名册工具（清洗 / 归一化 / 标签）—— 从 src/services/studentRosterService.js **原样移植**
+ * roster —— 学生名册：解析 / 归一化 / 校验 / 落库 / 批量维护
+ * 从 src/services/studentRosterService.js 移植（阶段 7）
  *
- * ⚠️ 这里只搬「用户端会用到的纯函数」；导入解析、批量建号、列表查询等管理端逻辑
- *    属于阶段 7，届时再整段搬过来（同一个文件继续加）。
- *    原文件 1094 行，大部分依赖 Sequelize 的 Op/fn/col，不能原样拿过来。
+ * ═══ 三段确定性规则（不猜） ═══════════════════════════════════════════════
+ *   1. 认表头：扫前 3 行找关键词（年级/班级/序号/姓名），命中最多的一行当表头。
+ *      一个都没命中 → 按列序取第 1/2/3 列，并拿第一行数据试解析，解析不出就报错。
+ *   2. 逐格归一化：2024级 / 24 → 2024；1班 → 01；第5 → 05；全角数字、撇号、空格先清洗。
+ *      也支持单列合并写法：20240101 / 2024-01-01 / 2024级1班1号。
+ *   3. 逐行出结论：可导入 / 异常（带原因和真实行号）/ 库中已存在。
+ *      **预览阶段一行都不写库**；commit 时服务端重新解析 + 重新校验（不信任前端回传）。
+ *
+ * ═══ 账号规则 ═════════════════════════════════════════════════════════════
+ *   账号 = 入学年级(4) + 班级(2) + 序号(2)，如 2024 + 01 + 01 = 20240101
+ *
+ * ═══ 云化差异（逐条，都经过实测/推演） ═══════════════════════════════════
+ * ① **没有跨文档事务**。原 `commit` / `removeGrade` / `updateStudent` 里的
+ *    `sequelize.transaction` 全部拆成顺序执行。可接受的理由：这些操作都是「批量维护」，
+ *    失败时最多留下「部分导入」的半成品 —— 而**每一行本身的写都是幂等的**
+ *    （按 username 覆盖 / 固定 `_id` 占用），重跑一遍即可收敛。真正的原子性需求
+ *    （抢座位）在 `songStatus` 的 `applyChange`，不在这里。
+ * ② **没有 GROUP BY**：`statsByClass` / `listGrades` / `listStudents.summary`
+ *    全部退化成「分页拉全量 + JS 聚合」。适用前提：学生数 ≤ 数千（本项目量级）。
+ * ③ **没有 LIKE**：`keyword` 过滤改成 JS 子串匹配（大小写不敏感，对齐 MySQL ci 排序规则）。
+ * ④ **唯一性**：MySQL 的 `uk_username` 改用 `reserveUnique('user_name', ...)`
+ *    （见 docs/data-model-mapping.md §三）。删除账号时**必须** `releaseUnique`，
+ *    否则孤儿键会挡住后续同名导入。
+ * ⑤ **时间显示改北京时间**：原 `formatTime` / `stamp` 用的是**容器本地时间**
+ *    （本项目容器是 UTC）→ 导出的「最近登录时间」比实际早 8 小时。这属于缺陷，不是语义，
+ *    按全项目口径改用 `lib/bjTime`。（有意偏离，已在 stage7 方案里标注。）
  */
+
+const { C, _, findOne, findAllPaged, findMany, insertOne, updateById, updateWhere, removeWhere, count, nextId, reserveUnique, releaseUnique } = require('../lib/db');
+const { ApiError, Codes } = require('../lib/response');
+const bj = require('../lib/bjTime');
+const accountService = require('./studentAccount');
+
+const CLASS_MAX = 99;
+const SEAT_MAX = 99;
+const GRADE_RE = /^(19|20)\d{2}$/;
+
+/** 表头关键词：命中越多的行越可能是表头行 */
+const HEADER_WORDS = {
+  grade: ['入学年份', '入学', '年级', '届', '年份'],
+  class: ['班级', '班'],
+  seat: ['序号', '座号', '编号', '学号', '号'],
+  name: ['姓名', '名字', '学生姓名'],
+};
+
+/**
+ * `username IS NOT NULL` 的云端等价物。
+ *
+ * ⚠️ 不能只写 `_.neq(null)`：模型文档数据库里「字段缺失」与「字段为 null」是两回事，
+ *    只判 neq 时缺失字段可能被算进来（不同 SDK 版本行为不一致）。
+ *    显式加 `exists(true)` 后语义就与 SQL 的 IS NOT NULL 完全一致。
+ */
+const HAS_USERNAME = _.exists(true).and(_.neq(null));
+
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+/** 云端下推 `_.in([...])` 时数组不宜过大（受命令体大小限制）—— 统一按 100 切 */
+const IN_CHUNK = 100;
 
 /* ────────────────────────── 清洗与归一化 ────────────────────────── */
 
-/** 全角数字 → 半角、去零宽字符、去首尾空格 */
+/** 全角数字 → 半角、去零宽字符 */
 function toHalfWidth(s) {
   return String(s)
     .replace(/[\uFF10-\uFF19]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
     .replace(/[\u200B-\u200D\uFEFF]/g, '');
 }
 
-/** 统一清洗：去 Excel 文本撇号 / 全角空格 / 所有空白 */
 function clean(v) {
   if (v === null || v === undefined) return '';
   let s = toHalfWidth(v);
@@ -1706,17 +1784,1144 @@ function clean(v) {
   return s.replace(/\s+/g, '');
 }
 
-/** 学号拼接：年级(4) + 班级(2) + 序号(2) */
+/**
+ * 年级 → 4 位入学年份
+ *   2024 / 2024级 / 2024届 / 24 / 24级 → 2024
+ */
+function normalizeGrade(raw) {
+  const s = clean(raw).replace(/[级届年份入学报到]/g, '');
+  const m = s.match(/\d+/);
+  if (!m) throw new Error(`年级「${String(raw).trim()}」无法识别，应为 4 位入学年份（如 2024）`);
+  let n = m[0];
+  if (n.length === 2) n = `20${n}`; // 24 → 2024
+  if (n.length !== 4 || !GRADE_RE.test(n)) {
+    throw new Error(`年级「${String(raw).trim()}」不合法，应为 4 位入学年份（如 2024）`);
+  }
+  return n;
+}
+
+/**
+ * 班级 / 序号 → 2 位
+ *   1 / 01 / 1班 / 高一(1)班 / 5号 / 第5 → 01 / 05
+ */
+function normalizePart(raw, label, max = CLASS_MAX) {
+  const s = clean(raw);
+  const m = s.match(/\d+/);
+  if (!m) throw new Error(`${label}「${String(raw).trim()}」无法识别，应为数字`);
+  const n = parseInt(m[0], 10);
+  if (!Number.isFinite(n) || n < 1 || n > max) {
+    throw new Error(`${label}「${String(raw).trim()}」超出范围（1~${max}）`);
+  }
+  return String(n).padStart(2, '0');
+}
+
+/**
+ * 单列合并写法 → 三元组
+ *   20240101 / 2024-01-01 / 2024 01 01 / 2024级1班1号
+ */
+function splitCombined(text) {
+  const s = clean(text);
+  if (!s) return null;
+  if (/^\d{8}$/.test(s)) return [s.slice(0, 4), s.slice(4, 6), s.slice(6, 8)];
+  const nums = s.match(/\d+/g) || [];
+  if (nums.length < 3) return null;
+  return [nums[0], nums[1], nums[2]];
+}
+
 function buildUsername(grade, classNo, seatNo) {
   return `${grade}${classNo}${seatNo}`;
 }
 
-/** 展示用班级标签：2024 级 1 班（班级去前导零） */
 function gradeLabel(grade, classNo) {
   return `${grade} 级 ${String(classNo).replace(/^0/, '')} 班`;
 }
 
-module.exports = { toHalfWidth, clean, buildUsername, gradeLabel };
+/** 北京时间格式化（源实现用容器本地时间 = UTC，见文件头 ⑤） */
+function formatTime(v) {
+  const d = bj.shifted(new Date(v).getTime());
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
+}
+
+/* ────────────────────────── 表头识别 ────────────────────────── */
+
+function detectHeader(rows) {
+  let best = null;
+  const scan = Math.min(rows.length, 3);
+  for (let i = 0; i < scan; i++) {
+    const row = rows[i] || [];
+    const map = {};
+    let hits = 0;
+    row.forEach((cell, ci) => {
+      const s = clean(cell);
+      if (!s || /^\d+$/.test(s)) return; // 纯数字单元格绝不可能是表头
+      for (const field of Object.keys(HEADER_WORDS)) {
+        if (map[field] !== undefined) continue;
+        if (HEADER_WORDS[field].some((w) => s.includes(w))) {
+          map[field] = ci;
+          hits++;
+          break;
+        }
+      }
+    });
+    if (hits >= 1 && (!best || hits > best.hits)) best = { rowIndex: i, map, hits };
+  }
+  return best;
+}
+
+/** 整行是否为空（全空 / 只有空白） */
+function isBlankRow(row) {
+  if (!row || !row.length) return true;
+  return row.every((c) => clean(c) === '');
+}
+
+/* ────────────────────────── 解析（纯逻辑，不查库） ────────────────────────── */
+
+function parseSheet(rows) {
+  if (!Array.isArray(rows) || !rows.length) {
+    throw new ApiError(Codes.PARAM_ERROR, '表格是空的，没有读到任何行');
+  }
+
+  const warnings = [];
+  const header = detectHeader(rows);
+  let mode = 'header';
+  let headerRowIndex = -1;
+  let columns = { grade: null, class: null, seat: null, name: null };
+
+  if (header) {
+    headerRowIndex = header.rowIndex;
+    columns = { grade: null, class: null, seat: null, name: null, ...header.map };
+  } else {
+    mode = 'position';
+    columns = { grade: 0, class: 1, seat: 2, name: 3 };
+    warnings.push('未识别到表头，已按前 3 列的顺序当作「年级 / 班级 / 序号」解析');
+  }
+  if (columns.name === null || columns.name === undefined) {
+    columns.name = null;
+  }
+
+  const start = headerRowIndex + 1;
+  const dataRows = [];
+  const seen = new Map(); // username -> 首次出现的行号
+
+  for (let i = start; i < rows.length; i++) {
+    const row = rows[i] || [];
+    if (isBlankRow(row)) continue;
+
+    const rowNo = i + 1; // 与用户在表格里看到的行号一致
+    const item = {
+      rowNo,
+      raw: row.map((c) => clean(c)),
+      grade: null,
+      classNo: null,
+      seatNo: null,
+      username: null,
+      name: '',
+      valid: true,
+      error: '',
+      state: 'invalid',
+    };
+
+    try {
+      let g = columns.grade !== null ? row[columns.grade] : '';
+      let c = columns.class !== null ? row[columns.class] : '';
+      let s = columns.seat !== null ? row[columns.seat] : '';
+
+      // 单列合并写法兜底：三元组没凑齐时，拿第一个「能切出三段」的单元格再试一次。
+      if ([g, c, s].filter((v) => clean(v) !== '').length < 3) {
+        const candidates = [g, ...row.map((cell) => clean(cell))];
+        for (const cand of candidates) {
+          const parts = splitCombined(cand);
+          if (parts) {
+            [g, c, s] = parts;
+            break;
+          }
+        }
+      }
+
+      item.grade = normalizeGrade(g);
+      item.classNo = normalizePart(c, '班级');
+      item.seatNo = normalizePart(s, '序号', SEAT_MAX);
+      item.username = buildUsername(item.grade, item.classNo, item.seatNo);
+      if (columns.name !== null && row[columns.name] !== undefined) {
+        item.name = clean(row[columns.name]).slice(0, 64);
+      }
+    } catch (e) {
+      item.valid = false;
+      item.error = e.message;
+    }
+
+    // 本批次内重复：只留第一行，后面的判异常（避免「同一人两条账号」）
+    if (item.valid && seen.has(item.username)) {
+      item.valid = false;
+      item.error = `本批次内账号 ${item.username} 重复（第 ${seen.get(item.username)} 行已出现）`;
+    } else if (item.valid) {
+      seen.set(item.username, rowNo);
+    }
+
+    dataRows.push(item);
+  }
+
+  if (!dataRows.length) {
+    throw new ApiError(Codes.PARAM_ERROR, '没有读到任何数据行（表头下面全是空行？）');
+  }
+  if (dataRows.length > 0 && dataRows.every((r) => !r.valid)) {
+    // 全部解析失败：把第一行的原因抛出去，比「一片红」更好定位
+    const first = dataRows[0];
+    if (mode === 'position') {
+      throw new ApiError(
+        Codes.PARAM_ERROR,
+        `未识别到列：第一行数据解析失败（${first.error}）。请确认前 3 列是「年级 / 班级 / 序号」，或补一行表头`
+      );
+    }
+  }
+
+  return { mode, headerRowIndex, columns, dataRows, totalRows: dataRows.length, warnings };
+}
+
+/* ────────────────────────── 查库校验 ────────────────────────── */
+
+async function fetchExistingMap(usernames) {
+  const map = new Map();
+  for (const part of chunk([...new Set(usernames)], IN_CHUNK)) {
+    const found = await findAllPaged(C.USER, { username: _.in(part) });
+    found.forEach((u) => {
+      map.set(u.username, {
+        id: u.id,
+        username: u.username,
+        status: Number(u.status),
+        activated: !!u.pwdChangedAt,
+        grade: u.grade,
+        classNo: u.classNo,
+        seatNo: u.seatNo,
+        name: u.remark || '',
+      });
+    });
+  }
+  return map;
+}
+
+/**
+ * 解析 + 查库校验（preview 与 commit 共用同一条链路）
+ * @param {string[][]} rows
+ * @param {{force?:boolean}} opts force=true 时「已激活」的账号也允许被覆盖更新
+ */
+async function analyze(rows, opts = {}) {
+  const force = !!opts.force;
+  const parsed = parseSheet(rows);
+  const validUsernames = parsed.dataRows.filter((r) => r.valid).map((r) => r.username);
+  const existing = await fetchExistingMap(validUsernames);
+
+  const summary = { new: 0, update: 0, active: 0, invalid: 0 };
+
+  for (const r of parsed.dataRows) {
+    if (!r.valid) {
+      r.state = 'invalid';
+      summary.invalid++;
+      continue;
+    }
+    const hit = existing.get(r.username);
+    if (!hit) {
+      r.state = 'new';
+      summary.new++;
+      continue;
+    }
+    r.existingId = hit.id;
+    r.existingStatus = hit.status;
+    if (hit.activated) {
+      // 真人在用（改过密码）：默认跳过保护，不把学生正在用的密码打回初始密码
+      r.state = force ? 'update' : 'active';
+      r.protectedPwd = true;
+      if (force) summary.update++;
+      else summary.active++;
+    } else {
+      r.state = 'update';
+      summary.update++;
+    }
+  }
+
+  const errors = parsed.dataRows
+    .filter((r) => r.state === 'invalid')
+    .map((r) => ({ rowNo: r.rowNo, message: r.error, raw: r.raw }));
+
+  return {
+    mode: parsed.mode,
+    headerRowIndex: parsed.headerRowIndex,
+    columns: parsed.columns,
+    totalRows: parsed.totalRows,
+    warnings: parsed.warnings,
+    summary,
+    errors,
+    rows: parsed.dataRows,
+  };
+}
+
+/** 只读预览：一行都不写库 */
+async function preview(rows, opts = {}) {
+  const a = await analyze(rows, opts);
+  return {
+    mode: a.mode,
+    headerRowIndex: a.headerRowIndex,
+    columns: a.columns,
+    totalRows: a.totalRows,
+    warnings: a.warnings,
+    summary: a.summary,
+    errors: a.errors,
+    rows: a.rows.map((r) => ({
+      rowNo: r.rowNo,
+      grade: r.grade,
+      classNo: r.classNo,
+      seatNo: r.seatNo,
+      username: r.username,
+      name: r.name,
+      state: r.state,
+      error: r.error,
+      raw: r.raw,
+    })),
+  };
+}
+
+/* ────────────────────────── 落库 ────────────────────────── */
+
+/**
+ * 确认导入（服务端重新解析 + 重新校验，不信任前端回传的结论）
+ *
+ * ⚠️ 初始密码只 hash 一次整批复用 —— bcrypt 每行 60~100ms，逐行 hash 2000 人就是分钟级超时。
+ *    （源注释原话；这里沿用：`hashInitPasswordFor` 内部已带 cost 8 的取舍。）
+ * ⚠️ 「已激活」的账号即使 force 也不覆盖 password，只更新三元组 / 备注。
+ * ⚠️ 源用 `bulkCreate + ignoreDuplicates`；云端等价物是
+ *    **`reserveUnique('user_name', ...)` 抢唯一键**（抢不到=已存在=跳过）。
+ */
+async function commit(rows, opts = {}) {
+  const { filename = '', operator = '', operatorId = null, force = false, strict = false } = opts;
+  const a = await analyze(rows, { force });
+
+  if (strict && a.summary.invalid > 0) {
+    throw new ApiError(
+      Codes.PARAM_ERROR,
+      `有 ${a.summary.invalid} 行异常，严格模式下已拒绝整批导入。请先修正后再试`
+    );
+  }
+
+  const toCreate = a.rows.filter((r) => r.state === 'new');
+  const toUpdate = a.rows.filter((r) => r.state === 'update');
+  const initHashOf = (r) => accountService.hashInitPasswordFor(r.username);
+
+  const now = new Date();
+  const batchId = await nextId(C.IMPORT_BATCH);
+  /**
+   * ⚠️⚠️ **必须接住 `insertOne` 返回的 `_id`**：云文档的 `_id` 是自动生成的字符串
+   * （`auto_N`），而 `batchId` 是**数字业务主键**（等价 MySQL AUTO_INCREMENT）。
+   * `updateById` 走的是 `doc(_id)`，拿数字 id 去更新会抛 `document does not exist`
+   * → 批次统计永远回填不上（且只在「导入成功」路径炸，测试不覆盖就发现不了）。
+   * 全项目约定：`insertOne` 之后要改这一行，一律用返回的 `_id`；
+   * 只有「业务键当 _id」的 4 张表才用 `insertWithId` 后按业务键更新。
+   */
+  const batchDocId = await insertOne(C.IMPORT_BATCH, {
+    id: batchId,
+    filename: String(filename).slice(0, 255),
+    total: a.totalRows,
+    created: 0,
+    updated: 0,
+    skipped: a.summary.active,
+    invalid: a.summary.invalid,
+    operatorId,
+    operator: String(operator).slice(0, 64),
+    createTime: now,
+    updateTime: now,
+  });
+
+  // 1) 新建
+  let created = 0;
+  for (const part of chunk(toCreate, IN_CHUNK)) {
+    for (const r of part) {
+      const id = await nextId(C.USER);
+      const got = await reserveUnique('user_name', r.username, id);
+      if (!got) continue; // 并发下已被别人抢先建号 → 跳过（等价 INSERT IGNORE）
+      await insertOne(C.USER, {
+        id,
+        openid: null,
+        username: r.username,
+        password: await initHashOf(r),
+        grade: r.grade,
+        classNo: r.classNo,
+        seatNo: r.seatNo,
+        remark: r.name || null,
+        nickname: r.name || null,
+        status: 1,
+        pwdChangedAt: null,
+        loginCount: 0,
+        importBatchId: batchId,
+        createTime: now,
+        updateTime: now,
+      });
+      created += 1;
+    }
+  }
+
+  // 2) 覆盖更新（未激活的既有账号；force 时也含已激活账号，但不碰密码）
+  let updated = 0;
+  for (const r of toUpdate) {
+    const patch = {
+      grade: r.grade,
+      classNo: r.classNo,
+      seatNo: r.seatNo,
+      importBatchId: batchId,
+      status: 1,
+      updateTime: new Date(),
+    };
+    if (r.name) {
+      patch.remark = r.name;
+      patch.nickname = r.name;
+    }
+    // 未激活账号：密码重设为「user + 新学号」的初始值保持一致
+    if (!r.protectedPwd) patch.password = await initHashOf(r);
+    updated += await updateWhere(C.USER, { username: r.username }, patch);
+  }
+
+  await updateById(C.IMPORT_BATCH, batchDocId, { created, updated, updateTime: new Date() });
+
+  // 缓存里可能存着旧状态（例如刚被 force 覆盖的账号），清一遍
+  toUpdate.forEach((r) => accountService.invalidate(r.username));
+
+  // 落库后再数一次，作为「本批真实生效数」的权威值
+  const total = await count(C.USER, { importBatchId: batchId });
+
+  return {
+    batchId,
+    created,
+    updated,
+    skipped: a.summary.active,
+    invalid: a.summary.invalid,
+    total,
+    totalRows: a.totalRows,
+    warnings: a.warnings,
+    errors: a.errors,
+    preview: {
+      mode: a.mode,
+      summary: a.summary,
+      rows: a.rows.map((r) => ({
+        rowNo: r.rowNo,
+        username: r.username,
+        grade: r.grade,
+        classNo: r.classNo,
+        seatNo: r.seatNo,
+        name: r.name,
+        state: r.state,
+        error: r.error,
+      })),
+    },
+  };
+}
+
+/* ────────────────────────── 列表 / 统计 / 导出 ────────────────────────── */
+
+/**
+ * 列表条件。返回**云端可下推**的 where（关键字走 JS 过滤，见文件头 ③）。
+ * 原实现把 keyword 也塞进 where（Op.like）；云端拆出来单独处理。
+ */
+function buildListWhere(q = {}) {
+  const where = { username: HAS_USERNAME };
+  if (q.grade) where.grade = String(q.grade);
+  if (q.classNo) where.classNo = String(q.classNo);
+  if (q.batchId) where.importBatchId = Number(q.batchId);
+  if (q.status === 0 || q.status === '0') where.status = 0;
+  if (q.status === 1 || q.status === '1') where.status = 1;
+  if (q.activated === 1 || q.activated === '1') where.pwdChangedAt = _.exists(true).and(_.neq(null));
+  if (q.activated === 0 || q.activated === '0') where.pwdChangedAt = null;
+  return where;
+}
+
+/** 关键字过滤（对齐 MySQL LIKE '%kw%'：子串 + 大小写不敏感） */
+function keywordHit(u, keyword) {
+  if (!keyword) return true;
+  const kw = String(keyword).toLowerCase();
+  return String(u.username || '').toLowerCase().indexOf(kw) >= 0
+    || String(u.remark || '').toLowerCase().indexOf(kw) >= 0;
+}
+
+function toDto(u) {
+  return {
+    id: u.id,
+    username: u.username,
+    grade: u.grade,
+    classNo: u.classNo,
+    seatNo: u.seatNo,
+    name: u.remark || '',
+    className: u.grade ? gradeLabel(u.grade, u.classNo) : '',
+    status: Number(u.status),
+    activated: !!u.pwdChangedAt,
+    pwdChangedAt: u.pwdChangedAt === undefined ? null : u.pwdChangedAt,
+    lastLoginAt: u.lastLoginAt === undefined ? null : u.lastLoginAt,
+    loginCount: Number(u.loginCount || 0),
+    importBatchId: u.importBatchId === undefined ? null : u.importBatchId,
+    createTime: u.createTime,
+  };
+}
+
+/**
+ * 「有投稿记录」的用户名集合（= `username IN (SELECT openid FROM submit)`）。
+ * ⚠️ 原实现用 SQL 子查询；云端改成「拉一遍 submit 的 openid 去重」。
+ *    调用方在一次请求内复用同一个集合，避免重复扫描。
+ */
+async function fetchSubmitOpenids() {
+  const rows = await findAllPaged(C.SUBMIT, {});
+  const set = new Set();
+  rows.forEach((r) => { if (r.openid) set.add(r.openid); });
+  return set;
+}
+
+async function listStudents(q = {}) {
+  const page = Math.max(parseInt(q.page, 10) || 1, 1);
+  const pageSize = Math.min(Math.max(parseInt(q.pageSize, 10) || 20, 1), 200);
+  const where = buildListWhere(q);
+  const kw = q.keyword ? String(q.keyword) : '';
+
+  let scoped = null;
+  let total = await count(C.USER, where);
+  let pageRows;
+
+  if (kw) {
+    // 有关键字 → 只能全量拉 + JS 过滤（没有 LIKE），顺带把这份数据给摘要复用
+    scoped = (await findAllPaged(C.USER, where)).filter((u) => keywordHit(u, kw));
+    total = scoped.length;
+    pageRows = scoped.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize);
+  } else {
+    // 无关键字 → 排序与分页都能下推给数据库，不必全量拉
+    pageRows = await findMany(C.USER, where, {
+      orderBy: [['grade', 'asc'], ['classNo', 'asc'], ['seatNo', 'asc']],
+      skip: (page - 1) * pageSize,
+      limit: pageSize,
+    });
+  }
+
+  // 摘要数字：与列表**同一个 where** 的全量聚合（不是当页），口径与 analyzeGrade 一致
+  // （有投稿记录 = username 出现在 submit.openid）。聚合失败不挡列表。
+  // ⚠️ 云端没有 GROUP BY / 子查询 → 这里必然要扫一遍 user（见文件头 ②）。
+  let summary = null;
+  try {
+    const all = scoped || await findAllPaged(C.USER, where);
+    const used = await fetchSubmitOpenids();
+    summary = {
+      total: all.length,
+      activated: all.filter((u) => !!u.pwdChangedAt).length,
+      disabled: all.filter((u) => Number(u.status) === 0).length,
+      withSubmit: all.filter((u) => used.has(u.username)).length,
+    };
+  } catch (e) {
+    summary = null;
+  }
+
+  return { list: pageRows.map(toDto), total, page, pageSize, summary };
+}
+
+/** grade → classNo → seatNo 的升序（都是零填充字符串，字典序 == 数值序） */
+function cmpSeat(a, b) {
+  const ka = `${a.grade || ''}|${a.classNo || ''}|${a.seatNo || ''}`;
+  const kb = `${b.grade || ''}|${b.classNo || ''}|${b.seatNo || ''}`;
+  if (ka === kb) return 0;
+  return ka < kb ? -1 : 1;
+}
+
+/** 按年级 + 班级汇总：总数 / 已激活 / 未激活 */
+async function statsByClass() {
+  const rows = await findAllPaged(C.USER, { username: HAS_USERNAME });
+
+  const map = new Map();
+  rows.forEach((u) => {
+    const k = `${u.grade || ''}\u0001${u.classNo || ''}`;
+    if (!map.has(k)) map.set(k, { grade: u.grade, classNo: u.classNo, total: 0, activated: 0 });
+    const c = map.get(k);
+    c.total += 1;
+    if (u.pwdChangedAt) c.activated += 1;
+  });
+
+  const classes = [...map.values()]
+    .sort((a, b) => cmpSeat(a, b))
+    .map((c) => ({
+      grade: c.grade,
+      classNo: c.classNo,
+      className: gradeLabel(c.grade, c.classNo),
+      total: c.total,
+      activated: c.activated,
+      inactive: c.total - c.activated,
+    }));
+
+  const overall = classes.reduce(
+    (acc, c) => ({
+      total: acc.total + c.total,
+      activated: acc.activated + c.activated,
+      inactive: acc.inactive + c.inactive,
+    }),
+    { total: 0, activated: 0, inactive: 0 }
+  );
+
+  return { classes, overall };
+}
+
+/* ────────────────────────── 按年级查询 / 整届清理 ────────────────────────── */
+
+/** 年级展示名：2024 → 2024 级 */
+function gradeName(grade) {
+  return `${grade} 级`;
+}
+
+/** 年级汇总列表（只查 user 一张表，不做跨表 join，避免 ONLY_FULL_GROUP_BY 之类的方言坑） */
+async function listGrades() {
+  const rows = await findAllPaged(C.USER, { username: HAS_USERNAME });
+
+  const map = new Map();
+  rows.forEach((u) => {
+    const g = u.grade;
+    if (g === undefined || g === null || g === '') return;
+    if (!map.has(g)) map.set(g, { grade: g, total: 0, activated: 0, disabled: 0, classes: new Set(), lastImportAt: null });
+    const a = map.get(g);
+    a.total += 1;
+    if (u.pwdChangedAt) a.activated += 1;
+    if (Number(u.status) === 0) a.disabled += 1;
+    if (u.classNo !== undefined && u.classNo !== null) a.classes.add(u.classNo);
+    const t = u.createTime ? new Date(u.createTime).getTime() : null;
+    if (t !== null && (a.lastImportAt === null || t > a.lastImportAt)) a.lastImportAt = t;
+  });
+
+  const list = [...map.values()]
+    .sort((a, b) => (String(a.grade) < String(b.grade) ? -1 : String(a.grade) > String(b.grade) ? 1 : 0))
+    .map((a) => ({
+      grade: a.grade,
+      name: gradeName(a.grade),
+      classCount: a.classes.size,
+      total: a.total,
+      activated: a.activated,
+      inactive: a.total - a.activated,
+      disabled: a.disabled,
+      lastImportAt: a.lastImportAt === null ? null : new Date(a.lastImportAt),
+    }));
+
+  const overall = list.reduce(
+    (acc, g) => ({
+      gradeCount: acc.gradeCount + 1,
+      total: acc.total + g.total,
+      activated: acc.activated + g.activated,
+      disabled: acc.disabled + g.disabled,
+    }),
+    { gradeCount: 0, total: 0, activated: 0, disabled: 0 }
+  );
+
+  return { list, overall };
+}
+
+/**
+ * 取一个年级的全部账号 + 这些账号里「已经发过投稿」的集合
+ * @returns {{grade:string, users:object[], usedSet:Set<string>}}
+ */
+async function collectGrade(gradeRaw) {
+  const grade = normalizeGrade(gradeRaw);
+  const users = await findAllPaged(C.USER, { grade, username: HAS_USERNAME });
+  users.sort(cmpSeat);
+  if (!users.length) throw new ApiError(Codes.NOT_FOUND, `${gradeName(grade)}下没有任何学生账号`);
+
+  const usedSet = new Set();
+  for (const part of chunk(users.map((u) => u.username), IN_CHUNK)) {
+    const rows = await findAllPaged(C.SUBMIT, { openid: _.in(part) });
+    rows.forEach((r) => { if (r.openid) usedSet.add(r.openid); });
+  }
+
+  return { grade, users, usedSet };
+}
+
+/**
+ * 整届清理 · 试算（只读，一行都不改）
+ *
+ * 判定与单个删除保持一致：有投稿记录的账号**不硬删**，改为停用
+ */
+async function analyzeGrade(gradeRaw) {
+  const { grade, users, usedSet } = await collectGrade(gradeRaw);
+
+  const classMap = new Map();
+  users.forEach((u) => {
+    const k = u.classNo || '';
+    if (!classMap.has(k)) classMap.set(k, { classNo: k, className: gradeLabel(grade, k), total: 0, activated: 0, withSubmit: 0 });
+    const c = classMap.get(k);
+    c.total++;
+    if (u.pwdChangedAt) c.activated++;
+    if (usedSet.has(u.username)) c.withSubmit++;
+  });
+
+  const withSubmit = users.filter((u) => usedSet.has(u.username)).length;
+
+  return {
+    grade,
+    name: gradeName(grade),
+    total: users.length,
+    classCount: classMap.size,
+    activated: users.filter((u) => u.pwdChangedAt).length,
+    disabled: users.filter((u) => Number(u.status) === 0).length,
+    withSubmit,
+    canDelete: users.length - withSubmit,
+    classes: [...classMap.values()],
+    // 给前端弹窗看的样例（最多 20 个，避免一次塞几千条）
+    samples: users.slice(0, 20).map((u) => toDto(u)),
+  };
+}
+
+/**
+ * 该届里「会被改为停用」的账号清单（有投稿记录的）+ 其余届未受影响的账号数
+ * —— v8「清理完成」回执要用
+ */
+async function gradeCleanupPreview(gradeRaw) {
+  const { grade, users, usedSet } = await collectGrade(gradeRaw);
+  const willDisable = users
+    .filter((u) => usedSet.has(u.username))
+    .map((u) => ({ username: u.username, name: u.remark || '', className: gradeLabel(grade, u.classNo) }));
+
+  // `[:where]` 等价物：username IS NOT NULL AND (grade IS NULL OR grade <> :grade)
+  const untouched = await count(C.USER, _.and([
+    { username: HAS_USERNAME },
+    _.or([{ grade: null }, { grade: _.neq(grade) }]),
+  ]));
+
+  return { grade, gradeName: gradeName(grade), total: users.length, willDisable, untouched };
+}
+
+/**
+ * 整届清理 · 执行（管理员一键删除该年级所有账号）
+ *
+ * @param {string} gradeRaw 年级（2024 / 2024级 / 24 都能识别）
+ * @param {{mode?:'safe'|'disable'|'purge', confirm?:string}} opts
+ */
+async function removeGrade(gradeRaw, opts = {}) {
+  const mode = ['disable', 'purge'].includes(opts.mode) ? opts.mode : 'safe';
+  const { grade, users, usedSet } = await collectGrade(gradeRaw);
+
+  if (mode === 'purge' && clean(opts.confirm) !== grade) {
+    throw new ApiError(
+      Codes.PARAM_ERROR,
+      `危险操作：要把投稿记录里的账号一并删掉，请在确认框里原样输入年级「${grade}」`
+    );
+  }
+
+  const ids = users.map((u) => u.id);
+
+  // 1) 只停用
+  if (mode === 'disable') {
+    let n = 0;
+    for (const part of chunk(ids, IN_CHUNK)) {
+      n += await updateWhere(C.USER, { id: _.in(part) }, { status: 0 });
+    }
+    users.forEach((u) => accountService.invalidate(u.username));
+    return {
+      grade,
+      name: gradeName(grade),
+      mode,
+      total: users.length,
+      deleted: 0,
+      disabled: n || users.length,
+    };
+  }
+
+  // 2) 纯清除 / 安全清除
+  let deleteUsers;
+  let disableUsers;
+  if (mode === 'purge') {
+    deleteUsers = users;
+    disableUsers = [];
+  } else {
+    deleteUsers = users.filter((u) => !usedSet.has(u.username));
+    disableUsers = users.filter((u) => usedSet.has(u.username));
+  }
+
+  // ⚠️ 云端没有跨文档事务（见文件头 ①）→ 顺序执行；每步按 100 一批
+  let deleted = 0;
+  for (const part of chunk(deleteUsers, IN_CHUNK)) {
+    deleted += await removeWhere(C.USER, { id: _.in(part.map((u) => u.id)) });
+    // 删主记录必须同步释放唯一键，否则孤儿键会挡住后续同名导入
+    for (const u of part) await releaseUnique('user_name', u.username);
+  }
+
+  let disabled = 0;
+  for (const part of chunk(disableUsers.map((u) => u.id), IN_CHUNK)) {
+    disabled += await updateWhere(C.USER, { id: _.in(part) }, { status: 0 });
+  }
+
+  // 3) 被删 / 被停用的账号，缓存里的旧状态必须立刻作废
+  users.forEach((u) => accountService.invalidate(u.username));
+
+  return {
+    grade,
+    name: gradeName(grade),
+    mode,
+    total: users.length,
+    deleted,
+    disabled,
+  };
+}
+
+/**
+ * 导出用的数据结构（列定义 + 行）
+ * ⚠️ 初始密码列只在「仍是初始密码」时有值；已改密的行留空（bcrypt 不可逆）
+ */
+async function exportData(q = {}) {
+  const where = buildListWhere(q);
+  let rows = await findAllPaged(C.USER, where);
+  if (q.keyword) rows = rows.filter((u) => keywordHit(u, q.keyword));
+  rows.sort(cmpSeat);
+
+  const columns = [
+    { header: '年级', width: 8 },
+    { header: '班级', width: 8 },
+    { header: '序号', width: 8 },
+    { header: '姓名', width: 12 },
+    { header: '账号', width: 14 },
+    { header: '初始密码', width: 14 },
+    { header: '状态', width: 8 },
+    { header: '是否已激活', width: 12 },
+    { header: '最近登录时间', width: 20 },
+  ];
+
+  const data = rows.map((u) => [
+    u.grade,
+    u.classNo,
+    u.seatNo,
+    u.remark || '',
+    u.username,
+    u.pwdChangedAt ? '' : accountService.initPasswordFor(u.username),
+    Number(u.status) === 1 ? '启用' : '停用',
+    u.pwdChangedAt ? '已激活' : '未激活',
+    u.lastLoginAt ? formatTime(u.lastLoginAt) : '',
+  ]);
+
+  return { columns, rows: data, total: rows.length };
+}
+
+/* ────────────────────────── 单个账号维护 ────────────────────────── */
+
+async function updateStudent(id, payload = {}) {
+  const uid = Number(id);
+  const user = Number.isInteger(uid) ? await findOne(C.USER, { id: uid }) : null;
+  if (!user || !user.username) throw new ApiError(Codes.NOT_FOUND, '学生账号不存在');
+
+  const oldUsername = user.username;
+  const grade = payload.grade !== undefined ? normalizeGrade(payload.grade) : user.grade;
+  const classNo = payload.classNo !== undefined ? normalizePart(payload.classNo, '班级') : user.classNo;
+  const seatNo = payload.seatNo !== undefined ? normalizePart(payload.seatNo, '序号', SEAT_MAX) : user.seatNo;
+  const newUsername = buildUsername(grade, classNo, seatNo);
+
+  if (newUsername !== oldUsername) {
+    const dup = await findOne(C.USER, { username: newUsername });
+    if (dup) throw new ApiError(Codes.CONFLICT, `账号 ${newUsername} 已存在，无法改到该班级 / 序号`);
+  }
+
+  const patch = { grade, classNo, seatNo, updateTime: new Date() };
+
+  // 姓名。对外字段名是 name，库里对应 remark + nickname 两列 —— 三个 key 都接受
+  const nameInput = payload.name !== undefined
+    ? payload.name
+    : (payload.remark !== undefined ? payload.remark : payload.nickname);
+  if (nameInput !== undefined) {
+    const name = String(nameInput == null ? '' : nameInput).trim();
+    if (!name) throw new ApiError(Codes.PARAM_ERROR, '姓名不能为空');
+    if (name.length > 64) throw new ApiError(Codes.PARAM_ERROR, '姓名最长 64 个字符');
+    // ⚠️ 必须两列一起写：管理端列表读 remark，投稿审核 / 留言审核 / 小程序「我的」读 nickname
+    patch.remark = name;
+    patch.nickname = name;
+  }
+
+  if (payload.status !== undefined) patch.status = Number(payload.status) === 0 ? 0 : 1;
+
+  await updateById(C.USER, user._id, patch);
+
+  // 改了三元组 = 账号变了：他的投稿 / 留言 / 已确认记录必须跟着迁
+  if (newUsername !== oldUsername) {
+    await updateById(C.USER, user._id, { username: newUsername });
+    // 唯一键跟着搬：先占新键（抢不到说明已被占，前面已查过重，这里只做兜底），再放旧键
+    const got = await reserveUnique('user_name', newUsername, user.id);
+    if (!got) throw new ApiError(Codes.CONFLICT, `账号 ${newUsername} 已存在，无法改到该班级 / 序号`);
+    await releaseUnique('user_name', oldUsername);
+
+    await updateWhere(C.SUBMIT, { openid: oldUsername }, { openid: newUsername });
+    await updateWhere(C.MESSAGE, { openid: oldUsername }, { openid: newUsername });
+    await updateWhere(C.NOTICE_ACK, { openid: oldUsername }, { openid: newUsername });
+  }
+
+  accountService.invalidate(oldUsername);
+  accountService.invalidate(newUsername);
+
+  const fresh = await findOne(C.USER, { id: uid });
+  return { ...toDto(fresh), renamed: newUsername !== oldUsername, oldUsername };
+}
+
+async function setStatus(id, status) {
+  const uid = Number(id);
+  const user = Number.isInteger(uid) ? await findOne(C.USER, { id: uid }) : null;
+  if (!user || !user.username) throw new ApiError(Codes.NOT_FOUND, '学生账号不存在');
+  const next = Number(status) === 0 ? 0 : 1;
+  await updateById(C.USER, user._id, { status: next, updateTime: new Date() });
+  await accountService.invalidate(user.username);
+  return toDto({ ...user, status: next });
+}
+
+/**
+ * 重置密码为初始密码（单个 / 批量）
+ * 重置后 pwdChangedAt 归零 → 学生那边的旧 token 会因为「密码版本不匹配」被踢下线
+ * @param {{ids?:number[], grade?:string, classNo?:string}} scope
+ */
+async function resetPasswords(scope = {}) {
+  const ids = Array.isArray(scope.ids) ? scope.ids.map(Number).filter(Boolean) : [];
+  let where;
+  if (ids.length) {
+    where = { id: _.in(ids), username: HAS_USERNAME };
+  } else if (scope.grade || scope.classNo) {
+    where = { username: HAS_USERNAME };
+    if (scope.grade) where.grade = String(scope.grade);
+    if (scope.classNo) where.classNo = String(scope.classNo);
+  } else {
+    // 不给范围就不给重置，避免手滑把全校密码全重置
+    throw new ApiError(Codes.PARAM_ERROR, '请指定要重置的账号（勾选列表或指定年级 / 班级）');
+  }
+
+  const targets = await findAllPaged(C.USER, where);
+  if (!targets.length) throw new ApiError(Codes.NOT_FOUND, '没有匹配到要重置的账号');
+
+  // 每个账号的初始密码都不同（user + 学号），逐行哈希
+  let affected = 0;
+  for (const u of targets) {
+    const hash = await accountService.hashInitPasswordFor(u.username);
+    affected += await updateWhere(C.USER, { id: u.id }, { password: hash, pwdChangedAt: null, updateTime: new Date() });
+    accountService.invalidate(u.username);
+  }
+
+  return { affected: affected || targets.length, usernames: targets.map((u) => u.username) };
+}
+
+/**
+ * 批量改状态（启用 / 停用）
+ *
+ * 走一条 UPDATE ... WHERE id IN (...)，再统一作废登录态。
+ */
+async function setStatusBatch(ids, status) {
+  const list = [...new Set((Array.isArray(ids) ? ids : []).map(Number).filter(Boolean))];
+  if (!list.length) throw new ApiError(Codes.PARAM_ERROR, '请先勾选要操作的账号');
+  if (list.length > 500) throw new ApiError(Codes.PARAM_ERROR, '一次最多操作 500 个账号');
+
+  const next = Number(status) === 0 ? 0 : 1;
+  const rows = [];
+  for (const part of chunk(list, IN_CHUNK)) {
+    const found = await findAllPaged(C.USER, { id: _.in(part), username: HAS_USERNAME });
+    rows.push(...found);
+  }
+  if (!rows.length) throw new ApiError(Codes.NOT_FOUND, '没有匹配到学生账号');
+
+  for (const part of chunk(rows.map((r) => r.id), IN_CHUNK)) {
+    await updateWhere(C.USER, { id: _.in(part) }, { status: next });
+  }
+  // 登录态作废：改停用后学生手里的 token 下一次请求就被踢，不用等 30 秒缓存
+  await Promise.all(rows.map((r) => accountService.invalidate(r.username)));
+
+  return { affected: rows.length, status: next, usernames: rows.map((r) => r.username) };
+}
+
+async function removeStudent(id) {
+  const uid = Number(id);
+  const user = Number.isInteger(uid) ? await findOne(C.USER, { id: uid }) : null;
+  if (!user || !user.username) throw new ApiError(Codes.NOT_FOUND, '学生账号不存在');
+
+  // 有投稿记录的不硬删：他只会在「我的投稿」里凭空少一条，且后台审核记录会指向不存在的账号
+  const used = await count(C.SUBMIT, { openid: user.username });
+  if (used > 0) {
+    await updateById(C.USER, user._id, { status: 0, updateTime: new Date() });
+    await accountService.invalidate(user.username);
+    return { deleted: false, disabled: true, submitCount: used, message: `该账号有 ${used} 条投稿记录，已改为停用（不删除）` };
+  }
+
+  await removeWhere(C.USER, { id: uid });
+  await releaseUnique('user_name', user.username);
+  await accountService.invalidate(user.username);
+  return { deleted: true, disabled: false, submitCount: 0 };
+}
+
+/* ────────────────────────── 批次 ────────────────────────── */
+
+async function listBatches(limit = 20) {
+  const n = Math.min(Number(limit) || 20, 100);
+  // ⚠️ 单次 get 上限 100 条；n 已被限制在 100 以内，直接 findMany 即可
+  const rows = await findMany(C.IMPORT_BATCH, {}, { orderBy: [['id', 'desc']], limit: n });
+  return rows.map((b) => ({
+    id: b.id,
+    filename: b.filename,
+    total: b.total,
+    created: b.created,
+    updated: b.updated,
+    skipped: b.skipped,
+    invalid: b.invalid,
+    operator: b.operator,
+    createTime: b.createTime,
+  }));
+}
+
+/**
+ * 撤销一个批次：只删本批次里「仍未激活」且「没有投稿记录」的账号
+ * （已激活的账号学生可能正在用，动了就是事故）
+ */
+async function rollbackBatch(id) {
+  const bid = Number(id);
+  const batch = Number.isInteger(bid) ? await findOne(C.IMPORT_BATCH, { id: bid }) : null;
+  if (!batch) throw new ApiError(Codes.NOT_FOUND, '批次不存在');
+
+  const candidates = await findAllPaged(C.USER, { importBatchId: bid, username: HAS_USERNAME, pwdChangedAt: null });
+  const activated = await count(C.USER, {
+    importBatchId: bid,
+    username: HAS_USERNAME,
+    pwdChangedAt: _.exists(true).and(_.neq(null)),
+  });
+
+  let removable = candidates;
+  if (candidates.length) {
+    const usedSet = new Set();
+    for (const part of chunk(candidates.map((u) => u.username), IN_CHUNK)) {
+      const rows = await findAllPaged(C.SUBMIT, { openid: _.in(part) });
+      rows.forEach((r) => { if (r.openid) usedSet.add(r.openid); });
+    }
+    removable = candidates.filter((u) => !usedSet.has(u.username));
+  }
+
+  if (removable.length) {
+    for (const part of chunk(removable, IN_CHUNK)) {
+      await removeWhere(C.USER, { id: _.in(part.map((u) => u.id)) });
+      for (const u of part) await releaseUnique('user_name', u.username);
+    }
+    removable.forEach((u) => accountService.invalidate(u.username));
+  }
+
+  return {
+    batchId: bid,
+    removed: removable.length,
+    keptActivated: activated,
+    keptWithSubmit: candidates.length - removable.length,
+  };
+}
+
+module.exports = {
+  initPasswordFor: accountService.initPasswordFor,
+  // 归一化（导出给验证脚本 / 测试直接断言）
+  toHalfWidth,
+  clean,
+  normalizeGrade,
+  normalizePart,
+  splitCombined,
+  buildUsername,
+  gradeLabel,
+  formatTime,
+  detectHeader,
+  parseSheet,
+  analyze,
+  preview,
+  commit,
+  listStudents,
+  statsByClass,
+  listGrades,
+  analyzeGrade,
+  gradeCleanupPreview,
+  removeGrade,
+  exportData,
+  updateStudent,
+  setStatus,
+  setStatusBatch,
+  resetPasswords,
+  removeStudent,
+  listBatches,
+  rollbackBatch,
+  fetchSubmitOpenids,
+  HAS_USERNAME,
+};
+
+};
+__mods["lib/bjTime.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 北京时间工具 —— 从 src/utils/bjTime.js **原样移植**（零依赖，不含任何 Sequelize 引用）
+ *
+ * 为什么不能省：云函数运行环境同样是 UTC，而「按天 / 按周 / 点播周锚点」全部按北京时间算。
+ * 直接用 new Date() 取日历日会落到错误的切点。
+ *
+ * 用法：拿到的 Date 是「真实 UTC 时刻」，写入云数据库即可；
+ *       要读「北京日历值」就配 shifted()。
+ */
+const TZ_OFFSET_MS = 8 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** 把时间戳平移 +8h：对这个 Date 用 getUTC* 读到的就是北京时间 */
+function shifted(ts = Date.now()) {
+  return new Date(ts + TZ_OFFSET_MS);
+}
+
+const pad2 = (n) => String(n).padStart(2, '0');
+
+/** 北京时间日历日：2026-09-18 */
+function ymd(d) {
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+}
+
+/** 日 key：2026-09-18 */
+function dayKey(ts) {
+  return ymd(shifted(ts));
+}
+
+/** 周 key：2026-W38（ISO 周，周一为第一天） */
+function weekKey(ts) {
+  const d = shifted(ts);
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const dow = (t.getUTCDay() + 6) % 7;      // 周一 = 0
+  t.setUTCDate(t.getUTCDate() - dow + 3);   // 移到本周四：ISO 周归属看周四
+  const firstThursday = new Date(Date.UTC(t.getUTCFullYear(), 0, 4));
+  const fDow = (firstThursday.getUTCDay() + 6) % 7;
+  firstThursday.setUTCDate(firstThursday.getUTCDate() - fDow + 3);
+  const week = 1 + Math.round((t - firstThursday) / (7 * DAY_MS));
+  return `${t.getUTCFullYear()}-W${pad2(week)}`;
+}
+
+/** 北京时间「今天」的起止（真实 UTC 时刻，左闭右开） */
+function dayRange(ts) {
+  const d = shifted(ts);
+  const start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - TZ_OFFSET_MS;
+  return { start: new Date(start), end: new Date(start + DAY_MS) };
+}
+
+/** 北京时间本周（周一 00:00 起）的起止 */
+function weekRange(ts) {
+  const d = shifted(ts);
+  const dow = (d.getUTCDay() + 6) % 7;
+  const start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - dow) - TZ_OFFSET_MS;
+  return { start: new Date(start), end: new Date(start + 7 * DAY_MS) };
+}
+
+/** 北京时间「下一周」的起止（严格下一周：本周 +7 天，即使今天就是周一） */
+function nextWeekRange(ts) {
+  const r = weekRange(ts);
+  return { start: new Date(r.start.getTime() + 7 * DAY_MS), end: new Date(r.end.getTime() + 7 * DAY_MS) };
+}
+
+/** 北京时间某个日期是周几（0=周日 … 6=周六） */
+function weekdayOf(d) {
+  return shifted(d).getUTCDay();
+}
+
+const WEEKDAY_CN = ['日', '一', '二', '三', '四', '五', '六'];
+
+module.exports = {
+  TZ_OFFSET_MS,
+  DAY_MS,
+  shifted,
+  pad2,
+  ymd,
+  dayKey,
+  weekKey,
+  dayRange,
+  weekRange,
+  nextWeekRange,
+  weekdayOf,
+  WEEKDAY_CN,
+};
 
 };
 __mods["services/wechat.js"] = function (module, exports, require) {
@@ -2148,7 +3353,7 @@ __mods["services/kv.js"] = function (module, exports, require) {
  *  - set(key, value) 不存在则建，value 一律转字符串
  */
 
-const { C, coll } = require('../lib/db');
+const { C, coll, nextId } = require('../lib/db');
 
 const docId = (key) => `setting:${key}`;
 
@@ -2174,12 +3379,21 @@ async function get(key, fallback = '') {
 
 /** 写入（不存在则建） */
 async function set(key, value, desc) {
-  const data = { key, value: String(value), desc: desc || null, update_time: new Date() };
+  // ⚠️ 时间列一律**驼峰**（`createTime` / `updateTime`），与 docs/data-model-mapping.md 第 18 行一致。
+  //    这里曾经写成 `create_time` / `update_time` —— 那不在 `system_setting` 模型的属性名里
+  //    （模型属性是 `updateTime`，DB 列名才是 `update_time`），管理端 `setting/list` 直接把文档
+  //    返回给前端时就会多出两个**前端不认识的**字段、却少了它期望的 `updateTime`。
+  const data = { key, value: String(value), desc: desc || null, updateTime: new Date() };
   try {
     await coll(C.SETTING).doc(docId(key)).update({ data });
   } catch (e) {
     // 文档不存在 → 新建（固定 _id，天然充当唯一键）
-    await coll(C.SETTING).add({ data: { _id: docId(key), ...data, create_time: new Date() } });
+    // ⚠️ 顺带补上数字 `id`：映射文档里 `system_setting` 的字段是
+    //    `id, key, value, desc, updateTime`，管理端 `GET /admin/setting/list`
+    //    在 direct 模式下是真的会返回 `id` 的 —— 不补就是一处静默的字段缺失。
+    //    只在**新建**时取号（更新路径不碰），成本可忽略。
+    const id = await nextId(C.SETTING);
+    await coll(C.SETTING).add({ data: { _id: docId(key), id, ...data, createTime: new Date() } });
   }
   return { key, value: data.value, desc: data.desc };
 }
@@ -2276,95 +3490,6 @@ async function detail(ctx) {
 }
 
 module.exports = { current, schedule, weekly, detail };
-
-};
-__mods["lib/bjTime.js"] = function (module, exports, require) {
-'use strict';
-
-/**
- * 北京时间工具 —— 从 src/utils/bjTime.js **原样移植**（零依赖，不含任何 Sequelize 引用）
- *
- * 为什么不能省：云函数运行环境同样是 UTC，而「按天 / 按周 / 点播周锚点」全部按北京时间算。
- * 直接用 new Date() 取日历日会落到错误的切点。
- *
- * 用法：拿到的 Date 是「真实 UTC 时刻」，写入云数据库即可；
- *       要读「北京日历值」就配 shifted()。
- */
-const TZ_OFFSET_MS = 8 * 60 * 60 * 1000;
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** 把时间戳平移 +8h：对这个 Date 用 getUTC* 读到的就是北京时间 */
-function shifted(ts = Date.now()) {
-  return new Date(ts + TZ_OFFSET_MS);
-}
-
-const pad2 = (n) => String(n).padStart(2, '0');
-
-/** 北京时间日历日：2026-09-18 */
-function ymd(d) {
-  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
-}
-
-/** 日 key：2026-09-18 */
-function dayKey(ts) {
-  return ymd(shifted(ts));
-}
-
-/** 周 key：2026-W38（ISO 周，周一为第一天） */
-function weekKey(ts) {
-  const d = shifted(ts);
-  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  const dow = (t.getUTCDay() + 6) % 7;      // 周一 = 0
-  t.setUTCDate(t.getUTCDate() - dow + 3);   // 移到本周四：ISO 周归属看周四
-  const firstThursday = new Date(Date.UTC(t.getUTCFullYear(), 0, 4));
-  const fDow = (firstThursday.getUTCDay() + 6) % 7;
-  firstThursday.setUTCDate(firstThursday.getUTCDate() - fDow + 3);
-  const week = 1 + Math.round((t - firstThursday) / (7 * DAY_MS));
-  return `${t.getUTCFullYear()}-W${pad2(week)}`;
-}
-
-/** 北京时间「今天」的起止（真实 UTC 时刻，左闭右开） */
-function dayRange(ts) {
-  const d = shifted(ts);
-  const start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - TZ_OFFSET_MS;
-  return { start: new Date(start), end: new Date(start + DAY_MS) };
-}
-
-/** 北京时间本周（周一 00:00 起）的起止 */
-function weekRange(ts) {
-  const d = shifted(ts);
-  const dow = (d.getUTCDay() + 6) % 7;
-  const start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - dow) - TZ_OFFSET_MS;
-  return { start: new Date(start), end: new Date(start + 7 * DAY_MS) };
-}
-
-/** 北京时间「下一周」的起止（严格下一周：本周 +7 天，即使今天就是周一） */
-function nextWeekRange(ts) {
-  const r = weekRange(ts);
-  return { start: new Date(r.start.getTime() + 7 * DAY_MS), end: new Date(r.end.getTime() + 7 * DAY_MS) };
-}
-
-/** 北京时间某个日期是周几（0=周日 … 6=周六） */
-function weekdayOf(d) {
-  return shifted(d).getUTCDay();
-}
-
-const WEEKDAY_CN = ['日', '一', '二', '三', '四', '五', '六'];
-
-module.exports = {
-  TZ_OFFSET_MS,
-  DAY_MS,
-  shifted,
-  pad2,
-  ymd,
-  dayKey,
-  weekKey,
-  dayRange,
-  weekRange,
-  nextWeekRange,
-  weekdayOf,
-  WEEKDAY_CN,
-};
 
 };
 __mods["handlers/user/showcase.js"] = function (module, exports, require) {
@@ -5889,6 +7014,3043 @@ async function get(ctx) {
 }
 
 module.exports = { list, get };
+
+};
+__mods["handlers/admin/auth.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 管理端 · 登录 / 当前管理员 / 改密 / 退出
+ * 迁移自 src/controllers/admin/authController.js —— 返回体逐字段一致
+ *
+ * ⚠️ 鉴权在**路由层**（原 routes/admin.js）：`/profile`、`/change-password`、
+ *    `/logout` 挂着 `adminAuth`，`/login` 是唯一免登录入口。
+ *    云函数没有中间件层，所以由 handler 第一行调 `asAdmin(ctx)` 补齐。
+ *
+ * ⚠️ 与原实现的一处**有意偏离**：原 `/admin/login` 挂了 `loginLimiter`
+ *    （按 IP 的 15 分钟窗口限流，超限返回 429）。云函数侧没有搬 —— 见
+ *    `cloud/docs/stage7-admin-plan.md` §「未搬的东西」。失败仍然返回同一句
+ *    「账号或密码错误」，不会泄露账号是否存在。
+ */
+
+const bcrypt = require('bcryptjs');
+const { C, findOne, updateById } = require('../../lib/db');
+const { ApiError, Codes } = require('../../lib/response');
+const { sign } = require('../../lib/auth');
+const { asAdmin, pick } = require('./_kit');
+
+/** 管理员的对外形状（**绝不包含 password**） */
+function adminDto(row) {
+  return {
+    id: row.id,
+    username: row.username,
+    nickname: row.nickname,
+    role: row.role,
+  };
+}
+
+/** POST /admin/login   body: { username, password } */
+async function login(ctx) {
+  const { username, password } = ctx.body || {};
+  if (!username || !password) {
+    throw new ApiError(Codes.PARAM_ERROR, '请输入用户名和密码');
+  }
+
+  const admin = await findOne(C.ADMIN, { username });
+  if (!admin) throw new ApiError(Codes.UNAUTHORIZED, '账号或密码错误');
+  if (Number(admin.status) !== 1) throw new ApiError(Codes.FORBIDDEN, '账号已禁用');
+
+  const ok = await bcrypt.compare(String(password), admin.password);
+  if (!ok) throw new ApiError(Codes.UNAUTHORIZED, '账号或密码错误');
+
+  // 原实现 `await admin.save()` 会就地刷实例，返回的 admin 是「更新后」的值 —— 这里对齐
+  const now = new Date();
+  await updateById(C.ADMIN, admin._id, { lastLoginAt: now, updateTime: now });
+
+  const token = sign({ id: admin.id, username: admin.username, role: admin.role });
+  return { token, admin: adminDto(admin) };
+}
+
+/**
+ * GET /admin/profile
+ *
+ * ⚠️ 原实现用 `attributes: ['id','username','nickname','role','lastLoginAt','createTime']`
+ *    投影 —— 云数据库没有该能力，这里手工挑（`pick` 同时把 password 摘掉）。
+ */
+async function profile(ctx) {
+  const me = asAdmin(ctx);
+  const admin = await findOne(C.ADMIN, { id: Number(me.id) });
+  if (!admin) throw new ApiError(Codes.UNAUTHORIZED, '账号不存在');
+  return pick(admin, ['id', 'username', 'nickname', 'role', 'lastLoginAt', 'createTime']);
+}
+
+/** PUT /admin/change-password   body: { oldPassword, newPassword } */
+async function changePassword(ctx) {
+  const me = asAdmin(ctx);
+  const { oldPassword, newPassword } = ctx.body || {};
+  if (!oldPassword || !newPassword) {
+    throw new ApiError(Codes.PARAM_ERROR, '请输入原密码和新密码');
+  }
+  if (String(newPassword).length < 6) {
+    throw new ApiError(Codes.PARAM_ERROR, '新密码长度不能少于6位');
+  }
+
+  const admin = await findOne(C.ADMIN, { id: Number(me.id) });
+  if (!admin) throw new ApiError(Codes.UNAUTHORIZED, '账号不存在');
+  const ok = await bcrypt.compare(String(oldPassword), admin.password);
+  if (!ok) throw new ApiError(Codes.PARAM_ERROR, '原密码错误');
+
+  const now = new Date();
+  const password = await bcrypt.hash(String(newPassword), 10);
+  await updateById(C.ADMIN, admin._id, { password, updateTime: now });
+  return null;
+}
+
+/**
+ * POST /admin/logout
+ * 原实现只返回一句成功文案（前端自行清 token），这里保持一致。
+ */
+async function logout(ctx) {
+  asAdmin(ctx);
+  return null;
+}
+
+module.exports = { login, profile, changePassword, logout };
+
+};
+__mods["handlers/admin/_kit.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 管理端 handler 公共件
+ *
+ * 这里集中处理四件在移植中**反复出现、且极易悄悄错掉**的事：
+ *
+ *  ① 鉴权：Express 把 `adminAuth` / `requireSuperAdmin` 挂在**路由**上，
+ *     云函数没有中间件层 → 每个 handler 的第一行必须自己调。
+ *     漏掉的后果是「接口能调通、但没登录也能调」，不报错（静默漂移 #2）。
+ *
+ *  ② `LIKE '%kw%'`：云数据库**没有 LIKE**，`_.or([...])` 也表达不了子串。
+ *     → 全量拉取 + JS 过滤。⚠️ 必须**大小写不敏感**：MySQL 默认排序规则
+ *     `utf8mb4_general_ci` 的 LIKE 就是 ci 的，写成 `includes()` 会静默变成区分大小写。
+ *
+ *  ③ 排序：Sequelize 的 `order: [['sort','DESC'],['id','ASC']]` 是多键次序。
+ *     ⚠️ 比较 Date 必须按**值**（`getTime()`），不能按对象同一性 —— 每个文档是
+ *     独立的 Date 实例，`===` 判等恒 false，会让比较器自相矛盾、排序退化成插入顺序。
+ *     （同款坑在 cloud/scripts/harness.js 里踩过一次，见 test-scheduling C5/C6。）
+ *
+ *  ④ 字段投影：云数据库不支持 `attributes: [...]` → 手工挑字段。
+ *     ⚠️ 缺字段一律补 `null`：原 Sequelize 对 NULL 列就是返回 `null`，
+ *     而 `undefined` 会被 `JSON.stringify` **整个丢掉**（静默漂移 #5）。
+ *     `admin.list` 更是靠这一步**把 password 摘掉**，漏了就是安全事件。
+ */
+
+const { ApiError, Codes } = require('../../lib/response');
+const { requireAdmin, requireSuperAdmin } = require('../../lib/auth');
+const { findAllPaged } = require('../../lib/db');
+
+/** 路由层 `adminAuth` 的等价物 —— 管理端每个 handler 的第一行 */
+function asAdmin(ctx) {
+  return requireAdmin(ctx);
+}
+
+/** 路由层 `requireSuperAdmin` 的等价物（内部已含 adminAuth 语义） */
+function asSuper(ctx) {
+  return requireSuperAdmin(ctx);
+}
+
+/**
+ * 分页参数。
+ * 原控制器写法是 `const { page = 1, pageSize = 20 } = req.query;` 再 `parseInt(...)`。
+ * 前端恒传数字，这里统一收敛成**合法整数**（`parseInt` 失败退回默认），
+ * 避免把 NaN 透进响应体（`JSON.stringify(NaN)` → `null`）。
+ */
+function pager(q, defSize = 20, maxSize = 200) {
+  const query = q || {};
+  const page = Math.max(1, parseInt(query.page, 10) || 1);
+  const raw = parseInt(query.pageSize, 10) || defSize;
+  const pageSize = Math.min(maxSize, Math.max(1, raw));
+  return { page, pageSize, skip: (page - 1) * pageSize };
+}
+
+/** LIKE '%kw%' 的单字段判定（大小写不敏感） */
+function likeHit(value, keyword) {
+  if (value === undefined || value === null) return false;
+  return String(value).toLowerCase().indexOf(String(keyword).toLowerCase()) >= 0;
+}
+
+/** 多字段 OR LIKE */
+function anyLike(row, keyword, fields) {
+  return fields.some((f) => likeHit(row[f], keyword));
+}
+
+/** 排序取值：Date → 时间戳（**必须**，见文件头 ③） */
+function sortValue(v) {
+  return v instanceof Date ? v.getTime() : v;
+}
+
+/** 单键比较：NULL/undefined 最小（与 MySQL 一致），数字按数值，其余按字符串 */
+function cmpValue(a, b) {
+  const av = sortValue(a);
+  const bv = sortValue(b);
+  if (av === bv) return 0;
+  if (av === undefined || av === null) return -1;
+  if (bv === undefined || bv === null) return 1;
+  if (typeof av === 'number' && typeof bv === 'number') return av < bv ? -1 : 1;
+  const as = String(av);
+  const bs = String(bv);
+  if (as === bs) return 0;
+  return as < bs ? -1 : 1;
+}
+
+/** 多键排序（等价 Sequelize `order: [[field, dir], ...]`） */
+function sortRows(rows, orderBy) {
+  const keys = (orderBy || []).map(([f, d]) => [f, String(d || 'asc').toLowerCase() === 'desc' ? -1 : 1]);
+  if (!keys.length) return rows;
+  return rows.slice().sort((x, y) => {
+    for (let i = 0; i < keys.length; i++) {
+      const [f, dir] = keys[i];
+      const c = cmpValue(x[f], y[f]);
+      if (c !== 0) return c * dir;
+    }
+    return 0;
+  });
+}
+
+/** 字段投影（等价 `attributes: [...]`）；缺字段补 null */
+function pick(row, fields) {
+  const out = {};
+  (fields || []).forEach((f) => {
+    const v = row ? row[f] : undefined;
+    out[f] = v === undefined ? null : v;
+  });
+  return out;
+}
+
+/**
+ * 「where + 可选关键字 + 排序 + 分页」的通用列表实现。
+ *
+ * ⚠️ 先全量拉（`findAllPaged`）再在 JS 里过滤/排序/切片 —— 因为 LIKE 与多键排序
+ *    都无法下推到云数据库。**适用前提是集合不大**（本项目 admin / cadre / staff /
+ *    notice / message 都是几十~几百量级）。
+ *    大表（如 submit，见 `test-*` 的量级假设）请改用「能下推的条件 + 限量拉取」。
+ *
+ * @param {string} name 集合名
+ * @param {object} o
+ *   where   必选，能下推的等值/范围条件
+ *   keyword 可选，子串关键字
+ *   fields  可选，keyword 参与匹配的字段
+ *   orderBy 可选，[['sort','desc'],['id','asc']]
+ *   page/pageSize
+ */
+async function pagedList(name, o) {
+  const opt = o || {};
+  let rows = await findAllPaged(name, opt.where || {});
+  if (opt.keyword) rows = rows.filter((r) => anyLike(r, opt.keyword, opt.fields || []));
+  if (opt.orderBy) rows = sortRows(rows, opt.orderBy);
+  const total = rows.length;
+  const page = opt.page || 1;
+  const pageSize = opt.pageSize || 20;
+  const skip = (page - 1) * pageSize;
+  return { list: rows.slice(skip, skip + pageSize), total, page, pageSize };
+}
+
+/** 取 body 里显式给出的字段（`!== undefined` 才覆盖，等价源控制器的 for 循环） */
+function applyFields(target, body, fields) {
+  (fields || []).forEach((f) => {
+    if (body && body[f] !== undefined) target[f] = body[f];
+  });
+  return target;
+}
+
+/** 字符串长度上限校验（与原控制器的 `String(x).length > N` 逐字对齐） */
+function assertMaxLen(value, max, label) {
+  if (value !== undefined && value !== null && String(value).length > max) {
+    throw new ApiError(Codes.PARAM_ERROR, `${label}过长`);
+  }
+}
+
+module.exports = {
+  asAdmin, asSuper,
+  pager, likeHit, anyLike, sortRows, cmpValue, pick, pagedList, applyFields, assertMaxLen,
+};
+
+};
+__mods["handlers/admin/setting.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 管理端 · 系统设置 KV（仅超管）
+ * 迁移自 src/controllers/admin/settingController.js
+ *
+ * 存储：`system_setting` 集合，`_id = 'setting:<key>'`（见 services/kv.js）。
+ * ⚠️ 路由层挂的是 `requireSuperAdmin`（含 adminAuth）→ 三个方法都必须 `asSuper`。
+ *
+ * ⚠️ `upsert` 的语义照抄源实现：
+ *   - 新建：`value: value || ''`、`desc: desc || ''`（空串兜底）
+ *   - 更新：`value !== undefined` 才覆盖；`desc !== undefined` 才覆盖
+ *   ⇒ **不能**直接复用 `kv.set()` —— 它是给「整条写入」用的，`desc` 缺省时会写成 null。
+ */
+
+const { C, findById, findAllPaged, insertWithId, updateById, nextId } = require('../../lib/db');
+const { ApiError, Codes } = require('../../lib/response');
+const kv = require('../../services/kv');
+const { asSuper, pick, sortRows } = require('./_kit');
+
+/** system_setting 的对外字段集（= 映射文档 §7；**不含** _id） */
+const FIELDS = ['id', 'key', 'value', 'desc', 'updateTime'];
+
+/** GET /admin/setting/list */
+async function list(ctx) {
+  asSuper(ctx);
+  const rows = await findAllPaged(C.SETTING);
+  return { list: sortRows(rows, [['key', 'asc']]).map((r) => pick(r, FIELDS)) };
+}
+
+/** GET /admin/setting/:key */
+async function get(ctx) {
+  asSuper(ctx);
+  const doc = await findById(C.SETTING, kv.docId(ctx.params.key));
+  if (!doc) throw new ApiError(Codes.NOT_FOUND, '配置不存在');
+  return pick(doc, FIELDS);
+}
+
+/** PUT /admin/setting/:key   body: { value, desc } */
+async function upsert(ctx) {
+  asSuper(ctx);
+  const key = ctx.params.key;
+  const { value, desc } = ctx.body || {};
+  const docId = kv.docId(key);
+  const existing = await findById(C.SETTING, docId);
+
+  if (!existing) {
+    const now = new Date();
+    const id = await nextId(C.SETTING);
+    const doc = {
+      id,
+      key,
+      value: value || '',
+      desc: desc || '',
+      createTime: now,
+      updateTime: now,
+    };
+    await insertWithId(C.SETTING, docId, doc);
+    return pick(doc, FIELDS);
+  }
+
+  const patch = { updateTime: new Date() };
+  if (value !== undefined) patch.value = value;
+  if (desc !== undefined) patch.desc = desc;
+  await updateById(C.SETTING, docId, patch);
+  return pick({ ...existing, ...patch }, FIELDS);
+}
+
+module.exports = { list, get, upsert };
+
+};
+__mods["handlers/admin/switch.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 管理端 · 模块开关（仅超管）
+ * 迁移自 src/controllers/admin/switchController.js
+ *
+ * `list` 会把 `updatedBy`（存的是 admin.id）换成管理员姓名 —— 原实现查 `Admin.findAll`
+ * 拿 `nickname || username`，云端等价于按 `id ∈ ids` 查一次 admin 集合。
+ */
+
+const { C, findAllPaged } = require('../../lib/db');
+const { ApiError, Codes } = require('../../lib/response');
+const switchService = require('../../services/switch');
+const { asSuper } = require('./_kit');
+
+/** GET /admin/switch/list */
+async function list(ctx) {
+  asSuper(ctx);
+  const rows = await switchService.listAll();
+
+  // updatedBy 存的是 admin.id，给前端换成姓名
+  const ids = [...new Set(rows.map((r) => r.updatedBy).filter(Boolean))].map((v) => Number(v));
+  const nameMap = new Map();
+  if (ids.length) {
+    // ⚠️ 用 findAllPaged + JS 过滤：云端 `_.in(ids)` 的数组长度受命令体大小限制，
+    //    而这里 ids 最多就是管理员人数（个位数），直接拉全表更简单、也不会失败。
+    const admins = await findAllPaged(C.ADMIN);
+    admins.forEach((a) => {
+      if (ids.indexOf(Number(a.id)) >= 0) nameMap.set(Number(a.id), a.nickname || a.username);
+    });
+  }
+
+  return {
+    list: rows.map((r) => ({
+      ...r,
+      updatedByName: r.updatedBy ? nameMap.get(Number(r.updatedBy)) || null : null,
+    })),
+  };
+}
+
+/** PUT /admin/switch/:key   body: { value: 'on' | 'off' } */
+async function update(ctx) {
+  const me = asSuper(ctx);
+  const { key } = ctx.params;
+  const { value } = ctx.body || {};
+  if (!['on', 'off'].includes(value)) {
+    throw new ApiError(Codes.PARAM_ERROR, 'value 必须为 on 或 off');
+  }
+  return switchService.set(key, value, me && me.id ? me.id : null);
+}
+
+module.exports = { list, update };
+
+};
+__mods["handlers/admin/program.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 管理端 · 节目排期
+ * 迁移自 src/controllers/admin/programController.js
+ *
+ * 路由层挂 `adminAuth + requireAdmin`（普通管理员即可）→ 全部 `asAdmin`。
+ *
+ * ⚠️ 时间语义：`broadcastDate` 是 `DATEONLY`（`YYYY-MM-DD` 字符串）。
+ *    原实现用 `Op.between: [startDate, endDate]` 落在 SQL 上比较的是日期；
+ *    云端改成 `_.gte(startDate).and(_.lte(endDate))`。字符串 `YYYY-MM-DD` 定长零填充，
+ *    字典序 == 日期序，所以等价。
+ *    ⚠️ 但**必须两端都给**才过滤（源实现就是 `if (startDate && endDate)`）。
+ */
+
+const { C, _, findOne, findAllPaged, insertOne, updateById, updateWhere, removeWhere, nextId, parseId } = require('../../lib/db');
+const { ApiError, Codes } = require('../../lib/response');
+const { asAdmin, pager, pick, applyFields, sortRows } = require('./_kit');
+
+/** program 的对外字段集（= 映射文档 §4，顺序与 Sequelize 属性一致） */
+const FIELDS = ['id', 'title', 'host', 'broadcastTime', 'broadcastDate', 'desc', 'cover', 'isShow', 'isLive', 'sort', 'createTime', 'updateTime'];
+
+/** GET /admin/program/list */
+async function list(ctx) {
+  asAdmin(ctx);
+  const q = ctx.query || {};
+  const { page, pageSize } = pager(q, 20);
+
+  const where = {};
+  if (q.startDate && q.endDate) {
+    where.broadcastDate = _.gte(q.startDate).and(_.lte(q.endDate));
+  }
+
+  const rows = await findAllPaged(C.PROGRAM, where);
+  const sorted = sortRows(rows, [['broadcastDate', 'asc'], ['sort', 'asc']]);
+  const skip = (page - 1) * pageSize;
+  return {
+    list: sorted.slice(skip, skip + pageSize).map((r) => pick(r, FIELDS)),
+    total: sorted.length,
+    page,
+    pageSize,
+  };
+}
+
+/** POST /admin/program/create */
+async function create(ctx) {
+  asAdmin(ctx);
+  const body = ctx.body || {};
+  const { title, host, broadcastTime, broadcastDate, desc, cover, isShow, sort } = body;
+  if (!title || !broadcastTime) {
+    throw new ApiError(Codes.PARAM_ERROR, '请填写节目名和开播时间');
+  }
+
+  const now = new Date();
+  const doc = {
+    id: await nextId(C.PROGRAM),
+    title,
+    host: host === undefined ? null : host,
+    broadcastTime,
+    broadcastDate: broadcastDate || null,
+    desc: desc === undefined ? null : desc,
+    cover: cover === undefined ? null : cover,
+    isShow: isShow === undefined ? 1 : isShow,
+    isLive: 0,
+    sort: sort || 0,
+    createTime: now,
+    updateTime: now,
+  };
+  await insertOne(C.PROGRAM, doc);
+  return pick(doc, FIELDS);
+}
+
+/** PUT /admin/program/:id */
+async function update(ctx) {
+  asAdmin(ctx);
+  const id = parseId(ctx.params.id);
+  const row = id === null ? null : await findOne(C.PROGRAM, { id });
+  if (!row) throw new ApiError(Codes.NOT_FOUND, '节目不存在');
+
+  const next = applyFields({ ...row }, ctx.body || {},
+    ['title', 'host', 'broadcastTime', 'broadcastDate', 'desc', 'cover', 'isShow', 'sort']);
+  next.updateTime = new Date();
+  await updateById(C.PROGRAM, row._id, {
+    title: next.title,
+    host: next.host,
+    broadcastTime: next.broadcastTime,
+    broadcastDate: next.broadcastDate,
+    desc: next.desc,
+    cover: next.cover,
+    isShow: next.isShow,
+    sort: next.sort,
+    updateTime: next.updateTime,
+  });
+  return pick(next, FIELDS);
+}
+
+/** DELETE /admin/program/:id */
+async function remove(ctx) {
+  asAdmin(ctx);
+  const id = parseId(ctx.params.id);
+  const row = id === null ? null : await findOne(C.PROGRAM, { id });
+  if (!row) throw new ApiError(Codes.NOT_FOUND, '节目不存在');
+  await removeWhere(C.PROGRAM, { id });
+  return null;
+}
+
+/**
+ * PUT /admin/program/:id/live   切换「正在直播」（保证全表仅一个 live=1）
+ *
+ * ⚠️ 源实现先 `Program.update({isLive:0}, {where:{}})` 全表清零，再置目标为 1。
+ *    云端 `where({})` 语义不明确，改用 `_id: _.exists(true)`（= 全部文档），等价。
+ */
+async function setLive(ctx) {
+  asAdmin(ctx);
+  const { isLive } = ctx.body || {};
+  const id = parseId(ctx.params.id);
+
+  if (Number(isLive) === 1) {
+    await updateWhere(C.PROGRAM, { _id: _.exists(true) }, { isLive: 0 });
+  }
+
+  const row = id === null ? null : await findOne(C.PROGRAM, { id });
+  if (!row) throw new ApiError(Codes.NOT_FOUND, '节目不存在');
+
+  const next = { ...row, isLive: isLive ? 1 : 0, updateTime: new Date() };
+  await updateById(C.PROGRAM, row._id, { isLive: next.isLive, updateTime: next.updateTime });
+  return pick(next, FIELDS);
+}
+
+module.exports = { list, create, update, remove, setLive };
+
+};
+__mods["handlers/admin/notice.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 管理端 · 公告管理
+ * 迁移自 src/controllers/admin/noticeController.js
+ *
+ * 路由层挂 `adminAuth + requireAdmin` → 全部 `asAdmin`。
+ *
+ * ⚠️ 关键字搜索是 `title/content` 两字段 OR LIKE —— 云端没有 LIKE，走
+ *    `_kit.pagedList` 的「全量拉取 + JS 子串过滤」。公告量级很小（几十条），可接受。
+ */
+
+const { C, findOne, insertOne, updateById, removeWhere, nextId, parseId } = require('../../lib/db');
+const { ApiError, Codes } = require('../../lib/response');
+const { asAdmin, pager, pick, pagedList, applyFields } = require('./_kit');
+
+/** notice 的对外字段集（= 映射文档 §5） */
+const FIELDS = ['id', 'title', 'content', 'isTop', 'isShow', 'publisherId', 'publishTime', 'createTime', 'updateTime'];
+
+/** GET /admin/notice/list */
+async function list(ctx) {
+  asAdmin(ctx);
+  const q = ctx.query || {};
+  const { page, pageSize } = pager(q, 20);
+  const r = await pagedList(C.NOTICE, {
+    where: {},
+    keyword: q.keyword ? String(q.keyword) : '',
+    fields: ['title', 'content'],
+    orderBy: [['isTop', 'desc'], ['publishTime', 'desc']],
+    page,
+    pageSize,
+  });
+  return { ...r, list: r.list.map((x) => pick(x, FIELDS)) };
+}
+
+/** POST /admin/notice/create */
+async function create(ctx) {
+  const me = asAdmin(ctx);
+  const { title, content, isTop, isShow } = ctx.body || {};
+  if (!title || !content) {
+    throw new ApiError(Codes.PARAM_ERROR, '请填写标题和内容');
+  }
+  const now = new Date();
+  const doc = {
+    id: await nextId(C.NOTICE),
+    title,
+    content,
+    isTop: isTop ? 1 : 0,
+    isShow: isShow === undefined ? 1 : isShow,
+    publisherId: me.id,
+    publishTime: now,
+    createTime: now,
+    updateTime: now,
+  };
+  await insertOne(C.NOTICE, doc);
+  return pick(doc, FIELDS);
+}
+
+/** PUT /admin/notice/:id */
+async function update(ctx) {
+  asAdmin(ctx);
+  const id = parseId(ctx.params.id);
+  const row = id === null ? null : await findOne(C.NOTICE, { id });
+  if (!row) throw new ApiError(Codes.NOT_FOUND, '公告不存在');
+
+  const next = applyFields({ ...row }, ctx.body || {}, ['title', 'content', 'isTop', 'isShow']);
+  next.updateTime = new Date();
+  await updateById(C.NOTICE, row._id, {
+    title: next.title, content: next.content, isTop: next.isTop, isShow: next.isShow,
+    updateTime: next.updateTime,
+  });
+  return pick(next, FIELDS);
+}
+
+/** DELETE /admin/notice/:id */
+async function remove(ctx) {
+  asAdmin(ctx);
+  const id = parseId(ctx.params.id);
+  const row = id === null ? null : await findOne(C.NOTICE, { id });
+  if (!row) throw new ApiError(Codes.NOT_FOUND, '公告不存在');
+  await removeWhere(C.NOTICE, { id });
+  return null;
+}
+
+/** PUT /admin/notice/:id/toggle */
+async function toggle(ctx) {
+  asAdmin(ctx);
+  const id = parseId(ctx.params.id);
+  const row = id === null ? null : await findOne(C.NOTICE, { id });
+  if (!row) throw new ApiError(Codes.NOT_FOUND, '公告不存在');
+
+  const isShow = Number(row.isShow) === 1 ? 0 : 1;
+  const updateTime = new Date();
+  await updateById(C.NOTICE, row._id, { isShow, updateTime });
+  return pick({ ...row, isShow, updateTime }, FIELDS);
+}
+
+module.exports = { list, create, update, remove, toggle };
+
+};
+__mods["handlers/admin/message.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 管理端 · 留言审核
+ * 迁移自 src/controllers/admin/messageController.js
+ *
+ * 路由层挂 `adminAuth + requireAdmin` → 全部 `asAdmin`。
+ *
+ * ⚠️ `message` 模型是 `timestamps: false`，**只有 `createTime`，没有 `updateTime`**
+ *    （映射文档 §6）—— 审核动作也不写 updateTime，别顺手补。
+ * ⚠️ `status` 过滤的判据是 `status !== undefined && status !== ''`（**空串要放过**）：
+ *    前端「全部」档位会传空串，此时不能加过滤。
+ */
+
+const { C, findOne, insertOne, updateById, removeWhere, parseId } = require('../../lib/db');
+const { ApiError, Codes } = require('../../lib/response');
+const { asAdmin, pager, pick, pagedList } = require('./_kit');
+
+/** message 的对外字段集（= 映射文档 §6） */
+const FIELDS = ['id', 'openid', 'programId', 'nickname', 'avatar', 'content', 'status', 'rejectReason', 'reviewerId', 'reviewTime', 'createTime'];
+
+/** GET /admin/message/list */
+async function list(ctx) {
+  asAdmin(ctx);
+  const q = ctx.query || {};
+  const { page, pageSize } = pager(q, 10);
+
+  const where = {};
+  if (q.status !== undefined && q.status !== '' && q.status !== null) {
+    where.status = parseInt(q.status, 10);
+  }
+  if (q.programId) where.programId = parseInt(q.programId, 10);
+
+  const r = await pagedList(C.MESSAGE, {
+    where,
+    keyword: q.keyword ? String(q.keyword) : '',
+    fields: ['content', 'nickname'],
+    orderBy: [['createTime', 'desc']],
+    page,
+    pageSize,
+  });
+  return { ...r, list: r.list.map((x) => pick(x, FIELDS)) };
+}
+
+/** PUT /admin/message/:id/approve */
+async function approve(ctx) {
+  const me = asAdmin(ctx);
+  const id = parseId(ctx.params.id);
+  const msg = id === null ? null : await findOne(C.MESSAGE, { id });
+  if (!msg) throw new ApiError(Codes.NOT_FOUND, '留言不存在');
+
+  const patch = { status: 1, reviewerId: me.id, reviewTime: new Date(), rejectReason: null };
+  await updateById(C.MESSAGE, msg._id, patch);
+  return pick({ ...msg, ...patch }, FIELDS);
+}
+
+/** PUT /admin/message/:id/reject   body: { reason } */
+async function reject(ctx) {
+  const me = asAdmin(ctx);
+  const { reason } = ctx.body || {};
+  if (!reason) throw new ApiError(Codes.PARAM_ERROR, '请填写驳回理由');
+
+  const id = parseId(ctx.params.id);
+  const msg = id === null ? null : await findOne(C.MESSAGE, { id });
+  if (!msg) throw new ApiError(Codes.NOT_FOUND, '留言不存在');
+
+  const patch = { status: 2, rejectReason: reason, reviewerId: me.id, reviewTime: new Date() };
+  await updateById(C.MESSAGE, msg._id, patch);
+  return pick({ ...msg, ...patch }, FIELDS);
+}
+
+/** DELETE /admin/message/:id */
+async function remove(ctx) {
+  asAdmin(ctx);
+  const id = parseId(ctx.params.id);
+  const msg = id === null ? null : await findOne(C.MESSAGE, { id });
+  if (!msg) throw new ApiError(Codes.NOT_FOUND, '留言不存在');
+  await removeWhere(C.MESSAGE, { id });
+  return null;
+}
+
+module.exports = { list, approve, reject, remove };
+
+};
+__mods["handlers/admin/stats.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 管理端 · 数据统计
+ * 迁移自 src/controllers/admin/statsController.js
+ *
+ * 路由层挂 `adminAuth + requireAdmin` → 全部 `asAdmin`。
+ *
+ * ⚠️⚠️ **三处必须改写的实现差异**（不是「可选优化」，是不改就错）：
+ *
+ *  ① 原实现用**裸 `dayjs()`**。云函数容器是 UTC，裸 `dayjs().startOf('day')`
+ *     切的是 UTC 零点（= 北京时间 08:00），「今天/本周」全偏。
+ *     → 统一改成 `lib/bjTime`（`dayRange` / `weekRange`），与全项目口径一致。
+ *
+ *  ② 原实现用 SQL `GROUP BY`（`submit-trend` 的 `DATE(create_time)`、`top-songs` 的
+ *     `songName+singer`）。云数据库**没有云端 GROUP BY**（聚合管道自研 harness 不支持）
+ *     → 退化成「分页拉全量 + JS 聚合」。
+ *     **适用上限**：`submit` 表到「几千条」量级仍可用；再大需要改成物化统计表。
+ *
+ *  ③ 原实现里 `status: 1` 的语义是「已通过」。协议改版后 `status` 变成了**派生镜像**：
+ *     `1 = 已排期`、`6 = 已通过·待排期`。**这里刻意保持与源实现逐字一致**（仍然数
+ *     `status: 1`），因为「顺手修正统计口径」= 改业务语义。是否要改成
+ *     `[1, 5, 6]`（已通过/已排期/已播放）请陛下定夺，见 docs/stage7-admin-plan.md。
+ */
+
+const { C, _, count, findAllPaged } = require('../../lib/db');
+const bj = require('../../lib/bjTime');
+const { asAdmin } = require('./_kit');
+
+/** GET /admin/stats/overview */
+async function overview(ctx) {
+  asAdmin(ctx);
+  const now = Date.now();
+  const today = bj.dayRange(now).start;
+  const weekStart = bj.weekRange(now).start;
+
+  const [
+    submitTotal, submitPending, submitApproved, submitRejected,
+    songTotal, articleTotal,
+    messageTotal, messagePending,
+    noticeTotal, programTotal,
+    todaySubmits, weekSubmits,
+    userTotal, todayUsers,
+  ] = await Promise.all([
+    count(C.SUBMIT),
+    count(C.SUBMIT, { status: 0 }),
+    count(C.SUBMIT, { status: 1 }),
+    count(C.SUBMIT, { status: 2 }),
+    count(C.SUBMIT, { type: 1 }),
+    count(C.SUBMIT, { type: 2 }),
+    count(C.MESSAGE),
+    count(C.MESSAGE, { status: 0 }),
+    count(C.NOTICE),
+    count(C.PROGRAM),
+    count(C.SUBMIT, { createTime: _.gte(today) }),
+    count(C.SUBMIT, { createTime: _.gte(weekStart) }),
+    count(C.USER),
+    count(C.USER, { createTime: _.gte(today) }),
+  ]);
+
+  return {
+    submit: {
+      total: submitTotal,
+      pending: submitPending,
+      approved: submitApproved,
+      rejected: submitRejected,
+      song: songTotal,
+      article: articleTotal,
+      today: todaySubmits,
+      thisWeek: weekSubmits,
+    },
+    message: { total: messageTotal, pending: messagePending },
+    content: { notice: noticeTotal, program: programTotal },
+    user: { total: userTotal, today: todayUsers },
+  };
+}
+
+/**
+ * GET /admin/stats/submit-trend?days=7
+ * 返回: [{ date: '2026-09-08', count: 12, song: 8, article: 4 }, ...]（**缺口补齐 0**）
+ */
+async function submitTrend(ctx) {
+  asAdmin(ctx);
+  const q = ctx.query || {};
+  const days = parseInt(q.days || '7', 10) || 7;
+  const now = Date.now();
+
+  // 起点 = 北京「今天」往前推 days-1 天的 00:00
+  const todayStart = bj.dayRange(now).start.getTime();
+  const start = new Date(todayStart - (days - 1) * bj.DAY_MS);
+  const todayKey = bj.dayKey(now);
+
+  const rows = await findAllPaged(C.SUBMIT, { createTime: _.gte(start) });
+
+  const agg = new Map();
+  rows.forEach((r) => {
+    if (!r.createTime) return;
+    const k = bj.dayKey(new Date(r.createTime).getTime());
+    if (!agg.has(k)) agg.set(k, { count: 0, song: 0, article: 0 });
+    const a = agg.get(k);
+    a.count += 1;
+    if (Number(r.type) === 1) a.song += 1;
+    else if (Number(r.type) === 2) a.article += 1;
+  });
+
+  // 补齐没有数据的日期（用北京日历日逐天回推，避免 DST / 时区错位）
+  const list = [];
+  const todayNoon = bj.dayRange(now).start.getTime() + 12 * 3600 * 1000;
+  for (let i = 0; i < days; i++) {
+    const ts = todayNoon - (days - 1 - i) * bj.DAY_MS;
+    const d = bj.dayKey(ts);
+    const a = agg.get(d) || { count: 0, song: 0, article: 0 };
+    list.push({ date: d, count: a.count, song: a.song, article: a.article });
+  }
+  // todayKey 只用于自检（确保最后一天确实是「今天」）
+  if (list.length && list[list.length - 1].date !== todayKey) {
+    console.warn('[stats] submit-trend 末日与北京今天不一致', list[list.length - 1].date, todayKey);
+  }
+  return { list };
+}
+
+/**
+ * GET /admin/stats/top-songs   热门点歌 Top10（已通过）
+ *
+ * ⚠️ 排序只在 `count` 上（与源实现 `order: [[literal('count'),'DESC']]` 一致）；
+ *    `count` 相同时的顺序在 MySQL 里本就未定义，这里保留「首次出现顺序」
+ *    （V8 的 Array.sort 是稳定的）。
+ */
+async function topSongs(ctx) {
+  asAdmin(ctx);
+  const rows = await findAllPaged(C.SUBMIT, { type: 1, status: 1 });
+
+  const map = new Map();
+  rows.forEach((r) => {
+    const songName = r.songName === undefined ? null : r.songName;
+    const singer = r.singer === undefined ? null : r.singer;
+    const key = `${songName === null ? '\u0000' : songName}\u0001${singer === null ? '\u0000' : singer}`;
+    if (!map.has(key)) map.set(key, { songName, singer, count: 0 });
+    map.get(key).count += 1;
+  });
+
+  const list = [...map.values()].sort((a, b) => b.count - a.count).slice(0, 10);
+  return { list };
+}
+
+module.exports = { overview, submitTrend, topSongs };
+
+};
+__mods["handlers/admin/cadre.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 管理端 · 社干 CRUD（仅超管）
+ * 迁移自 src/controllers/admin/cadreController.js
+ *
+ * 通用实现见 `_people.js`（与 staff 同构）。这里只描述差异：
+ *   · 搜索字段：name / role / grade（**没有** department）
+ *   · 排序：sort DESC, id ASC
+ *   · 必填：姓名、职务；长度：name≤32 / role≤32 / grade≤32 / motto≤200
+ */
+
+const { C } = require('../../lib/db');
+const { asSuper } = require('./_kit');
+const { makeCrud } = require('./_people');
+
+const FIELDS = ['id', 'name', 'role', 'grade', 'avatar', 'motto', 'sort', 'isShow', 'createTime', 'updateTime'];
+
+module.exports = makeCrud({
+  coll: C.CADRE,
+  guard: asSuper,          // 原路由挂 requireSuperAdmin
+  label: '社干',
+  fields: FIELDS,
+  searchFields: ['name', 'role', 'grade'],
+  orderBy: [['sort', 'desc'], ['id', 'asc']],
+  writable: ['name', 'role', 'grade', 'avatar', 'motto', 'sort', 'isShow'],
+  createRequired: [['name', '请填写姓名'], ['role', '请填写职务']],
+  defaults: (b) => ({
+    name: b.name,
+    role: b.role,
+    grade: b.grade || '',
+    avatar: b.avatar || '',
+    motto: b.motto || null,
+    sort: b.sort || 0,
+    isShow: b.isShow === undefined ? 1 : b.isShow,
+  }),
+  lens: [
+    ['name', 32, '姓名过长'],
+    ['role', 32, '职务过长'],
+    ['grade', 32, '年级班级过长'],
+    ['motto', 200, '座右铭过长'],
+  ],
+});
+
+};
+__mods["handlers/admin/_people.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 社干 / 部员 两套 CRUD 的公共实现
+ *
+ * `cadreController` 与 `staffController` 结构几乎逐行相同（差异只有：必填字段、
+ * 搜索字段、长度上限文案、排序键）。写成一个工厂，避免「改了一处忘了另一处」。
+ *
+ * ⚠️ 与原实现逐字对齐的细节：
+ *   · `create` 先查必填，再查长度；`update` 只对**合并后**的值查长度
+ *   · 长度判据是 `String(x).length > N`（空串天然通过）
+ *   · `avatar` 缺省写 `''`（照片自 2026-09-19 起可选，各端用「姓名首字」兜底）
+ *   · `motto` 缺省写 `null`（**不是**空串 —— 映射文档 §9 记的就是 null）
+ *   · 列表排序 `[['sort','DESC'],['id','ASC']]`（staff 多一档 department ASC）
+ *
+ * ⚠️⚠️ **鉴权必须由 cfg.guard 显式传入，不要在这里写死 `asAdmin`**。
+ *     原路由给 `/admin/cadre/*` 与 `/admin/staff/*` 挂的是 **requireSuperAdmin**
+ *     （这两张表的增删改对普通管理员是禁区），而 `makeCrud` 一度默认 `asAdmin`
+ *     → 普管能直接调 `/admin/cadre/create`，接口**返回 40101 之外的一切正常**，
+ *     没有任何报错（静默漂移 #2 的典型形态）。
+ *     兜底默认值仍然是 `asAdmin`（「最不意外的那个」），但调用方**应当**显式写清楚。
+ */
+
+const { findOne, insertOne, updateById, removeWhere, nextId, parseId } = require('../../lib/db');
+const { ApiError, Codes } = require('../../lib/response');
+const { asAdmin, pager, pick, pagedList, applyFields } = require('./_kit');
+
+/**
+ * @param {object} cfg
+ *   coll           集合名
+ *   guard          (ctx) => admin  鉴权函数，**必传**（asAdmin / asSuper）
+ *   label          404 文案里的名字（'社干' / '成员'）
+ *   fields         对外字段集（顺序即返回顺序）
+ *   searchFields   keyword 参与匹配的字段
+ *   orderBy        列表排序
+ *   createRequired [[field, message], ...]
+ *   defaults       (body) => 额外的建行默认值
+ *   lens           [field, max, message]
+ */
+function makeCrud(cfg) {
+  if (!cfg.guard) cfg.guard = asAdmin;   // 兜底：不传时按「普通管理员即可」处理
+
+  /** 长度上限校验（合并后的对象上也用同一套判据） */
+  function assertLens(src) {
+    (cfg.lens || []).forEach(([f, max, msg]) => {
+      const v = src[f];
+      if (v === undefined || v === null) return;
+      if (String(v).length > max) throw new ApiError(Codes.PARAM_ERROR, msg);
+    });
+  }
+
+  /** GET /admin/<x>/list */
+  async function list(ctx) {
+    cfg.guard(ctx);
+    const q = ctx.query || {};
+    const { page, pageSize } = pager(q, 20);
+    const where = {};
+    if (cfg.listFilter) cfg.listFilter(where, q);
+    const r = await pagedList(cfg.coll, {
+      where,
+      keyword: q.keyword ? String(q.keyword) : '',
+      fields: cfg.searchFields,
+      orderBy: cfg.orderBy,
+      page,
+      pageSize,
+    });
+    return { ...r, list: r.list.map((x) => pick(x, cfg.fields)) };
+  }
+
+  /** GET /admin/<x>/:id */
+  async function detail(ctx) {
+    cfg.guard(ctx);
+    const id = parseId(ctx.params.id);
+    const row = id === null ? null : await findOne(cfg.coll, { id });
+    if (!row) throw new ApiError(Codes.NOT_FOUND, `${cfg.label}不存在`);
+    return pick(row, cfg.fields);
+  }
+
+  /** POST /admin/<x>/create */
+  async function create(ctx) {
+    cfg.guard(ctx);
+    const body = ctx.body || {};
+    (cfg.createRequired || []).forEach(([f, msg]) => {
+      if (!body[f]) throw new ApiError(Codes.PARAM_ERROR, msg);
+    });
+
+    const now = new Date();
+    const doc = { id: await nextId(cfg.coll), ...(cfg.defaults ? cfg.defaults(body) : {}) };
+    // 可写字段：body 显式给了才取（其余一律用 defaults 的值，保证字段写全）
+    (cfg.writable || []).forEach((f) => {
+      if (body[f] !== undefined) doc[f] = body[f];
+    });
+    doc.createTime = now;
+    doc.updateTime = now;
+
+    assertLens(doc);
+    await insertOne(cfg.coll, doc);
+    return pick(doc, cfg.fields);
+  }
+
+  /** PUT /admin/<x>/:id */
+  async function update(ctx) {
+    cfg.guard(ctx);
+    const id = parseId(ctx.params.id);
+    const row = id === null ? null : await findOne(cfg.coll, { id });
+    if (!row) throw new ApiError(Codes.NOT_FOUND, `${cfg.label}不存在`);
+
+    const next = applyFields({ ...row }, ctx.body || {}, cfg.writable || []);
+    assertLens(next);
+
+    const patch = {};
+    (cfg.writable || []).forEach((f) => { patch[f] = next[f] === undefined ? null : next[f]; });
+    patch.updateTime = new Date();
+    await updateById(cfg.coll, row._id, patch);
+    return pick({ ...next, ...patch }, cfg.fields);
+  }
+
+  /** DELETE /admin/<x>/:id */
+  async function remove(ctx) {
+    cfg.guard(ctx);
+    const id = parseId(ctx.params.id);
+    const row = id === null ? null : await findOne(cfg.coll, { id });
+    if (!row) throw new ApiError(Codes.NOT_FOUND, `${cfg.label}不存在`);
+    await removeWhere(cfg.coll, { id });
+    return null;
+  }
+
+  /** PUT /admin/<x>/:id/toggle */
+  async function toggle(ctx) {
+    cfg.guard(ctx);
+    const id = parseId(ctx.params.id);
+    const row = id === null ? null : await findOne(cfg.coll, { id });
+    if (!row) throw new ApiError(Codes.NOT_FOUND, `${cfg.label}不存在`);
+
+    const isShow = Number(row.isShow) === 1 ? 0 : 1;
+    const updateTime = new Date();
+    await updateById(cfg.coll, row._id, { isShow, updateTime });
+    return pick({ ...row, isShow, updateTime }, cfg.fields);
+  }
+
+  return { list, detail, create, update, remove, toggle };
+}
+
+/** 单条 isShow 翻转（showcase.toggle 复用；文案与 CRUD 的 toggle 不同） */
+async function flipShow(coll, id, label) {
+  const row = id === null ? null : await findOne(coll, { id });
+  if (!row) throw new ApiError(Codes.NOT_FOUND, `${label}不存在`);
+  const isShow = Number(row.isShow) === 1 ? 0 : 1;
+  const updateTime = new Date();
+  await updateById(coll, row._id, { isShow, updateTime });
+  return { ...row, isShow, updateTime };
+}
+
+module.exports = { makeCrud, flipShow };
+
+};
+__mods["handlers/admin/staff.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 管理端 · 部门人员 CRUD（仅超管）
+ * 迁移自 src/controllers/admin/staffController.js
+ *
+ * 通用实现见 `_people.js`。与 cadre 的差异：
+ *   · 多一个必填 `department`，多一个字段 `programs`（负责栏目）
+ *   · 搜索字段多 `department` / `programs`
+ *   · 排序：**department ASC, sort DESC, id DESC**（注意最后是 DESC，与 cadre 的 id ASC 不同）
+ *   · 列表支持 `?department=` 精确过滤
+ *   · 长度：department≤32 / programs≤200
+ */
+
+const { C } = require('../../lib/db');
+const { asSuper } = require('./_kit');
+const { makeCrud } = require('./_people');
+
+const FIELDS = ['id', 'name', 'role', 'department', 'grade', 'programs', 'avatar', 'motto', 'sort', 'isShow', 'createTime', 'updateTime'];
+
+module.exports = makeCrud({
+  coll: C.STAFF,
+  guard: asSuper,          // 原路由挂 requireSuperAdmin
+  label: '成员',
+  fields: FIELDS,
+  searchFields: ['name', 'role', 'department', 'grade', 'programs'],
+  listFilter: (where, q) => {
+    if (q.department) where.department = q.department;
+  },
+  orderBy: [['department', 'asc'], ['sort', 'desc'], ['id', 'desc']],
+  writable: ['name', 'role', 'department', 'grade', 'programs', 'avatar', 'motto', 'sort', 'isShow'],
+  createRequired: [['name', '请填写姓名'], ['role', '请填写职务'], ['department', '请填写部门']],
+  defaults: (b) => ({
+    name: b.name,
+    role: b.role,
+    department: b.department,
+    grade: b.grade || '',
+    programs: b.programs || '',
+    avatar: b.avatar || '',
+    motto: b.motto || null,
+    sort: b.sort || 0,
+    isShow: b.isShow === undefined ? 1 : b.isShow,
+  }),
+  lens: [
+    ['name', 32, '姓名过长'],
+    ['role', 32, '职务过长'],
+    ['department', 32, '部门过长'],
+    ['grade', 32, '年级班级过长'],
+    ['programs', 200, '栏目过长'],
+    ['motto', 200, '座右铭过长'],
+  ],
+});
+
+};
+__mods["handlers/admin/showcase.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 管理端 · 风采展示（社干 + 部门人员 合并视图，仅超管）
+ * 迁移自 src/controllers/admin/showcaseController.js
+ *
+ * 设计说明照抄源文件：**不是合表，而是「归一化读接口」** —— 把 cadre / staff
+ * 两张表映射成同一形状供后台一个页面渲染；原有 CRUD 接口全部保留不动。
+ *
+ * ⚠️ 两处顺序细节别抄错：
+ *   · 合并顺序恒为 **社干在前、部员在后**（分页切片依赖它）
+ *   · `staffRows` 的排序是 `department ASC, sort DESC, id ASC`
+ *     —— 与 `admin/staff/list` 的 `... id DESC` **不同**，源实现就是这样
+ */
+
+const { C, findAllPaged, parseId } = require('../../lib/db');
+const { ApiError, Codes } = require('../../lib/response');
+const { asSuper, anyLike, sortRows } = require('./_kit');
+const { flipShow } = require('./_people');
+
+/** 两张表可搜索的字段不一样，混用会拿不到结果（源注释原话：混用会 Unknown column） */
+const SEARCH_KEYS = {
+  cadre: ['name', 'role', 'grade'],
+  staff: ['name', 'role', 'department', 'grade', 'programs'],
+};
+
+const TYPES = ['cadre', 'staff'];
+
+/** 把两行不同结构的记录归一成同一形状，前端一个卡片组件就能渲染 */
+function normalize(row, type) {
+  return {
+    id: row.id,
+    type,
+    name: row.name || '',
+    avatar: row.avatar || '',
+    // 卡片上那行副标题：社干显示职务，部员显示部门
+    subtitle: type === 'cadre' ? row.role || '' : row.department || '',
+    role: row.role || '',
+    department: row.department || '',
+    programs: row.programs || '',
+    grade: row.grade || '',
+    motto: row.motto || '',
+    isShow: row.isShow,
+    sort: row.sort || 0,
+  };
+}
+
+/** GET /admin/showcase/list?type=cadre|staff|all */
+async function list(ctx) {
+  asSuper(ctx);
+  const q = ctx.query || {};
+  const type = String(q.type || 'all').toLowerCase();
+  if (type !== 'all' && TYPES.indexOf(type) < 0) {
+    throw new ApiError(Codes.PARAM_ERROR, 'type 只能是 cadre / staff / all');
+  }
+  const keyword = String(q.keyword || '').trim();
+  const page = Math.max(1, parseInt(q.page, 10) || 1);
+  // 合并视图默认一次给全（24 人量级），需要分页时前端显式传 pageSize
+  const pageSize = Math.min(200, Math.max(1, parseInt(q.pageSize, 10) || 50));
+
+  const wantCadre = type === 'all' || type === 'cadre';
+  const wantStaff = type === 'all' || type === 'staff';
+
+  // ⚠️ 两张表各自全量拉 + JS 过滤：关键字是 LIKE，无法下推（见 _kit 文件头 ②）
+  const [cadreRaw, staffRaw] = await Promise.all([
+    wantCadre ? findAllPaged(C.CADRE, {}) : Promise.resolve([]),
+    wantStaff ? findAllPaged(C.STAFF, {}) : Promise.resolve([]),
+  ]);
+
+  const cadreRows = keyword
+    ? cadreRaw.filter((r) => anyLike(r, keyword, SEARCH_KEYS.cadre))
+    : cadreRaw;
+  const staffRows = keyword
+    ? staffRaw.filter((r) => anyLike(r, keyword, SEARCH_KEYS.staff))
+    : staffRaw;
+
+  // 计数不受 keyword 影响，始终给全量，供顶部「全部 / 社干 / 部员」用。
+  // wantXxx 时上面已经拉过全量，直接复用，省两次查询。
+  const [cadreAll, staffAll] = await Promise.all([
+    wantCadre ? cadreRaw : findAllPaged(C.CADRE, {}),
+    wantStaff ? staffRaw : findAllPaged(C.STAFF, {}),
+  ]);
+
+  const merged = [
+    ...sortRows(cadreRows, [['sort', 'desc'], ['id', 'asc']]).map((r) => normalize(r, 'cadre')),
+    ...sortRows(staffRows, [['department', 'asc'], ['sort', 'desc'], ['id', 'asc']]).map((r) => normalize(r, 'staff')),
+  ];
+
+  const offset = (page - 1) * pageSize;
+  const allCount = cadreAll.length + staffAll.length;
+  const showCadre = cadreAll.filter((r) => Number(r.isShow) === 1).length;
+  const showStaff = staffAll.filter((r) => Number(r.isShow) === 1).length;
+  const showAll = showCadre + showStaff;
+
+  return {
+    list: merged.slice(offset, offset + pageSize),
+    total: merged.length,
+    page,
+    pageSize,
+    counts: { cadre: cadreAll.length, staff: staffAll.length, all: allCount },
+    onShow: { cadre: showCadre, staff: showStaff, all: showAll },
+    // 说明条 / 状态筛选直接用这两个合计，前端不用再算
+    hidden: {
+      cadre: cadreAll.length - showCadre,
+      staff: staffAll.length - showStaff,
+      all: allCount - showAll,
+    },
+  };
+}
+
+/** PUT /admin/showcase/:type/:id/toggle */
+async function toggle(ctx) {
+  asSuper(ctx);
+  const { type } = ctx.params;
+  if (TYPES.indexOf(type) < 0) throw new ApiError(Codes.PARAM_ERROR, 'type 只能是 cadre / staff');
+
+  const id = parseId(ctx.params.id);
+  const row = await flipShow(type === 'cadre' ? C.CADRE : C.STAFF, id, type === 'cadre' ? '社干' : '部员');
+  return normalize(row, type);
+}
+
+module.exports = { list, toggle };
+
+};
+__mods["handlers/admin/adminMgr.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 管理端 · 管理员账号管理（仅超管）
+ * 迁移自 src/controllers/admin/adminController.js
+ *
+ * ⚠️ 字段安全：原实现用 `attributes: ['id','username','nickname','role','status','lastLoginAt','createTime']`
+ *    **把 password 摘掉**。云数据库没有投影能力 → 必须手工 `pick`，
+ *    漏了就是把 bcrypt 哈希吐给前端。
+ *
+ * ⚠️ 唯一性：MySQL 有 `uk_admin_username`。云端改用 `reserveUnique('admin_username', ...)`
+ *    （固定 `_id` 占位，重复写入直接报错）—— 与源实现「先 findOne 查重 + DB 唯一索引兜底」
+ *    两层语义对齐。⚠️ 阶段 8 迁移时需要**为存量管理员补登记** `unique_keys`。
+ */
+
+const bcrypt = require('bcryptjs');
+const { C, _, findOne, insertOne, updateById, removeWhere, count, nextId, parseId, reserveUnique, releaseUnique } = require('../../lib/db');
+const { ApiError, Codes } = require('../../lib/response');
+const { asSuper, pager, pick, pagedList } = require('./_kit');
+
+/** admin 的对外字段集（**绝无 password**） */
+const LIST_FIELDS = ['id', 'username', 'nickname', 'role', 'status', 'lastLoginAt', 'createTime'];
+
+/** GET /admin/admin/list */
+async function list(ctx) {
+  asSuper(ctx);
+  const q = ctx.query || {};
+  const { page, pageSize } = pager(q, 20);
+  const r = await pagedList(C.ADMIN, {
+    where: {},
+    keyword: q.keyword ? String(q.keyword) : '',
+    fields: ['username', 'nickname'],
+    orderBy: [['id', 'asc']],
+    page,
+    pageSize,
+  });
+  return { ...r, list: r.list.map((x) => pick(x, LIST_FIELDS)) };
+}
+
+/** POST /admin/admin/create   body: { username, password, nickname, role } */
+async function create(ctx) {
+  asSuper(ctx);
+  const { username, password, nickname, role } = ctx.body || {};
+  if (!username || !password) {
+    throw new ApiError(Codes.PARAM_ERROR, '请输入用户名和密码');
+  }
+  if (String(password).length < 6) {
+    throw new ApiError(Codes.PARAM_ERROR, '密码长度不能少于6位');
+  }
+  if (![0, 1].includes(role)) {
+    throw new ApiError(Codes.PARAM_ERROR, '角色必须为0或1');
+  }
+
+  const exists = await findOne(C.ADMIN, { username });
+  if (exists) throw new ApiError(Codes.CONFLICT, '用户名已存在');
+
+  const now = new Date();
+  const id = await nextId(C.ADMIN);
+  // 唯一索引等价物（并发下 findOne 可能双双落空，这一步才是真兜底）。
+  // ⚠️ scope 必须用 'admin'（= 映射文档 §三 的 `admin:` 前缀），不要另起名字。
+  const got = await reserveUnique('admin', username, id);
+  if (!got) throw new ApiError(Codes.CONFLICT, '用户名已存在');
+
+  const doc = {
+    id,
+    username,
+    password: await bcrypt.hash(String(password), 10),
+    nickname: nickname || username,
+    role,
+    status: 1,
+    lastLoginAt: null,
+    createTime: now,
+    updateTime: now,
+  };
+  await insertOne(C.ADMIN, doc);
+
+  return { id: doc.id, username: doc.username, nickname: doc.nickname, role: doc.role };
+}
+
+/** PUT /admin/admin/:id   body: { nickname?, status?, role?, password? } */
+async function update(ctx) {
+  asSuper(ctx);
+  const id = parseId(ctx.params.id);
+  const admin = id === null ? null : await findOne(C.ADMIN, { id });
+  if (!admin) throw new ApiError(Codes.NOT_FOUND, '账号不存在');
+
+  const body = ctx.body || {};
+  const patch = { updateTime: new Date() };
+  if (body.nickname !== undefined) patch.nickname = body.nickname;
+  if (body.status !== undefined) patch.status = body.status ? 1 : 0;
+  if (body.role !== undefined && [0, 1].includes(body.role)) patch.role = body.role;
+  if (body.password) {
+    if (String(body.password).length < 6) {
+      throw new ApiError(Codes.PARAM_ERROR, '密码长度不能少于6位');
+    }
+    patch.password = await bcrypt.hash(String(body.password), 10);
+  }
+
+  await updateById(C.ADMIN, admin._id, patch);
+  const next = { ...admin, ...patch };
+  return {
+    id: next.id,
+    username: next.username,
+    nickname: next.nickname,
+    role: next.role,
+    status: next.status,
+  };
+}
+
+/** DELETE /admin/admin/:id */
+async function remove(ctx) {
+  const me = asSuper(ctx);
+  const id = parseId(ctx.params.id);
+  if (id !== null && id === Number(me.id)) {
+    throw new ApiError(Codes.FORBIDDEN, '不能删除自己');
+  }
+  const admin = id === null ? null : await findOne(C.ADMIN, { id });
+  if (!admin) throw new ApiError(Codes.NOT_FOUND, '账号不存在');
+
+  if (Number(admin.role) === 0) {
+    // 检查是否还有其它超级管理员
+    const otherSuper = await count(C.ADMIN, { role: 0, id: _.neq(admin.id) });
+    if (otherSuper === 0) {
+      throw new ApiError(Codes.FORBIDDEN, '系统至少保留一个超级管理员');
+    }
+  }
+
+  await removeWhere(C.ADMIN, { id });
+  // 删主记录必须同步释放唯一键（否则孤儿键挡住后续同名新建）
+  await releaseUnique('admin', admin.username);
+  return null;
+}
+
+module.exports = { list, create, update, remove };
+
+};
+__mods["handlers/admin/student.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 管理端 · 学生账号（导入分发 / 列表 / 导出 / 重置）—— 全部仅超管
+ * 迁移自 src/controllers/admin/studentController.js
+ *
+ * 路由层全部挂 `adminAuth + requireSuperAdmin` → 每个方法第一行 `asSuper(ctx)`。
+ *
+ * ═══════════════ ⚠️ 二进制文件的传输契约（与原 HTTP 版**有意不同**） ═══════════════
+ * 原实现是 HTTP：`multipart(file)` 上传、`res.send(buffer)` 下载。
+ * 云函数 `callFunction` 只走 JSON，没有 multipart，也没有二进制响应体。所以：
+ *
+ *   上传（import/preview）：body 传 `{ filename, fileBase64 }`
+ *                          （前端 FileReader.readAsDataURL / arrayBuffer→base64）
+ *   下载（template / export）：返回 `{ filename, base64, mime }`
+ *                          （前端 atob → Blob → 触发下载）
+ *
+ * ⚠️ 大小上限：云函数单次请求/响应体约 **1MB**。xlsx 转 base64 后 +33%，
+ *    所以「几千行的名册」够用，超大表需要改走云存储（见 stage7 方案「未定事项」）。
+ *    超限时云函数会直接报 `-504002`，前端只会看到笼统的失败 —— 这是已知边界，已文档化。
+ *
+ * ⚠️ 时间显示：`stamp()` / 导出里的「导出时间」原用**容器本地时间**（= UTC），
+ *    云端统一改成北京时间（`lib/bjTime`）。属缺陷修正，已在方案里标注。
+ */
+
+const { C, findMany, insertOne, nextId, parseId } = require('../../lib/db');
+const { ApiError, Codes } = require('../../lib/response');
+const bj = require('../../lib/bjTime');
+const roster = require('../../services/roster');
+const importer = require('../../services/sheet');
+const accountService = require('../../services/studentAccount');
+const { asSuper } = require('./_kit');
+
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+/** 北京时间 YYYYMMDD（源用容器本地时间 = UTC，见文件头） */
+function stamp() {
+  return bj.ymd(bj.shifted(Date.now())).replace(/-/g, '');
+}
+
+/** 北京时间显示串（导出说明页用） */
+function nowText() {
+  return roster.formatTime(Date.now());
+}
+
+/** xlsx 的统一响应壳（前端 atob → Blob → 下载） */
+function xlsxPayload(buffer, filename) {
+  return {
+    filename,
+    mime: XLSX_MIME,
+    base64: Buffer.from(buffer).toString('base64'),
+  };
+}
+
+/** 校验前端回传的 rows（二维数组） */
+function assertRows(rows) {
+  if (!Array.isArray(rows) || !rows.length) {
+    throw new ApiError(Codes.PARAM_ERROR, '缺少 rows（应为白名单二维数组）');
+  }
+  if (rows.length > importer.MAX_ROWS) {
+    throw new ApiError(Codes.PARAM_ERROR, `行数超过上限 ${importer.MAX_ROWS}`);
+  }
+  rows.forEach((r, i) => {
+    if (!Array.isArray(r)) throw new ApiError(Codes.PARAM_ERROR, `rows[${i}] 不是数组`);
+  });
+  return rows;
+}
+
+/* ────────────────── 导入 ────────────────── */
+
+/**
+ * 上传并预览（不写库）
+ * body: { filename, fileBase64 }    query: { force: '1' }
+ */
+async function importPreview(ctx) {
+  asSuper(ctx);
+  const body = ctx.body || {};
+  const filename = String(body.filename || '');
+  if (!body.fileBase64) {
+    throw new ApiError(Codes.PARAM_ERROR, '缺少文件内容（fileBase64）');
+  }
+
+  let buffer;
+  try {
+    buffer = Buffer.from(String(body.fileBase64).replace(/^data:[^,]*,/, ''), 'base64');
+  } catch (e) {
+    throw new ApiError(Codes.PARAM_ERROR, '文件内容不是合法的 base64');
+  }
+  if (!buffer.length) throw new ApiError(Codes.PARAM_ERROR, '文件内容为空');
+
+  const force = String((ctx.query || {}).force) === '1';
+  try {
+    const { rows, sheetName } = await importer.readSheet(buffer, filename);
+    const result = await roster.preview(rows, { force });
+    return {
+      filename,
+      sheetName,
+      ...result,
+      // 把原始行一并回给前端：确认导入时原样回传，服务端会重新解析校验（不信任前端结论）
+      rawRows: rows,
+    };
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    console.warn('[student] importPreview 失败:', e && e.message);
+    throw new ApiError(Codes.PARAM_ERROR, `表格解析失败：${e.message}`);
+  }
+}
+
+/** 确认导入   body: { rows, filename, force?, strict? } */
+async function importCommit(ctx) {
+  const me = asSuper(ctx);
+  const { rows, filename = '', force = false, strict = false } = ctx.body || {};
+  assertRows(rows);
+
+  const result = await roster.commit(rows, {
+    filename,
+    force: !!force,
+    strict: !!strict,
+    operator: (me && me.username) || '',
+    operatorId: (me && me.id) || null,
+  });
+
+  console.log(
+    `[student] 导入批次 ${result.batchId}：新建 ${result.created} 更新 ${result.updated} ` +
+      `跳过 ${result.skipped} 异常 ${result.invalid}（操作人 ${me && me.username}）`
+  );
+  return result;
+}
+
+/** 下载导入模板（说明页写清规则，避免用户来回问格式） */
+async function template(ctx) {
+  asSuper(ctx);
+  const buffer = await importer.buildWorkbook([
+    {
+      name: '学生名册',
+      columns: [
+        { header: '年级', width: 10 },
+        { header: '班级', width: 10 },
+        { header: '序号', width: 10 },
+        { header: '姓名', width: 14 },
+      ],
+      rows: [
+        ['2024', '01', '01', '张三'],
+        ['2024', '01', '02', '李四'],
+        ['2024', '02', '01', '王五'],
+      ],
+    },
+    {
+      name: '填写说明',
+      columns: [{ header: '说明', width: 96 }],
+      rows: [
+        ['1. 列名认「年级 / 班级 / 序号」，第 4 列「姓名」可留空，多余的空列会被忽略。'],
+        ['2. 年级填 4 位入学年份：2024 或 2024级（写 24 也能识别，自动补成 2024）。'],
+        ['3. 班级、序号填 1~99，写 1 会当成 01；写成 1班、5号、第5 也能识别。'],
+        ['4. 没有表头时按前 3 列顺序当作「年级 / 班级 / 序号」解析。'],
+        ['5. 也支持把三段拼成一列写，例如 20240101 或 2024级1班1号。'],
+        ['6. 账号 = 年级 + 班级 + 序号，例如 2024 + 01 + 01 = 20240101；初始密码为 user+学号（如 user20240101）。'],
+        ['7. 同一行重复、缺序号、超范围的行会在预览里标红并给出原因，不会写进系统。'],
+      ],
+    },
+  ]);
+  return xlsxPayload(buffer, `学生账号导入模板_${stamp()}.xlsx`);
+}
+
+/* ────────────────── 列表 / 统计 ────────────────── */
+
+async function list(ctx) {
+  asSuper(ctx);
+  return roster.listStudents(ctx.query || {});
+}
+
+async function stats(ctx) {
+  asSuper(ctx);
+  return roster.statsByClass();
+}
+
+/* ────────────────── 导出 ────────────────── */
+
+async function exportXlsx(ctx) {
+  const me = asSuper(ctx);
+  const q = ctx.query || {};
+  const { columns, rows, total } = await roster.exportData(q);
+  if (!total) throw new ApiError(Codes.NOT_FOUND, '没有符合条件的账号可导出');
+
+  const parts = [];
+  if (q.grade) parts.push(`${q.grade}级`);
+  if (q.classNo) parts.push(`${String(q.classNo).replace(/^0/, '')}班`);
+  if (String(q.activated) === '0') parts.push('未激活');
+
+  const buffer = await importer.buildWorkbook([
+    { name: '学生账号', columns, rows },
+    {
+      name: '说明',
+      columns: [{ header: '说明', width: 96 }],
+      rows: [
+        ['本表含登录初始密码，请只在站内分发，不要外发。'],
+        ['「初始密码」列留空表示该学生已经改过密码（哈希不可逆，无法导出原密码）。'],
+        ['学生忘记密码时，在管理后台「学生账号」里重置为初始密码（user+学号，如 user20240101）即可。'],
+        ['导出时间：' + nowText()],
+      ],
+    },
+  ]);
+
+  console.log(`[student] 导出 ${total} 条账号（操作人 ${me && me.username}）`);
+  return xlsxPayload(buffer, `学生账号${parts.length ? '_' + parts.join('') : ''}_${stamp()}.xlsx`);
+}
+
+/* ────────────────── 单个账号维护 ────────────────── */
+
+async function update(ctx) {
+  asSuper(ctx);
+  const id = parseId(ctx.params.id);
+  if (id === null) throw new ApiError(Codes.NOT_FOUND, '学生账号不存在');
+  return roster.updateStudent(id, ctx.body || {});
+}
+
+async function setStatus(ctx) {
+  asSuper(ctx);
+  const { status } = ctx.body || {};
+  if (status === undefined) throw new ApiError(Codes.PARAM_ERROR, '缺少 status（1=启用 0=停用）');
+  const id = parseId(ctx.params.id);
+  if (id === null) throw new ApiError(Codes.NOT_FOUND, '学生账号不存在');
+  return roster.setStatus(id, status);
+}
+
+/** POST /student/status/batch   body { ids:number[], status:0|1 } */
+async function setStatusBatch(ctx) {
+  const me = asSuper(ctx);
+  const { ids, status } = ctx.body || {};
+  if (status === undefined) throw new ApiError(Codes.PARAM_ERROR, '缺少 status（1=启用 0=停用）');
+  const data = await roster.setStatusBatch(ids, status);
+  const off = Number(status) === 0;
+  console.log(`[student] 批量${off ? '停用' : '启用'} ${data.affected} 个（操作人 ${me && me.username}）`);
+  return { affected: data.affected };
+}
+
+async function resetPassword(ctx) {
+  const me = asSuper(ctx);
+  const id = parseId(ctx.params.id);
+  if (id === null) throw new ApiError(Codes.NOT_FOUND, '学生账号不存在');
+  const data = await roster.resetPasswords({ ids: [id] });
+  console.log(`[student] 重置密码 ${data.usernames.join(',')}（操作人 ${me && me.username}）`);
+  return { ...data, initPassword: accountService.initPasswordFor(data.usernames[0]) };
+}
+
+async function resetPasswordBatch(ctx) {
+  const me = asSuper(ctx);
+  const { ids, grade, classNo } = ctx.body || {};
+  const data = await roster.resetPasswords({ ids, grade, classNo });
+  console.log(`[student] 批量重置密码 ${data.affected} 个（操作人 ${me && me.username}）`);
+  return { affected: data.affected, initPasswordRule: 'user + 学号' };
+}
+
+async function remove(ctx) {
+  asSuper(ctx);
+  const id = parseId(ctx.params.id);
+  if (id === null) throw new ApiError(Codes.NOT_FOUND, '学生账号不存在');
+  return roster.removeStudent(id);
+}
+
+/**
+ * 批量删除（仅超管 · 不可逆批量属于超管边界）
+ * 逐条走与单条删除完全相同的规则：没有投稿记录的真删；有投稿记录的改为「停用」。
+ */
+async function removeBatch(ctx) {
+  const me = asSuper(ctx);
+  const raw = Array.isArray((ctx.body || {}).ids) ? ctx.body.ids : [];
+  const ids = [...new Set(raw.filter((v) => v !== undefined && v !== null && v !== ''))];
+  if (!ids.length) throw new ApiError(Codes.PARAM_ERROR, '请先勾选要删除的账号');
+  if (ids.length > 200) throw new ApiError(Codes.PARAM_ERROR, '一次最多删除 200 个账号');
+
+  let deleted = 0;
+  let disabled = 0;
+  const failed = [];
+  for (const id of ids) {
+    try {
+      const r = await roster.removeStudent(Number(id));
+      if (r.deleted) deleted += 1;
+      else disabled += 1;
+    } catch (e) {
+      failed.push({ id, message: (e && e.message) || '处理失败' });
+    }
+  }
+  console.log(
+    `[student] 批量删除 ${ids.length} 个（真删 ${deleted} / 转停用 ${disabled} / 失败 ${failed.length}，操作人 ${me && me.username}）`
+  );
+  return { total: ids.length, deleted, disabled, failed };
+}
+
+/* ────────────────── 按年级（查询 / 整届清理） ────────────────── */
+
+async function grades(ctx) {
+  asSuper(ctx);
+  return roster.listGrades();
+}
+
+async function gradeDetail(ctx) {
+  asSuper(ctx);
+  return roster.analyzeGrade(ctx.params.grade);
+}
+
+/** 整届清理   body: { mode?: 'safe'|'disable'|'purge', confirm?: string } */
+async function removeGrade(ctx) {
+  const me = asSuper(ctx);
+  const { mode, confirm } = ctx.body || {};
+  const gradeParam = ctx.params.grade;
+
+  // 执行前先取「会被停用的账号清单 + 其余届未受影响数」，用于写清理回执（v8「清理完成」屏）
+  let preview = null;
+  try { preview = await roster.gradeCleanupPreview(gradeParam); } catch (e) { preview = null; }
+
+  const startedAt = Date.now();
+  const data = await roster.removeGrade(gradeParam, { mode, confirm });
+  const costMs = Date.now() - startedAt;
+
+  // ── 写清理回执（v8：清理完成屏要回答「删了几个 / 留了几个 / 怎么找回」）──
+  const disabledAccounts = preview ? preview.willDisable : [];
+  const now = new Date();
+  let receipt = null;
+  try {
+    const logId = await nextId(C.CLEANUP_LOG);
+    const doc = {
+      id: logId,
+      grade: data.grade,
+      gradeName: data.name,
+      mode: data.mode,
+      total: data.total,
+      deleted: data.deleted,
+      disabled: data.disabled,
+      classCount: preview ? new Set((preview.willDisable || []).map((x) => x.className)).size : 0,
+      untouched: preview ? preview.untouched : 0,
+      costMs,
+      operatorId: (me && me.id) || null,
+      operatorName: (me && (me.nickname || me.username)) || '',
+      disabledAccounts: JSON.stringify(disabledAccounts),
+      createTime: now,
+      updateTime: now,
+    };
+    await insertOne(C.CLEANUP_LOG, doc);
+    receipt = doc;
+  } catch (e) {
+    console.warn(`[student] 清理回执落库失败：${e.message}`);
+  }
+
+  console.log(
+    `[student] 整届清理 ${data.grade}（${data.mode}）：删除 ${data.deleted} 停用 ${data.disabled}` +
+      `，共 ${data.total} 个（操作人 ${me && me.username}，耗时 ${costMs}ms）`
+  );
+
+  const receiptDto = receipt
+    ? { ...receipt, disabledAccounts, costText: `${(costMs / 1000).toFixed(1)}s` }
+    : null;
+
+  return { ...data, costMs, receipt: receiptDto };
+}
+
+/**
+ * 最近一次清理回执（按年级）
+ * GET /admin/student/cleanup/last?grade=2024
+ * 不传 grade 就取全局最近一次 —— 「清理完成」屏刷新后靠它还原整屏内容
+ */
+async function cleanupLast(ctx) {
+  asSuper(ctx);
+  const q = ctx.query || {};
+  const where = {};
+  if (q.grade) where.grade = String(q.grade).trim();
+
+  const rows = await findMany(C.CLEANUP_LOG, where, { orderBy: [['createTime', 'desc']], limit: 1 });
+  const dto = rows[0];
+  if (!dto) return null;
+
+  let disabledAccounts = [];
+  try { disabledAccounts = JSON.parse(dto.disabledAccounts || '[]'); } catch (e) { disabledAccounts = []; }
+  return {
+    ...dto,
+    disabledAccounts,
+    costText: `${((Number(dto.costMs) || 0) / 1000).toFixed(1)}s`,
+  };
+}
+
+/* ────────────────── 批次 ────────────────── */
+
+async function batches(ctx) {
+  asSuper(ctx);
+  const list = await roster.listBatches((ctx.query || {}).limit);
+  return { list };
+}
+
+async function rollback(ctx) {
+  const me = asSuper(ctx);
+  const id = parseId(ctx.params.id);
+  if (id === null) throw new ApiError(Codes.NOT_FOUND, '批次不存在');
+  const data = await roster.rollbackBatch(id);
+  const msg =
+    `已撤销 ${data.removed} 个未激活账号` +
+    (data.keptActivated ? `；保留 ${data.keptActivated} 个已激活账号` : '') +
+    (data.keptWithSubmit ? `；${data.keptWithSubmit} 个有投稿记录已保留` : '');
+  console.log(`[student] 撤销批次 ${data.batchId}：${msg}（操作人 ${me && me.username}）`);
+  return data;
+}
+
+module.exports = {
+  importPreview,
+  importCommit,
+  template,
+  list,
+  stats,
+  exportXlsx,
+  update,
+  setStatus,
+  setStatusBatch,
+  resetPassword,
+  resetPasswordBatch,
+  remove,
+  removeBatch,
+  grades,
+  gradeDetail,
+  removeGrade,
+  cleanupLast,
+  batches,
+  rollback,
+};
+
+};
+__mods["services/sheet.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 表格读写（xlsx / csv）—— 从 src/services/studentImportService.js 移植
+ *
+ * 只碰文件、不碰业务规则：
+ *   读：readSheet(buffer, filename) → 二维数组（含表头行，索引 0 = 表格第 1 行）
+ *   写：buildWorkbook(sheets)       → xlsx Buffer
+ *
+ * ⚠️ 为什么用 exceljs 而不是 xlsx(SheetJS)：SheetJS 在 npm 上的公开版本 0.18.5 已停更
+ *    且有已知漏洞，后续版本只走自建 CDN；exceljs 在 npm 上活跃维护、纯 JS、支持流式读写。
+ *    （依赖已在 cloud/cloudfunctions/api/package.json 里声明，云端安装。）
+ *
+ * ⚠️ 行号即 Excel 行号：读的时候**保留空行**（不压缩数组），这样报错里的「第 N 行」
+ *    和用户在自己表格里看到的行号一致，不用换算。
+ *
+ * ⚠️ **代码逻辑零改动**，只把 `require('path')` 的用途留在原地（云函数里也能用）。
+ */
+
+const path = require('path');
+const ExcelJS = require('exceljs');
+
+const MAX_ROWS = 5000; // 单次导入上限，防手滑传了个几万行的表
+
+/** 统一把单元格值转成字符串（数字 / 公式 / 富文本 / 日期 都能吃） */
+function cellToText(v) {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (v instanceof Date) {
+    // 极少数情况：用户把 2024 输成了日期。转成 YYYYMMDD 让归一化层再解析
+    const y = v.getFullYear();
+    const m = String(v.getMonth() + 1).padStart(2, '0');
+    const d = String(v.getDate()).padStart(2, '0');
+    return `${y}${m}${d}`;
+  }
+  if (typeof v === 'object') {
+    if (Array.isArray(v.richText)) return v.richText.map((r) => r.text || '').join('');
+    if (v.text !== undefined) return String(v.text);
+    if (v.result !== undefined) return cellToText(v.result);
+    if (v.hyperlink !== undefined && v.text) return String(v.text);
+  }
+  return String(v);
+}
+
+/**
+ * 轻量 CSV 解析：支持双引号包裹、引号内逗号 / 换行 / 双写引号转义、CRLF、BOM。
+ * 不引第三方库 —— 规则就这些，够用且好读。
+ */
+function parseCsv(text) {
+  const s = String(text).replace(/^\uFEFF/, ''); // BOM
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let inQuote = false;
+
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inQuote) {
+      if (c === '"') {
+        if (s[i + 1] === '"') { cell += '"'; i++; }
+        else inQuote = false;
+      } else {
+        cell += c;
+      }
+      continue;
+    }
+    if (c === '"') { inQuote = true; continue; }
+    if (c === ',') { row.push(cell); cell = ''; continue; }
+    if (c === '\r') continue;
+    if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; continue; }
+    cell += c;
+  }
+  // 收尾（最后一行没有换行符时）
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+
+  // 去掉尾部纯空行（文件末尾多敲的回车）
+  while (rows.length && rows[rows.length - 1].every((x) => String(x).trim() === '')) rows.pop();
+  return rows;
+}
+
+/**
+ * 读表格 → 二维数组（含表头行，行号 = 数组下标 + 1）
+ * @param {Buffer} buffer
+ * @param {string} filename 用于判断格式
+ * @returns {Promise<{ rows: string[][], sheetName: string }>}
+ */
+async function readSheet(buffer, filename = '') {
+  const ext = path.extname(String(filename)).toLowerCase();
+
+  if (ext === '.csv' || ext === '.txt') {
+    const rows = parseCsv(buffer.toString('utf8'));
+    guardRowCount(rows);
+    return { rows, sheetName: 'CSV' };
+  }
+
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer);
+  const ws = wb.worksheets[0];
+  if (!ws) throw new Error('文件里没有工作表');
+
+  const rows = [];
+  const last = ws.rowCount;
+  for (let r = 1; r <= last; r++) {
+    const values = ws.getRow(r).values || []; // 1-based，[0] 恒为 undefined
+    const arr = [];
+    const width = Math.max(values.length - 1, 1);
+    for (let c = 1; c <= width; c++) arr.push(cellToText(values[c]));
+    rows.push(arr);
+  }
+  guardRowCount(rows);
+  return { rows, sheetName: ws.name || 'Sheet1' };
+}
+
+function guardRowCount(rows) {
+  if (rows.length > MAX_ROWS) {
+    throw new Error(`表格行数 ${rows.length} 超过上限 ${MAX_ROWS}，请拆分后再导入`);
+  }
+}
+
+/**
+ * 生成 xlsx Buffer
+ * @param {Array<{name:string, columns?:Array, rows:Array<Array>, note?:string}>} sheets
+ *   columns: [{ header, width }]
+ */
+async function buildWorkbook(sheets) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = '菁悠广播站';
+  wb.created = new Date();
+
+  for (const spec of sheets) {
+    const ws = wb.addWorksheet(spec.name || 'Sheet1');
+    const cols = spec.columns || [];
+    if (cols.length) {
+      ws.columns = cols.map((c) => ({ header: c.header, key: c.key || c.header, width: c.width || 12 }));
+      ws.getRow(1).font = { bold: true };
+      ws.getRow(1).alignment = { vertical: 'middle' };
+      ws.views = [{ state: 'frozen', ySplit: 1 }];
+    }
+    (spec.rows || []).forEach((r) => ws.addRow(r));
+  }
+
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
+module.exports = { readSheet, parseCsv, buildWorkbook, cellToText, MAX_ROWS };
+
+};
+__mods["handlers/admin/submit.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 管理端 · 投稿审核与排期（协议版）
+ * 迁移自 src/controllers/admin/submitController.js（1083 行）
+ *
+ * 这是阶段 7 里**唯一带写排期算法**的模块 —— 阶段 5 移植的 `services/scheduling`
+ * 到这一步才第一次从管理端真实调用（用户端零入口，见 README 阶段 5 说明）。
+ *
+ * ═══════════════ 云化改动（逐条对齐源码语义）═══════════════
+ *
+ * ① **路由中间件 → handler 第一行**。云函数没有中间件层，`adminAuth + requireAdmin`
+ *    与 `adminAuth + requireSuperAdmin` 的差异必须逐个 handler 手写：
+ *      asAdmin  → list / capacity / window(读) / notice(读·写) / timeslots / schedule /
+ *                 week / rules(读) / batch / detail / approve / statusLogs / reject / remove
+ *      asSuper  → setQuota / sweepQueue / saveWindow / saveSlots / previewSchedule /
+ *                 runSchedule / lock / unlock / saveRules / purgeSongs /
+ *                 revoke / assign / played
+ *    ⚠️ 漏写 = 「没登录 / 普管也能调」，接口照样返回 200（静默漂移 #2）。
+ *    ⚠️ `admin.submit.capacity` 一个 key 对应两条路由（GET /quota 与 GET /capacity），
+ *       `admin.submit.sweepQueue` 对应两条（POST /quota/sweep 与 /queue/sweep）——
+ *       好在同组两边的权限一致，合并成同一个 handler 不会串权。
+ *
+ * ② **`LIKE '%kw%'` → 全量拉 + JS 大小写不敏感子串**。云数据库没有 LIKE，
+ *    `_.or` 也表达不了子串。`keyword` 参与 `songName / singer / articleTitle / wishContent`
+ *    四个字段（与源码逐字一致）。
+ *    ⚠️ **没有 keyword 时把 where + 排序 + 分页整体下推数据库**（`orderBy` + `skip` + `limit`），
+ *       这是列表页的热路径；只有带 keyword 时才退化成全量拉 + JS 过滤切片。
+ *
+ * ③ **多键排序 `create_time ASC, id ASC`**。云数据库的 `orderBy` 可链式（等价多键），
+ *    但**带 keyword 的 JS 路径必须自己排**，且比较 Date 只能按值（`_kit.sortRows` 已处理）。
+ *    ⚠️ `id` 兜同秒不可省 —— 少了它，同秒提交的多条在跨页边界会重复/漏。
+ *
+ * ④ **无 `attributes` 投影** → 用 `_kit.pick` 手工挑；缺字段补 `null`
+ *    （`undefined` 会被 `JSON.stringify` 整个丢掉）。
+ *
+ * ⑤ **无跨文档事务** → `purgeSongs` 从「一个事务里删三张表」改成
+ *    「分批：先删两张日志的对应行，再删 submit 行」。中途失败会留下
+ *    「日志已删、点歌还在」的中间态 —— 这是**可以接受**的方向（重跑一次即幂等收敛），
+ *    反方向（点歌没了日志还在）才会产生指向不存在点歌的孤儿行。
+ *
+ * ⑥ **无 `SUM/MAX` 聚合** → `detail` 的 `MIN/MAX(create_time)` 改用两次
+ *    「`orderBy + limit:1`」的轻查询（比全量拉该用户的投稿便宜得多）。
+ *
+ * ⑦ **`submit.reload()` → 回读一次**。审核通过后要跑排期，排期会**再改一次这条记录**
+ *    （scheduleStatus 0 → 1/2）；不回读就会把「已通过 · 待排期」这个中间态回给前端
+ *    （界面显示「还没排上」、刷新又变「已排期」，看起来像 bug）。源码也是 reload。
+ *
+ * ⑧ **`ctx.admin` 就是 JWT payload**（`lib/auth.requireAdmin` 写入），
+ *    与源码 `req.admin.id` 同义。
+ *
+ * ⑨ **并发冲突显式处理**（**有意的小改进**，源码此处是漏的）：
+ *    `applyChange` 影响 0 行时返回 `{conflict:true, logs:[]}`，而源码 `approveOne`
+ *    无视它、照样报 `changed:true`。云端改成「回读真实状态 + `changed:false`」——
+ *    避免把内存里的乐观值当结果返回。frontend 契约不变（`admin-web` 的成功 `message`
+ *    本来就被 http 拦截器丢掉，请求体/响应体字段名一个没动）。
+ *
+ * ⑩ **成功路径的自定义 message 一律不带**：原后端 `success(res, data, msg)` 的 `msg`
+ *    被 `admin-web/src/utils/request.js` 的「`if (body?.code === 0) return body.data`」
+ *    整条丢弃，所以云端网关统一回 `message:'ok'` 不产生任何可见差异。
+ */
+
+const { C, _, findOne, findMany, findAllPaged, removeWhere, count, parseId } = require('../../lib/db');
+const { ApiError, Codes } = require('../../lib/response');
+const { asAdmin, asSuper, pager, anyLike, sortRows } = require('./_kit');
+const songQueue = require('../../services/songQueue');
+const songWindow = require('../../services/songWindow');
+const submitRule = require('../../services/submitRule');
+const songNotice = require('../../services/songNotice');
+const broadcastSlot = require('../../services/broadcastSlot');
+const S = require('../../services/songStatus');
+const sched = require('../../services/scheduling');
+const roster = require('../../services/roster');
+
+/** 列表排序：**先提交先审**（提交时间升序；id 兜同秒，防分页重复/漏） */
+const LIST_ORDER = [['createTime', 'asc'], ['id', 'asc']];
+/** keyword 路径全量拉的安全上限（超出请改用下推条件，见文件头 ②） */
+const LIST_SCAN_MAX = 5000;
+/** `_.in([...])` 一批最多几个（命令体大小限制，与 roster.js 同一口径） */
+const IN_CHUNK = 100;
+/** 按 _id 取单条的集合是文档型，没有 `:id` 主键 —— 统一走 `parseId` + `findOne({id})` */
+
+/** 小块切分（`_.in` 数组不宜过大） */
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+/**
+ * 把 service 层抛的**裸 Error + `code: 40001`** 翻译成 ApiError。
+ *
+ * ⚠️ 源控制器里这类 catch 出现三次（saveNotice / saveSlots / assign）：
+ *      `catch (e) { if (e.code === 40001) return fail(res, Codes.PARAM_ERROR, e.message); return next(e); }`
+ *    漏掉它的后果很具体：`songNotice.save` 的内容超长、`broadcastSlot.setSlotTimes` 的
+ *    时段全非法，都会从**明确的 40001 业务提示**退化成 `50001 服务器繁忙，请稍后再试`
+ *    —— 管理员看不到「为什么存不上」（实测已复现，见 test-admin-submit M 段）。
+ *
+ * ⚠️ 注意与 `unlockWeek` 的区别：它抛的也是裸 Error + code 40001，但源控制器**没有**这个
+ *    catch，所以源后端返回的就是 500。那里保持 50001 不动（不擅自"修好"线上既有行为）。
+ */
+function paramError(e) {
+  if (e && e.code === 40001) return new ApiError(Codes.PARAM_ERROR, e.message);
+  return e;
+}
+
+/** 给接口对象塞上三维状态视图 */
+function withStatus(o) { return { ...o, ...S.statusView(o) }; }
+
+/** 拿到这条点歌所属周的周一 00:00（绝对时刻） */
+function weekMsOf(submit) {
+  const ws = sched.weekStartOfRow(submit);
+  return ws ? ws.getTime() : null;
+}
+
+/** 数字 id → 行（非法 id 直接当不存在，不把 NaN 塞进 where） */
+async function submitOf(ctx, label = '投稿') {
+  const id = parseId(ctx.params && ctx.params.id);
+  const row = id === null ? null : await findOne(C.SUBMIT, { id });
+  if (!row) throw new ApiError(Codes.NOT_FOUND, `${label}不存在`);
+  return row;
+}
+
+/**
+ * 《V1 规格》第 11 节：**锁定之后的周不允许人工改动**。
+ * 系统自己的动作（`lockWeek` 的最后调度、`markPlayed`）不走这里，不受影响。
+ */
+async function assertWeekNotLocked(ms, label = '这一周') {
+  if (ms === null || ms === undefined) return null;
+  const week = await sched.ensureWeek(ms, { now: Date.now() });
+  if (week.status === sched.WEEK_STATUS.LOCKED) {
+    throw new ApiError(
+      Codes.PARAM_ERROR,
+      `${label}的排期已锁定（${week.weekStartDate} 当周），不能再改动`
+    );
+  }
+  return week;
+}
+
+/** 按记录反推归属周后校验（文稿不参与排期，不受锁定约束） */
+async function assertWeekOpen(submit) {
+  if (Number(submit.type) !== 1) return null;
+  return assertWeekNotLocked(weekMsOf(submit), '这条点歌所属周');
+}
+
+/** 审核动作之后让这一周的排期与候补重新对齐（幂等） */
+async function runWeekSchedule(submit, opts = {}) {
+  const ms = weekMsOf(submit);
+  if (ms === null) return { promoted: 0, rescheduled: 0, left: 0 };
+  try {
+    const a = await sched.initialAllocate(ms, opts);
+    const b = await sched.reschedule(ms, opts);
+    return { ...b, assigned: a.assigned, waiting: a.waiting };
+  } catch (e) {
+    // 排期失败不能把审核动作本身搞失败（审核已经落库了），但**必须留痕**
+    console.warn(`[songSchedule] 审核后重算排期失败 week=${new Date(ms).toISOString()}：${e.message}`);
+    return { promoted: 0, rescheduled: 0, left: 0, error: e.message };
+  }
+}
+
+/** 把调剂结果拼成给管理员看的话（云端 message 会被前端丢弃，保留只为日志/调试口径一致） */
+function releaseMsg(base, rel) {
+  if (!rel) return base;
+  const bits = [];
+  if (rel.promoted) bits.push(`原位递补 ${rel.promoted} 条`);
+  if (rel.rescheduled) bits.push(`跨时段调剂 ${rel.rescheduled} 条`);
+  return bits.length ? `${base}，已${bits.join('、')}` : base;
+}
+
+/** 回读一条（等价 Sequelize 的 `submit.reload()`） */
+async function reread(row) {
+  const fresh = await findOne(C.SUBMIT, { id: Number(row.id) });
+  return fresh || row;
+}
+
+/* ------------------------------------------------------------------ *
+ * 内部：审核通过 / 驳回
+ * ------------------------------------------------------------------ */
+/**
+ * 协议 §14：这里的 approve **只是审核通过**，不等于拿到位置。
+ *   审核通过 → review=APPROVED / schedule=UNASSIGNED → 进排期候选池
+ */
+async function approveOne(submit, adminId) {
+  const review = Number(submit.reviewStatus) || 0;
+  const schedule = Number(submit.scheduleStatus) || 0;
+
+  if (review === S.REVIEW.APPROVED) {
+    return { submit, changed: false, already: true };
+  }
+  // v1 的老毛病：通过一条已驳回的记录会静默无操作却返回「已通过」。这里明确报错。
+  if (review === S.REVIEW.REJECTED) {
+    throw new ApiError(Codes.PARAM_ERROR, '这条已驳回，请先撤销再通过');
+  }
+  if (review === S.REVIEW.CANCELLED) {
+    throw new ApiError(Codes.PARAM_ERROR, '这条已被取消，不能通过');
+  }
+
+  // 曾被系统自动驳回（无位 / 逾期）的，审核通过时要把排期维度重置回候选池
+  const changes = {
+    reviewStatus: S.REVIEW.APPROVED,
+    reviewerId: adminId,
+    reviewTime: new Date(),
+    rejectReason: null,
+    autoRejected: 0,
+  };
+  if (schedule === S.SCHEDULE.AUTO_REJECTED || schedule === S.SCHEDULE.UNASSIGNED) {
+    changes.scheduleStatus = S.SCHEDULE.UNASSIGNED;
+  }
+
+  const r = await S.applyChange(submit, changes, {
+    operatorId: adminId, operatorName: 'ADMIN', reason: 'REVIEW_APPROVED',
+  });
+  // 文件头 ⑨：抢晚了（影响 0 行）时回读真实状态，别把乐观值当结果
+  if (r.conflict) return { submit: await reread(submit), changed: false, conflict: true };
+  return { submit: r.row, changed: true };
+}
+
+/**
+ * 审核驳回：review → REJECTED，位子随之释放（占位要求 review=APPROVED）
+ * schedule 维度**保留原值**，用来回答「他当时排到了哪一格」
+ */
+async function rejectOne(submit, adminId, reason) {
+  const review = Number(submit.reviewStatus) || 0;
+  if (review === S.REVIEW.REJECTED) {
+    throw new ApiError(Codes.PARAM_ERROR, '这条已是驳回状态，无需重复操作');
+  }
+  const wasSeated = sched.isSeated(submit);
+  const r = await S.applyChange(submit, {
+    reviewStatus: S.REVIEW.REJECTED,
+    reviewerId: adminId,
+    reviewTime: new Date(),
+    rejectReason: reason,
+    autoRejected: 0,
+  }, { operatorId: adminId, operatorName: 'ADMIN', reason: 'REVIEW_REJECTED' });
+  return { submit: r.conflict ? await reread(submit) : r.row, wasSeated, conflict: !!r.conflict };
+}
+
+/* ------------------------------------------------------------------ *
+ * 列表 / 详情
+ * ------------------------------------------------------------------ */
+/** GET /admin/submit/list */
+async function list(ctx) {
+  asAdmin(ctx);
+  const q = ctx.query || {};
+  const { page, pageSize, skip } = pager(q, 10, 200);
+
+  // —— 能下推数据库的等值 / 范围条件 ——
+  const base = {};
+  const intOf = (v) => {
+    if (v === undefined || v === null || v === '') return null;
+    const n = parseInt(v, 10);
+    return Number.isNaN(n) ? null : n;
+  };
+  const status = intOf(q.status);
+  if (status !== null) base.status = status;
+  const type = intOf(q.type);
+  if (type !== null) base.type = type;
+  const reviewStatus = intOf(q.reviewStatus);
+  if (reviewStatus !== null) base.reviewStatus = reviewStatus;
+  const scheduleStatus = intOf(q.scheduleStatus);
+  if (scheduleStatus !== null) base.scheduleStatus = scheduleStatus;
+  // ⚠️ 源码是 `Op.between: [startDate, endDate]`，MySQL 会把 'YYYY-MM-DD' 隐式转成
+  //    当天 00:00:00（于是**当天不含末尾**）。这里保持同口径：把字符串解析成同一时刻。
+  if (q.startDate && q.endDate) {
+    const from = new Date(`${q.startDate}T00:00:00+08:00`);
+    const to = new Date(`${q.endDate}T00:00:00+08:00`);
+    if (!Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime())) {
+      base.createTime = _.gte(from).and(_.lte(to));
+    }
+  }
+
+  const slot = q.slot ? String(q.slot) : '';
+  const keyword = q.keyword ? String(q.keyword) : '';
+
+  const conds = [];
+  if (Object.keys(base).length) conds.push(base);
+  // 首选时段 OR 实排时段（两条都要能命中）
+  if (slot) conds.push(_.or([{ scheduledSlot: slot }, { wantBroadcastTime: slot }]));
+  const where = conds.length === 0 ? {} : (conds.length === 1 ? conds[0] : _.and(conds));
+
+  let rows;
+  let total;
+  if (!keyword) {
+    // 热路径：where + 多键排序 + 分页整体下推（云数据库 orderBy 可链式 = 多键）
+    total = await count(C.SUBMIT, where);
+    rows = await findMany(C.SUBMIT, where, { orderBy: LIST_ORDER, skip, limit: pageSize });
+  } else {
+    // LIKE 路径：全量拉 + JS 过滤 + JS 多键排序 + 切片
+    const all = await findAllPaged(C.SUBMIT, where, { max: LIST_SCAN_MAX });
+    const hit = all.filter((r) => anyLike(r, keyword, ['songName', 'singer', 'articleTitle', 'wishContent']));
+    const sorted = sortRows(hit, LIST_ORDER);
+    total = sorted.length;
+    rows = sorted.slice(skip, skip + pageSize);
+  }
+
+  // —— 关联用户昵称/头像（账号体系下投稿的 openid 字段里存的是学号）——
+  const keys = [...new Set(rows.map((r) => r.openid).filter((v) => v !== undefined && v !== null && v !== ''))];
+  const userMap = new Map();
+  for (const part of chunk(keys, IN_CHUNK)) {
+    const us = await findAllPaged(C.USER, _.or([{ openid: _.in(part) }, { username: _.in(part) }]), { max: 400 });
+    us.forEach((u) => {
+      if (u.openid) userMap.set(u.openid, u);
+      if (u.username) userMap.set(u.username, u);
+    });
+  }
+  const displayName = (u) => (u && (u.nickname || u.remark)) || '匿名';
+
+  // —— 审核人昵称 ——
+  const reviewerIds = [...new Set(rows.map((r) => r.reviewerId).filter((v) => v !== undefined && v !== null && v !== ''))];
+  const adminMap = new Map();
+  for (const part of chunk(reviewerIds, IN_CHUNK)) {
+    const as = await findMany(C.ADMIN, { id: _.in(part) }, { limit: IN_CHUNK });
+    as.forEach((a) => adminMap.set(Number(a.id), a));
+  }
+  const reviewerName = (r) => {
+    if (Number(r.autoRejected) === 1) return '系统自动驳回';
+    const a = adminMap.get(Number(r.reviewerId));
+    return a ? (a.nickname || a.username) : (Number(r.reviewStatus) === 0 ? '' : '—');
+  };
+
+  const out = rows.map((r) => {
+    const u = userMap.get(r.openid);
+    return withStatus({
+      ...r,
+      nickname: displayName(u),
+      studentNo: (u && u.username) || '',
+      avatar: (u && u.avatar) || '',
+      reviewerName: reviewerName(r),
+      reviewTime: r.reviewTime === undefined ? null : r.reviewTime,
+      autoRejected: Number(r.autoRejected) === 1,
+    });
+  });
+
+  // 候补中的行补「第几位」
+  await Promise.all(out.map(async (item) => {
+    if (Number(item.scheduleStatus) !== S.SCHEDULE.WAITING) return;
+    try {
+      const p = await sched.waitingPosOf(item);
+      item.queuePos = p.pos;
+      item.queueAhead = p.ahead;
+      item.queueTotal = p.total;
+    } catch (e) {
+      item.queuePos = null;
+    }
+  }));
+
+  return { list: out, total, page, pageSize };
+}
+
+/** GET /admin/submit/:id */
+async function detail(ctx) {
+  asAdmin(ctx);
+  const submit = await submitOf(ctx);
+  const key = submit.openid;
+  // ⚠️ `openid` 缺失时显式用 `null` 去比（等价 SQL `WHERE openid IS NULL`），
+  //    不能留 `undefined` —— `JSON.stringify` 会丢掉整个键，条件静默失效成「全表统计」。
+  const owner = key === undefined ? null : key;
+  const user = key
+    ? await findOne(C.USER, _.or([{ openid: key }, { username: key }]))
+    : null;
+
+  const [totalCount, approved, rejected, pending] = await Promise.all([
+    count(C.SUBMIT, { openid: owner }),
+    count(C.SUBMIT, { openid: owner, reviewStatus: S.REVIEW.APPROVED }),
+    count(C.SUBMIT, { openid: owner, reviewStatus: S.REVIEW.REJECTED }),
+    count(C.SUBMIT, { openid: owner, reviewStatus: S.REVIEW.PENDING }),
+  ]);
+
+  // 源码用 `MIN/MAX(create_time)` 聚合；云数据库没有聚合 → 两次「排序 + limit:1」轻查询
+  const [firstRows, lastRows] = await Promise.all([
+    findMany(C.SUBMIT, { openid: owner }, { orderBy: [['createTime', 'asc']], limit: 1 }),
+    findMany(C.SUBMIT, { openid: owner }, { orderBy: [['createTime', 'desc']], limit: 1 }),
+  ]);
+  const firstAt = firstRows[0] ? (firstRows[0].createTime === undefined ? null : firstRows[0].createTime) : null;
+  const lastAt = lastRows[0] ? (lastRows[0].createTime === undefined ? null : lastRows[0].createTime) : null;
+
+  let weekly = null;
+  try { weekly = await submitRule.checkUserWeeklyLimit(key); } catch (e) { weekly = null; }
+
+  const submitter = {
+    key,
+    isAccount: !!(user && user.username),
+    nickname: (user && (user.nickname || user.remark)) || '匿名',
+    username: (user && user.username) || '',
+    className: (user && user.grade) ? roster.gradeLabel(user.grade, user.classNo) : '',
+    grade: (user && user.grade) || '',
+    classNo: (user && user.classNo) || '',
+    seatNo: (user && user.seatNo) || '',
+    status: user ? Number(user.status) : null,
+    lastLoginAt: (user && user.lastLoginAt) || null,
+    loginCount: Number((user && user.loginCount) || 0),
+    total: totalCount,
+    approved,
+    rejected,
+    pending,
+    firstAt,
+    lastAt,
+    weekUsed: weekly ? weekly.used : null,
+    weekLimit: weekly ? weekly.limit : null,
+    weekRemaining: weekly ? weekly.remaining : null,
+  };
+
+  let reviewer = null;
+  if (submit.reviewerId) {
+    reviewer = await findOne(C.ADMIN, { id: Number(submit.reviewerId) });
+  }
+  const reviewerName = Number(submit.autoRejected) === 1
+    ? '系统自动驳回'
+    : (reviewer ? (reviewer.nickname || reviewer.username) : (Number(submit.reviewStatus) === 0 ? '' : '—'));
+
+  // 协议：处理台要能看到「这首歌为什么现在是这个状态」+ 换过几次时段
+  let statusHistory = [];
+  let assignments = [];
+  if (Number(submit.type) === 1) {
+    try { statusHistory = await S.historyOf(submit.id, 50); } catch (e) { statusHistory = []; }
+    try {
+      assignments = await findMany(C.ASSIGNMENT_LOG, { requestId: Number(submit.id) }, { orderBy: [['id', 'asc']] });
+    } catch (e) { assignments = []; }
+  }
+
+  const card = Number(submit.type) === 1
+    ? await songQueue.cardFor(submit).catch(() => null)
+    : null;
+
+  return {
+    ...withStatus(submit),
+    nickname: submitter.nickname,
+    studentNo: submitter.username,
+    avatar: (user && user.avatar) || '',
+    reviewerName,
+    autoRejected: Number(submit.autoRejected) === 1,
+    submitter,
+    card,
+    statusHistory,
+    assignments,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * 通过 / 驳回 / 删除 / 撤销
+ * ------------------------------------------------------------------ */
+/** PUT /admin/submit/:id/approve */
+async function approve(ctx) {
+  asAdmin(ctx);
+  const submit = await submitOf(ctx);
+  await assertWeekOpen(submit);                 // 已锁定的周不允许再审批
+
+  const result = await approveOne(submit, ctx.admin.id);
+  let fresh = result.submit;
+
+  // 审核通过 → 进排期候选池 → 立刻跑一次该周的排期（幂等）
+  // 这样管理员点完「通过」就能在矩阵上看到位置变化，不用额外点「执行排期」。
+  let rel = null;
+  if (result.changed && Number(fresh.type) === 1) {
+    rel = await runWeekSchedule(fresh, { operatorId: ctx.admin.id });
+    // ⚠️ 排期会**再改一次这条记录**（schedule_status 0 → 1/2）→ 必须回读（文件头 ⑦）
+    fresh = await reread(fresh);
+  }
+  void rel;
+
+  const data = withStatus(fresh);
+  if (Number(fresh.type) === 1) {
+    try { data.card = await songQueue.cardFor(fresh); } catch (e) { data.card = null; }
+  }
+  return data;
+}
+
+/** PUT /admin/submit/:id/reject */
+async function reject(ctx) {
+  asAdmin(ctx);
+  const { reason } = ctx.body || {};
+  if (!reason || String(reason).trim().length === 0) {
+    throw new ApiError(Codes.PARAM_ERROR, '请填写驳回理由');
+  }
+  const submit = await submitOf(ctx);
+  await assertWeekOpen(submit);                 // 已锁定的周不允许再驳回
+
+  const { submit: fresh, wasSeated } = await rejectOne(submit, ctx.admin.id, reason);
+
+  // 驳回使 review 离开 APPROVED → 位子释放 → 立刻让候补重新对齐
+  if (wasSeated && Number(fresh.type) === 1) {
+    const rel = await runWeekSchedule(fresh, { operatorId: ctx.admin.id });
+    void releaseMsg('已驳回，位子已释放', rel);
+  }
+  return withStatus(await reread(fresh));
+}
+
+/** DELETE /admin/submit/:id */
+async function remove(ctx) {
+  asAdmin(ctx);
+  const submit = await submitOf(ctx);
+  await assertWeekOpen(submit);                 // 已锁定的周不允许再删（会破坏已公布的排期）
+  const wasSeated = Number(submit.type) === 1 && sched.isSeated(submit);
+  const ms = Number(submit.type) === 1 ? weekMsOf(submit) : null;
+  await removeWhere(C.SUBMIT, { id: Number(submit.id) });
+  if (wasSeated && ms !== null) {
+    await sched.runAllocators(ms, { operatorId: ctx.admin.id }).catch(() => null);
+  }
+  return null;
+}
+
+/**
+ * PUT /admin/submit/:id/revoke   撤销审核结果（仅超管）
+ *   审核通过(1) → 回到待审(0)；排期维度重置，位子释放并触发调剂
+ *   已驳回(2)   → 回到待审(0)，重新走审核
+ */
+async function revoke(ctx) {
+  asSuper(ctx);
+  const submit = await submitOf(ctx);
+  await assertWeekOpen(submit);                 // 已锁定的周不允许撤销
+  const review = Number(submit.reviewStatus) || 0;
+  if (review === S.REVIEW.PENDING) {
+    throw new ApiError(Codes.PARAM_ERROR, '这条还是待审状态，无需撤销');
+  }
+  const wasSeated = sched.isSeated(submit);
+  const fromSlot = submit.scheduledSlot || null;
+
+  // 撤销 = 把三维一起归零（审核人 / 审核时间也清掉，撤销是操作者自己做的事）
+  const r = await S.applyChange(submit, {
+    reviewStatus: S.REVIEW.PENDING,
+    scheduleStatus: S.SCHEDULE.UNASSIGNED,
+    playStatus: S.PLAY.NOT_PLAYED,
+    scheduledSlot: null,
+    assignedAt: null,
+    playedAt: null,
+    rejectReason: null,
+    reviewTime: null,
+    reviewerId: null,
+    autoRejected: 0,
+  }, { operatorId: ctx.admin.id, operatorName: 'ADMIN', reason: 'REVOKED' });
+  const row = r.conflict ? await reread(submit) : r.row;
+
+  if (Number(row.type) === 1) {
+    if (fromSlot) {
+      await sched.logAssignment(row.id, fromSlot, null, sched.ASSIGN.RELEASED, sched.ASSIGN_REASON.slotReleased, ctx.admin.id);
+    }
+    if (wasSeated) {
+      const rel = await runWeekSchedule(row, { operatorId: ctx.admin.id });
+      void releaseMsg('已撤销，回到待审', rel);
+    }
+  }
+  return withStatus(await reread(row));
+}
+
+/* ------------------------------------------------------------------ *
+ * 批量审核
+ * ------------------------------------------------------------------ */
+/** POST /admin/submit/batch */
+async function batch(ctx) {
+  asAdmin(ctx);
+  const { ids, action, reason } = ctx.body || {};
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new ApiError(Codes.PARAM_ERROR, '请选择要操作的记录');
+  }
+  if (!['approve', 'reject'].includes(action)) {
+    throw new ApiError(Codes.PARAM_ERROR, '操作类型错误');
+  }
+  if (action === 'reject' && !reason) {
+    throw new ApiError(Codes.PARAM_ERROR, '驳回操作必须填写理由');
+  }
+
+  let affected = 0;
+  const skipped = [];
+  const weeks = new Set();
+
+  for (const raw of ids) {
+    const id = parseId(raw);
+    const submit = id === null ? null : await findOne(C.SUBMIT, { id });
+    if (!submit) { skipped.push(raw); continue; }
+    try {
+      await assertWeekOpen(submit);            // 已锁定的周整条跳过（记 skipped，不报错中断）
+      if (action === 'approve') {
+        const r = await approveOne(submit, ctx.admin.id);
+        if (r.changed) affected += 1; else skipped.push(raw);
+      } else {
+        const r = await rejectOne(submit, ctx.admin.id, reason);
+        affected += 1;
+        if (r.wasSeated) { const ms = weekMsOf(submit); if (ms !== null) weeks.add(ms); }
+      }
+      if (Number(submit.type) === 1) {
+        const ms = weekMsOf(submit);
+        if (ms !== null) weeks.add(ms);
+      }
+    } catch (e) {
+      if (e instanceof ApiError) { skipped.push(raw); continue; }
+      throw e;
+    }
+  }
+
+  // 涉及的每一周统一重跑排期（一次，而不是每条约一次）
+  for (const ms of weeks) {
+    await sched.initialAllocate(ms, { operatorId: ctx.admin.id }).catch(() => null);
+    await sched.runAllocators(ms, { operatorId: ctx.admin.id }).catch(() => null);
+  }
+
+  return { affected, skipped };
+}
+
+/* ------------------------------------------------------------------ *
+ * 排期：矩阵 / 执行 / 锁定 / 人工调整 / 播放
+ * ------------------------------------------------------------------ */
+/** 先算一条点歌属于哪个周（没有排期行时用「首选时段」推） */
+async function targetWeekMs(now = Date.now()) {
+  const slots = await broadcastSlot.getSlots(now);
+  if (slots.list.length) {
+    const ws = sched.weekStartOfValue(slots.list[0].value);
+    if (ws) return ws.getTime();
+  }
+  return songWindow.windowRangeAt(await songWindow.getConfig(now), now).weekStart.getTime();
+}
+
+/** 解析 body/query 里的 weekStart（'YYYY-MM-DD' → 北京时间当天 00:00） */
+function weekStartMsOf(v) {
+  if (!v) return null;
+  const d = new Date(`${v}T00:00:00+08:00`);
+  return Number.isNaN(d.getTime()) ? null : d.getTime();
+}
+
+/** GET /admin/submit/schedule   排期矩阵（三维）+ 全局候补队列 */
+async function schedule(ctx) {
+  asAdmin(ctx);
+  const now = Date.now();
+  const slots = await broadcastSlot.getSlots(now);
+  const values = slots.list.map((s) => s.value);
+  const capacity = await songQueue.getCapacity();
+  const weekMs = values.length ? sched.weekStartOfValue(values[0]).getTime() : await targetWeekMs(now);
+  const week = await sched.ensureWeek(weekMs, { now });
+
+  // ① 每格已占（review=APPROVED AND schedule=APPROVED）
+  const seatedMap = await sched.countSeatedBySlot(values);
+
+  // ② 每格「首选这一格但还在候补」/ ③ 「还在审核中」—— 源码用 GROUP BY，
+  //    云端无聚合 → 全量拉「首选落在本周格子内」的子集再 JS 计数（集合有天然上限）。
+  //
+  // ⚠️ ③ 的「审核中」**不能**再加 scheduleStatus 条件：审核中的行 scheduleStatus 恒为
+  //    UNASSIGNED，写成 `scheduleStatus: _.in([APPROVED, WAITING])` 会把它们整批滤掉，
+  //    于是矩阵上「待审」格子永远显示 0（静默错，不报错）。所以用 `_.or` 分两支：
+  const scoped = await findAllPaged(C.SUBMIT, _.and([
+    { type: 1, wantBroadcastTime: _.in(values) },
+    _.or([
+      { reviewStatus: S.REVIEW.PENDING },                                              // 还在审核中
+      { reviewStatus: S.REVIEW.APPROVED, scheduleStatus: S.SCHEDULE.WAITING },         // 首选满、在候补
+    ]),
+  ]), { max: 3000 });
+  const waitingMap = {};
+  const pendingMap = {};
+  scoped.forEach((r) => {
+    const v = r.wantBroadcastTime;
+    if (r.reviewStatus === S.REVIEW.PENDING) pendingMap[v] = (pendingMap[v] || 0) + 1;
+    else if (r.scheduleStatus === S.SCHEDULE.WAITING) waitingMap[v] = (waitingMap[v] || 0) + 1;
+  });
+
+  const days = [];
+  let byDate = null;
+  let totalPending = 0;
+  let totalScheduled = 0;
+  slots.list.forEach((s) => {
+    if (!byDate || byDate.date !== s.date) {
+      byDate = { date: s.date, weekday: s.weekday, monthDay: s.monthDay, slots: [] };
+      days.push(byDate);
+    }
+    const seated = seatedMap[s.value] || 0;
+    const waiting = waitingMap[s.value] || 0;
+    const pending = pendingMap[s.value] || 0;
+    totalPending += pending;
+    totalScheduled += seated;
+    byDate.slots.push({
+      value: s.value,
+      date: s.date,
+      time: s.time,
+      period: s.period,
+      label: s.label,
+      scheduled: seated,          // 已排期（占位）
+      waiting,                    // 首选这一格、还在候补
+      pending,                    // 还在审核中
+      approved: seated,           // 兼容旧字段名
+      promoted: 0,                // 兼容旧字段名（协议版没有「补位未审」）
+      seated,
+      left: capacity > 0 ? Math.max(0, capacity - seated) : null,
+      capacity,
+      full: capacity > 0 && seated >= capacity,
+    });
+  });
+
+  const [queue, win] = await Promise.all([songQueue.snapshot(now), songWindow.status(now)]);
+  const lockAt = week.scheduleLockAt ? songWindow.toBjsIso(new Date(+new Date(week.scheduleLockAt))) : null;
+
+  return {
+    weekStart: slots.weekStart,
+    weekEnd: slots.weekEnd,
+    rangeText: slots.rangeText,
+    capacity,
+    weekCapacity: queue.weekCapacity,
+    totalPending,
+    totalScheduled,
+    totalWaiting: queue.total,
+    days,
+    queue,
+    week: sched.weekView(week, now),
+    window: win,
+    lockAt,
+    /** @deprecated 旧字段名（= 锁定时刻） */
+    finalizeAt: lockAt,
+  };
+}
+
+/** GET /admin/submit/week   目标周的状态与时间锚点 */
+async function week(ctx) {
+  asAdmin(ctx);
+  const now = Date.now();
+  const ms = weekStartMsOf(ctx.query && ctx.query.weekStart) || await targetWeekMs(now);
+  const row = await sched.ensureWeek(ms, { now });
+  const values = await sched.slotValuesOfWeek(ms);
+  const counters = await sched.countSeatedBySlot(values);
+  const capacity = await songQueue.getCapacity();
+  const seated = Object.values(counters).reduce((a, b) => a + b, 0);
+  const total = capacity > 0 ? values.length * capacity : 0;
+  return {
+    ...sched.weekView(row, now),
+    slots: values.length,
+    capacity,
+    seated,
+    left: total ? Math.max(0, total - seated) : null,
+    total,
+  };
+}
+
+/** POST /admin/submit/schedule/run   执行第一轮排期 + 全局调剂（仅超管） */
+async function runSchedule(ctx) {
+  asSuper(ctx);
+  const now = Date.now();
+  const body = ctx.body || {};
+  const ms = weekStartMsOf(body.weekStart) || await targetWeekMs(now);
+  await assertWeekNotLocked(ms, '这一周');    // 锁定后不允许重跑排期
+
+  // 超管手动执行 = 完整调度，**显式**放开跨时段调剂：
+  // 自动路径要等点播截止才跨时段，手动执行是管理员的明确意图，不受该闸门限制。
+  const a = await sched.initialAllocate(ms, { now, operatorId: ctx.admin.id });
+  const b = await sched.reschedule(ms, { now, operatorId: ctx.admin.id, crossSlot: true });
+  const row = await sched.ensureWeek(ms, { now });
+  return {
+    week: sched.weekView(row, now),
+    crossSlot: b.crossSlot,
+    assigned: a.assigned,
+    waiting: a.waiting,
+    promoted: b.promoted,
+    rescheduled: b.rescheduled,
+    stillWaiting: b.left,
+  };
+}
+
+/**
+ * POST /admin/submit/schedule/preview   模拟排期（只算不写库，仅超管）
+ *
+ * body: { weekStart?, crossSlot? }
+ *   crossSlot 省略 = 按「点播是否已截止」自动判断（与自动路径一致）；
+ *   传 true 可预览「如果现在放开跨时段会怎样」。
+ */
+async function previewSchedule(ctx) {
+  asSuper(ctx);
+  const now = Date.now();
+  const body = ctx.body || {};
+  const ms = weekStartMsOf(body.weekStart) || await targetWeekMs(now);
+  const row = await sched.ensureWeek(ms, { now });
+  const values = await sched.slotValuesOfWeek(ms);
+  const capacity = await sched.getCapacity();
+  const counters = await sched.countSeatedBySlot(values);
+  const crossSlot = body.crossSlot === undefined || body.crossSlot === null
+    ? null                                  // null = 交给算法按点播截止时间判断
+    : !!body.crossSlot;
+
+  const a = await sched.initialAllocate(ms, { now, dryRun: true });
+  const b = await sched.reschedule(ms, { now, dryRun: true, crossSlot });
+
+  // dryRun 不写库 → 「模拟后各格占用」只能从动作清单自己推
+  const after = { ...counters };
+  [...a.actions, ...b.actions].forEach((x) => {
+    if (x.to) after[x.to] = (after[x.to] || 0) + 1;
+  });
+
+  const actions = [...a.actions, ...b.actions];
+  const ids = [...new Set(actions.map((x) => Number(x.id)).filter((n) => Number.isInteger(n)))];
+  const byId = new Map();
+  for (const part of chunk(ids, IN_CHUNK)) {
+    const rows = await findMany(
+      C.SUBMIT,
+      { id: _.in(part) },
+      { limit: IN_CHUNK }
+    );
+    rows.forEach((r) => byId.set(Number(r.id), r));
+  }
+
+  const detailOf = (x) => {
+    const r = byId.get(Number(x.id)) || {};
+    return {
+      id: x.id,
+      songName: r.songName || x.songName || '',
+      singer: r.singer || '',
+      submittedAt: r.createTime || null,
+      want: x.want || r.wantBroadcastTime || '',
+      to: x.to || null,
+      cost: x.cost === undefined ? null : x.cost,   // 成本表档位（0/10/20/30/50）
+    };
+  };
+
+  const assign = a.actions.filter((x) => x.action === 'ASSIGN').map(detailOf);
+  const promote = b.actions.filter((x) => x.action === 'PROMOTE').map(detailOf);
+  const rescheduled = b.actions.filter((x) => x.action === 'RESCHEDULE').map(detailOf);
+  const waiting = [
+    ...a.actions.filter((x) => x.action === 'WAITING'),
+    ...b.actions.filter((x) => x.action === 'WAITING'),
+  ].map(detailOf);
+
+  return {
+    dryRun: true,
+    week: sched.weekView(row, now),
+    crossSlot: b.crossSlot,
+    crossSlotReason: b.crossSlot
+      ? '点播已截止（或手动指定），允许跨时段调剂'
+      : '点播未截止，只做原位递补 —— 别处的空位要留给首选那一格的原申请者',
+    slots: values.map((v) => ({
+      value: v,
+      seated: counters[v] || 0,
+      after: after[v] || 0,
+      capacity,
+      full: capacity > 0 && (after[v] || 0) >= capacity,
+    })),
+    // waiting = 现在仍排不上的人；到了锁定时刻他们会被 AUTO_REJECTED
+    plan: { assign, promote, rescheduled, waiting },
+    summary: {
+      assigned: a.assigned,
+      waiting: a.waiting,
+      promoted: b.promoted,
+      rescheduled: b.rescheduled,
+      stillWaiting: b.left,
+      autoRejectedIfLocked: waiting.length,
+    },
+  };
+}
+
+/** POST /admin/submit/schedule/lock   正式锁定（仅超管；body.force 可提前锁） */
+async function lock(ctx) {
+  asSuper(ctx);
+  const now = Date.now();
+  const body = ctx.body || {};
+  const ms = weekStartMsOf(body.weekStart) || await targetWeekMs(now);
+  const force = body.force === true || body.force === 1 || body.force === '1';
+  const r = await sched.lockWeek(ms, { now, operatorId: ctx.admin.id, force });
+  if (r.tooEarly) {
+    throw new ApiError(Codes.PARAM_ERROR, `还没到锁定时刻（${r.lockText}），如需提前锁定请传 force: true`);
+  }
+  return r;
+}
+
+/**
+ * POST /admin/submit/schedule/unlock   解锁（撤销锁定，仅超管）
+ * body: { weekStart?, restore? }  restore 显式 false 才不解冻被自动驳回的候补
+ */
+async function unlock(ctx) {
+  asSuper(ctx);
+  const now = Date.now();
+  const body = ctx.body || {};
+  const ms = weekStartMsOf(body.weekStart) || await targetWeekMs(now);
+  const restore = body.restore === undefined || body.restore === null ? true : !!body.restore;
+  return sched.unlockWeek(ms, { now, operatorId: ctx.admin.id, restore });
+}
+
+/** POST /admin/submit/:id/assign   人工指定时段（仅超管） */
+async function assign(ctx) {
+  asSuper(ctx);
+  const { slot, reason } = ctx.body || {};
+  if (!slot) throw new ApiError(Codes.PARAM_ERROR, '请传 slot（目标时段值）');
+  const submit = await submitOf(ctx);
+  if (Number(submit.type) !== 1) throw new ApiError(Codes.PARAM_ERROR, '只能对点歌做排期调整');
+  // 原归属周 与 目标时段所属周 都不能是已锁定的周
+  await assertWeekOpen(submit);
+  const targetWs = sched.weekStartOfValue(String(slot));
+  const targetMs = targetWs ? targetWs.getTime() : null;
+  await assertWeekNotLocked(targetMs, '目标时段所属周');
+
+  try {
+    const r = await sched.manualAssign(submit, String(slot), {
+      operatorId: ctx.admin.id,
+      reason: reason || sched.ASSIGN_REASON.manual,
+    });
+    // 新位置占了，原位置空了 → 重新对齐候补（targetMs 为 null 时 manualAssign 早已抛错）
+    if (targetMs !== null) {
+      await sched.runAllocators(targetMs, { operatorId: ctx.admin.id }).catch(() => null);
+    }
+    return withStatus(await reread(r.row));
+  } catch (e) {
+    if (e.code === 40001) throw new ApiError(Codes.PARAM_ERROR, e.message);
+    throw e;
+  }
+}
+
+/** PUT /admin/submit/:id/played   标记已播放 / 取消（仅超管） */
+async function played(ctx) {
+  asSuper(ctx);
+  const submit = await submitOf(ctx);
+  await assertWeekOpen(submit);                 // 已锁定的周不允许人工改播放标记
+  const body = ctx.body || {};
+  const want = body.played === undefined ? true : !!body.played;
+  const r = await sched.setPlayed(submit, want, { operatorId: ctx.admin.id });
+  return withStatus(await reread(r.row));
+}
+
+/** GET /admin/submit/:id/status-logs */
+async function statusLogs(ctx) {
+  asAdmin(ctx);
+  const id = parseId(ctx.params && ctx.params.id);
+  return S.historyOf(id === null ? -1 : id, 100);
+}
+
+/* ------------------------------------------------------------------ *
+ * 容量 / 兜底
+ * ------------------------------------------------------------------ */
+/** GET /admin/submit/capacity（= 旧路径 GET /admin/submit/quota） */
+async function capacity(ctx) {
+  asAdmin(ctx);
+  return songQueue.capacitySnapshot();
+}
+
+/**
+ * PUT /admin/submit/quota   设置每格容量（仅超管）
+ * body: { capacity? }
+ * ⚠️ `queueLimit` 在协议版已废弃 —— 候补没有人数上限，传了也不生效（与源码一致）。
+ */
+async function setQuota(ctx) {
+  asSuper(ctx);
+  const { capacity: cap } = ctx.body || {};
+  if (cap !== undefined && cap !== null && cap !== '') {
+    await broadcastSlot.setCapacity(cap);
+  }
+  await broadcastSlot.clearCache();
+  // 改容量后立刻重跑排期（可能多出位置 / 少掉位置），行为符合直觉。
+  // ⚠️ 已锁定的周不重算 —— 那是定稿数据，改容量不该反悔它。
+  const now = Date.now();
+  const ms = await targetWeekMs(now);
+  const wk = await sched.ensureWeek(ms, { now });
+  const locked = wk.status === sched.WEEK_STATUS.LOCKED;
+  if (!locked) {
+    await sched.initialAllocate(ms, { now, operatorId: ctx.admin.id }).catch(() => null);
+    await sched.runAllocators(ms, { now, operatorId: ctx.admin.id }).catch(() => null);
+  }
+  return songQueue.snapshot(now);
+}
+
+/** POST /admin/submit/queue/sweep（= 旧路径 POST /admin/submit/quota/sweep）幂等，仅超管 */
+async function sweepQueue(ctx) {
+  asSuper(ctx);
+  return sched.sweep({ now: Date.now(), operatorId: ctx.admin.id });
+}
+
+/* ------------------------------------------------------------------ *
+ * 点歌设置：注意事项 / 播出时段 / 提交规则
+ * ------------------------------------------------------------------ */
+/** GET /admin/submit/notice */
+async function notice(ctx) {
+  asAdmin(ctx);
+  return songNotice.getAllForAdmin();
+}
+
+/** PUT /admin/submit/notice   注意：**管理员即可**（源码此处不是超管） */
+async function saveNotice(ctx) {
+  asAdmin(ctx);
+  const { content, type } = ctx.body || {};
+  if (content === undefined) {
+    throw new ApiError(Codes.PARAM_ERROR, '请传 content（允许空字符串表示停用）');
+  }
+  try {
+    return await songNotice.save(content, type);
+  } catch (e) {
+    throw paramError(e);   // 内容超 5000 字 → 源控制器翻成 40001
+  }
+}
+
+/** GET /admin/submit/timeslots */
+async function timeslots(ctx) {
+  asAdmin(ctx);
+  return broadcastSlot.getAdminConfig();
+}
+
+/** GET /admin/submit/window */
+async function window(ctx) {
+  asAdmin(ctx);
+  return songWindow.describe();
+}
+
+/** PUT /admin/submit/window（仅超管） */
+async function saveWindow(ctx) {
+  asSuper(ctx);
+  const body = ctx.body || {};
+  await songWindow.setConfig(body, ctx.admin.id);
+  return songWindow.describe();
+}
+
+/** PUT /admin/submit/slots（仅超管） */
+async function saveSlots(ctx) {
+  asSuper(ctx);
+  const { times, capacity: cap } = ctx.body || {};
+  if (!Array.isArray(times)) {
+    throw new ApiError(Codes.PARAM_ERROR, '请传 times 数组，如 [{time:"12:20",label:"午间"}]');
+  }
+  try {
+    return await broadcastSlot.setSlotTimes(times, cap);
+  } catch (e) {
+    throw paramError(e);   // 时段全非法 → 源控制器翻成 40001
+  }
+}
+
+/** GET /admin/submit/rules */
+async function rules(ctx) {
+  asAdmin(ctx);
+  const r = await submitRule.getRules();
+  return { ...r, defaultUserLimit: submitRule.DEFAULT_USER_LIMIT };
+}
+
+/** PUT /admin/submit/rules（仅超管） */
+async function saveRules(ctx) {
+  asSuper(ctx);
+  const { weeklyUserLimit, dupBlock } = ctx.body || {};
+  const r = await submitRule.setRules({ weeklyUserLimit, dupBlock });
+  return { ...r, defaultUserLimit: submitRule.DEFAULT_USER_LIMIT };
+}
+
+/**
+ * DELETE /admin/submit/songs   一键清空全部点歌数据（仅超管）
+ * body: { confirm: 'DELETE' }
+ *
+ * ⚠️ 无跨文档事务（文件头 ⑤）：分批「先删日志、再删点歌」，重跑即收敛。
+ */
+async function purgeSongs(ctx) {
+  asSuper(ctx);
+  const { confirm } = ctx.body || {};
+  if (confirm !== 'DELETE') {
+    throw new ApiError(Codes.PARAM_ERROR, '高危操作：请传 confirm: "DELETE" 明确确认');
+  }
+  let deleted = 0;
+  let logs = 0;
+  // 每轮取 100 条（云函数端单次 get 上限），删完再取，直到没有点歌为止
+  for (let guard = 0; guard < 10000; guard++) {
+    const rows = await findMany(C.SUBMIT, { type: 1 }, { limit: IN_CHUNK });
+    const ids = rows.map((r) => r.id).filter((v) => v !== undefined && v !== null);
+    if (!ids.length) break;                    // 没有可删的合法 id（或已清空）→ 退出
+    // 先删两张日志的对应行（否则会留下指向不存在点歌的孤儿行）
+    await removeWhere(C.ASSIGNMENT_LOG, { requestId: _.in(ids) });
+    await removeWhere(C.STATUS_LOG, { requestId: _.in(ids) });
+    logs += ids.length;
+    deleted += await removeWhere(C.SUBMIT, { id: _.in(ids) });
+    if (rows.length < IN_CHUNK) break;         // 最后一批
+  }
+  return { deletedSongs: deleted, logsCleared: logs };
+}
+
+module.exports = {
+  list,
+  detail,
+  approve,
+  reject,
+  revoke,
+  remove,
+  batch,
+  schedule,
+  week,
+  previewSchedule,
+  runSchedule,
+  lock,
+  unlock,
+  assign,
+  played,
+  statusLogs,
+  capacity,
+  setQuota,
+  sweepQueue,
+  notice,
+  saveNotice,
+  timeslots,
+  window,
+  saveWindow,
+  saveSlots,
+  rules,
+  saveRules,
+  purgeSongs,
+};
 
 };
 module.exports = __load("index.js");
