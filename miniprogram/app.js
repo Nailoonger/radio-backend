@@ -31,6 +31,15 @@ App({
     // 真机/体验版：走腾讯云服务器（2026-09-19 部署，公网 IP）
     // 调试期用 IP；正式化（域名+备案+HTTPS）后换成 https://域名/api
     baseURL: 'http://129.28.26.180/api',
+
+    // ── 云开发通道（2026-09-28 新增，用于免备案发布正式版）──────────────
+    // requestMode: 'direct' 走上面的服务器（现状）；'cloud' 走云函数（免备案）
+    // 切换方式：改成本行 + 填好 cloudEnvId，重新上传即可；改回 'direct' 立即复原
+    requestMode: 'direct',
+    cloudEnvId: '',                 // 云开发环境 ID（开发者工具「云开发」创建后填入）
+    cloudFunctionName: 'api',       // 网关云函数名（与 cloud/cloudfunctions/api 对应）
+    // ────────────────────────────────────────────────────────────────
+
     token: '',
     userInfo: null,
     switches: {},
@@ -41,6 +50,22 @@ App({
   },
 
   onLaunch() {
+    // 注入请求配置（必须在任何请求之前）：决定走 direct 还是 cloud 通道
+    const { configure } = require('./utils/request.js');
+    configure({
+      mode: this.globalData.requestMode,
+      baseURL: this.globalData.baseURL,
+      cloudFunctionName: this.globalData.cloudFunctionName,
+    });
+
+    // 云开发初始化（仅有环境 ID 时）：cloud 模式下所有请求依赖它
+    if (this.globalData.cloudEnvId && wx.cloud && wx.cloud.init) {
+      wx.cloud.init({ env: this.globalData.cloudEnvId, traceUser: true });
+      console.log('[app] 云开发已初始化 env =', this.globalData.cloudEnvId);
+    } else if (this.globalData.requestMode === 'cloud') {
+      console.warn('[app] requestMode=cloud 但 cloudEnvId 为空，请求会失败');
+    }
+
     // 恢复登录态
     const token = wx.getStorageSync('token');
     const userInfo = wx.getStorageSync('userInfo');
@@ -67,26 +92,25 @@ App({
     // 并发去重：App.onShow 与页面 onShow 有可能同一拍各触发一次
     if (this._switchesPending) return this._switchesPending;
 
-    this._switchesPending = new Promise((resolve) => {
-      // 这里直接用 wx.request，避免 request.js 在 app 还没 ready 时调用 getApp()
-      wx.request({
-        // 注意：模块开关的用户端接口挂在 /api/user 下，正确路径是 /user/switch/list
-        // （写成 /switch/list 会 404，而且 isModuleEnabled 有兜底，所以之前一直没被发现）
-        url: this.globalData.baseURL + '/user/switch/list',
-        success: (res) => {
-          if (res.data && res.data.code === 0 && Array.isArray(res.data.data.list)) {
-            const map = {};
-            res.data.data.list.forEach((s) => { map[s.key] = s.value; });
-            this.globalData.switches = map;
-          }
-          resolve(this.globalData.switches);
-        },
-        fail: () => resolve(this.globalData.switches),
+    // 走统一请求层（自动适配 direct / cloud 通道）。
+    // 注：onLaunch 里已先 configure 注入 baseURL，所以这里不依赖 getApp() 是否就绪。
+    const { request } = require('./utils/request.js');
+
+    this._switchesPending = Promise.resolve()
+      .then(() => request('/user/switch/list', 'GET'))
+      .then((data) => {
+        if (data && Array.isArray(data.list)) {
+          const map = {};
+          data.list.forEach((s) => { map[s.key] = s.value; });
+          this.globalData.switches = map;
+        }
+        return this.globalData.switches;
+      })
+      .catch(() => this.globalData.switches)
+      .then((data) => {
+        this._switchesPending = null;
+        return data;
       });
-    }).then((data) => {
-      this._switchesPending = null;
-      return data;
-    });
 
     return this._switchesPending;
   },
