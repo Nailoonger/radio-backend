@@ -45,7 +45,7 @@
 - 不开 Docker 的整链路验证：`DB_STORAGE=./data/_shot.db` + `npm run db:init` + `npm run seed` + `node src/app.js`；admin-web 走 vite dev（路由 `/submit/settings`，**不是** `/#/...`）；`localStorage` 存 `admin_token` + `admin_info`(role:0)。
   ⚠️ 复用的服务**会在会话之间掉线**：现象是 `curl localhost:PORT` 返回 **502**（本机代理在拦，不是真服务）→ 截图前先探活，掉了就重起后端 + vite。**用 `_shot.db` 前若 schema 变过要先 `rm` 再 db:init**（旧库会 `no such column` 崩）。
 - jest 基线：56 条里 15 条失败全是已删 member 模块的（member.test 14 + switch.test 1），别当新回归。
-- **push 配方**：PortableGit 凭据没问题（GCM 0.05s 返回 `Nailoonger` + `gho_…`），卡的是代理 CONNECT 隧道「闲置后首次建立」极慢 → **先 curl 预热（期望 401）再 push**：
+- ⚠️ **push（2026-09-28 复测：本机已经推不了）**：代理预热能通（401），但 `git push` 报 `fatal: unable to get password from user` —— **不是代理问题，是 GCM 在非交互环境取不到凭据**（历史记录说"凭据没问题"已过时）。⇒ **commit 我负责，push 必须陛下在自己 PowerShell 里敲**。下面这套预热命令留着（对陛下手动推有用）：
   ```bash
   curl -s -o /dev/null -w "%{http_code}" --max-time 8 -x http://127.0.0.1:7890 \
     "https://github.com/<owner>/<repo>.git/info/refs?service=git-receive-pack"
