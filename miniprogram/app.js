@@ -36,7 +36,7 @@ App({
     // requestMode: 'direct' 走上面的服务器（现状）；'cloud' 走云函数（免备案）
     // 切换方式：改成本行 + 填好 cloudEnvId，重新上传即可；改回 'direct' 立即复原
     requestMode: 'direct',
-    cloudEnvId: '',                 // 云开发环境 ID（开发者工具「云开发」创建后填入）
+    cloudEnvId: 'jy-radio-d1gdwmptl816ee6a9',   // 云开发环境 ID（2026-09-28 创建）
     cloudFunctionName: 'api',       // 网关云函数名（与 cloud/cloudfunctions/api 对应）
     // ────────────────────────────────────────────────────────────────
 
@@ -50,10 +50,20 @@ App({
   },
 
   onLaunch() {
-    // 注入请求配置（必须在任何请求之前）：决定走 direct 还是 cloud 通道
+    // 通道选择：默认读 globalData.requestMode；
+    // 调试期可在开发者工具控制台临时改，无需改代码、不用重新提审：
+    //   wx.setStorageSync('debug_requestMode', 'cloud')   // 切云通道
+    //   wx.setStorageSync('debug_requestMode', 'direct')  // 切回直连
+    //   wx.removeStorageSync('debug_requestMode')         // 恢复默认
+    let mode = this.globalData.requestMode;
+    try {
+      const dbg = wx.getStorageSync('debug_requestMode');
+      if (dbg === 'cloud' || dbg === 'direct') mode = dbg;
+    } catch (e) { /* 忽略 */ }
+
     const { configure } = require('./utils/request.js');
     configure({
-      mode: this.globalData.requestMode,
+      mode,
       baseURL: this.globalData.baseURL,
       cloudFunctionName: this.globalData.cloudFunctionName,
     });

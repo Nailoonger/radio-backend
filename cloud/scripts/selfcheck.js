@@ -90,6 +90,52 @@ Object.keys(oldR.Codes).forEach((k) => {
   eq(`错误码 ${k}`, newR.Codes[k], oldR.Codes[k]);
 });
 
+// ============ 3. 云函数镜像目录一致性 ============
+// 微信开发者工具的 cloudfunctionRoot 必须位于项目内 → 源文件镜像到 miniprogram/cloudfunctions/
+// 这里断言两边完全一致，防止「改了源文件忘了同步，线上跑的还是旧代码」。
+const SRC_DIR = path.join(ROOT, 'cloud', 'cloudfunctions');
+const DST_DIR = path.join(ROOT, 'miniprogram', 'cloudfunctions');
+
+function walkFiles(dir, base = '') {
+  if (!fs.existsSync(dir)) return [];
+  const out = [];
+  fs.readdirSync(dir, { withFileTypes: true }).forEach((e) => {
+    if (e.name === 'node_modules') return;
+    const rel = base ? `${base}/${e.name}` : e.name;
+    if (e.isDirectory()) out.push(...walkFiles(path.join(dir, e.name), rel));
+    else out.push(rel);
+  });
+  return out;
+}
+
+const srcFiles = walkFiles(SRC_DIR);
+const dstFiles = walkFiles(DST_DIR);
+eq('镜像目录文件数一致', dstFiles.length, srcFiles.length);
+
+const missingInDst = srcFiles.filter((f) => !dstFiles.includes(f));
+eq('镜像目录无缺失文件', missingInDst.join(',') || '(none)', '(none)');
+
+const contentDiff = srcFiles.filter((f) => {
+  if (!dstFiles.includes(f)) return false;
+  return !fs.readFileSync(path.join(SRC_DIR, f)).equals(fs.readFileSync(path.join(DST_DIR, f)));
+});
+eq('镜像目录内容一致', contentDiff.join(',') || '(none)', '(none)');
+info('若不一致 → 跑 node cloud/scripts/sync.js 重新镜像');
+
+// ============ 4. 小程序配置 ============
+const projCfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'miniprogram', 'project.config.json'), 'utf8'));
+eq('cloudfunctionRoot 已配置', projCfg.cloudfunctionRoot, 'cloudfunctions/');
+
+const appJs = fs.readFileSync(path.join(ROOT, 'miniprogram', 'app.js'), 'utf8');
+ok_contains('app.js 已填云环境 ID', appJs, /cloudEnvId:\s*'jy-radio-[a-z0-9]+'/);
+ok_contains('app.js 保留 direct 模式开关', appJs, /requestMode:\s*'direct'/);
+
+function ok_contains(name, text, re) {
+  const hit = re.test(text);
+  if (!hit) failed++;
+  lines.push(`${hit ? 'OK  ' : 'FAIL'} ${name}`);
+}
+
 // ============ 输出 ============
 lines.push('');
 lines.push(`结论：${lines.length} 行 / 失败 ${failed} 项`);

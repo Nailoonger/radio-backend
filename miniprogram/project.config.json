@@ -49,6 +49,7 @@
   "libVersion": "2.32.3",
   "appid": "wxa88836729f07a976",
   "projectname": "radio-station",
+  "cloudfunctionRoot": "cloudfunctions/",
   "condition": {},
   "editorSetting": {
     "tabIndent": "insertSpaces",

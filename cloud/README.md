@@ -130,14 +130,53 @@ cloud/
     └── test-gateway.js            # 网关实测（25 项）
 ```
 
-## 六、小程序端切换开关（阶段 1 已落地）
+## 六、小程序端切换开关
 
 `miniprogram/app.js` 的 `globalData`：
 
 ```js
-cloudEnvId: '',            // 云开发环境 ID（在开发者工具里创建后填入）
-requestMode: 'direct',     // 'direct' = 走原服务器（现状）； 'cloud' = 走云函数
+cloudEnvId: 'jy-radio-d1gdwmptl816ee6a9',  // 云开发环境 ID（2026-09-28 创建）
+requestMode: 'direct',                     // 'direct' = 走原服务器（现状）； 'cloud' = 走云函数
 ```
 
-改成 `'cloud'` + 填 `cloudEnvId` 即切云开发；改回 `'direct'` 立即恢复直连。
+**调试期免改代码切换**（开发者工具控制台执行，之后重启小程序）：
+
+```js
+wx.setStorageSync('debug_requestMode', 'cloud')   // 切云通道
+wx.setStorageSync('debug_requestMode', 'direct')  // 切回直连
+wx.removeStorageSync('debug_requestMode')         // 恢复默认
+```
+
 两个模式**共用同一套调用签名**，业务代码（页面）完全无感。
+
+## 七、云函数镜像目录（重要）
+
+微信开发者工具的 `cloudfunctionRoot` **必须位于项目目录内**，不接受仓库根目录外的路径。
+所以源文件在 `cloud/cloudfunctions/`，运行时目录是 `miniprogram/cloudfunctions/`（`project.config.json` 里 `"cloudfunctionRoot": "cloudfunctions/"`）。
+
+```
+node cloud/scripts/sync.js           # 同步（单向镜像，覆盖 + 清理多余）
+node cloud/scripts/sync.js --check   # 只校验一致性（不一致退出码 1）
+```
+
+⚠️ **永远不要手改 `miniprogram/cloudfunctions/`** —— 改源文件后跑一次 `sync.js`。
+`selfcheck.js` 里有镜像一致性断言，改完不同步会当场报红。
+
+## 八、首次部署步骤（陛下操作）
+
+1. **开发者工具** → 顶部「云开发」→ 确认环境为 `jy-radio-d1gdwmptl816ee6a9`；
+2. 左侧文件树找到 `cloudfunctions/api` → **右键 → 上传并部署：云端安装依赖**
+   （首次约 1~2 分钟；它会在云端装 `wx-server-sdk` / `jsonwebtoken` / `bcryptjs` / `axios` / `exceljs`）；
+3. **验证通道**：控制台执行 `wx.cloud.callFunction({name:'api',data:{method:'GET',path:'/health'}})`，
+   返回 `{ code: 0, data: { ok: true, scope: 'cloud-function', ... } }` 即通道打通；
+4. **验证业务接口**（需先建集合，见下）：控制台切 `debug_requestMode = 'cloud'` 重启小程序，
+   观察启动时 `[request:cloud] GET /user/switch/list → 0` 的日志；
+5. 都通过后，把 `app.js` 的 `requestMode` 正式改成 `'cloud'` 再提审。
+
+**云数据库集合**（云开发控制台 → 数据库 → 新建集合）：
+
+| 阶段 | 需要建的集合 |
+|---|---|
+| 验证 `/health` | 无 |
+| 验证开关/站点信息 | `system_switch`、`system_setting` |
+| 后续阶段 | `user`、`submit`、`weekly_schedule`、`unique_keys`、`sequence` …（见 docs/data-model-mapping.md） |

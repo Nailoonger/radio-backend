@@ -1,0 +1,17 @@
+{
+  "name": "radio-api",
+  "version": "1.0.0",
+  "description": "菁悠广播站 · 云开发网关云函数（Express 后端迁移目标）",
+  "main": "index.js",
+  "private": true,
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
+    "axios": "^1.7.7",
+    "exceljs": "^4.4.0"
+  },
+  "scripts": {
+    "test": "echo \"no tests in cloud function\" && exit 0"
+  }
+}
