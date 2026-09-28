@@ -53,7 +53,7 @@
 **一键跑完全部（源码 + 打包产物各一轮）：**
 
 ```bash
-node cloud/scripts/regression.js            # 13 套件 × 两轮，合计 2883 项
+node cloud/scripts/regression.js            # 13 套件 × 两轮，合计 2899 项
 node cloud/scripts/regression.js --source   # 只跑源码目录
 node cloud/scripts/regression.js --selftest # 只自检「结论行解析器」（不依赖子进程）
 ```
@@ -73,8 +73,8 @@ node cloud/scripts/test-user-auth.js       # 登录 / 改密 / me（62 项）
 node cloud/scripts/test-user-submit.js     # 投稿 / 点歌 11 个接口（206 项）
 node cloud/scripts/test-scheduling-cost.js # 调剂选址成本表（63 项）
 node cloud/scripts/test-scheduling.js      # 排期算法 12 个函数 + 定时闸门（273 项）
-node cloud/scripts/test-admin-core.js      # 管理端非点歌 63 条 + 93 路由权限矩阵（163 项）
-node cloud/scripts/test-admin-submit.js    # 点歌 30 条 + 排期算法整链路（225 项）
+node cloud/scripts/test-admin-core.js      # 管理端非点歌 63 条 + 93 路由权限矩阵（165 项）
+node cloud/scripts/test-admin-submit.js    # 点歌 30 条 + 排期算法整链路（231 项）
 node cloud/scripts/test-admin-student.js   # 学生账号 19 条 + roster/sheet 服务（263 项）
 node cloud/scripts/test-admin-routes.js    # 路由 ↔ handler 就绪性守门（19 项）
 node cloud/scripts/test-bundle.js          # 打包产物冒烟（24 项）
@@ -82,9 +82,9 @@ node cloud/scripts/test-bundle.js          # 打包产物冒烟（24 项）
 
 | 轮次 | 断言数 |
 |---|---|
-| 源码目录（13 套件） | **1504 项** |
-| 打包产物（11 套件，`test-bundle`/`selfcheck` 本就自看产物） | **1379 项** |
-| 合计 | **2883 项 / 失败 0** |
+| 源码目录（13 套件） | **1512 项** |
+| 打包产物（11 套件，`test-bundle`/`selfcheck` 本就自看产物） | **1387 项** |
+| 合计 | **2899 项 / 失败 0** |
 
 ⚠️ **产物行为必须与源码一致**：`HARNESS_API_DIR=miniprogram/cloudfunctions/api` 再跑一遍
 （打包器是自研的，必须能自证 —— 它漏收一条 `require` 就是线上 `Cannot find module`）。
@@ -141,9 +141,15 @@ $env:HARNESS_API_DIR="$PWD/miniprogram/cloudfunctions/api"; node cloud/scripts/t
 4. 未搬 `loginLimiter` / `submitLimiter` / `messageLimiter`（Express 内存限流，
    云函数多实例下天然失效；改用「时间窗口 + 唯一键」业务级防刷，已由断言覆盖）。
 5. 未搬 `uploadController`（未被任何路由引用）。
-6. **两处「源实现瑕疵」已显式钉住，不擅自改**（留给陛下定夺，见 `docs/stage7-admin-plan.md`）：
-   - `stats.overview` 的 `approved` 口径仍是 `status:1`（协议改版后 `1 = 已排期`）
-   - `previewSchedule(dryRun)` 的 `promoted/rescheduled/stillWaiting` 恒 0（诊断归零）
+6. **两处「源实现瑕疵」已被陛下裁决修正**（2026-09-29，详见 `docs/stage7-admin-plan.md` §五）：
+   - `stats.overview` 的 `approved` 口径 `status:1` → **`status ∈ {1,5,6}`**
+     （旧口径在派生镜像下只表示「已排期」，把「已通过·待排期」和「已播放」一起漏掉）。
+     ⚠️ 孪生位置 `topSongs()` **仍是 `status:1`**（它进 Dashboard 的可见榜，未获授权）——
+     同一个「已通过」语义在那儿还偏着，等陛下一句话。
+   - `previewSchedule(dryRun)` 的 `promoted/rescheduled/stillWaiting` 恒 0 → 已修（见静默漂移 #10）；
+     顺带修正了 `autoRejectedIfLocked` 的**虚高**（它原先复用当前闸门下的 `left`，
+     而锁定时刻闸门是强制放开的 → 预览说会驳回 1 条、真锁定时 0 条）。
+     所以「**预览排期的主结论在修正前也是错的**」—— 这条比数字归零更值得记。
 7. **有意的缺陷修正**（已标注，因为改的是「显示」而不是「语义」）：
    `formatTime` / `stamp` 从容器本地时间（= UTC，导出时间早 8 小时）改成北京时间。
 
@@ -184,7 +190,7 @@ $env:HARNESS_API_DIR="$PWD/miniprogram/cloudfunctions/api"; node cloud/scripts/t
 | `admin.submit` | 30 | 点歌：列表 / 审核 / 排期 / 锁定解锁 / 容量 / 规则 / 窗口 / 注意事项 / 一键清空 |
 | **合计** | **93** | 超管 56 路由 / 普管 37 路由（同一 handlerKey 可挂多条路由） |
 
-### ⚠️ 九个「不报错」的静默漂移（移植时务必对照）
+### ⚠️ 十个「不报错」的静默漂移（移植时务必对照）
 
 1. **`ApiError` 是 4 参**：`(code, message, httpStatus = 200, data = null)`，与 `src/utils/response.js` 一致。
    从 src 逐字移植过来的 service 会写 `new ApiError(code, msg, 200, { opensAt })` ——
@@ -223,6 +229,21 @@ $env:HARNESS_API_DIR="$PWD/miniprogram/cloudfunctions/api"; node cloud/scripts/t
    （唯一例外：`system_setting` / `system_switch` / `notice_ack` / `weekly_schedule`
    这 4 张表用 `insertWithId` 把业务键当 `_id`。）
    踩点：`services/roster.js` 的 `commit()`，防回归断言 `test-admin-student.js` C 段。
+10. **多阶段流程只要有一阶段跑在 `dryRun`，「链式演练」就断了**。
+    正式路径是「`initialAllocate()` 写库 → `reschedule()` 读库」，第二步天然看得见第一步的
+    结果；`dryRun` 下两步都不写库 → 第二步看到的是「第一步从没发生过」的世界，
+    于是**同时**出现两种失真：① 按库查候选 → 一条查不到 → 计数恒 0；
+    ② 各格占用还是落座前的 → 刚发给别人的座位又被算成空位 → 同一个人塞进两个位置。
+    ⚠️ 只修 ① 会让数字「看起来对了」但占用图虚得更厉害，两个必须一起修。
+    → 正确做法：让上一阶段把**内存结果**（候补**整行** + 落座后**占用表**）交给下一阶段
+    （`reschedule` 的 `extraWaiting` / `seatedOverride`），并**按 id 去重**。
+    ⚠️ 还有第三层：**汇报口径要按「最终动作时刻的参数」重算**。
+    `previewSchedule` 的 `autoRejectedIfLocked` 原先复用「当前闸门」下的 `left`，
+    而锁定时刻 `lockWeek()` 是**显式 `crossSlot: true`** → 闸门关着时该数字**虚高**
+    （预览说会驳回 1 条，真锁定时是 0 条 —— 连主结论都错）。闸门关着时必须另跑一轮演练。
+    踩点：`handlers/admin/submit.js` 的 `previewSchedule()`、`services/scheduling.js`。
+    防回归：`test-admin-submit.js` H 段（含**反向用例** —— 拒绝调剂 + 首选格满时该数字必须是 1，
+    否则那些 `= 0` 的断言用一个「恒返回 0」的坏实现也能全绿）。
 
 ### 阶段 6：定时器为什么不直接每分钟裸跑 `sweep()`
 

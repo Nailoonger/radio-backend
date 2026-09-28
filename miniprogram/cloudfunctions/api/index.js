@@ -5792,13 +5792,17 @@ async function logAssignment(requestId, fromSlot, toSlot, type, reason, operator
  * 按提交时间升序，前 capacity 个拿到正式位，其余进 WAITING。
  *
  * 幂等：候选条件带 scheduleStatus = UNASSIGNED，重复跑只命中更少行。
- * @returns {Promise<{assigned:number, waiting:number, weekId:number}>}
+ *
+ * ⚠️ `dryRun` 下额外返回 `waitingRows`（**整行**，不是 action 摘要）：第二阶段的
+ *    `reschedule()` 在 dryRun 里读不到库里刚写进去的 `WAITING`，只能靠调用方把
+ *    这批行从内存喂过去。非 dryRun 时恒为空数组。
+ * @returns {Promise<{assigned:number, waiting:number, weekId:number, actions:Array, waitingRows:Array}>}
  */
 async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = null, dryRun = false } = {}) {
   const week = await ensureWeek(weekStartMs, { now });
   const values = await slotValuesOfWeek(weekStartMs);
   const capacity = await getCapacity();
-  const res = { weekId: week.id, assigned: 0, waiting: 0, actions: [] };
+  const res = { weekId: week.id, assigned: 0, waiting: 0, actions: [], waitingRows: [] };
 
   const counters = await countSeatedBySlot(values);
 
@@ -5834,6 +5838,11 @@ async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = nul
       } else {
         if (dryRun) {
           res.actions.push({ action: 'WAITING', id: row.id, songName: row.songName, want: value, to: null, cost: null });
+          // ⚠️ 整行留一份：`reschedule(dryRun)` 的候选是「库里 WAITING」，dryRun 下
+          //    这条规则写不进去，只能由调用方把整行转交给第二阶段（见 reschedule 的
+          //    `extraWaiting`）。只留 action 摘要不够 —— 排序要用 createTime / id、
+          //    可接受落点要用 allowReschedule。
+          res.waitingRows.push(row);
           res.waiting += 1;
         } else {
           const r = await S.applyChange(row, { scheduleStatus: S.SCHEDULE.WAITING }, {
@@ -5870,9 +5879,30 @@ async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = nul
  * @param {boolean} [opts.crossSlot] true=允许跨时段，false=只做原位递补，
  *                                   null / 省略 = 按「点播是否已截止」自动判断
  * @param {boolean} [opts.dryRun]    只算不写库（模拟排期预览），动作清单在 actions 里
+ * @param {Array}   [opts.extraWaiting]   dryRun 链式演练专用：把「第一阶段即将判为候补」
+ *                                   的**整行**从内存喂进来当候选（见下）
+ * @param {Object}  [opts.seatedOverride] dryRun 链式演练专用：用这份「各格占用」替代
+ *                                   从库里现算的占用表（见下）
  * @returns {Promise<{weekId, promoted, rescheduled, left, crossSlot, actions}>}
+ *
+ * ⚠️⚠️ **为什么需要 `extraWaiting` / `seatedOverride`（预览排期的正确性关键）**：
+ *    正式锁定路径是 `initialAllocate()`（写库）→ `reschedule()`（写库），第二步
+ *    读得到第一步刚写进去的 `WAITING` 与刚占掉的格子。
+ *    但**预览**要跑 `dryRun` —— 两步都不写库，于是第二步看到的是一个「第一步从没
+ *    发生过」的世界：
+ *      ① 候选按库查 `scheduleStatus = WAITING` → **一条都查不到** →
+ *         `promoted / rescheduled / left` 恒 0，预览页的「调剂」栏永远是空的；
+ *      ② 各格占用还是**落座前**的 → 第一步刚发给别人的座位在第二步眼里仍然空着
+ *         → 同一个人会被塞进两个位置，「模拟后占用」双计。
+ *    历史上只有 ② 的表现被当成「源实现同款瑕疵」钉住了（源后端也这样），其实两步
+ *    都是错的。修法就是这两个参数：调用方把第一步的结果（候补整行 + 落座后占用表）
+ *    传进来，第二步就能如实演出「锁定那一刻会发生什么」。
+ *    非 dryRun 调用方**一律不传**（默认 null → 走原来的库读）。
  */
-async function reschedule(weekStartMs, { now = Date.now(), operatorId = null, crossSlot = null, dryRun = false } = {}) {
+async function reschedule(weekStartMs, {
+  now = Date.now(), operatorId = null, crossSlot = null, dryRun = false,
+  extraWaiting = null, seatedOverride = null,
+} = {}) {
   const week = await ensureWeek(weekStartMs, { now });
   const values = await slotValuesOfWeek(weekStartMs);
   const capacity = await getCapacity();
@@ -5880,12 +5910,14 @@ async function reschedule(weekStartMs, { now = Date.now(), operatorId = null, cr
   const allowCross = crossSlot === null ? canCrossSlot(week, now) : !!crossSlot;
   const res = { weekId: week.id, promoted: 0, rescheduled: 0, left: 0, crossSlot: allowCross, actions: [] };
 
-  const counters = await countSeatedBySlot(values);
+  // ⚠️ `seatedOverride` 必须**拷贝**：下面循环里会就地累加 counters，
+  //    直接引用调用方的对象会把「预览占用表」改脏（那个对象 handler 还要用）。
+  const counters = seatedOverride ? { ...seatedOverride } : await countSeatedBySlot(values);
   const free = new Set(
     capacity > 0 ? values.filter((v) => (counters[v] || 0) < capacity) : values
   );
 
-  const candidates = await findAllPaged(
+  const dbCandidates = await findAllPaged(
     C.SUBMIT,
     {
       type: 1,
@@ -5895,6 +5927,17 @@ async function reschedule(weekStartMs, { now = Date.now(), operatorId = null, cr
     },
     { orderBy: [['createTime', 'asc'], ['id', 'asc']] }
   );
+  // 库里的候选 + 内存里的候选（dryRun 链式演练），**按 id 去重**：
+  // 万一某条既在库里是 WAITING、又被 extraWaiting 带进来（调用方多用了一次），
+  // 不去重就会把它算两遍（`rescheduled` 虚高）。
+  const seenIds = new Set();
+  const candidates = [];
+  for (const row of [...dbCandidates, ...(extraWaiting || [])]) {
+    const key = Number(row.id);
+    if (seenIds.has(key)) continue;
+    seenIds.add(key);
+    candidates.push(row);
+  }
   if (!candidates.length) return res;
 
   /**
@@ -7743,9 +7786,14 @@ __mods["handlers/admin/stats.js"] = function (module, exports, require) {
  *     **适用上限**：`submit` 表到「几千条」量级仍可用；再大需要改成物化统计表。
  *
  *  ③ 原实现里 `status: 1` 的语义是「已通过」。协议改版后 `status` 变成了**派生镜像**：
- *     `1 = 已排期`、`6 = 已通过·待排期`。**这里刻意保持与源实现逐字一致**（仍然数
- *     `status: 1`），因为「顺手修正统计口径」= 改业务语义。是否要改成
- *     `[1, 5, 6]`（已通过/已排期/已播放）请陛下定夺，见 docs/stage7-admin-plan.md。
+ *     `0 待审 / 1 已排期 / 2 已驳回 / 5 已播放 / 6 已通过·待排期 / 7 已取消`。
+ *     `overview.approved` **已按陛下 2026-09-29 裁决改为 `status ∈ {1, 5, 6}`** ——
+ *     理由：卡片标题写的就是「已通过」，而审核通过但还没排期的（`6`）与
+ *     已经播完的（`5`）都被漏掉了，数字偏小。
+ *     ⚠️ 这是统计模块里**唯一一处有意偏离源实现的业务口径**，见 docs/stage7-admin-plan.md §五。
+ *     ⚠️ `topSongs()` 仍是源实现的 `status: 1`（**未获授权改动**，且它直接进
+ *        Dashboard 的「热门点歌」榜，属可见数字）—— 同一份「已通过」语义在那里
+ *        还偏着，等陛下点头再一并改，见 §五 的说明。
  */
 
 const { C, _, count, findAllPaged } = require('../../lib/db');
@@ -7769,7 +7817,10 @@ async function overview(ctx) {
   ] = await Promise.all([
     count(C.SUBMIT),
     count(C.SUBMIT, { status: 0 }),
-    count(C.SUBMIT, { status: 1 }),
+    // 「已通过」= 已排期(1) + 已播放(5) + 已通过·待排期(6)（陛下 2026-09-29 裁决）
+    // ⚠️ 别再简化成 `{ status: 1 }` —— `status` 是派生镜像，`1` 只是「已排期」，
+    //    会把「审核已过、还没排期」和「已经播完」的一起漏掉（静默偏小，不报错）。
+    count(C.SUBMIT, { status: _.in([1, 5, 6]) }),
     count(C.SUBMIT, { status: 2 }),
     count(C.SUBMIT, { type: 1 }),
     count(C.SUBMIT, { type: 2 }),
@@ -7846,6 +7897,13 @@ async function submitTrend(ctx) {
 
 /**
  * GET /admin/stats/top-songs   热门点歌 Top10（已通过）
+ *
+ * ⚠️⚠️ **这里的 `status: 1` 与 `overview.approved` 的口径已经不一致了** ——
+ *    2026-09-29 陛下的裁决只覆盖 `overview`，本接口**保持源实现原样**（后果是
+ *    「已通过但还没排期」和「已经播完」的歌都不进榜，而这个榜的标题写的是「已通过」）。
+ *    这是**有意保留**的：它直接渲染到 Dashboard 的「热门点歌」，改它就是改可见数字，
+ *    需要单独点头。要改的话把 where 换成 `{ type: 1, status: _.in([1, 5, 6]) }` 即可。
+ *    → docs/stage7-admin-plan.md §五。
  *
  * ⚠️ 排序只在 `count` 上（与源实现 `order: [[literal('count'),'DESC']]` 一致）；
  *    `count` 相同时的顺序在 MySQL 里本就未定义，这里保留「首次出现顺序」
@@ -9738,11 +9796,38 @@ async function previewSchedule(ctx) {
     : !!body.crossSlot;
 
   const a = await sched.initialAllocate(ms, { now, dryRun: true });
-  const b = await sched.reschedule(ms, { now, dryRun: true, crossSlot });
+
+  /**
+   * ⚠️⚠️ **第二步必须吃到第一步的内存结果，否则三个数字恒 0**（陛下 2026-09-29 裁决修复）。
+   *
+   * 正式锁定路径（`lockWeek`）是「`initialAllocate` 写库 → `reschedule` 写库」，
+   * 第二步天然读得到第一步写下的 `WAITING` 与已占格子。预览跑的是 `dryRun`，
+   * 两步都不写库 → 第二步看到的是「第一步从没发生过」的世界：
+   *   ① 候选按库查 `scheduleStatus = WAITING` → 一条都查不到
+   *      → `promoted / rescheduled / stillWaiting` 全是 0（`plan` 的调剂栏永远空着）；
+   *   ② 各格占用仍是**落座前**的 → 第一步刚发给别人的座位在第二步眼里还空着
+   *      → 会把一个人塞进两个位置，「模拟后占用」双计。
+   *
+   * 修法：把第一步的结果（**候补整行** + **落座后的占用表**）从内存传过去，纯算不写库。
+   * 顺带把「锁定后会被自动驳回几条」一并修正 —— 它原本把「会被调剂到别处的人」
+   * 也算成会被驳回，是**虚高**的。
+   */
+  const afterA = { ...counters };
+  a.actions.forEach((x) => {
+    if (x.action === 'ASSIGN' && x.to) afterA[x.to] = (afterA[x.to] || 0) + 1;
+  });
+
+  const b = await sched.reschedule(ms, {
+    now,
+    dryRun: true,
+    crossSlot,
+    extraWaiting: a.waitingRows,
+    seatedOverride: afterA,
+  });
 
   // dryRun 不写库 → 「模拟后各格占用」只能从动作清单自己推
-  const after = { ...counters };
-  [...a.actions, ...b.actions].forEach((x) => {
+  const after = { ...afterA };
+  b.actions.forEach((x) => {
     if (x.to) after[x.to] = (after[x.to] || 0) + 1;
   });
 
@@ -9774,10 +9859,47 @@ async function previewSchedule(ctx) {
   const assign = a.actions.filter((x) => x.action === 'ASSIGN').map(detailOf);
   const promote = b.actions.filter((x) => x.action === 'PROMOTE').map(detailOf);
   const rescheduled = b.actions.filter((x) => x.action === 'RESCHEDULE').map(detailOf);
+  /**
+   * ⚠️ **必须按 id 去重**：修好 dryRun 链式演练之后，同一条记录完全可能
+   *    先被第一阶段判「首选格满 → 候补」、再被第二阶段判「连别处也塞不下 → 仍候补」，
+   *    于是它同时出现在 `a.actions` 与 `b.actions` 的 WAITING 里 → 不去重就会
+   *    在预览面板里列两遍，`autoRejectedIfLocked` 也跟着翻倍。
+   */
+  const waitingSeen = new Set();
   const waiting = [
     ...a.actions.filter((x) => x.action === 'WAITING'),
     ...b.actions.filter((x) => x.action === 'WAITING'),
-  ].map(detailOf);
+  ].filter((x) => {
+    const k = Number(x.id);
+    if (waitingSeen.has(k)) return false;
+    waitingSeen.add(k);
+    return true;
+  }).map(detailOf);
+
+  /**
+   * 「锁定后会被自动驳回几条」——**这是这个页面的头号结论，必须按锁定时刻的真实参数算**。
+   *
+   * ⚠️⚠️ 不能图省事复用 `b.left`：`b` 是按**当前闸门**跑的（点播未截止时只做原位递补），
+   *    而 `lockWeek()` 在锁定时是**显式传 `crossSlot: true`** 的 —— 到了锁定那一刻
+   *    点播早就截止了，不可能再有新申请者，所以闸门一定放开。
+   *    用 `b.left` 会得到一个**虚高**的驳回数（例如「现在只做原位递补 → 1 条被驳回」，
+   *    而真锁定那天这条会被调剂到别处、根本没被驳回）。
+   *
+   * 闸门本来就放开时（`b.crossSlot === true`）`b` 的结果就是锁定时刻的结果，不必重算；
+   * 只有 `crossSlot === false` 时才补一轮纯内存演练 —— 那一轮里 `b` 一个人都没挪动
+   * （首选格满且不许跨时段 → 全判 WAITING），所以拿同一个 `afterA` 起点重跑不会双计。
+   */
+  let autoRejectedIfLocked = b.left;
+  if (!b.crossSlot) {
+    const lockB = await sched.reschedule(ms, {
+      now,
+      dryRun: true,
+      crossSlot: true,
+      extraWaiting: a.waitingRows,
+      seatedOverride: afterA,
+    });
+    autoRejectedIfLocked = lockB.left;
+  }
 
   return {
     dryRun: true,
@@ -9793,7 +9915,7 @@ async function previewSchedule(ctx) {
       capacity,
       full: capacity > 0 && (after[v] || 0) >= capacity,
     })),
-    // waiting = 现在仍排不上的人；到了锁定时刻他们会被 AUTO_REJECTED
+    // waiting = 现在仍排不上的人（按**当前闸门**算）；autoRejectedIfLocked 按**锁定时刻**的闸门算
     plan: { assign, promote, rescheduled, waiting },
     summary: {
       assigned: a.assigned,
@@ -9801,7 +9923,7 @@ async function previewSchedule(ctx) {
       promoted: b.promoted,
       rescheduled: b.rescheduled,
       stillWaiting: b.left,
-      autoRejectedIfLocked: waiting.length,
+      autoRejectedIfLocked,
     },
   };
 }

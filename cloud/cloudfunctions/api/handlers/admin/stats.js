@@ -18,9 +18,14 @@
  *     **适用上限**：`submit` 表到「几千条」量级仍可用；再大需要改成物化统计表。
  *
  *  ③ 原实现里 `status: 1` 的语义是「已通过」。协议改版后 `status` 变成了**派生镜像**：
- *     `1 = 已排期`、`6 = 已通过·待排期`。**这里刻意保持与源实现逐字一致**（仍然数
- *     `status: 1`），因为「顺手修正统计口径」= 改业务语义。是否要改成
- *     `[1, 5, 6]`（已通过/已排期/已播放）请陛下定夺，见 docs/stage7-admin-plan.md。
+ *     `0 待审 / 1 已排期 / 2 已驳回 / 5 已播放 / 6 已通过·待排期 / 7 已取消`。
+ *     `overview.approved` **已按陛下 2026-09-29 裁决改为 `status ∈ {1, 5, 6}`** ——
+ *     理由：卡片标题写的就是「已通过」，而审核通过但还没排期的（`6`）与
+ *     已经播完的（`5`）都被漏掉了，数字偏小。
+ *     ⚠️ 这是统计模块里**唯一一处有意偏离源实现的业务口径**，见 docs/stage7-admin-plan.md §五。
+ *     ⚠️ `topSongs()` 仍是源实现的 `status: 1`（**未获授权改动**，且它直接进
+ *        Dashboard 的「热门点歌」榜，属可见数字）—— 同一份「已通过」语义在那里
+ *        还偏着，等陛下点头再一并改，见 §五 的说明。
  */
 
 const { C, _, count, findAllPaged } = require('../../lib/db');
@@ -44,7 +49,10 @@ async function overview(ctx) {
   ] = await Promise.all([
     count(C.SUBMIT),
     count(C.SUBMIT, { status: 0 }),
-    count(C.SUBMIT, { status: 1 }),
+    // 「已通过」= 已排期(1) + 已播放(5) + 已通过·待排期(6)（陛下 2026-09-29 裁决）
+    // ⚠️ 别再简化成 `{ status: 1 }` —— `status` 是派生镜像，`1` 只是「已排期」，
+    //    会把「审核已过、还没排期」和「已经播完」的一起漏掉（静默偏小，不报错）。
+    count(C.SUBMIT, { status: _.in([1, 5, 6]) }),
     count(C.SUBMIT, { status: 2 }),
     count(C.SUBMIT, { type: 1 }),
     count(C.SUBMIT, { type: 2 }),
@@ -121,6 +129,13 @@ async function submitTrend(ctx) {
 
 /**
  * GET /admin/stats/top-songs   热门点歌 Top10（已通过）
+ *
+ * ⚠️⚠️ **这里的 `status: 1` 与 `overview.approved` 的口径已经不一致了** ——
+ *    2026-09-29 陛下的裁决只覆盖 `overview`，本接口**保持源实现原样**（后果是
+ *    「已通过但还没排期」和「已经播完」的歌都不进榜，而这个榜的标题写的是「已通过」）。
+ *    这是**有意保留**的：它直接渲染到 Dashboard 的「热门点歌」，改它就是改可见数字，
+ *    需要单独点头。要改的话把 where 换成 `{ type: 1, status: _.in([1, 5, 6]) }` 即可。
+ *    → docs/stage7-admin-plan.md §五。
  *
  * ⚠️ 排序只在 `count` 上（与源实现 `order: [[literal('count'),'DESC']]` 一致）；
  *    `count` 相同时的顺序在 MySQL 里本就未定义，这里保留「首次出现顺序」

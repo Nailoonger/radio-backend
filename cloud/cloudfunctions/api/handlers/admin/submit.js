@@ -770,11 +770,38 @@ async function previewSchedule(ctx) {
     : !!body.crossSlot;
 
   const a = await sched.initialAllocate(ms, { now, dryRun: true });
-  const b = await sched.reschedule(ms, { now, dryRun: true, crossSlot });
+
+  /**
+   * ⚠️⚠️ **第二步必须吃到第一步的内存结果，否则三个数字恒 0**（陛下 2026-09-29 裁决修复）。
+   *
+   * 正式锁定路径（`lockWeek`）是「`initialAllocate` 写库 → `reschedule` 写库」，
+   * 第二步天然读得到第一步写下的 `WAITING` 与已占格子。预览跑的是 `dryRun`，
+   * 两步都不写库 → 第二步看到的是「第一步从没发生过」的世界：
+   *   ① 候选按库查 `scheduleStatus = WAITING` → 一条都查不到
+   *      → `promoted / rescheduled / stillWaiting` 全是 0（`plan` 的调剂栏永远空着）；
+   *   ② 各格占用仍是**落座前**的 → 第一步刚发给别人的座位在第二步眼里还空着
+   *      → 会把一个人塞进两个位置，「模拟后占用」双计。
+   *
+   * 修法：把第一步的结果（**候补整行** + **落座后的占用表**）从内存传过去，纯算不写库。
+   * 顺带把「锁定后会被自动驳回几条」一并修正 —— 它原本把「会被调剂到别处的人」
+   * 也算成会被驳回，是**虚高**的。
+   */
+  const afterA = { ...counters };
+  a.actions.forEach((x) => {
+    if (x.action === 'ASSIGN' && x.to) afterA[x.to] = (afterA[x.to] || 0) + 1;
+  });
+
+  const b = await sched.reschedule(ms, {
+    now,
+    dryRun: true,
+    crossSlot,
+    extraWaiting: a.waitingRows,
+    seatedOverride: afterA,
+  });
 
   // dryRun 不写库 → 「模拟后各格占用」只能从动作清单自己推
-  const after = { ...counters };
-  [...a.actions, ...b.actions].forEach((x) => {
+  const after = { ...afterA };
+  b.actions.forEach((x) => {
     if (x.to) after[x.to] = (after[x.to] || 0) + 1;
   });
 
@@ -806,10 +833,47 @@ async function previewSchedule(ctx) {
   const assign = a.actions.filter((x) => x.action === 'ASSIGN').map(detailOf);
   const promote = b.actions.filter((x) => x.action === 'PROMOTE').map(detailOf);
   const rescheduled = b.actions.filter((x) => x.action === 'RESCHEDULE').map(detailOf);
+  /**
+   * ⚠️ **必须按 id 去重**：修好 dryRun 链式演练之后，同一条记录完全可能
+   *    先被第一阶段判「首选格满 → 候补」、再被第二阶段判「连别处也塞不下 → 仍候补」，
+   *    于是它同时出现在 `a.actions` 与 `b.actions` 的 WAITING 里 → 不去重就会
+   *    在预览面板里列两遍，`autoRejectedIfLocked` 也跟着翻倍。
+   */
+  const waitingSeen = new Set();
   const waiting = [
     ...a.actions.filter((x) => x.action === 'WAITING'),
     ...b.actions.filter((x) => x.action === 'WAITING'),
-  ].map(detailOf);
+  ].filter((x) => {
+    const k = Number(x.id);
+    if (waitingSeen.has(k)) return false;
+    waitingSeen.add(k);
+    return true;
+  }).map(detailOf);
+
+  /**
+   * 「锁定后会被自动驳回几条」——**这是这个页面的头号结论，必须按锁定时刻的真实参数算**。
+   *
+   * ⚠️⚠️ 不能图省事复用 `b.left`：`b` 是按**当前闸门**跑的（点播未截止时只做原位递补），
+   *    而 `lockWeek()` 在锁定时是**显式传 `crossSlot: true`** 的 —— 到了锁定那一刻
+   *    点播早就截止了，不可能再有新申请者，所以闸门一定放开。
+   *    用 `b.left` 会得到一个**虚高**的驳回数（例如「现在只做原位递补 → 1 条被驳回」，
+   *    而真锁定那天这条会被调剂到别处、根本没被驳回）。
+   *
+   * 闸门本来就放开时（`b.crossSlot === true`）`b` 的结果就是锁定时刻的结果，不必重算；
+   * 只有 `crossSlot === false` 时才补一轮纯内存演练 —— 那一轮里 `b` 一个人都没挪动
+   * （首选格满且不许跨时段 → 全判 WAITING），所以拿同一个 `afterA` 起点重跑不会双计。
+   */
+  let autoRejectedIfLocked = b.left;
+  if (!b.crossSlot) {
+    const lockB = await sched.reschedule(ms, {
+      now,
+      dryRun: true,
+      crossSlot: true,
+      extraWaiting: a.waitingRows,
+      seatedOverride: afterA,
+    });
+    autoRejectedIfLocked = lockB.left;
+  }
 
   return {
     dryRun: true,
@@ -825,7 +889,7 @@ async function previewSchedule(ctx) {
       capacity,
       full: capacity > 0 && (after[v] || 0) >= capacity,
     })),
-    // waiting = 现在仍排不上的人；到了锁定时刻他们会被 AUTO_REJECTED
+    // waiting = 现在仍排不上的人（按**当前闸门**算）；autoRejectedIfLocked 按**锁定时刻**的闸门算
     plan: { assign, promote, rescheduled, waiting },
     summary: {
       assigned: a.assigned,
@@ -833,7 +897,7 @@ async function previewSchedule(ctx) {
       promoted: b.promoted,
       rescheduled: b.rescheduled,
       stillWaiting: b.left,
-      autoRejectedIfLocked: waiting.length,
+      autoRejectedIfLocked,
     },
   };
 }

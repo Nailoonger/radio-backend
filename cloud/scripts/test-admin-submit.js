@@ -132,7 +132,7 @@ function mkSubmit(id, o) {
     reviewStatus: review,
     scheduleStatus: schedule,
     playStatus: play,
-    allowReschedule: 1,
+    allowReschedule: opt.allow === undefined ? 1 : opt.allow,
     assignedAt: opt.assignedAt === undefined ? null : opt.assignedAt,
     playedAt: opt.playedAt === undefined ? null : opt.playedAt,
     status: opt.status === undefined ? S.deriveStatus(review, schedule, play) : opt.status,
@@ -433,21 +433,58 @@ function byId(id) {
     [r.data.summary.assigned, r.data.summary.waiting], [1, 1]);
   eq('plan.assign 里带歌名与目标格', [r.data.plan.assign.length, r.data.plan.assign[0].songName, r.data.plan.assign[0].to], [1, '晴天', `${DATE0} 早间 07:20`]);
   eq('plan.waiting 带期待格', [r.data.plan.waiting.length, r.data.plan.waiting[0].want], [1, `${DATE0} 早间 07:20`]);
-  // ⚠️⚠️ **已知的口径瑕疵，与源实现逐字一致，这里钉住而不是"修好"**：
-  //    `reschedule(dryRun)` 的候选条件是**库里的** `scheduleStatus = WAITING`，
-  //    而 `initialAllocate(dryRun)` 不写库 → 刚被判为"候补"的那条在库里仍是 UNASSIGNED
-  //    → `reschedule` 一个候选都看不到 → `promoted/rescheduled/stillWaiting` 全是 0。
-  //    真正有意义的是 `autoRejectedIfLocked`（它把两步的 waiting 动作合起来数）。
-  //    线上表现：预览面板里「仍候补」显示 0，但「锁定后将被驳回」是真实的 n。
-  //    → 见 docs/stage7-admin-plan.md §「待陛下定夺」第 ② 条。
-  eq('★ 预览的 rescheduled/stillWaiting 因 dryRun 不写 WAITING 而归零（源实现同款）',
-    [r.data.summary.promoted, r.data.summary.rescheduled, r.data.summary.stillWaiting], [0, 0, 0]);
-  eq('★ 但「锁定后会被自动驳回」是真实的（合并两步的 waiting 动作）', r.data.summary.autoRejectedIfLocked, 1);
+  /**
+   * ⚠️⚠️ 这一段是**陛下 2026-09-29 裁决修复的 dryRun 链式演练**的判据。
+   *
+   * 修之前：`reschedule(dryRun)` 的候选是「库里的 `scheduleStatus = WAITING`」，
+   *   而 `initialAllocate(dryRun)` 不写库 → 刚被判「候补」的 2 号在库里仍是
+   *   `UNASSIGNED` → 第二步一个候选都看不到 → `[0, 0, 0]`（源实现同款瑕疵）。
+   * 修之后：第一步把「候补整行」+「落座后占用表」从内存交给第二步 →
+   *   2 号被调剂到同一天的另一格（点播已截止 → 允许跨时段；成本表 10 档最近的一格）。
+   */
+  eq('★ 2 号被调剂到同一天的另一格（dryRun 也能算出调剂，不再是 0）',
+    [r.data.plan.rescheduled.length, r.data.plan.rescheduled[0].to, r.data.plan.rescheduled[0].cost],
+    [1, `${DATE0} 午间 12:20`, 10]);
+  eq('★ summary：递补 0 / 调剂 1 / 仍候补 0',
+    [r.data.summary.promoted, r.data.summary.rescheduled, r.data.summary.stillWaiting], [0, 1, 0]);
+  /**
+   * ⚠️ `autoRejectedIfLocked` 的语义（2026-09-29 与 dryRun 链式演练一起修正）：
+   *    它按**锁定时刻的真实闸门**算 —— `lockWeek()` 是**显式 `crossSlot: true`**。
+   *    所以即便本次预览的闸门是关的（点播未截止），这个数字仍然是「锁定那天会怎样」。
+   *    这正是它在用途上必须与 `stillWaiting` 分开的原因：一个是**现在**，一个是**锁定时刻**。
+   */
+  eq('★ 「锁定后会被自动驳回」= 0（按锁定时刻的闸门算：2 号会被调剂到别处）',
+    r.data.summary.autoRejectedIfLocked, 0);
+  eq('★ 「模拟后各格占用」反映两步结果：早间 1 / 午间 1',
+    [r.data.slots.find((s) => s.value === `${DATE0} 早间 07:20`).after,
+      r.data.slots.find((s) => s.value === `${DATE0} 午间 12:20`).after], [1, 1]);
   eq('★ dryRun **不写库**', JSON.stringify((H.dump().submit || []).map((x) => [x.id, x.scheduleStatus, x.scheduledSlot])), beforeSnap);
 
   r = await H.call(H.req('POST', '/admin/submit/schedule/preview', { crossSlot: false }, SUPER_TOKEN));
   ok('crossSlot=false 时理由文案说「只做原位递补」', /只做原位递补/.test(r.data.crossSlotReason), r.data.crossSlotReason);
   eq('crossSlot=false 时 crossSlot 回流 false', r.data.crossSlot, false);
+  // 首选格已被 1 号占满，且不许跨时段 → 2 号只能留在候补（闸门与链式演练互不干扰）
+  eq('★ crossSlot=false：2 号留在候补（stillWaiting 1），不会被挪走',
+    [r.data.summary.rescheduled, r.data.summary.stillWaiting, r.data.plan.rescheduled.length], [0, 1, 0]);
+  eq('★ 但「锁定后会被自动驳回」仍是 0 —— 它看的是锁定时刻（闸门强制放开），不是现在',
+    r.data.summary.autoRejectedIfLocked, 0);
+  eq('★ dryRun **不写库**（crossSlot=false 这一轮同样）', JSON.stringify((H.dump().submit || []).map((x) => [x.id, x.scheduleStatus, x.scheduledSlot])), beforeSnap);
+
+  /**
+   * ★★ 「会被自动驳回」不能永远为 0 —— 否则上面两条断言是空过的。
+   *    造一个**真的哪儿都去不了**的人：首选格被占满 + **本人拒绝调剂**
+   *    （`allowReschedule = 0`）→ 跨时段放开了也没用，锁定时必然被驳回。
+   */
+  reset(baseSeed({
+    system_setting: [{ _id: 'setting:song_slot_capacity', id: 1, key: 'song_slot_capacity', value: '1', desc: '容量', updateTime: new Date() }],
+    submit: [
+      mkSubmit(1, { review: S.REVIEW.APPROVED, schedule: S.SCHEDULE.APPROVED, slot: `${DATE0} 早间 07:20`, want: `${DATE0} 早间 07:20` }),
+      mkSubmit(2, { review: S.REVIEW.APPROVED, schedule: S.SCHEDULE.UNASSIGNED, want: `${DATE0} 早间 07:20`, allow: 0 }),
+    ],
+  }, { appEnd: Date.now() - 3600000 }));   // 点播已截止 → 闸门放开，仍然无解
+  r = await H.call(H.req('POST', '/admin/submit/schedule/preview', {}, SUPER_TOKEN));
+  eq('★ 拒绝调剂 + 首选格满 → 锁定时会被自动驳回 1 条（这个数字不是恒 0）',
+    [r.data.summary.autoRejectedIfLocked, r.data.summary.stillWaiting, r.data.plan.waiting.length], [1, 1, 1]);
 
   // 点播未截止 → 闸门自动关掉跨时段
   reset(baseSeed({

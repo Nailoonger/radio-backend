@@ -7,8 +7,12 @@
 ## 云开发迁移（`cloud/`，主线 · 阶段 0–7 已完成，8/9 待做）
 - **起因**：小程序正式版报 `url not in domain list`，合法域名要 ICP 备案 → 陛下裁决**不续费服务器、整体走云开发**（`wx.cloud.callFunction` 免备案）。免费额度：调用 20 万次/月、**资源使用量 10 万 GBs/月**、容量 2GB。
 - **铁律：只做加法** —— 原 Express `src/` + `admin-web/` + Docker 链路一行不删，保留 `requestMode: 'direct'|'cloud'` 开关，随时可切回。陛下原话：「不要删除原来的，以防我想换回来」。
-- **环境** `jy-radio-d1gdwmptl816ee6a9`。总纲 `cloud/README.md`；字段映射 `cloud/docs/data-model-mapping.md`；方案 `cloud/docs/stage5-scheduling-plan.md` / `stage6-timer-plan.md` / `stage7-admin-plan.md`；skill `express-to-cloudfunction-migration`（**22 条「不报错的静默漂移」**）。
-- **进度**：0 盘点 / 1 骨架 / 2 数据层+harness / 3 配置类 / 4 用户端 32 / 5 排期算法 12 函数 / 6 定时触发器 / **7 管理端 93 条** —— 全 ✅。回归 **2883 项 / 0 失败**（源码 13 套件 1504 + 打包产物 11 套件 1379，秒级）。
+- **环境** `jy-radio-d1gdwmptl816ee6a9`。总纲 `cloud/README.md`；字段映射 `cloud/docs/data-model-mapping.md`；方案 `cloud/docs/stage5-scheduling-plan.md` / `stage6-timer-plan.md` / `stage7-admin-plan.md`；skill `express-to-cloudfunction-migration`（**23 条「不报错的静默漂移」**）。
+- **进度**：0 盘点 / 1 骨架 / 2 数据层+harness / 3 配置类 / 4 用户端 32 / 5 排期算法 12 函数 / 6 定时触发器 / **7 管理端 93 条** —— 全 ✅。回归 **2899 项 / 0 失败**（源码 13 套件 1512 + 打包产物 11 套件 1387，秒级）。
+- **陛下已裁决的两处源实现瑕疵修正（2026-09-29，见 `cloud/docs/stage7-admin-plan.md` §五）**：
+  - `stats.overview.approved` 口径 `status:1` → **`status ∈ {1,5,6}`**。⚠️ **孪生位置 `topSongs()` 仍是 `status:1`**（进 Dashboard 可见榜，未授权）→ 同一「已通过」语义在那儿还偏着，**属新待办**，陛下点头才改。
+  - `previewSchedule(dryRun)` 的 `promoted/rescheduled/stillWaiting` 恒 0 → 已修（`reschedule` 新增 dryRun 专用 `extraWaiting` / `seatedOverride`，**按 id 去重**）；顺带修正 `autoRejectedIfLocked` **虚高**（原先复用当前闸门下的 `left`，而锁定时刻 `lockWeek` 显式 `crossSlot:true` → 预览说驳回 1 条、真锁定 0 条，**连主结论都错**）。→ 静默漂移 #23。
+  - 教训：**「把恒 X 改成真实值」的修复必须补反向用例**（造一个「值该不为 X」的场景），否则新旧实现在正向用例上表现一致；自检 `git diff --stat` 里测试脚本必须同时在列。
 - **架构**：源在 `cloud/cloudfunctions/api/`，**运行目录** `miniprogram/cloudfunctions/api/`（微信 `cloudfunctionRoot` 必须在项目内）。⚠️⚠️ **Windows CLI 传子目录必坏**（`\` 被写进压缩包条目名 → 云端解压出一堆「名字里带反斜杠」的扁平文件，`require('./lib/x')` 必失败）→ `sync.js` 把 **49 个模块打成单文件 index.js**，只传根文件 + `config.json`。⇒ **`handlers/index.js` 必须写静态 `() => require('./x')` 注册表**，动态拼路径打包器看不见。
 - **部署**：`node cloud/scripts/deploy-cloud.js`（默认只打印命令）→ 手动跑 `cli.bat cloud functions deploy --env <env> --names api --project <miniprogram> -r </dev/null`；**等 1~2 分钟**再验（云端 npm install 未完会报 Cannot find module）。
 - **会话内速查**：
@@ -17,7 +21,7 @@
   - 打包/删 dist 一律 `NODE_OPTIONS=""`（safe-delete 拦截）。
   - 云端验收：`MSYS_NO_PATHCONV=1 node cloud/scripts/verify-user.js ws://127.0.0.1:9420`（需先 `cli.bat auto`）。
 - **口径**：业务查询一律用**数字 `id`**（`parseId` 收敛）；4 张表用业务键当 `_id`（`setting:` / `switch:` / `ack:` / `week:`）；字段名一律**驼峰**；⚠️ `insertOne` 之后改这一行必须用**返回的 `_id`**，不能用数字 id。
-- **需陛下动手**：云开发控制台把云函数**超时 3s → 20s**（CLI 无此能力）；确认触发器页签有 `songSweepTick`。
+- **需陛下动手**：云开发控制台确认触发器页签有 `songSweepTick`。（超时 **3s → 30s✅ 已配 2026-09-29**）
 
 ## 铁律
 - **admin-web 按 v8 落地**（权威 `preview/admin-ui-v8/admin-ui-v8.html`）：唯一强调色 **#0066CC**、无渐变无彩色投影、深色卡为主角。**登录页是唯一例外**（用户 v4 分栏版），勿动。改前备份 `admin-web/_backup/<时间戳>-src/`。

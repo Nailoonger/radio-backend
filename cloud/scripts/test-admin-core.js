@@ -443,6 +443,16 @@ const PLAIN_ONLY = new Set([
       { _id: 's3', id: 3, type: 1, status: 1, reviewStatus: 1, scheduleStatus: 1, playStatus: 0, createTime: new Date(T0 - 30 * 86400000), songName: '晴天', singer: '周杰伦' },
       // 昨天：1 点歌（已驳回 status=2）—— 周一时属上周、其余日子属本周
       { _id: 's4', id: 4, type: 1, status: 2, reviewStatus: 2, scheduleStatus: 0, playStatus: 0, createTime: new Date(T0 - 86400000), songName: '七里香', singer: '周杰伦' },
+      /**
+       * ⚠️ s5 / s6 是**为 `overview.approved` 的口径断言专门补的样本**（陛下 2026-09-29 裁决）：
+       *    `approved` 从「`status: 1`」改成「`status ∈ {1, 5, 6}`」。只有 s3（=1）时
+       *    新旧口径都是 1 —— 改了实现断言也不会有任何变化，等于没测。
+       *    补上 5（已播放）和 6（已通过·待排期）之后，expect 从 1 变 3，才真正锁得住。
+       *    createTime 一律取 30 天前：**不能落在本周或近 3 天**，否则会撞
+       *    `thisWeek` 与 `submit-trend`（days=3）的既有断言。
+       */
+      { _id: 's5', id: 5, type: 1, status: 5, reviewStatus: 1, scheduleStatus: 1, playStatus: 1, createTime: new Date(T0 - 30 * 86400000), songName: '夜曲', singer: '周杰伦' },
+      { _id: 's6', id: 6, type: 1, status: 6, reviewStatus: 1, scheduleStatus: 0, playStatus: 0, createTime: new Date(T0 - 30 * 86400000), songName: '稻香', singer: '周杰伦' },
     ],
     message: [{ _id: 'm1', id: 1, status: 0, content: 'x', createTime: new Date(T0) }],
     notice: [{ _id: 'n1', id: 1, title: 't', createTime: new Date(T0) }],
@@ -455,10 +465,12 @@ const PLAIN_ONLY = new Set([
 
   r = await H.call(H.req('GET', '/admin/stats/overview', {}, PLAIN_TOKEN));
   eq('overview → code 0', r.code, 0);
-  eq('overview.submit（**approved 口径 = status:1 = 已排期**）', r.data.submit, {
-    total: 4, pending: 2, approved: 1, rejected: 1, song: 3, article: 1, today: 2,
+  eq('overview.submit（**approved 口径 = status ∈ {1,5,6}** = 已排期+已播放+已通过·待排期）', r.data.submit, {
+    total: 6, pending: 2, approved: 3, rejected: 1, song: 5, article: 1, today: 2,
     thisWeek: [T0, T0, T0 - 86400000].filter(inThisWeek).length,
   });
+  ok('★ approved 把「已播放(5)」和「已通过·待排期(6)」都算进来了（旧口径 status:1 只有 1）',
+    r.data.submit.approved === 3, String(r.data.submit.approved));
   ok('★ 本周计数与「北京周一 00:00」口径一致（今天/昨天，30 天前不算）',
     r.data.submit.thisWeek === 2 + (inThisWeek(T0 - 86400000) ? 1 : 0), String(r.data.submit.thisWeek));
   eq('overview.message', r.data.message, { total: 1, pending: 1 });
@@ -474,7 +486,13 @@ const PLAIN_ONLY = new Set([
   ok('trend 日期严格递增', r.data.list.every((x, i) => i === 0 || x.date > r.data.list[i - 1].date));
 
   r = await H.call(H.req('GET', '/admin/stats/top-songs', {}, PLAIN_TOKEN));
-  eq('top-songs 只统计 status:1 的点歌（口径同 overview）', r.data.list, [{ songName: '晴天', singer: '周杰伦', count: 1 }]);
+  // ⚠️ 这里**故意与 `overview.approved` 不同口径**：top-songs 保持源实现的 `status: 1`。
+  //    陛下 2026-09-29 的裁决只覆盖 overview；本接口直接渲染 Dashboard 的「热门点歌」，
+  //    属可见数字，要改需单独点头（handlers/admin/stats.js 的注释里有改法）。
+  eq('top-songs 仍只统计 status:1 的点歌（**口径已与 overview 不同**，等陛下点头）',
+    r.data.list, [{ songName: '晴天', singer: '周杰伦', count: 1 }]);
+  ok('★ 已播放(夜曲) / 已通过·待排期(稻香) 都不进热门榜 —— 同一个「已通过」语义在这里还偏着',
+    !r.data.list.some((x) => x.songName === '夜曲' || x.songName === '稻香'));
 
   /* ══════════════════ I. cadre / staff / showcase ══════════════════ */
   section('I. 社干 / 部门人员 / 风采展示（全部仅超管）');

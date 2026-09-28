@@ -376,13 +376,17 @@ async function logAssignment(requestId, fromSlot, toSlot, type, reason, operator
  * 按提交时间升序，前 capacity 个拿到正式位，其余进 WAITING。
  *
  * 幂等：候选条件带 scheduleStatus = UNASSIGNED，重复跑只命中更少行。
- * @returns {Promise<{assigned:number, waiting:number, weekId:number}>}
+ *
+ * ⚠️ `dryRun` 下额外返回 `waitingRows`（**整行**，不是 action 摘要）：第二阶段的
+ *    `reschedule()` 在 dryRun 里读不到库里刚写进去的 `WAITING`，只能靠调用方把
+ *    这批行从内存喂过去。非 dryRun 时恒为空数组。
+ * @returns {Promise<{assigned:number, waiting:number, weekId:number, actions:Array, waitingRows:Array}>}
  */
 async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = null, dryRun = false } = {}) {
   const week = await ensureWeek(weekStartMs, { now });
   const values = await slotValuesOfWeek(weekStartMs);
   const capacity = await getCapacity();
-  const res = { weekId: week.id, assigned: 0, waiting: 0, actions: [] };
+  const res = { weekId: week.id, assigned: 0, waiting: 0, actions: [], waitingRows: [] };
 
   const counters = await countSeatedBySlot(values);
 
@@ -418,6 +422,11 @@ async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = nul
       } else {
         if (dryRun) {
           res.actions.push({ action: 'WAITING', id: row.id, songName: row.songName, want: value, to: null, cost: null });
+          // ⚠️ 整行留一份：`reschedule(dryRun)` 的候选是「库里 WAITING」，dryRun 下
+          //    这条规则写不进去，只能由调用方把整行转交给第二阶段（见 reschedule 的
+          //    `extraWaiting`）。只留 action 摘要不够 —— 排序要用 createTime / id、
+          //    可接受落点要用 allowReschedule。
+          res.waitingRows.push(row);
           res.waiting += 1;
         } else {
           const r = await S.applyChange(row, { scheduleStatus: S.SCHEDULE.WAITING }, {
@@ -454,9 +463,30 @@ async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = nul
  * @param {boolean} [opts.crossSlot] true=允许跨时段，false=只做原位递补，
  *                                   null / 省略 = 按「点播是否已截止」自动判断
  * @param {boolean} [opts.dryRun]    只算不写库（模拟排期预览），动作清单在 actions 里
+ * @param {Array}   [opts.extraWaiting]   dryRun 链式演练专用：把「第一阶段即将判为候补」
+ *                                   的**整行**从内存喂进来当候选（见下）
+ * @param {Object}  [opts.seatedOverride] dryRun 链式演练专用：用这份「各格占用」替代
+ *                                   从库里现算的占用表（见下）
  * @returns {Promise<{weekId, promoted, rescheduled, left, crossSlot, actions}>}
+ *
+ * ⚠️⚠️ **为什么需要 `extraWaiting` / `seatedOverride`（预览排期的正确性关键）**：
+ *    正式锁定路径是 `initialAllocate()`（写库）→ `reschedule()`（写库），第二步
+ *    读得到第一步刚写进去的 `WAITING` 与刚占掉的格子。
+ *    但**预览**要跑 `dryRun` —— 两步都不写库，于是第二步看到的是一个「第一步从没
+ *    发生过」的世界：
+ *      ① 候选按库查 `scheduleStatus = WAITING` → **一条都查不到** →
+ *         `promoted / rescheduled / left` 恒 0，预览页的「调剂」栏永远是空的；
+ *      ② 各格占用还是**落座前**的 → 第一步刚发给别人的座位在第二步眼里仍然空着
+ *         → 同一个人会被塞进两个位置，「模拟后占用」双计。
+ *    历史上只有 ② 的表现被当成「源实现同款瑕疵」钉住了（源后端也这样），其实两步
+ *    都是错的。修法就是这两个参数：调用方把第一步的结果（候补整行 + 落座后占用表）
+ *    传进来，第二步就能如实演出「锁定那一刻会发生什么」。
+ *    非 dryRun 调用方**一律不传**（默认 null → 走原来的库读）。
  */
-async function reschedule(weekStartMs, { now = Date.now(), operatorId = null, crossSlot = null, dryRun = false } = {}) {
+async function reschedule(weekStartMs, {
+  now = Date.now(), operatorId = null, crossSlot = null, dryRun = false,
+  extraWaiting = null, seatedOverride = null,
+} = {}) {
   const week = await ensureWeek(weekStartMs, { now });
   const values = await slotValuesOfWeek(weekStartMs);
   const capacity = await getCapacity();
@@ -464,12 +494,14 @@ async function reschedule(weekStartMs, { now = Date.now(), operatorId = null, cr
   const allowCross = crossSlot === null ? canCrossSlot(week, now) : !!crossSlot;
   const res = { weekId: week.id, promoted: 0, rescheduled: 0, left: 0, crossSlot: allowCross, actions: [] };
 
-  const counters = await countSeatedBySlot(values);
+  // ⚠️ `seatedOverride` 必须**拷贝**：下面循环里会就地累加 counters，
+  //    直接引用调用方的对象会把「预览占用表」改脏（那个对象 handler 还要用）。
+  const counters = seatedOverride ? { ...seatedOverride } : await countSeatedBySlot(values);
   const free = new Set(
     capacity > 0 ? values.filter((v) => (counters[v] || 0) < capacity) : values
   );
 
-  const candidates = await findAllPaged(
+  const dbCandidates = await findAllPaged(
     C.SUBMIT,
     {
       type: 1,
@@ -479,6 +511,17 @@ async function reschedule(weekStartMs, { now = Date.now(), operatorId = null, cr
     },
     { orderBy: [['createTime', 'asc'], ['id', 'asc']] }
   );
+  // 库里的候选 + 内存里的候选（dryRun 链式演练），**按 id 去重**：
+  // 万一某条既在库里是 WAITING、又被 extraWaiting 带进来（调用方多用了一次），
+  // 不去重就会把它算两遍（`rescheduled` 虚高）。
+  const seenIds = new Set();
+  const candidates = [];
+  for (const row of [...dbCandidates, ...(extraWaiting || [])]) {
+    const key = Number(row.id);
+    if (seenIds.has(key)) continue;
+    seenIds.add(key);
+    candidates.push(row);
+  }
   if (!candidates.length) return res;
 
   /**
