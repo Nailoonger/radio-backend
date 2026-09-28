@@ -705,16 +705,24 @@ const now = () => new Date();
   eq('statusView 名称', S.statusView({ reviewStatus: 2, scheduleStatus: 0, playStatus: 0 }).reviewStatusName, 'REJECTED');
   eq('statusView statusText', S.statusView({ reviewStatus: 2, scheduleStatus: 0, playStatus: 0 }).statusText, '已驳回');
 
-  /* ══════════════════ K. 阶段 5 占位守卫 ══════════════════ */
-  section('K. 阶段 5 占位（排期算法未移植时要「响」而不是静默）');
+  /* ══════════════════ K. 阶段 5 排期算法导出面 ══════════════════ */
+  section('K. 阶段 5 排期算法：12 个函数必须全部导出且可调用');
 
-  eq('未移植函数清单条数', sched.NOT_PORTED_YET.length, 11);
-  let threw = '';
-  try { await sched.sweep(); } catch (e) { threw = e.message; }
-  ok('sweep() 抛清晰错误（而非 is not a function）', /阶段5未移植/.test(threw), threw);
-  threw = '';
-  try { await sched.initialAllocate(0); } catch (e) { threw = e.message; }
-  ok('initialAllocate() 抛清晰错误', /阶段5未移植/.test(threw), threw);
+  // ⚠️ 阶段 5 收尾后，原先的「占位抛错」机制（NOT_PORTED_YET）已**整体拆除** ——
+  //    现在这条断言反向守住：**排期算法的导出面一个都不能少**。
+  //    （导出面被误删的表现是 `sched.xxx is not a function`，只在真调到的分支才炸。）
+  const SCHED_EXPORTS = [
+    'logAssignment', 'initialAllocate', 'reschedule', 'runAllocators', 'afterRelease',
+    'lockWeek', 'unlockWeek', 'cancelWeek',
+    'markPlayed', 'setPlayed', 'manualAssign', 'sweep',
+  ];
+  const missing = SCHED_EXPORTS.filter((n) => typeof sched[n] !== 'function');
+  eq('阶段 5 排期算法 12 个函数全部导出', JSON.stringify(missing), JSON.stringify([]));
+  ok('占位机制已拆除（不再有 NOT_PORTED_YET）', sched.NOT_PORTED_YET === undefined);
+  // 读路径也必须还在（阶段 4 的成果不能被阶段 5 的改动挤掉）
+  eq('阶段 4 读路径仍在（canCrossSlot / waitingSnapshot / weekView）',
+    JSON.stringify(['canCrossSlot', 'waitingSnapshot', 'weekView'].filter((n) => typeof sched[n] !== 'function')),
+    JSON.stringify([]));
 
   /* ══════════════════ 汇总 ══════════════════ */
   console.log(lines.join('\n'));

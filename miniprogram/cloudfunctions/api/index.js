@@ -2851,8 +2851,10 @@ async function cancelRequest(submit, { reason, operatorName }) {
   const wasSeated = sched.isSeated(submit);
   await S.applyChange(submit, { reviewStatus: S.REVIEW.CANCELLED }, { operatorName, reason });
   if (wasSeated) {
-    // ⚠️ afterRelease（释放后跑递补/调剂）属于阶段 5 排期算法，尚未移植 → 这里会抛错，
-    //    但被 catch 兜住：取消动作本身必须成功，不能因为「排期还没做」而让学生取消不了。
+    // 释放位子后跑「原位递补 + 全局调剂」。
+    // ⚠️ 仍保留 `.catch(() => null)`：取消是**用户可见的终态动作**，必须成功；
+    //    排期失败只能靠下一次审核 / 手动 sweep 兜底重试，绝不能因此让取消本身失败。
+    //    （阶段 5 已把 afterRelease/reschedule 移植到位，正常路径不会再抛。）
     await sched.afterRelease(submit).catch(() => null);
   }
 }
@@ -4275,13 +4277,13 @@ __mods["services/scheduling.js"] = function (module, exports, require) {
  *      候补读路径        waitingSnapshot / waitingPosOf
  *      常量              WEEK_STATUS / WEEK_STATUS_CN / ASSIGN / ASSIGN_REASON / DAYS_PER_WEEK
  *
- * ⛔ **尚未移植（阶段 5：排期算法，最高风险，动工前需出方案给陛下过目）**：
- *      initialAllocate / reschedule / lockWeek / unlockWeek / cancelWeek
- *      markPlayed / setPlayed / manualAssign / runAllocators / afterRelease / sweep
- *      logAssignment
- *    这些是**改状态**的路径，依赖《V1 规格》的完整调度语义 + 跨文档一致性设计。
- *    这里导出的是**显式抛错**的占位函数（而不是干脆不导出）—— 不导出的话调用点
- *    会得到晦涩的 `xxx is not a function`，那种报错在云函数日志里几乎无法定位。
+ * ✅ 已移植（阶段 5 · 排期算法，**2026-09-28 全部完成**）：
+ *      logAssignment / initialAllocate / reschedule / runAllocators / afterRelease
+ *      lockWeek / unlockWeek / cancelWeek
+ *      markPlayed / setPlayed / manualAssign / sweep
+ *      + services/songRescheduleCost.js（调剂选址成本表，纯函数）
+ *
+ * 阶段 6 待办（**不在本文件范围**）：定时触发器替换原 60s `startScheduler`。
  *
  * ═══════════════ 云化改动 ═══════════════
  * ① weekly_schedule 的 `_id` 用业务键 `week:<week_start_date>`（见 lib/db.js 主键口径表），
@@ -4292,12 +4294,14 @@ __mods["services/scheduling.js"] = function (module, exports, require) {
  * ④ `week.update(...)` → `updateById(...)` + 在内存对象上同步，保持调用方读字段是新值。
  */
 
-const { C, _, findOne, findAllPaged, count, countByField, insertWithId, updateById, nextId } = require('../lib/db');
+const { C, _, findOne, findById, findAllPaged, count, countByField, insertWithId, updateById, updateWhere, nextId, insertOne } = require('../lib/db');
 const bj = require('../lib/bjTime');
 const kv = require('./kv');
 const slotSvc = require('./broadcastSlot');
 const songWindow = require('./songWindow');
 const S = require('./songStatus');
+/** 调剂选址成本表（纯函数，无 DB）—— 阶段 5 与 reschedule 一起启用 */
+const costCalc = require('./songRescheduleCost');
 
 const DAYS_PER_WEEK = 5;                    // 周一到周五
 /** 审核截止未单独配置时的兜底偏移（真值在 songWindowService，这里只做转发/再导出） */
@@ -4590,6 +4594,538 @@ function canCrossSlot(week, now = Date.now()) {
 }
 
 /* ------------------------------------------------------------------ *
+ * 排期算法（阶段 5）
+ * ------------------------------------------------------------------ */
+/**
+ * ⚠️⚠️ 周行更新必须走这里 —— **内存同步不可省**。
+ *
+ * 源实现里 `week` 是 Sequelize **实例**，`await week.update(patch)` 之后实例自身
+ * 就是新值，紧接着读 `week.status` 拿到的是新数据（`cancelWeek` 就靠这个
+ * 直接 `return weekView(week, now)`）。
+ *
+ * 云端 `week` 是**普通对象**，`updateById` 只改数据库、内存对象纹丝不动 ——
+ * 漏了 `Object.assign` 就会「返回值悄悄是旧状态」，而且**不报任何错**。
+ */
+async function applyWeekPatch(week, patch) {
+  await updateById(C.WEEKLY, week._id, { ...patch, updateTime: new Date() });
+  Object.assign(week, patch);
+  return week;
+}
+
+/** 写一条排期变动日志（失败只 warn，不影响主流程 —— 与源一致） */
+async function logAssignment(requestId, fromSlot, toSlot, type, reason, operatorId = null) {
+  try {
+    const id = await nextId(C.ASSIGNMENT_LOG);
+    await insertOne(C.ASSIGNMENT_LOG, {
+      id,
+      requestId,
+      fromSlot: fromSlot || null,
+      toSlot: toSlot || null,
+      assignmentType: type,
+      reason: reason || null,
+      operatorId: operatorId || null,
+      createTime: new Date(),
+    });
+  } catch (e) {
+    console.log(`[songSchedule] 排期日志写入失败 #${requestId}：${e.message}`);
+  }
+}
+
+/**
+ * ① 第一轮排期 InitialAllocator
+ *
+ * 对每个时段：取「审核已通过 + 还没排期 + 首选就是这一格」的候选，
+ * 按提交时间升序，前 capacity 个拿到正式位，其余进 WAITING。
+ *
+ * 幂等：候选条件带 scheduleStatus = UNASSIGNED，重复跑只命中更少行。
+ * @returns {Promise<{assigned:number, waiting:number, weekId:number}>}
+ */
+async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = null, dryRun = false } = {}) {
+  const week = await ensureWeek(weekStartMs, { now });
+  const values = await slotValuesOfWeek(weekStartMs);
+  const capacity = await getCapacity();
+  const res = { weekId: week.id, assigned: 0, waiting: 0, actions: [] };
+
+  const counters = await countSeatedBySlot(values);
+
+  for (const value of values) {
+    let left = capacity > 0 ? Math.max(0, capacity - (counters[value] || 0)) : Infinity;
+
+    const candidates = await findAllPaged(
+      C.SUBMIT,
+      {
+        type: 1,
+        reviewStatus: S.REVIEW.APPROVED,
+        scheduleStatus: S.SCHEDULE.UNASSIGNED,
+        wantBroadcastTime: value,
+      },
+      { orderBy: [['createTime', 'asc'], ['id', 'asc']] }
+    );
+    if (!candidates.length) continue;
+
+    for (const row of candidates) {
+      if (left > 0) {
+        if (dryRun) {
+          res.actions.push({ action: 'ASSIGN', id: row.id, songName: row.songName, want: value, to: value, cost: 0 });
+        } else {
+          const r = await S.applyChange(row, {
+            scheduleStatus: S.SCHEDULE.APPROVED,
+            scheduledSlot: value,
+            assignedAt: new Date(now),
+          }, { operatorId, operatorName: operatorId ? 'ADMIN' : 'SYSTEM', reason: S.SYSTEM_REASON.initial });
+          if (r.logs.length) await logAssignment(row.id, null, value, ASSIGN.INITIAL, ASSIGN_REASON.INITIAL, operatorId);
+        }
+        res.assigned += 1;
+        if (left !== Infinity) left -= 1;
+      } else {
+        if (dryRun) {
+          res.actions.push({ action: 'WAITING', id: row.id, songName: row.songName, want: value, to: null, cost: null });
+          res.waiting += 1;
+        } else {
+          const r = await S.applyChange(row, { scheduleStatus: S.SCHEDULE.WAITING }, {
+            operatorId, operatorName: 'SYSTEM', reason: 'ORIGINAL_SLOT_FULL',
+          });
+          if (r.logs.length) res.waiting += 1;
+        }
+      }
+    }
+  }
+
+  if (!dryRun) {
+    if (week.status !== WEEK_STATUS.LOCKED && week.status !== WEEK_STATUS.CANCELLED) {
+      await applyWeekPatch(week, { status: WEEK_STATUS.SCHEDULING });
+    }
+    console.log(`[songSchedule] 第一轮排期 周${week.weekStartDate}：落座 ${res.assigned}、候补 ${res.waiting}`);
+  }
+  return res;
+}
+
+/**
+ * ② 全局调剂 RescheduleAllocator
+ *
+ * 协议 §17：执行全局调剂
+ *   1. 获取所有空位
+ *   2. 候选 = 审核通过 + WAITING
+ *   3. 排序：可接受位置少的优先 → 提交时间早的优先 → 距原时段近的优先
+ *   4. 分配并写 assignment_log
+ *
+ * 「距原时段近」用《V1 规格》第 10 节的**成本表**（`songRescheduleCost`）：
+ *   同一天其他时段 10 / 前后一天相同时段 20 / 前后一天其他时段 30 / 更远日期 50。
+ *
+ * @param {object}  [opts]
+ * @param {boolean} [opts.crossSlot] true=允许跨时段，false=只做原位递补，
+ *                                   null / 省略 = 按「点播是否已截止」自动判断
+ * @param {boolean} [opts.dryRun]    只算不写库（模拟排期预览），动作清单在 actions 里
+ * @returns {Promise<{weekId, promoted, rescheduled, left, crossSlot, actions}>}
+ */
+async function reschedule(weekStartMs, { now = Date.now(), operatorId = null, crossSlot = null, dryRun = false } = {}) {
+  const week = await ensureWeek(weekStartMs, { now });
+  const values = await slotValuesOfWeek(weekStartMs);
+  const capacity = await getCapacity();
+  const indexOf = new Map(values.map((v, i) => [v, i]));
+  const allowCross = crossSlot === null ? canCrossSlot(week, now) : !!crossSlot;
+  const res = { weekId: week.id, promoted: 0, rescheduled: 0, left: 0, crossSlot: allowCross, actions: [] };
+
+  const counters = await countSeatedBySlot(values);
+  const free = new Set(
+    capacity > 0 ? values.filter((v) => (counters[v] || 0) < capacity) : values
+  );
+
+  const candidates = await findAllPaged(
+    C.SUBMIT,
+    {
+      type: 1,
+      reviewStatus: S.REVIEW.APPROVED,
+      scheduleStatus: S.SCHEDULE.WAITING,
+      wantBroadcastTime: _.in(values),
+    },
+    { orderBy: [['createTime', 'asc'], ['id', 'asc']] }
+  );
+  if (!candidates.length) return res;
+
+  /**
+   * 这一行**可接受**的落点（每次重算，因为 free 在循环里会变小）：
+   *   允许跨时段 且 本人接受调剂 → 周内所有空位
+   *   否则                       → 只有「首选格还空着」这一个选项（原位递补）
+   */
+  const acceptableOf = (row) => {
+    const want = row.wantBroadcastTime;
+    const allow = Number(row.allowReschedule) !== 0;
+    if (allow && allowCross) return [...free];
+    return free.has(want) ? [want] : [];
+  };
+
+  // 排序键用当前 free 快照算；分配过程中 free 会变小，但顺序一次定死，避免不可复现
+  const decorated = candidates.map((row) => {
+    const want = row.wantBroadcastTime;
+    const acceptable = acceptableOf(row);
+    const best = acceptable.length
+      ? acceptable.reduce((m, v) => Math.min(m, costCalc.costBetween(want, v)), Infinity)
+      : Infinity;
+    return {
+      row,
+      want,
+      acceptableCount: acceptable.length,
+      cost: best,
+      at: +new Date(row.createTime || 0),
+    };
+  });
+  decorated.sort((a, b) => {
+    if (a.acceptableCount !== b.acceptableCount) return a.acceptableCount - b.acceptableCount; // 可接受位少 → 先安排
+    if (a.at !== b.at) return a.at - b.at;                                                      // 提交早 → 先安排
+    const c = costCalc.compareCost(a.cost, b.cost);
+    if (c) return c;                                                                            // 离原时段近 → 先安排
+    return Number(a.row.id) - Number(b.row.id);
+  });
+
+  for (const item of decorated) {
+    const { row, want } = item;
+    const options = acceptableOf(row);
+    if (!options.length) {
+      res.left += 1;
+      if (dryRun) res.actions.push({ action: 'WAITING', id: row.id, songName: row.songName, want, to: null, cost: null });
+      continue;
+    }
+
+    const target = costCalc.pickBest(options, want, indexOf);
+    const isSame = target === want;
+
+    if (dryRun) {
+      res.actions.push({
+        action: isSame ? 'PROMOTE' : 'RESCHEDULE',
+        id: row.id,
+        songName: row.songName,
+        want,
+        to: target,
+        cost: costCalc.describeCost(want, target).cost,
+      });
+    } else {
+      const r = await S.applyChange(row, {
+        scheduleStatus: S.SCHEDULE.APPROVED,
+        scheduledSlot: target,
+        assignedAt: new Date(now),
+      }, {
+        operatorId,
+        operatorName: operatorId ? 'ADMIN' : 'SYSTEM',
+        reason: isSame ? S.SYSTEM_REASON.rescheduleOk : ASSIGN_REASON.originalFull,
+      });
+      if (!r.logs.length) continue;              // 并发被别人改过 → 跳过
+
+      await logAssignment(
+        row.id, want, target,
+        isSame ? ASSIGN.PROMOTED : ASSIGN.RESCHEDULED,
+        isSame ? S.SYSTEM_REASON.rescheduleOk : ASSIGN_REASON.originalFull,
+        operatorId
+      );
+    }
+    if (isSame) res.promoted += 1; else res.rescheduled += 1;
+
+    if (capacity > 0) {
+      counters[target] = (counters[target] || 0) + 1;
+      if (counters[target] >= capacity) free.delete(target);
+    }
+  }
+
+  if (!dryRun && (res.promoted || res.rescheduled)) {
+    console.log(`[songSchedule] 调剂 周${week.weekStartDate}${allowCross ? '' : '（点播未截止·仅原位递补）'}：原位递补 ${res.promoted}、跨时段调剂 ${res.rescheduled}、仍未安排 ${res.left}`);
+  }
+  return res;
+}
+
+/** 释放位子之后统一调用：原位递补 + 全局调剂（幂等） */
+async function runAllocators(weekStartMs, opts = {}) {
+  try {
+    const r = await reschedule(weekStartMs, opts);
+    return r;
+  } catch (e) {
+    console.log(`[songSchedule] 调剂失败（下次审核 / 手动 sweep 会重试）：${e.message}`);
+    return { promoted: 0, rescheduled: 0, left: 0, error: e.message };
+  }
+}
+
+/** 释放某条记录占的位子 → 对归属周跑一次调剂 */
+async function afterRelease(row, opts = {}) {
+  const ws = weekStartOfRow(row);
+  if (!ws) return { promoted: 0, rescheduled: 0, left: 0 };
+  return runAllocators(ws.getTime(), opts);
+}
+
+/**
+ * ③ 正式锁定 Lock（协议 §18）
+ *
+ * 检查是否到锁定时间 → 执行最后一次调度 → WAITING → AUTO_REJECTED → 周 = LOCKED
+ *
+ * 这样就不会出现「系统还有空位，管理员先点了锁定」的问题（那样会白白浪费位置）。
+ * @param {object} opts.force 手动提前锁定（管理员点了「立即锁定」）
+ */
+async function lockWeek(weekStartMs, { now = Date.now(), operatorId = null, force = false } = {}) {
+  const week = await ensureWeek(weekStartMs, { now });
+  if (week.status === WEEK_STATUS.LOCKED) return { ...weekView(week, now), already: true, rejected: 0 };
+
+  const lockAt = week.scheduleLockAt ? +new Date(week.scheduleLockAt) : 0;
+  if (!force && lockAt && now < lockAt) {
+    return { ...weekView(week, now), already: false, tooEarly: true, rejected: 0 };
+  }
+
+  // 最后一次调度：把还能塞进空位的人都塞进去
+  // 锁定时**显式**放开跨时段 —— 到了这一步点播早已截止，不可能再有新申请者
+  await initialAllocate(weekStartMs, { now, operatorId });
+  const alloc = await reschedule(weekStartMs, { now, operatorId, crossSlot: true });
+
+  // 剩下仍是 WAITING 的 → AUTO_REJECTED
+  // ⚠️ 云数据库的顶层 `_.or` 子项是 **where 子句**（见 harness 里 matchesWhere 的注释）
+  const values = await slotValuesOfWeek(weekStartMs);
+  const waiting = await findAllPaged(C.SUBMIT, _.and([
+    { type: 1, reviewStatus: S.REVIEW.APPROVED, scheduleStatus: S.SCHEDULE.WAITING },
+    _.or([
+      { wantBroadcastTime: _.in(values) },
+      { scheduledSlot: _.in(values) },
+    ]),
+  ]));
+  let rejected = 0;
+  for (const row of waiting) {
+    const r = await S.applyChange(row, {
+      scheduleStatus: S.SCHEDULE.AUTO_REJECTED,
+      rejectReason: S.SYSTEM_REASON.lockedNoSlot,
+      autoRejected: 1,
+      reviewTime: new Date(now),
+    }, { operatorName: 'SYSTEM', reason: 'SCHEDULE_LOCKED_NO_AVAILABLE_SLOT' });
+    if (r.logs.length) rejected += 1;
+  }
+
+  await applyWeekPatch(week, { status: WEEK_STATUS.LOCKED, lockedAt: new Date(now), lockPaused: 0 });
+  console.log(`[songSchedule] 周 ${week.weekStartDate} 已锁定：最后调度 ${alloc.promoted + alloc.rescheduled} 条，无位自动驳回 ${rejected} 条`);
+  return { ...weekView(await findById(C.WEEKLY, week._id), now), already: false, rejected, lastAlloc: alloc };
+}
+
+/**
+ * 解锁（撤销锁定）—— 超管专用，给「锁错了 / 锁完发现还要改」兜底。
+ *
+ * 做三件事：
+ *   ① 周退回 `SCHEDULING`（可继续人工调整、可重跑排期）；
+ *   ② **恢复本次锁定时被系统自动驳回的候补** —— 退回 `WAITING`，清掉 `reject_reason`
+ *      与 `auto_rejected` 标记。只恢复「当时是系统驳回、且现在仍原封不动」的那些
+ *      （`schedule_status` 还是 AUTO_REJECTED），管理员后来手动动过的一概不碰。
+ *      不想恢复就传 `restore: false`（此时这些人会永久停在已驳回，慎用）。
+ *   ③ `lock_paused = 1` —— ⚠️ 这一步不能省：`sweep()` 的自动锁定只看
+ *      `now >= schedule_lock_at`，而解锁发生在锁定时刻之后，不拦住的话
+ *      下一轮 sweep（定时器/手动）会立刻把它锁回去，解锁等于没做。
+ *      恢复自动锁定只能靠超管**手动**重新锁定（`lockWeek` 里会清 0）。
+ *
+ * ⚠️ 锚点不动：解锁后状态是 SCHEDULING，而 SCHEDULING 属于 `ANCHOR_FROZEN_STATUS`，
+ * `refreshAnchors()` 不会拿新配置覆盖它 —— 这一周的调度依据必须保持原样。
+ */
+async function unlockWeek(weekStartMs, { now = Date.now(), operatorId = null, restore = true } = {}) {
+  const week = await ensureWeek(weekStartMs, { now });
+  if (week.status !== WEEK_STATUS.LOCKED) {
+    throw Object.assign(new Error('这一周没有锁定，无需解锁'), { code: 40001 });
+  }
+
+  // ② 恢复被自动驳回的候补
+  let restored = 0;
+  if (restore) {
+    const values = await slotValuesOfWeek(weekStartMs);
+    const rows = await findAllPaged(C.SUBMIT, _.and([
+      {
+        type: 1,
+        reviewStatus: S.REVIEW.APPROVED,
+        scheduleStatus: S.SCHEDULE.AUTO_REJECTED,
+        autoRejected: 1,
+        rejectReason: S.SYSTEM_REASON.lockedNoSlot,
+      },
+      _.or([
+        { wantBroadcastTime: _.in(values) },
+        { scheduledSlot: _.in(values) },
+      ]),
+    ]));
+    for (const row of rows) {
+      const r = await S.applyChange(row, {
+        scheduleStatus: S.SCHEDULE.WAITING,
+        rejectReason: null,
+        autoRejected: 0,
+      }, { operatorId, reason: 'WEEK_UNLOCKED_RESTORE_WAITING' });
+      if (r.logs.length) restored += 1;
+    }
+  }
+
+  await applyWeekPatch(week, { status: WEEK_STATUS.SCHEDULING, lockedAt: null, lockPaused: 1 });
+  console.log(`[songSchedule] 周 ${week.weekStartDate} 已解锁：恢复候补 ${restored} 条，自动锁定暂停`);
+  return {
+    ...weekView(await findById(C.WEEKLY, week._id), now),
+    already: false,
+    restored,
+    lockPaused: true,
+  };
+}
+
+/** 取消某一周的排期（管理员操作，未开始播出的周） */
+async function cancelWeek(weekStartMs, { now = Date.now(), operatorId = null } = {}) {
+  const week = await ensureWeek(weekStartMs, { now });
+  if (week.status === WEEK_STATUS.LOCKED) {
+    throw Object.assign(new Error('这一周已经锁定，不能取消'), { code: 40001 });
+  }
+  await applyWeekPatch(week, { status: WEEK_STATUS.CANCELLED });
+  return weekView(week, now);
+}
+
+/* ------------------------------------------------------------------ *
+ * ④ 播放标记
+ * ------------------------------------------------------------------ */
+/**
+ * 播出时刻已过的「已排期」→ 已播放（幂等）
+ * 播出时刻 = 时段值里的日期 + 时刻（北京时间）
+ *
+ * ⚠️⚠️ 本函数是**批量** UPDATE，是全项目唯一**不用** `applyChange` 的改状态路径
+ *    （源实现就是 `Submit.update(patch, { where: { id: { [Op.in]: due } } })`）。
+ *    两点必须如实保留、不要「顺手修正」：
+ *      ① **不带** reviewStatus/scheduleStatus/playStatus 守卫 —— 加了会改变
+ *         `affectedRows` 的语义（原实现没有守卫）；
+ *      ② **不写** `request_status_log`（只有 `applyChange` 才写状态日志）。
+ *
+ * ⚠️ 云端差异：`_.in(due)` 的数组长度受**单次命令体大小**限制，故按 100 一批切分，
+ *    累加 `updated`（结果与一次性 UPDATE 等价）。
+ */
+async function markPlayed({ now = Date.now() } = {}) {
+  const rows = await findAllPaged(C.SUBMIT, {
+    type: 1,
+    reviewStatus: S.REVIEW.APPROVED,
+    scheduleStatus: S.SCHEDULE.APPROVED,
+    playStatus: S.PLAY.NOT_PLAYED,
+  });
+  const due = [];
+  rows.forEach((r) => {
+    const t = instantOfValue(r.scheduledSlot);
+    if (t !== null && now >= t) due.push(r.id);
+  });
+  if (!due.length) return { played: 0 };
+
+  const patch = S.patchWithDerivedStatus({
+    reviewStatus: S.REVIEW.APPROVED,
+    scheduleStatus: S.SCHEDULE.APPROVED,
+    playStatus: S.PLAY.PLAYED,
+    playedAt: new Date(now),
+  });
+  let n = 0;
+  const CHUNK = 100;
+  for (let i = 0; i < due.length; i += CHUNK) {
+    n += await updateWhere(C.SUBMIT, { id: _.in(due.slice(i, i + CHUNK)) }, patch);
+  }
+  if (n) console.log(`[songSchedule] 标记已播放 ${n} 条`);
+  return { played: n };
+}
+
+/** 管理员手动标记某条为已播放 / 取消已播放 */
+async function setPlayed(row, played, { now = Date.now(), operatorId = null } = {}) {
+  return S.applyChange(row, {
+    playStatus: played ? S.PLAY.PLAYED : S.PLAY.NOT_PLAYED,
+    playedAt: played ? new Date(now) : null,
+  }, { operatorId, operatorName: played ? 'SYSTEM' : 'ADMIN', reason: 'MANUAL' });
+}
+
+/* ------------------------------------------------------------------ *
+ * ⑤ 人工调整（协议 §20）
+ * ------------------------------------------------------------------ */
+/**
+ * 管理员手工把某条点歌放到某个时段（不可逆动作不会破坏历史链：照写 assignment_log）
+ */
+async function manualAssign(row, targetSlot, { now = Date.now(), operatorId = null, reason = ASSIGN_REASON.manual } = {}) {
+  const values = await slotValuesOfWeek(weekStartOfValue(targetSlot).getTime());
+  if (!values.includes(targetSlot)) {
+    throw Object.assign(new Error('目标时段不属于任何一个可选播出周'), { code: 40001 });
+  }
+  const from = row.scheduledSlot || null;
+  const r = await S.applyChange(row, {
+    reviewStatus: S.REVIEW.APPROVED,
+    scheduleStatus: S.SCHEDULE.APPROVED,
+    scheduledSlot: targetSlot,
+    assignedAt: new Date(now),
+  }, { operatorId, operatorName: 'ADMIN', reason });
+  await logAssignment(row.id, from, targetSlot, ASSIGN.MANUAL, reason, operatorId);
+  return r;
+}
+
+/* ------------------------------------------------------------------ *
+ * ⑥ 兜底 sweep（管理端手动触发 / 定时器 → 阶段 6 改触发器）
+ * ------------------------------------------------------------------ */
+/**
+ * 全量兜底（幂等）：
+ *   ① 对每个「还有活着的点歌」的周：跑第一轮排期 + 调剂
+ *   ② 到锁定时刻的周 → 锁定（最后调度 + AUTO_REJECTED）
+ *   ③ 播出时刻已过的 → 标记已播放
+ *
+ * ⚠️⚠️ 第 ② 步必须**独立于第 ① 步**扫一遍 `weekly_schedule`：
+ *    如果只看「还有 UNASSIGNED/WAITING 的周」，那么「所有点歌早就排好了、
+ *    一条候补都不剩」的周永远不会进入循环，也就永远锁不上 ——
+ *    而周锁不上，`play_status` 与「排期已定稿」的展示就全都不对。
+ *
+ * ⚠️ 原实现用 `attributes: ['week_start_date']` 做投影，云端不支持字段投影 →
+ *    `findAllPaged` 全字段返回。**但字段名必须改成驼峰 `weekStartDate`** ——
+ *    写成 `week_start_date` 会得到 `undefined` → `msOfWeekStartDate` 返回 null
+ *    → 那一周被静默跳过 → 永远锁不上，且不报任何错。
+ */
+async function sweep({ now = Date.now(), operatorId = null } = {}) {
+  const result = { weeks: [], played: 0 };
+
+  // ── 收集要处理的周 ──
+  const weekMsSet = new Set();
+
+  const alive = await findAllPaged(C.SUBMIT, {
+    type: 1,
+    scheduleStatus: _.in([S.SCHEDULE.UNASSIGNED, S.SCHEDULE.WAITING]),
+  });
+  alive.forEach((r) => {
+    const ws = weekStartOfRow(r);
+    if (ws) weekMsSet.add(ws.getTime());
+  });
+
+  // 已经建了周行、但还没锁定 / 取消的周（不管里面还有没有点歌）
+  const openWeeks = await findAllPaged(C.WEEKLY, {
+    status: _.in([WEEK_STATUS.DRAFT, WEEK_STATUS.APPLICATION, WEEK_STATUS.REVIEW, WEEK_STATUS.SCHEDULING]),
+  });
+  openWeeks.forEach((w) => {
+    const ms = msOfWeekStartDate(w.weekStartDate);
+    if (ms !== null) weekMsSet.add(ms);
+  });
+
+  for (const wsMs of [...weekMsSet].sort((a, b) => a - b)) {
+    const week = await ensureWeek(wsMs, { now });
+    const entry = { weekStartDate: week.weekStartDate, weekId: week.id };
+
+    const lockAt = week.scheduleLockAt ? +new Date(week.scheduleLockAt) : 0;
+    if (week.status === WEEK_STATUS.CANCELLED) {
+      entry.skipped = 'CANCELLED';
+    } else if (week.status === WEEK_STATUS.LOCKED) {
+      entry.skipped = 'LOCKED';
+    } else if (lockAt && now >= lockAt && Number(week.lockPaused) === 1) {
+      // ⚠️ 已解锁的周：到点了也**不自动锁**，否则解锁后一眨眼又锁回去。
+      // 仍然跑一遍排期（空位照补），只是不再走「锁定 + 自动驳回」那一步。
+      entry.lockPaused = true;
+      const a = await initialAllocate(wsMs, { now, operatorId });
+      const b = await reschedule(wsMs, { now, operatorId });
+      entry.assigned = a.assigned;
+      entry.waiting = a.waiting;
+      entry.promoted = b.promoted;
+      entry.rescheduled = b.rescheduled;
+    } else if (lockAt && now >= lockAt) {
+      const r = await lockWeek(wsMs, { now, operatorId });
+      entry.locked = !r.already;
+      entry.rejected = r.rejected;
+    } else {
+      const a = await initialAllocate(wsMs, { now, operatorId });
+      const b = await reschedule(wsMs, { now, operatorId });
+      entry.assigned = a.assigned;
+      entry.waiting = a.waiting;
+      entry.promoted = b.promoted;
+      entry.rescheduled = b.rescheduled;
+    }
+    result.weeks.push(entry);
+  }
+
+  result.played = (await markPlayed({ now })).played;
+  return result;
+}
+
+/* ------------------------------------------------------------------ *
  * 候补读路径
  * ------------------------------------------------------------------ */
 /** 候选池 / 候补队列快照（管理端与候补卡用） */
@@ -4657,26 +5193,18 @@ async function waitingPosOf(row) {
 }
 
 /* ------------------------------------------------------------------ *
- * 阶段 5 占位（排期算法）
+ * 阶段 5 完成
  * ------------------------------------------------------------------ */
 /**
- * ⛔ 这些函数改状态、依赖完整调度语义，**尚未移植**（阶段 5）。
+ * ✅ 排期算法 12 个函数**已全部移植完成**（2026-09-28）。
  *
- * 刻意导出成「一调就抛清晰错误」而不是不导出：
- * 不导出的话调用点只会得到 `x is not a function`，在云函数日志里几乎无法定位是
- * 「还没做」还是「打包漏了」。
+ * 原先这里有一组「一调就抛清晰错误」的占位函数（`NOT_PORTED_YET`），
+ * 现在已随阶段 5 收尾**全部拆除** —— 保留空壳只会变成误导。
+ *
+ * 阶段 6 待办（**不在本文件范围**）：把原 `songQueueService.startScheduler()`
+ * 的 60 秒 `setInterval` 换成云开发的**定时触发器**（云函数无常驻进程），
+ * 触发器只需调 `sweep()` 一处。
  */
-const NOT_PORTED_YET = [
-  'initialAllocate', 'reschedule', 'lockWeek', 'unlockWeek', 'cancelWeek',
-  'markPlayed', 'setPlayed', 'manualAssign',
-  'runAllocators', 'afterRelease', 'sweep',
-];
-const notPort = {};
-NOT_PORTED_YET.forEach((name) => {
-  notPort[name] = async () => {
-    throw new Error(`[阶段5未移植] songScheduling.${name}() —— 排期算法属于阶段 5，需先出方案`);
-  };
-});
 
 module.exports = {
   // 常量
@@ -4715,9 +5243,159 @@ module.exports = {
   // 候补读路径
   waitingSnapshot,
   waitingPosOf,
-  // ⛔ 阶段 5 占位
-  ...notPort,
-  NOT_PORTED_YET,
+  // ── 排期算法（阶段 5 · 已全部落地）──
+  logAssignment,
+  initialAllocate,
+  reschedule,
+  runAllocators,
+  afterRelease,
+  lockWeek,
+  unlockWeek,
+  cancelWeek,
+  markPlayed,
+  setPlayed,
+  manualAssign,
+  sweep,
+};
+
+};
+__mods["services/songRescheduleCost.js"] = function (module, exports, require) {
+'use strict';
+
+/**
+ * 调剂选址成本表（《V1 规格》第 10 节）
+ *
+ * ═══════════════════════════════════════════════════════════════════════
+ * 从 `src/services/songRescheduleCost.js` **逐字移植**（阶段 5），业务逻辑一行未改。
+ * 纯字符串解析 + 纯函数，**零依赖、零 DB、零缓存**，因此没有任何云化改写点。
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * 把「候补的人该被调到哪一格」从「周内下标距离最小」换成显式成本表：
+ *
+ *   同一天其他时段        10
+ *   前 / 后一天相同时段    20
+ *   前 / 后一天其他时段    30
+ *   更远日期              50
+ *   不可接受              ∞
+ *   —— 选 cost 最小的那个格子
+ *
+ * 与下标距离的差别（这正是之前对不上规格的地方）：
+ *   下标差把「周一晚 → 周二早」(差 1) 与「周一晚 → 周一午」(差 1) 当成一样近，
+ *   而按成本表应当是 周一午 10 < 周二早 30 —— 跨天的相邻时段不该被当成同天邻近。
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * 时段值形如 `2026-09-21 午间 12:20`（日期 + 时段名 + 时刻），由
+ * `broadcastSlotService` 派生，这里只做纯字符串解析，不碰数据库。
+ */
+
+const DAY_MS = 86400000;
+
+/** 成本档位（对外导出，便于接口/文档引用同一份数字） */
+const COST = {
+  SELF: 0,                      // 就是首选的这一格
+  SAME_DAY: 10,                 // 同一天的其他时段
+  ADJACENT_SAME_PERIOD: 20,     // 前 / 后一天的同一时段
+  ADJACENT_OTHER_PERIOD: 30,    // 前 / 后一天的其他时段
+  FARTHER: 50,                  // 更远的日期（同一播出周内）
+  UNACCEPTABLE: Infinity,       // 不可接受（跨周 / 解析不出来）
+};
+
+const COST_LABEL = {
+  0: '首选时段',
+  10: '同一天其他时段',
+  20: '前后一天相同时段',
+  30: '前后一天其他时段',
+  50: '更远日期',
+  Infinity: '不可接受',
+};
+
+/** `2026-09-21 午间 12:20` → { date, period, time }；解析不出返回 null */
+function parseSlot(value) {
+  const m = String(value || '').match(/^(\d{4}-\d{2}-\d{2})\s+(\S+)\s+(\d{1,2}:\d{2})$/);
+  if (!m) return null;
+  return { date: m[1], period: m[2], time: m[3] };
+}
+
+/** 北京日期串 → 第几天（用于算天差，不受时区影响） */
+function dayNumber(dateStr) {
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  return Math.round(Date.UTC(y, m - 1, d) / DAY_MS);
+}
+
+/**
+ * 两个时段之间的调剂成本。
+ *
+ * 判据用的是「相隔天数 + 是否同一时段（时段名与时刻都相同）」，
+ * 而**不是**周内格子下标 —— 下标会把跨天相邻与同天相邻混为一谈。
+ *
+ * 本系统的可选时段固定是**下一周的周一到周五**（`broadcastSlotService`），
+ * 所以同周内天差最多 4；天差 ≥ 5 必然是跨周 → 不可接受。
+ *
+ * @returns {number} 0 / 10 / 20 / 30 / 50 / Infinity
+ */
+function costBetween(fromValue, toValue) {
+  const a = parseSlot(fromValue);
+  const b = parseSlot(toValue);
+  if (!a || !b) return COST.UNACCEPTABLE;
+
+  const days = Math.abs(dayNumber(b.date) - dayNumber(a.date));
+  if (days >= 5) return COST.UNACCEPTABLE;                 // 跨周
+
+  const samePeriod = a.period === b.period && a.time === b.time;
+  if (days === 0) return samePeriod ? COST.SELF : COST.SAME_DAY;
+  if (days === 1) return samePeriod ? COST.ADJACENT_SAME_PERIOD : COST.ADJACENT_OTHER_PERIOD;
+  return COST.FARTHER;
+}
+
+/** 成本的中文说明（接口 / 日志 / 预览用） */
+function describeCost(fromValue, toValue) {
+  const c = costBetween(fromValue, toValue);
+  return { cost: c === Infinity ? null : c, text: COST_LABEL[c] || '' };
+}
+
+/**
+ * 从一组候选格子里挑 cost 最小的那个。
+ * cost 相同时按周内下标升序 —— 保证同样输入永远得到同样结果（可复现），
+ * 否则排序不稳定会让「手动重跑排期」的结果飘。
+ *
+ * @param {string[]} options 可选的目标格
+ * @param {string}   want    首选格
+ * @param {Map<string,number>} indexOf 格子 → 周内下标
+ * @returns {string} 选中的格子
+ */
+function pickBest(options, want, indexOf) {
+  const list = options.slice();
+  list.sort((x, y) => {
+    const cx = costBetween(want, x);
+    const cy = costBetween(want, y);
+    if (cx !== cy) {
+      if (cx === Infinity) return 1;
+      if (cy === Infinity) return -1;
+      return cx - cy;
+    }
+    return (indexOf.get(x) ?? 999) - (indexOf.get(y) ?? 999);
+  });
+  return list[0];
+}
+
+/** 用于 sort 比较：Infinity 不能直接相减（Infinity - Infinity = NaN） */
+function compareCost(a, b) {
+  if (a === b) return 0;
+  if (a === Infinity) return 1;
+  if (b === Infinity) return -1;
+  return a - b;
+}
+
+module.exports = {
+  COST,
+  COST_LABEL,
+  DAY_MS,
+  parseSlot,
+  dayNumber,
+  costBetween,
+  describeCost,
+  pickBest,
+  compareCost,
 };
 
 };

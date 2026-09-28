@@ -42,7 +42,7 @@
 | 2 | 数据层（`lib/db.js`）+ 本地测试 harness（内存假库跑真网关） | ✅ 完成 |
 | 3 | 配置类集合（system_setting / system_switch）+ 首批接口（switch、station） | ✅ 完成 |
 | 4 | 用户端接口移植（登录/改密/投稿/点歌/留言/节目/公告/风采） | ✅ 完成（33/33 接口，云端实测 31 条全绿） |
-| 5 | 点歌状态机（songStatusService + songSchedulingService）重写 | ⏳ 最高风险（**动工前先出方案**） |
+| 5 | 点歌状态机（songStatusService + songSchedulingService）重写 | ✅ 完成（12/12 算法函数，本地 783 项全绿；**云端待阶段 7 验收**，见下） |
 | 6 | 定时触发器（原 60s sweep → 云函数定时器） | ⏳ |
 | 7 | 管理端接口移植（含学生名册 Excel） | ⏳ |
 | 8 | 数据迁移脚本 + 双向校验 | ⏳ |
@@ -57,19 +57,36 @@ node cloud/scripts/test-gateway.js     # 网关 + lib/db 原语（26 项）
 node cloud/scripts/test-user-readonly.js  # 用户端只读（76 项）
 node cloud/scripts/test-user-auth.js      # 登录 / 改密 / me（62 项）
 node cloud/scripts/test-user-submit.js    # 投稿 / 点歌 11 个接口（206 项）
-node cloud/scripts/test-bundle.js         # 打包产物冒烟（20 项）
+node cloud/scripts/test-scheduling-cost.js # 调剂选址成本表（63 项）
+node cloud/scripts/test-scheduling.js      # 排期算法 12 个函数（234 项）
+node cloud/scripts/test-bundle.js          # 打包产物冒烟（20 项）
 ```
 
-合计 **481 项**，全绿才算过。
+合计 **783 项**，全绿才算过。
 
 ⚠️ **产物行为必须与源码一致**：`HARNESS_API_DIR=miniprogram/cloudfunctions/api` 再跑一遍
-`test-user-submit.js`（打包器是自研的，必须能自证）。
+`test-scheduling.js` / `test-scheduling-cost.js` / `test-user-submit.js`
+（打包器是自研的，必须能自证）。
 
 `cloud/scripts/harness.js` 把 `wx-server-sdk` 替换成内存假数据库（Map 存集合），
-并**刻意模拟**了三个真实行为，否则测不出问题：
+并**刻意模拟**了五个真实行为，否则测不出问题：
 `add()` 撞 `_id` 抛错（等价 UNIQUE 冲突）、`doc().get()/update()` 不存在抛错、
-`where().update()` 返回 `stats.updated`（等价 affectedRows）。
+`where().update()` 返回 `stats.updated`（等价 affectedRows）、
+**多键排序按「值」比较 Date**（不同实例同一时刻必须判等，否则排序退化成插入顺序）、
+**`where()` 支持顶层 `_.and([...])` / `_.or([...])`**（子项是 where 子句，可嵌套）。
 → 新增 handler 时在 `test-gateway.js` 里加断言，不要只靠「部署后手点」。
+
+### 阶段 5 的两个重要结论
+
+1. **原排期算法的事务是「空的」**。`grep -rn transaction src/controllers/ src/services/songSchedulingService.js`
+   证实所有调用点传的都是 `undefined` —— 真实并发模型一直是
+   「单条条件 UPDATE + `affectedRows` 判定」，也就是 `applyChange` 的乐观锁。
+   → 云化**不需要跨文档事务**（唯一真事务在 `admin/submitController.js:1067` 的 `purgeSongs`，与排期无关）。
+2. **排期算法在用户端「零入口」**。用户端 `cancel` 的可撤销判定是
+   `review===PENDING || (APPROVED && schedule===WAITING)`，而 `cancelRequest` 里
+   触发 `afterRelease` 的条件是 `isSeated()`（`APPROVED && APPROVED`）—— 两者**互斥**。
+   → 阶段 5 **无法用用户端接口做云端验收**，真实入口全在管理端（阶段 7）。
+   当下最强证据 = 本地 harness 783 项全绿 + 产物自证。
 
 ### 已跑通的接口（用户端 33/33）
 
@@ -86,7 +103,7 @@ node cloud/scripts/test-bundle.js         # 打包产物冒烟（20 项）
 | 我的 | `GET /user/profile` |
 | **投稿/点歌** | `POST /user/submit`、`GET /user/submit/my`、`quota`、`window`、`week`、`notice`、`timeslots`、`/:id`、`POST /user/submit/notice/ack`、`DELETE /user/submit/:id`、`POST /user/submit/:id/leave-queue` |
 
-### ⚠️ 两个「不报错」的静默漂移（移植时务必对照）
+### ⚠️ 四个「不报错」的静默漂移（移植时务必对照）
 
 1. **`ApiError` 是 4 参**：`(code, message, httpStatus = 200, data = null)`，与 `src/utils/response.js` 一致。
    从 src 逐字移植过来的 service 会写 `new ApiError(code, msg, 200, { opensAt })` ——
@@ -96,6 +113,12 @@ node cloud/scripts/test-bundle.js         # 打包产物冒烟（20 项）
    只搬 controller 会漏鉴权，漏了不报错、只会「未登录也能看」。
    （例：`/user/submit/window`、`/user/submit/timeslots` 都挂了 `userAuth`；
    而 `/user/submit/week` **没有** —— 全组唯一免登录。）
+3. **`week.update()` 之后必须同步内存对象**。源里 `week` 是 Sequelize 实例，`await week.update(patch)`
+   之后实例自身就是新值；云端 `week` 是普通对象，`updateById` 只改库。
+   不同步的后果是 `weekView(week)` **返回旧状态**，且不报错。
+   → 统一走 `scheduling.applyWeekPatch()`。
+4. **字段名一律驼峰**：`sweep()` 里写 `w.week_start_date` 会得到 `undefined`
+   → `msOfWeekStartDate` 返回 `null` → 那一周被静默跳过 → **永远锁不上**，且不报错。
 
 ## 四、关键设计决策（已在阶段 1 落定）
 
@@ -137,22 +160,39 @@ cloud/
 │       ├── package.json
 │       ├── handlers/              # 按接口分文件，一个 handlerKey 对应一个方法
 │       │   ├── index.js           #   惰性解析 + 未移植兜底
-│       │   ├── system.js          #   /health
+│       │   ├── system.js          #   /health · init-collections
 │       │   └── user/
 │       │       ├── switch.js      #   /user/switch/*
-│       │       └── profile.js     #   /user/station/*
+│       │       ├── profile.js     #   /user/station/*
+│       │       ├── auth.js        #   登录 / 改密 / me
+│       │       ├── content.js     #   公告 / 节目 / 风采 / 留言
+│       │       └── submit.js      #   投稿 / 点歌 11 个接口
 │       ├── services/              # 业务服务（从 src/services 移植）
 │       │   ├── kv.js              #   系统设置 KV
-│       │   └── switch.js          #   模块开关
+│       │   ├── switch.js          #   模块开关（含云函数用的 isEnabledAsync）
+│       │   ├── studentAccount.js  #   学生账号
+│       │   ├── songWindow.js      #   点播时间窗口（逐字移植）
+│       │   ├── broadcastSlot.js   #   播出时段派生
+│       │   ├── submitRule.js      #   提交规则 / 配额
+│       │   ├── songNotice.js      #   点歌注意事项
+│       │   ├── songStatus.js      #   三维状态 + applyChange（乐观锁唯一入口）
+│       │   ├── songQueue.js       #   候选池门面 / 状态卡
+│       │   ├── songRescheduleCost.js  # 调剂选址成本表（纯函数，阶段 5）
+│       │   └── scheduling.js      #   ★ 排期算法 12 函数（阶段 5 已完成）
 │       └── lib/
 │           ├── response.js         # 错误码与统一响应（原样移植）
 │           ├── bjTime.js           # 北京时间工具（原样移植）
 │           ├── auth.js             # JWT 校验 + pv 新鲜度 + 角色
 │           └── db.js               # 数据层：唯一键模拟 / 数字主键 / 条件更新
 └── scripts/
-    ├── selfcheck.js               # 静态自检（68 项）
+    ├── selfcheck.js               # 静态自检 + 产物一致性
     ├── harness.js                 # 内存假数据库（stub 掉 wx-server-sdk）
-    └── test-gateway.js            # 网关实测（25 项）
+    ├── sync.js                    # 自研零依赖打包器（产物 = 单文件 index.js）
+    ├── test-gateway.js            # 网关 + db 原语
+    ├── test-scheduling.js         # ★ 排期算法 12 函数（234 项）
+    ├── test-scheduling-cost.js    # ★ 调剂成本表（63 项）
+    ├── verify-user.js             # 云端真实调用验收（需 IDE 自动化端口）
+    └── deploy-cloud.js            # 部署（单文件产物）
 ```
 
 ## 六、小程序端切换开关

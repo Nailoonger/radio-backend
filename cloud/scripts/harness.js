@@ -91,14 +91,41 @@ function matchCmd(docVal, cmd) {
   return false;
 }
 
-function matches(doc, where) {
-  return Object.keys(where || {}).every((k) => {
+/**
+ * where 求值。
+ *
+ * ⚠️⚠️ 真实云数据库的 `where()` 既能接**字段映射**，也能接**顶层逻辑指令**：
+ *
+ *     db.collection('order_info').where(_.and([
+ *       { publish_type: '1' },
+ *       _.or([{ _openid: openid }, { order_openid: openid }]),
+ *     ])).get()
+ *
+ *   —— 顶层 `_.and` / `_.or` 的**子项是 where 子句**（不是字段值），且可以嵌套。
+ *   早期假实现只支持「字段级指令」，于是任何用顶层 `or` 的查询在本地会
+ *   **恒不匹配**（静默返回空集），而线上却正常 —— 典型的「本地绿、线上错」。
+ *   排期算法里 `lockWeek` / `unlockWeek` 的候补筛选正是这个形状，所以必须补。
+ *
+ * 字段级指令（`{ age: _.gte(16).and(_.lte(19)) }`）仍走 `matchCmd`。
+ */
+function matchesWhere(doc, where) {
+  if (!where) return true;
+  if (isCmd(where)) {
+    const op = where.__cmd || {};
+    if (op.and) return op.and.every((c) => matchesWhere(doc, c));
+    if (op.or) return op.or.some((c) => matchesWhere(doc, c));
+    return false;            // 顶层只支持 and / or 组合
+  }
+  return Object.keys(where).every((k) => {
     const want = where[k];
     if (isCmd(want)) return matchCmd(doc[k], want);
     if (want && typeof want === 'object' && want[INC] !== undefined) return true; // 自增条件不参与筛选
     return doc[k] === want;
   });
 }
+
+/** @deprecated 保留旧名，内部转交 matchesWhere（阶段 5 前只有字段级 where） */
+const matches = matchesWhere;
 
 class Query {
   constructor(name, where) {
@@ -121,17 +148,29 @@ class Query {
         for (let i = 0; i < this._orders.length; i++) {
           const f = this._orders[i][0];
           const dir = this._orders[i][1];
-          const av = a[f];
-          const bv = b[f];
-          if (av === bv) continue;
+          const rawA = a[f];
+          const rawB = b[f];
+          /**
+           * ⚠️⚠️ **Date 必须按「时刻」比较，不能用 `===` 判等**。
+           *    这里每个文档都是 `clone()` 出来的**独立 Date 实例** ——
+           *    两行 createTime 同一时刻但实例不同，`rawA === rawB` 是 **false**，
+           *    于是 `rawA < rawB ? -1 : 1` 恒返回 1，比较器自相矛盾，
+           *    多键排序**退化成插入顺序**（且不报错）。
+           *    而「候选按 createTime 升序 + id 兜同秒」正是排期算法的可复现性基础
+           *    （见 songSchedulingService.initialAllocate / reschedule），
+           *    这个 bug 会让「同秒提交的两个人谁先落座」每次跑都不一样。
+           */
+          const av = rawA instanceof Date ? rawA.getTime() : rawA;
+          const bv = rawB instanceof Date ? rawB.getTime() : rawB;
           const an = av === undefined || av === null;
           const bn = bv === undefined || bv === null;
           let c;
           if (an && bn) c = 0;
           else if (an) c = -1;      // 近似 SQL：NULL 最小
           else if (bn) c = 1;
+          else if (av === bv) c = 0;              // 相等 → 交给下一个排序键
           else c = av < bv ? -1 : 1;
-          return dir === 'desc' ? -c : c;
+          if (c !== 0) return dir === 'desc' ? -c : c;
         }
         return 0;
       });
@@ -229,8 +268,8 @@ const fakeDb = {
     in: (arr) => new Cmd({ in: arr }),
     nin: (arr) => new Cmd({ nin: arr }),
     exists: (b) => new Cmd({ exists: !!b }),
-    and: (...a) => new Cmd({ and: a }),
-    or: (...a) => new Cmd({ or: a }),
+    and: (...a) => new Cmd({ and: a.length === 1 && Array.isArray(a[0]) ? a[0] : a }),
+    or: (...a) => new Cmd({ or: a.length === 1 && Array.isArray(a[0]) ? a[0] : a }),
   },
   RegExp: (o) => o,
 };

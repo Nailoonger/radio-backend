@@ -435,8 +435,10 @@ async function cancelRequest(submit, { reason, operatorName }) {
   const wasSeated = sched.isSeated(submit);
   await S.applyChange(submit, { reviewStatus: S.REVIEW.CANCELLED }, { operatorName, reason });
   if (wasSeated) {
-    // ⚠️ afterRelease（释放后跑递补/调剂）属于阶段 5 排期算法，尚未移植 → 这里会抛错，
-    //    但被 catch 兜住：取消动作本身必须成功，不能因为「排期还没做」而让学生取消不了。
+    // 释放位子后跑「原位递补 + 全局调剂」。
+    // ⚠️ 仍保留 `.catch(() => null)`：取消是**用户可见的终态动作**，必须成功；
+    //    排期失败只能靠下一次审核 / 手动 sweep 兜底重试，绝不能因此让取消本身失败。
+    //    （阶段 5 已把 afterRelease/reschedule 移植到位，正常路径不会再抛。）
     await sched.afterRelease(submit).catch(() => null);
   }
 }
