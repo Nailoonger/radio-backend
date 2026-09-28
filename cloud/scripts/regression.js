@@ -46,8 +46,12 @@ const SUITE = [
   ['test-admin-core.js', true],
   ['test-admin-submit.js', true],
   ['test-admin-student.js', true],
-  ['test-admin-routes.js', true],
+  // ⚠️ 标 false：它自己会检测「目标不是源码目录」并打印 [skip] 退出 ——
+  //    路由守门测的是「handler 能不能加载」，产物是单文件、没有 handlers/，本就没意义。
+  //    让它进产物轮只会让本脚本报「无结论行」，是假警报。
+  ['test-admin-routes.js', false],
   ['test-gateway.js', true],
+  ['test-migration.js', true],
   ['test-bundle.js', false],
   ['selfcheck.js', false],
 ];

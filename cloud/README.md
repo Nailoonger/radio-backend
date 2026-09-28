@@ -43,9 +43,9 @@
 | 3 | 配置类集合（system_setting / system_switch）+ 首批接口（switch、station） | ✅ 完成 |
 | 4 | 用户端接口移植（登录/改密/投稿/点歌/留言/节目/公告/风采） | ✅ 完成（32/32 接口 + 2 条 system 路由，云端实测 31 条全绿） |
 | 5 | 点歌状态机（songStatusService + songSchedulingService）重写 | ✅ 完成（12/12 算法函数，本地 783 项全绿；**整链路云端验收已在阶段 7 由 `test-admin-submit.js` 完成**） |
-| 6 | 定时触发器（原 60s sweep → 云函数定时器） | ✅ 完成（+廉价闸门把空转从 32% 额度压到 ~2%；**上线前需人工把函数超时 3s → 20s**） |
+| 6 | 定时触发器（原 60s sweep → 云函数定时器） | ✅ 完成（+廉价闸门把空转从 32% 额度压到 ~2%；**函数超时已配 30s**） |
 | 7 | 管理端接口移植（含学生名册 Excel） | ✅ 完成（**93/93 路由**，仍就绪未 0；本地 670 项管理端断言全绿） |
-| 8 | 数据迁移脚本 + 双向校验 | ⏳ |
+| 8 | 数据迁移脚本 + 双向校验 | ✅ 完成（导出只读原库 / `_id` 规则 / `unique_keys` 补登记 / `sequence` 预置 / 双向校验 + 4 类反向用例，75 项断言全绿；**真机导入与校验待跑**） |
 | 9 | admin-web 接云开发 | ⏳ 最后一步 |
 
 ### 本地验证（每次改完必跑，秒级）
@@ -53,7 +53,7 @@
 **一键跑完全部（源码 + 打包产物各一轮）：**
 
 ```bash
-node cloud/scripts/regression.js            # 13 套件 × 两轮，合计 2899 项
+node cloud/scripts/regression.js            # 14 套件 × 两轮，合计 3049 项
 node cloud/scripts/regression.js --source   # 只跑源码目录
 node cloud/scripts/regression.js --selftest # 只自检「结论行解析器」（不依赖子进程）
 ```
@@ -76,15 +76,16 @@ node cloud/scripts/test-scheduling.js      # 排期算法 12 个函数 + 定时�
 node cloud/scripts/test-admin-core.js      # 管理端非点歌 63 条 + 93 路由权限矩阵（165 项）
 node cloud/scripts/test-admin-submit.js    # 点歌 30 条 + 排期算法整链路（231 项）
 node cloud/scripts/test-admin-student.js   # 学生账号 19 条 + roster/sheet 服务（263 项）
-node cloud/scripts/test-admin-routes.js    # 路由 ↔ handler 就绪性守门（19 项）
+node cloud/scripts/test-admin-routes.js    # 路由 ↔ handler 就绪性守门（19 项，**仅源码目录**）
+node cloud/scripts/test-migration.js       # ★ 阶段 8 数据迁移：_id 规则 / 唯一键补登记 / 双向校验 + 反向用例（75 项）
 node cloud/scripts/test-bundle.js          # 打包产物冒烟（24 项）
 ```
 
 | 轮次 | 断言数 |
 |---|---|
-| 源码目录（13 套件） | **1512 项** |
-| 打包产物（11 套件，`test-bundle`/`selfcheck` 本就自看产物） | **1387 项** |
-| 合计 | **2899 项 / 失败 0** |
+| 源码目录（14 套件） | **1587 项** |
+| 打包产物（12 套件，`test-bundle`/`selfcheck`/`test-admin-routes` 不参与） | **1462 项** |
+| 合计 | **3049 项 / 失败 0** |
 
 ⚠️ **产物行为必须与源码一致**：`HARNESS_API_DIR=miniprogram/cloudfunctions/api` 再跑一遍
 （打包器是自研的，必须能自证 —— 它漏收一条 `require` 就是线上 `Cannot find module`）。
@@ -190,7 +191,7 @@ $env:HARNESS_API_DIR="$PWD/miniprogram/cloudfunctions/api"; node cloud/scripts/t
 | `admin.submit` | 30 | 点歌：列表 / 审核 / 排期 / 锁定解锁 / 容量 / 规则 / 窗口 / 注意事项 / 一键清空 |
 | **合计** | **93** | 超管 56 路由 / 普管 37 路由（同一 handlerKey 可挂多条路由） |
 
-### ⚠️ 十个「不报错」的静默漂移（移植时务必对照）
+### ⚠️ 十二个「不报错」的静默漂移（移植时务必对照）
 
 1. **`ApiError` 是 4 参**：`(code, message, httpStatus = 200, data = null)`，与 `src/utils/response.js` 一致。
    从 src 逐字移植过来的 service 会写 `new ApiError(code, msg, 200, { opensAt })` ——
@@ -244,6 +245,31 @@ $env:HARNESS_API_DIR="$PWD/miniprogram/cloudfunctions/api"; node cloud/scripts/t
     踩点：`handlers/admin/submit.js` 的 `previewSchedule()`、`services/scheduling.js`。
     防回归：`test-admin-submit.js` H 段（含**反向用例** —— 拒绝调剂 + 首选格满时该数字必须是 1，
     否则那些 `= 0` 的断言用一个「恒返回 0」的坏实现也能全绿）。
+11. **迁移/导出通道两侧必须用**同一套** wire 编解码**（阶段 8）。
+    JSON 没有 Date 类型。若源快照写 `{ $date: ISO }` 而云库导出是 `Date`，
+    逐字段比对会冒出**几十条假差异**，真差异被淹没；反之若写成裸 ISO 字符串，
+    导入后是**字符串**，`_.gte(new Date())` 这类时间条件**全部静默失效**。
+    → 统一走 `cloud/migration/wire.js`（`toWire` / `fromWire` / `sameValue`）；
+      `sameValue` 额外容错「一侧还没还原 `{ $date }`」的情况，不靠调用方自觉。
+    防回归：`test-migration.js` D06 / F07–F10。
+12. **`Model.findAll({ raw: true })` 会把「驼峰别名」和「裸下划线列名」两份都选出来**（阶段 8）。
+    模型里既有显式属性（`createTime`，`field:'create_time'`）、又开了 `timestamps`
+    时，SQL 是 `SELECT ..., create_time AS createTime, ..., create_time` ——
+    于是文档里同时出现 `createTime` 与 `create_time`，违反「字段名一律驼峰」，
+    且控制台导入时键名歧义极难排查。
+    → `export.js` 用 `snakeDupesOf(Model)` 生成映射，transform 里**只在驼峰版本确实存在时**才删
+    （宁可脏，也不能误删真字段）。防回归：`test-migration.js` A28–A30。
+
+### 阶段 8：数据迁移的三个「不报错」陷阱
+
+1. **`unique_keys` 不补登记 = 云端能建重名管理员且不报错**。文档库没有 UNIQUE 索引，
+   存量数据搬过去后这个集合**是空的**。→ 迁移必须按 8 个 scope 补登记（见方案文档 §三.3）。
+2. **NULL 不能登记进 `unique_keys`**。MySQL 的 UNIQUE 允许多行 NULL
+   （学生账号 `openid` 为 NULL；老微信用户 `username` 为 NULL）。
+   登记 `user_openid:null` 就只剩一行能占这个键 —— 与原语义**相反**。
+3. **`sequence` 必须预置，且预置值 = `max(id)`**（不是 `+1`）。
+   `nextId()` 的语义是「`sequence.value` = 已发出的最后一个 id」，取号时先 `inc` 再返回。
+   云数据库只保证 `_id` 唯一、**不校验业务 `id`** → 撞号静默，前端按 id 跳详情拿到错的那条。
 
 ### 阶段 6：定时器为什么不直接每分钟裸跑 `sweep()`
 
@@ -290,7 +316,8 @@ cloud/
 │   ├── data-model-mapping.md      # 17 张 MySQL 表 → 云数据库集合映射
 │   ├── stage5-scheduling-plan.md  # 排期算法重写方案
 │   ├── stage6-timer-plan.md       # 定时触发器 + 「日期串字典序」踩坑
-│   └── stage7-admin-plan.md       # ★ 管理端移植方案 + 待陛下定夺事项
+│   ├── stage7-admin-plan.md       # ★ 管理端移植方案 + 陛下裁决记录
+│   └── stage8-migration-plan.md   # ★ 数据迁移方案（_id 规则 / 唯一键补登记 / 双向校验）
 ├── cloudfunctions/
 │   └── api/                       # 主网关云函数（唯一对外函数）
 │       ├── index.js               # 入口：解析入参 + 分发 + 统一异常（含定时事件分支）
@@ -346,7 +373,19 @@ cloud/
     ├── test-admin-core.js         # ★ 管理端 63 条 + 93 路由权限矩阵
     ├── test-admin-submit.js       # ★ 点歌 30 条 + 排期算法整链路
     ├── test-admin-student.js      # ★ 学生账号 19 条 + roster/sheet
-    ├── test-admin-routes.js       # ★ 路由 ↔ handler 就绪性守门
+    ├── test-admin-routes.js       # ★ 路由 ↔ handler 就绪性守门（仅源码目录）
+    ├── test-migration.js          # ★ 阶段 8 数据迁移 + 双向校验（含 4 类反向用例）
+├── migration/                     # ★ 阶段 8 数据迁移（只读原库）
+│   ├── README.md                  #   操作手册（导出 → 导入 → 校验 三步）
+│   ├── tables.js                  #   表级规则唯一声明处（_id 规则 / 唯一键 scope）
+│   ├── wire.js                    #   落盘编解码（{ $date } ISODate 格式）+ 值相等判定
+│   ├── transform.js               #   行 → 云文档（纯函数，无 IO）
+│   ├── unique-keys.js             #   unique_keys 补登记（NULL 不登记）
+│   ├── sequence.js                #   sequence 计数器预置（防 id 撞号）
+│   ├── export.js                  #   读源库 → out/（**只 SELECT**）
+│   ├── verify.js                  #   双向校验（源 ↔ 云，含唯一键/计数器结构检查）
+│   ├── out/                       #   导出产物（**已 gitignore，含密码哈希**）
+│   └── cloud-dump/                #   云库导出快照（**已 gitignore**）
     ├── test-scheduling.js         # 排期算法 12 函数 + 定时闸门（273 项）
     ├── test-scheduling-cost.js    # 调剂成本表（63 项）
     ├── test-user-*.js             # 用户端（只读 / 登录 / 投稿）
