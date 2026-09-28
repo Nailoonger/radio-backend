@@ -53,7 +53,7 @@
 **一键跑完全部（源码 + 打包产物各一轮）：**
 
 ```bash
-node cloud/scripts/regression.js            # 15 套件 × 两轮，合计 3107 项
+node cloud/scripts/regression.js            # 15 套件 × 两轮，合计 3113 项
 node cloud/scripts/regression.js --source   # 只跑源码目录
 node cloud/scripts/regression.js --selftest # 只自检「结论行解析器」（不依赖子进程）
 ```
@@ -84,9 +84,9 @@ node cloud/scripts/test-bundle.js          # 打包产物冒烟（24 项）
 
 | 轮次 | 断言数 |
 |---|---|
-| 源码目录（15 套件） | **1616 项** |
-| 打包产物（13 套件，`test-bundle`/`selfcheck`/`test-admin-routes` 不参与） | **1491 项** |
-| 合计 | **3107 项 / 失败 0** |
+| 源码目录（15 套件） | **1619 项** |
+| 打包产物（13 套件，`test-bundle`/`selfcheck`/`test-admin-routes` 不参与） | **1494 项** |
+| 合计 | **3113 项 / 失败 0** |
 
 ⚠️ **产物行为必须与源码一致**：`HARNESS_API_DIR=miniprogram/cloudfunctions/api` 再跑一遍
 （打包器是自研的，必须能自证 —— 它漏收一条 `require` 就是线上 `Cannot find module`）。

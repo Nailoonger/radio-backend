@@ -12,7 +12,7 @@
 ## 云开发迁移（`cloud/`，主线 · 阶段 0–9 **全部做完**，只剩真机导入与部署）
 - **起因**：小程序正式版 `url not in domain list`（合法域名需 ICP 备案）→ 陛下裁决**不续费服务器、整体走云开发**。免费额度：调用 20 万次/月、资源使用量 10 万 GBs/月、容量 2GB。
 - 环境 `jy-radio-d1gdwmptl816ee6a9`。总纲 `cloud/README.md`；字段映射 `cloud/docs/data-model-mapping.md`；方案 `stage5-scheduling-plan.md` / `stage6-timer-plan.md` / `stage7-admin-plan.md`；skill `express-to-cloudfunction-migration`（**23 条静默漂移**）。
-- **进度**：0–9 **全部完成**（真机导入/部署待陛下跑）。回归 **3107 项 / 0 失败**（源码 15 套件 1616 + 产物 13 套件 1491）。产物 50 模块 / 394.9 KB。
+- **进度**：0–9 **全部完成**（真机导入/部署待陛下跑）。回归 **3113 项 / 0 失败**（源码 15 套件 1619 + 产物 13 套件 1494）。产物 50 模块 / 394.9 KB。
 - **阶段 9（admin-web 接云）= HTTP 访问服务通道**：⚠️ 「要不要备案」的答案是**都不需要**（用官方默认域名即可；只有绑自有域名才要）。A（HTTP 访问服务）默认域名有**有效期需续期**；B（Web SDK）无此问题但多一个 npm 依赖 + 要开匿名登录 ⇒ **选 A**。
   - 云函数侧 `api/httpBridge.js`：把「集成请求」还原成 `{method,path,body,token,query}`，适配必须放在 index.js **解构 event 之前**（放错完全不生效）；判据只认 `httpMethod || requestContext`（收窄，否则误伤小程序请求）。两种形态：信封模式（admin-web 用，不依赖「路径透传」）+ RESTful 兜底。
   - admin-web `src/utils/http.js` 改成**门面**：`VITE_REQUEST_MODE=direct` 导出原 axios 实例（行为逐字不变），`=cloud` 导出同形状门面 → 全站 114 处调用零改动。xlsx 走 `{filename,base64,mime}` → `atob` 还原 Blob。
