@@ -19,13 +19,12 @@
  *
  *  ③ 原实现里 `status: 1` 的语义是「已通过」。协议改版后 `status` 变成了**派生镜像**：
  *     `0 待审 / 1 已排期 / 2 已驳回 / 5 已播放 / 6 已通过·待排期 / 7 已取消`。
- *     `overview.approved` **已按陛下 2026-09-29 裁决改为 `status ∈ {1, 5, 6}`** ——
+ *     `overview.approved` 与 `topSongs()` **均已按陛下 2026-09-29 裁决改为 `status ∈ {1, 5, 6}`**
+ *     （overview 先批，topSongs 同日点头跟进 —— 两处是同一个「已通过」语义，口径必须一致）。
  *     理由：卡片标题写的就是「已通过」，而审核通过但还没排期的（`6`）与
  *     已经播完的（`5`）都被漏掉了，数字偏小。
  *     ⚠️ 这是统计模块里**唯一一处有意偏离源实现的业务口径**，见 docs/stage7-admin-plan.md §五。
- *     ⚠️ `topSongs()` 仍是源实现的 `status: 1`（**未获授权改动**，且它直接进
- *        Dashboard 的「热门点歌」榜，属可见数字）—— 同一份「已通过」语义在那里
- *        还偏着，等陛下点头再一并改，见 §五 的说明。
+ *     ⚠️ 别再"顺手"简化成 `{ status: 1 }` —— 那会把这两类静默漏掉（不报错，只偏小）。
  */
 
 const { C, _, count, findAllPaged } = require('../../lib/db');
@@ -143,7 +142,9 @@ async function submitTrend(ctx) {
  */
 async function topSongs(ctx) {
   asAdmin(ctx);
-  const rows = await findAllPaged(C.SUBMIT, { type: 1, status: 1 });
+  // 「已通过」= 已排期(1) + 已播放(5) + 已通过·待排期(6)（陛下 2026-09-29 裁决，与 overview.approved 同口径）
+  // ⚠️ 别再简化成 `{ status: 1 }` —— 那只是「已排期」，已播完的和审核已过还没排期的都进不了热门榜。
+  const rows = await findAllPaged(C.SUBMIT, { type: 1, status: _.in([1, 5, 6]) });
 
   const map = new Map();
   rows.forEach((r) => {

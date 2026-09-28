@@ -53,7 +53,7 @@
 **一键跑完全部（源码 + 打包产物各一轮）：**
 
 ```bash
-node cloud/scripts/regression.js            # 15 套件 × 两轮，合计 3113 项
+node cloud/scripts/regression.js            # 15 套件 × 两轮，合计 3115 项
 node cloud/scripts/regression.js --source   # 只跑源码目录
 node cloud/scripts/regression.js --selftest # 只自检「结论行解析器」（不依赖子进程）
 ```
@@ -73,7 +73,7 @@ node cloud/scripts/test-user-auth.js       # 登录 / 改密 / me（62 项）
 node cloud/scripts/test-user-submit.js     # 投稿 / 点歌 11 个接口（206 项）
 node cloud/scripts/test-scheduling-cost.js # 调剂选址成本表（63 项）
 node cloud/scripts/test-scheduling.js      # 排期算法 12 个函数 + 定时闸门（273 项）
-node cloud/scripts/test-admin-core.js      # 管理端非点歌 63 条 + 93 路由权限矩阵（165 项）
+node cloud/scripts/test-admin-core.js      # 管理端非点歌 63 条 + 93 路由权限矩阵（166 项）
 node cloud/scripts/test-admin-submit.js    # 点歌 30 条 + 排期算法整链路（231 项）
 node cloud/scripts/test-admin-student.js   # 学生账号 19 条 + roster/sheet 服务（263 项）
 node cloud/scripts/test-admin-routes.js    # 路由 ↔ handler 就绪性守门（19 项，**仅源码目录**）
@@ -84,9 +84,9 @@ node cloud/scripts/test-bundle.js          # 打包产物冒烟（24 项）
 
 | 轮次 | 断言数 |
 |---|---|
-| 源码目录（15 套件） | **1619 项** |
-| 打包产物（13 套件，`test-bundle`/`selfcheck`/`test-admin-routes` 不参与） | **1494 项** |
-| 合计 | **3113 项 / 失败 0** |
+| 源码目录（15 套件） | **1620 项** |
+| 打包产物（13 套件，`test-bundle`/`selfcheck`/`test-admin-routes` 不参与） | **1495 项** |
+| 合计 | **3115 项 / 失败 0** |
 
 ⚠️ **产物行为必须与源码一致**：`HARNESS_API_DIR=miniprogram/cloudfunctions/api` 再跑一遍
 （打包器是自研的，必须能自证 —— 它漏收一条 `require` 就是线上 `Cannot find module`）。
@@ -144,10 +144,10 @@ $env:HARNESS_API_DIR="$PWD/miniprogram/cloudfunctions/api"; node cloud/scripts/t
    云函数多实例下天然失效；改用「时间窗口 + 唯一键」业务级防刷，已由断言覆盖）。
 5. 未搬 `uploadController`（未被任何路由引用）。
 6. **两处「源实现瑕疵」已被陛下裁决修正**（2026-09-29，详见 `docs/stage7-admin-plan.md` §五）：
-   - `stats.overview` 的 `approved` 口径 `status:1` → **`status ∈ {1,5,6}`**
-     （旧口径在派生镜像下只表示「已排期」，把「已通过·待排期」和「已播放」一起漏掉）。
-     ⚠️ 孪生位置 `topSongs()` **仍是 `status:1`**（它进 Dashboard 的可见榜，未获授权）——
-     同一个「已通过」语义在那儿还偏着，等陛下一句话。
+   - `stats.overview` 的 `approved` 与 `topSongs()` 的 `status:1` → **均改 `status ∈ {1,5,6}`**
+     （旧口径在派生镜像下只表示「已排期」，把「已通过·待排期」和「已播放」一起漏掉；
+     两处是同一个「已通过」语义，陛下分两次拍板后统一）。
+     ⚠️ 别再"顺手"改回 `{ status: 1 }`。
    - `previewSchedule(dryRun)` 的 `promoted/rescheduled/stillWaiting` 恒 0 → 已修（见静默漂移 #10）；
      顺带修正了 `autoRejectedIfLocked` 的**虚高**（它原先复用当前闸门下的 `left`，
      而锁定时刻闸门是强制放开的 → 预览说会驳回 1 条、真锁定时 0 条）。

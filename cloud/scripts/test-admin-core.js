@@ -451,7 +451,7 @@ const PLAIN_ONLY = new Set([
        *    createTime 一律取 30 天前：**不能落在本周或近 3 天**，否则会撞
        *    `thisWeek` 与 `submit-trend`（days=3）的既有断言。
        */
-      { _id: 's5', id: 5, type: 1, status: 5, reviewStatus: 1, scheduleStatus: 1, playStatus: 1, createTime: new Date(T0 - 30 * 86400000), songName: '夜曲', singer: '周杰伦' },
+      { _id: 's5', id: 5, type: 1, status: 5, reviewStatus: 1, scheduleStatus: 1, playStatus: 1, createTime: new Date(T0 - 30 * 86400000), songName: '晴天', singer: '周杰伦' },
       { _id: 's6', id: 6, type: 1, status: 6, reviewStatus: 1, scheduleStatus: 0, playStatus: 0, createTime: new Date(T0 - 30 * 86400000), songName: '稻香', singer: '周杰伦' },
     ],
     message: [{ _id: 'm1', id: 1, status: 0, content: 'x', createTime: new Date(T0) }],
@@ -486,13 +486,19 @@ const PLAIN_ONLY = new Set([
   ok('trend 日期严格递增', r.data.list.every((x, i) => i === 0 || x.date > r.data.list[i - 1].date));
 
   r = await H.call(H.req('GET', '/admin/stats/top-songs', {}, PLAIN_TOKEN));
-  // ⚠️ 这里**故意与 `overview.approved` 不同口径**：top-songs 保持源实现的 `status: 1`。
-  //    陛下 2026-09-29 的裁决只覆盖 overview；本接口直接渲染 Dashboard 的「热门点歌」，
-  //    属可见数字，要改需单独点头（handlers/admin/stats.js 的注释里有改法）。
-  eq('top-songs 仍只统计 status:1 的点歌（**口径已与 overview 不同**，等陛下点头）',
-    r.data.list, [{ songName: '晴天', singer: '周杰伦', count: 1 }]);
-  ok('★ 已播放(夜曲) / 已通过·待排期(稻香) 都不进热门榜 —— 同一个「已通过」语义在这里还偏着',
-    !r.data.list.some((x) => x.songName === '夜曲' || x.songName === '稻香'));
+  // 口径已随陛下 2026-09-29 裁决与 overview.approved 统一为 `status ∈ {1,5,6}`（同日第二次点头）。
+  // 期望值按新口径重新推导：s3 晴天(status1) + s5 晴天(status5 已播放) 聚成同一首 → 晴天×2；
+  // s6 稻香(status6 已通过·待排期) → ×1。s1 晴天是待审(0)、s4 七里香已驳回(2)，都不算「已通过」。
+  eq('top-songs 统计 status ∈ {1,5,6} 的点歌（与 overview.approved 同口径）',
+    r.data.list, [
+      { songName: '晴天', singer: '周杰伦', count: 2 },
+      { songName: '稻香', singer: '周杰伦', count: 1 },
+    ]);
+  ok('★ 这条断言能区分新旧实现：旧口径(status:1)只会给出晴天×1（已播放的那次不算热门）',
+    r.data.list.length === 2 && r.data.list[0].count === 2,
+    `got ${JSON.stringify(r.data.list)}`);
+  ok('★ 待审(晴天 s1)与已驳回(七里香)仍不进热门榜 —— 口径放宽不等于全收',
+    !r.data.list.some((x) => x.songName === '七里香'));
 
   /* ══════════════════ I. cadre / staff / showcase ══════════════════ */
   section('I. 社干 / 部门人员 / 风采展示（全部仅超管）');

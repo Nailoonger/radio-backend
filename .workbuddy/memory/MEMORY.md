@@ -12,14 +12,14 @@
 ## 云开发迁移（`cloud/`，主线 · 阶段 0–9 **全部做完**，只剩真机导入与部署）
 - **起因**：小程序正式版 `url not in domain list`（合法域名需 ICP 备案）→ 陛下裁决**不续费服务器、整体走云开发**。免费额度：调用 20 万次/月、资源使用量 10 万 GBs/月、容量 2GB。
 - 环境 `jy-radio-d1gdwmptl816ee6a9`。总纲 `cloud/README.md`；字段映射 `cloud/docs/data-model-mapping.md`；方案 `stage5-scheduling-plan.md` / `stage6-timer-plan.md` / `stage7-admin-plan.md`；skill `express-to-cloudfunction-migration`（**23 条静默漂移**）。
-- **进度**：0–9 **全部完成**（真机导入/部署待陛下跑）。回归 **3113 项 / 0 失败**（源码 15 套件 1619 + 产物 13 套件 1494）。产物 50 模块 / 394.9 KB。
+- **进度**：0–9 **全部完成**（真机导入/部署待陛下跑）。回归 **3115 项 / 0 失败**（源码 15 套件 1620 + 产物 13 套件 1495）。产物 50 模块 / 395.2 KB。
 - **阶段 9（admin-web 接云）= HTTP 访问服务通道**：⚠️ 「要不要备案」的答案是**都不需要**（用官方默认域名即可；只有绑自有域名才要）。A（HTTP 访问服务）默认域名有**有效期需续期**；B（Web SDK）无此问题但多一个 npm 依赖 + 要开匿名登录 ⇒ **选 A**。
   - 云函数侧 `api/httpBridge.js`：把「集成请求」还原成 `{method,path,body,token,query}`，适配必须放在 index.js **解构 event 之前**（放错完全不生效）；判据只认 `httpMethod || requestContext`（收窄，否则误伤小程序请求）。两种形态：信封模式（admin-web 用，不依赖「路径透传」）+ RESTful 兜底。
   - admin-web `src/utils/http.js` 改成**门面**：`VITE_REQUEST_MODE=direct` 导出原 axios 实例（行为逐字不变），`=cloud` 导出同形状门面 → 全站 114 处调用零改动。xlsx 走 `{filename,base64,mime}` → `atob` 还原 Blob。
   - `cloud/scripts/test-http-bridge.js` 32 项；关键反向保护：E 段钉死「小程序 callFunction 与定时触发照旧」。
 - **阶段 8（`cloud/migration/`，手册 `cloud/migration/README.md`）**：只 SELECT 原库 → JSON Lines → 控制台导入 → 控制台导出 → `verify.js` 双向校验。⚠️ 官方三约束：JSON **Lines**、时间必须 `{"$date": "<ISO>"}`（写成裸 ISO 串 → 导入后是字符串，时间条件**静默失效**）、Upsert 可重复。三个陷阱：① **`unique_keys` 必须补登记**（文档库无 UNIQUE，不补＝能建重名管理员**且不报错**），**NULL 不登记**（MySQL UNIQUE 允许多行 NULL）② **`sequence` 预置 = `max(id)` 不是 +1**（nextId 是「先 inc 再返回」）③ `weekStartDate` 是 DATEONLY，**保持字符串**（转 Date 会把 `_id` 拼成 `week:Mon Oct 05 2026…`）。
 - **陛下已裁决的两处源实现瑕疵（2026-09-29）**：
-  - `stats.overview.approved` 口径 `status:1` → **`status ∈ {1,5,6}`** ✅。⚠️ 孪生位置 `topSongs()` 仍是 `status:1`（进 Dashboard 可见榜，未授权）→ **新待办**，陛下点头才改。
+  - `stats.overview.approved` 与 `topSongs()` 的口径 `status:1` → **均改 `status ∈ {1,5,6}`** ✅（陛下分两次拍板；⚠️ 别再"顺手"改回 `{status:1}`）。
   - `previewSchedule(dryRun)` 的 `promoted/rescheduled/stillWaiting` 恒 0 → 已修（`reschedule` 新增 dryRun 专用 `extraWaiting`/`seatedOverride`，**按 id 去重**）；顺带修 `autoRejectedIfLocked` 虚高（原复用当前闸门下的 `left`，而 `lockWeek` 显式 `crossSlot:true` → 预览说驳回 1、真锁定 0，**主结论都错**）。→ 漂移 #23。
   - 教训：**「把恒 X 改成真实值」的修复必须补反向用例**（造「值该不为 X」的场景）；自检 `git diff --stat` 里测试脚本必须同时在列。
 - **架构**：源在 `cloud/cloudfunctions/api/`，**运行目录** `miniprogram/cloudfunctions/api/`。⚠️⚠️ **Windows CLI 传子目录必坏**（`\` 写进压缩包条目名 → 云端解压出扁平文件，`require('./lib/x')` 必败）→ `sync.js` 把 **50 模块打成单文件 index.js**，只传根文件 + `config.json`。⇒ `handlers/index.js` 必须是**静态 `() => require('./x')` 注册表**，动态拼路径打包器看不见。
