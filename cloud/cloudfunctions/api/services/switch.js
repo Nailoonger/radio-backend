@@ -48,11 +48,33 @@ function isEnabled(key) {
   return !row || row.value !== 'off';
 }
 
-/** 业务拦截：模块关闭时抛 40302 */
-function assertEnabled(key) {
+/**
+ * 业务拦截：模块关闭时抛 40302
+ *
+ * ⚠️⚠️ 云函数**没有启动钩子** —— 原后端在 app 启动时调 `ensureLoaded()` 预热内存缓存，
+ *    云函数没有这个时机。若沿用原来的同步实现，实例里 cache 恒为空 →
+ *    `isEnabled()` 永远返回 true → **管理端把模块关掉也拦不住**（静默失效）。
+ *    因此这里改成「先确保加载（3s 实例内缓存），再判断」。
+ *
+ * ⚠️ 调用方**必须 await**。
+ */
+async function assertEnabled(key) {
+  await loadAll();
   if (!isEnabled(key)) {
     throw new ApiError(Codes.MODULE_DISABLED, '该模块暂时关闭，请稍后再试');
   }
+}
+
+/**
+ * 异步读开关 —— **云函数里读开关一律用这个，不要直接调 `isEnabled()`**
+ *
+ * 原因见 assertEnabled 上方：云函数没有启动预热，`isEnabled()` 在未加载时恒返回 true。
+ * 与 assertEnabled 的区别只在「不抛错」——用于「关掉就隐藏某块」这类分支
+ * （如首页点歌排期 home_song_schedule）。
+ */
+async function isEnabledAsync(key) {
+  await loadAll();
+  return isEnabled(key);
 }
 
 async function ensureLoaded() {
@@ -75,8 +97,10 @@ async function listAll() {
     key: row.key,
     value: row.value,
     desc: row.desc,
-    updatedBy: row.updated_by,
-    updateTime: row.update_time,
+    // ⚠️ 字段名全用驼峰（见 lib/db.js 文件头）。注意 system_switch 模型里
+    //    最后一个时间列属性是 **updatedAt**（不是 updateTime），与 system_setting 不同，别抄错。
+    updatedBy: row.updatedBy,
+    updateTime: row.updatedAt,
   }));
 
   const seen = new Set(rows.map((x) => x.key));
@@ -90,7 +114,7 @@ async function listAll() {
 /** 管理端：更新某个开关（不存在则按默认 on 建行） */
 async function set(key, value, adminId = null) {
   const id = `switch:${key}`;
-  const patch = { key, value: String(value), updated_by: adminId, update_time: new Date() };
+  const patch = { key, value: String(value), updatedBy: adminId, updatedAt: new Date() };
   let updated = 0;
   try {
     const r = await coll(C.SWITCH).doc(id).update({ data: patch });
@@ -98,7 +122,7 @@ async function set(key, value, adminId = null) {
   } catch (e) { updated = 0; }
 
   if (!updated) {
-    await coll(C.SWITCH).add({ data: { _id: id, ...patch, desc: '', create_time: new Date() } });
+    await coll(C.SWITCH).add({ data: { _id: id, ...patch, desc: '', createTime: new Date() } });
   }
 
   invalidate();
@@ -121,6 +145,7 @@ async function publicGet(key) {
 module.exports = {
   ensureLoaded,
   isEnabled,
+  isEnabledAsync,
   assertEnabled,
   listAll,
   set,

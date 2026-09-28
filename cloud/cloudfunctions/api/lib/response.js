@@ -14,13 +14,27 @@ const SUCCESS_CODE = 0;
 
 class ApiError extends Error {
   /**
+   * ⚠️⚠️ **签名必须与原后端 `src/utils/response.js` 完全一致（4 参）**。
+   *
+   * 云版一度简化成 3 参 `(code, message, data)`，看起来更干净，但代价是：
+   * 从 src 里**逐字移植**过来的 service 仍在写 4 参 —— 于是
+   * `new ApiError(Codes.SONG_WINDOW_CLOSED, msg, 200, { opensAt })` 的 `200`
+   * 被当成了 `data`，`{ opensAt }` 被静默丢弃。
+   * 后果是**前端拿不到倒计时数据**，而且不报任何错（message 还是对的），
+   * 属于最难发现的一类漂移。
+   *
+   * 这类拦截（40907 窗口、排期满、候补满…）在阶段 5/7 还会继续出现，
+   * 所以这里选择「保持四方言一致」而不是「每处调用都记得少写一个参数」。
+   *
    * @param {number} code   业务码
    * @param {string} message 给用户看的文案
-   * @param {object} data   可选附加数据（如 40907 的 opensAt / windowText）
+   * @param {number} httpStatus HTTP 状态码（云函数无 HTTP，单纯为签名对齐而保留，默认 200）
+   * @param {object} data   可选附加数据（如 40907 的 opensAt / windowText，前端拿来做倒计时）
    */
-  constructor(code, message, data = null) {
+  constructor(code, message, httpStatus = 200, data = null) {
     super(message);
     this.code = code;
+    this.httpStatus = httpStatus;
     this.data = data;
   }
 }
@@ -46,9 +60,12 @@ const Codes = {
   CONTENT_BLOCKED: 60002,
 };
 
-/** 快捷抛错（云函数里取代 res.status().json()） */
+/**
+ * 快捷抛错（云函数里取代 res.status().json()）
+ * ⚠️ 注意 ApiError 是 4 参，这里必须显式补上 httpStatus，否则 data 会被当成状态码。
+ */
 function fail(code, message, data = null) {
-  throw new ApiError(code, message, data);
+  throw new ApiError(code, message, 200, data);
 }
 
 module.exports = { ApiError, Codes, fail, SUCCESS_CODE };

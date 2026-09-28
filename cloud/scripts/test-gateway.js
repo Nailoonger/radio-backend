@@ -70,9 +70,17 @@ function ok(name, cond, extra = '') {
   eq('未配置 KV → 文案', r.message, '未配置');
 
   // ============ 4. 未移植接口优雅降级（不能把网关打崩） ============
-  r = await H.call(H.req('GET', '/user/submit/week'));
+  //
+  // ⚠️ 挑样本的原则：必须是**当前确实还没登记**的模块。
+  //    这里用 admin.*（管理端 93 个接口属阶段 7）—— 阶段 7 落地后这条会跟着失效，
+  //    届时换成仍未被 REGISTRY 登记的那个模块，别直接删掉这段（降级路径本身要一直在测）。
+  r = await H.call(H.req('GET', '/admin/submit/list'));
   eq('未移植接口 → 50001', r.code, 50001);
-  ok('未移植接口 → 提示含「迁移中」', /迁移中/.test(r.message), r.message);
+  ok('未移植接口 → 提示含「未就绪」', /未就绪/.test(r.message), r.message);
+  // 文案从「接口迁移中」改成「接口未就绪 · 原因：xxx」是**有意**的：
+  // 原来只给一句笼统提示，「模块名写错 / 依赖缺失 / 模块不存在」长得一模一样，无法定位。
+  // 现在必须带出真实原因（见 handlers/index.js 的 todoHandler）。
+  ok('未移植接口 → 带出真实原因', /模块未登记|Cannot find module|未导出/.test(r.message), r.message);
 
   // ============ 5. 路由兜底 ============
   r = await H.call(H.req('GET', '/user/nope/x/y'));

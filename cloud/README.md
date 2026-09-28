@@ -41,8 +41,8 @@
 | 1 | `cloud/` 骨架 + 核心库移植 + 小程序双通道 | ✅ 完成 |
 | 2 | 数据层（`lib/db.js`）+ 本地测试 harness（内存假库跑真网关） | ✅ 完成 |
 | 3 | 配置类集合（system_setting / system_switch）+ 首批接口（switch、station） | ✅ 完成 |
-| 4 | 用户端接口移植（登录/改密/投稿/点歌/留言/节目/公告/风采） | ⏳ 进行中 |
-| 5 | 点歌状态机（songStatusService + songSchedulingService）重写 | ⏳ 最高风险 |
+| 4 | 用户端接口移植（登录/改密/投稿/点歌/留言/节目/公告/风采） | ✅ 完成（33/33 接口，云端实测 31 条全绿） |
+| 5 | 点歌状态机（songStatusService + songSchedulingService）重写 | ⏳ 最高风险（**动工前先出方案**） |
 | 6 | 定时触发器（原 60s sweep → 云函数定时器） | ⏳ |
 | 7 | 管理端接口移植（含学生名册 Excel） | ⏳ |
 | 8 | 数据迁移脚本 + 双向校验 | ⏳ |
@@ -51,9 +51,19 @@
 ### 本地验证（每次改完必跑，秒级）
 
 ```bash
-node cloud/scripts/selfcheck.js      # 静态自检：路由优先级 / 时间工具逐位一致 / 错误码逐值一致（68 项）
-node cloud/scripts/test-gateway.js   # 网关实测：内存假库跑真云函数，25 项断言
+node cloud/scripts/selfcheck.js        # 静态自检：路由优先级 / 时间工具逐位一致 / 错误码逐值一致（75 项）
+node cloud/scripts/test-system.js      # /health + 建集合 + 开关（21 项）
+node cloud/scripts/test-gateway.js     # 网关 + lib/db 原语（26 项）
+node cloud/scripts/test-user-readonly.js  # 用户端只读（76 项）
+node cloud/scripts/test-user-auth.js      # 登录 / 改密 / me（62 项）
+node cloud/scripts/test-user-submit.js    # 投稿 / 点歌 11 个接口（206 项）
+node cloud/scripts/test-bundle.js         # 打包产物冒烟（20 项）
 ```
+
+合计 **481 项**，全绿才算过。
+
+⚠️ **产物行为必须与源码一致**：`HARNESS_API_DIR=miniprogram/cloudfunctions/api` 再跑一遍
+`test-user-submit.js`（打包器是自研的，必须能自证）。
 
 `cloud/scripts/harness.js` 把 `wx-server-sdk` 替换成内存假数据库（Map 存集合），
 并**刻意模拟**了三个真实行为，否则测不出问题：
@@ -61,16 +71,31 @@ node cloud/scripts/test-gateway.js   # 网关实测：内存假库跑真云函�
 `where().update()` 返回 `stats.updated`（等价 affectedRows）。
 → 新增 handler 时在 `test-gateway.js` 里加断言，不要只靠「部署后手点」。
 
-### 首批已跑通的接口
+### 已跑通的接口（用户端 33/33）
 
-| 接口 | 说明 |
+| 分组 | 接口 |
 |---|---|
-| `GET /health` | 云函数自检，部署后用它验证通道是否打通 |
-| `GET /user/switch/list` | 小程序启动首个请求（tabBar 模块开关） |
-| `GET /user/switch/:key` | 单开关查询，缺行视为 `on` |
-| `GET /user/station/intro` | 广播站介绍（未配置 → 40401「未配置」） |
-| `GET /user/station/schedule` | 开播时间 |
-| `GET /user/station/contact` | 联系方式 |
+| 系统 | `GET /health`、`POST /system/init-collections` |
+| 开关 | `GET /user/switch/list`、`GET /user/switch/:key` |
+| 登录 | `POST /user/login`、`POST /user/login/account`、`PUT /user/change-password`、`GET /user/me` |
+| 公告 | `GET /user/notice/list`、`GET /user/notice/:id` |
+| 节目 | `GET /user/program/current`、`weekly`、`schedule`、`/:id` |
+| 风采 | `GET /user/showcase`、`GET /user/cadre/:id`、`GET /user/staff/:id` |
+| 站务 | `GET /user/station/intro`、`schedule`、`contact` |
+| 留言 | `POST /user/message`、`GET /user/message/my` |
+| 我的 | `GET /user/profile` |
+| **投稿/点歌** | `POST /user/submit`、`GET /user/submit/my`、`quota`、`window`、`week`、`notice`、`timeslots`、`/:id`、`POST /user/submit/notice/ack`、`DELETE /user/submit/:id`、`POST /user/submit/:id/leave-queue` |
+
+### ⚠️ 两个「不报错」的静默漂移（移植时务必对照）
+
+1. **`ApiError` 是 4 参**：`(code, message, httpStatus = 200, data = null)`，与 `src/utils/response.js` 一致。
+   从 src 逐字移植过来的 service 会写 `new ApiError(code, msg, 200, { opensAt })` ——
+   若云版改成 3 参，`200` 会被当成 `data`，**附加数据静默丢失**（message 却仍然正确）。
+2. **路由层中间件要单独对照 `src/routes/*.js`**：Express 的鉴权挂在路由上，
+   controller 里**不读** `req.user` 也可能需要登录。
+   只搬 controller 会漏鉴权，漏了不报错、只会「未登录也能看」。
+   （例：`/user/submit/window`、`/user/submit/timeslots` 都挂了 `userAuth`；
+   而 `/user/submit/week` **没有** —— 全组唯一免登录。）
 
 ## 四、关键设计决策（已在阶段 1 落定）
 

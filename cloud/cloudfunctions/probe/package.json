@@ -1,0 +1,8 @@
+{
+  "name": "radio-probe",
+  "version": "1.0.0",
+  "description": "云端目录结构探测（零依赖，必定可运行）",
+  "main": "index.js",
+  "private": true,
+  "dependencies": {}
+}

@@ -20,6 +20,17 @@
 - ℹ️ 2026-09-26 新增 `weekly_schedule.lock_paused`：上线前必须跑一次 db-repair。
 - radio-nginx 会莫名自退（Exited 0）→ 80 全拒，排障先看它。
 
+## 云开发迁移（2026-09-28 起，主线）
+- 起因：小程序正式版报 `url not in domain list`，合法域名要 ICP 备案 → 陛下裁决**不续费服务器，整体走云开发**（`wx.cloud.callFunction` 免备案）。铁律：**原 `src/`、`admin-web/`、Docker 链路一行不动**，只做加法；`app.js` 的 `requestMode` 保留 `'direct' | 'cloud'` 可随时切回。
+- 云环境 `jy-radio-d1gdwmptl816ee6a9`（校园额度账号，换绑已完成）。总纲 `cloud/README.md`，字段映射 `cloud/docs/data-model-mapping.md`。
+- ⚠️⚠️ **Windows CLI 传子目录必坏**（`\` 被写进压缩包条目名 → 云端解压出扁平文件）→ **整个云函数打成单文件**，只传根文件 `index.js` + `package.json`。打包器 `cloud/scripts/sync.js`（零依赖、静态分析字面量 require）→ **`handlers/index.js` 必须写静态 `() => require('./x')` 注册表**，动态拼路径打包器看不见。
+- 部署：`node cloud/scripts/deploy-cloud.js`（默认只打印命令）→ 手动跑 `cli.bat cloud functions deploy --env <env> --names api --project <miniprogram> -r </dev/null`；**等 1~2 分钟**再验（云端 npm install 未完会报 Cannot find module）。
+- 验证必须本机跑（481 项）：`selfcheck` 75 / `test-system` 21 / `test-gateway` 26 / `test-user-readonly` 76 / `test-user-auth` 62 / `test-user-submit` 206 / `test-bundle` 20。云端验收：`MSYS_NO_PATHCONV=1 node cloud/scripts/verify-user.js ws://127.0.0.1:9420`（需先 `cli.bat auto`）。
+- ⚠️ **两个「不报错」的静默漂移**：① `ApiError` 是 **4 参** `(code, message, httpStatus=200, data)`，与 src 一致 —— 改成 3 参会把 `200` 当 data，附加数据静默丢失（40907 的 `opensAt` 就这么丢过）。② **鉴权在路由层**（`router.get(x, userAuth, ctrl)`），controller 不读 `req.user` 也可能要登录 —— 移植只搬 controller 就会漏，漏了只是「未登录也能看」。⇒ 逐条对照 `src/routes/*.js`。
+- ⚠️ **云函数超时默认仅 3 秒**，CLI 改不了（只有 list/info/deploy/inc-deploy/download）→ 必须去控制台改（建议 20s）。
+- 主键口径：业务查询一律用**数字 `id`**（`parseId` 收敛），4 张表用业务键当 `_id`（`setting:` / `switch:` / `ack:` / `week:`）。字段名一律**驼峰**。
+- 进度：阶段 0~4 完成（用户端 33/33 接口）；**阶段 5 = 排期算法重写（最高风险，动工前先出方案）**。
+
 ## 给陛下的服务器命令
 - 他在自己的 PowerShell 里跑。SQL 用 `docker exec -e MYSQL_PWD="$DB_PASSWORD" -i radio-mysql mysql -uroot "$DB_NAME"`；`-p<密码>` 必打印无害的 password warning（stderr，不是失败）。
 - ⚠️ SQL 别用中文别名/标识符（经 shell→docker 传参乱码 1064），多行走 `<<'SQL'` heredoc。

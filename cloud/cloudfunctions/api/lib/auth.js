@@ -43,14 +43,20 @@ function decodeToken(ctx) {
  * 学生态：等价于原 userAuth
  * 注入 ctx.user = { openid, uid, username }
  *
- * ⚠️ 原中间件还会调用 accountService.assertTokenFresh(payload) —— 依赖 DB 读 user.status + pwd_changed_at，
- *    阶段 3（数据层就位）时在此补上；届时保持「pv 不符 → 40101 密码已变更」的文案不变。
+ * ⚠️ 额外做 `assertTokenFresh(payload)`（与原中间件一致）：
+ *    账号被禁用 / 删除 / 密码已变更 → 40101，旧 token 立刻作废（最多迟 30 秒，靠实例内状态缓存）。
+ *    老微信用户（payload 无 username）不参与，直接放行。
+ *
+ * ⚠️ 因含数据库校验，**本函数是异步的，调用方必须 await**。
+ * ⚠️ 对 services 层用**惰性 require**：lib 层不应在顶层依赖 services 层，
+ *    否则 services 里任一模块加载失败会把整个 handler 拖挂（回落到笼统的 50001）。
  */
-function requireUser(ctx) {
+async function requireUser(ctx) {
   const payload = decodeToken(ctx);
   if (!payload.openid) throw new ApiError(Codes.UNAUTHORIZED, '请先登录');
   ctx.user = { openid: payload.openid, uid: payload.uid, username: payload.username, pv: payload.pv };
   ctx.payload = payload;
+  await require('../services/studentAccount').assertTokenFresh(payload);
   return ctx.user;
 }
 

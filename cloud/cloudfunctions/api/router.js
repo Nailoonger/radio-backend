@@ -169,9 +169,11 @@ const ADMIN_ROUTES = [
   ['DELETE /admin/student/:id', 'admin.student.remove'],
 ];
 
-// 健康检查（云函数自检用）
+// 系统自检 / 初始化（不属于业务接口，但用同一套网关）
 const SYSTEM_ROUTES = [
   ['GET /health', 'system.health'],
+  // 一次性建齐所有集合（幂等，可重复调用）；替代「去云开发控制台手点新建集合」
+  ['POST /system/init-collections', 'system.initCollections'],
 ];
 
 const RAW_ROUTES = [...SYSTEM_ROUTES, ...USER_ROUTES, ...ADMIN_ROUTES];
