@@ -175,8 +175,48 @@ function run(checkOnly) {
   fs.copyFileSync(path.join(SRC, 'package.json'), path.join(DST, 'package.json'));
   fs.writeFileSync(outFile, text, 'utf8');
 
+  /**
+   * config.json（云函数触发器配置，阶段 6）—— 必须**原样复制**到产物目录。
+   *
+   * ⚠️⚠️ 这个文件是**平台侧解析**的：它决定定时触发器是否存在。
+   *    漏传的表现是「函数部署成功、日志一片正常、但定时任务从来不跑」——
+   *    纯静默，排查代价极高。所以：
+   *      ① 必须跟着 index.js 一起上传（`deploy --names api -r` 传的是整个目录）；
+   *      ② `cleanDir()` 会清空产物目录，所以只能在这里复制，不能手动往里放。
+   * 内容：triggers[0] = { name: songSweepTick, type: timer, config: 每分钟第 0 秒 }
+   *      —— 微信云开发小程序端**只支持一个触发器**；cron 为 **7 位**
+   *      「秒 分 时 日 月 周 年」，写法见源文件 `cloud/cloudfunctions/api/config.json`。
+   *      （⚠️ 这一段刻意不把 cron 字面量抄进来：`*` + `/` 会提前闭合本块注释。）
+   */
+  const cfgSrc = path.join(SRC, 'config.json');
+  if (fs.existsSync(cfgSrc)) {
+    const cfgText = fs.readFileSync(cfgSrc, 'utf8');
+    try {
+      const parsed = JSON.parse(cfgText);
+      if (!parsed || !Array.isArray(parsed.triggers) || !parsed.triggers.length) {
+        throw new Error('triggers 缺失或为空');
+      }
+      parsed.triggers.forEach((t) => {
+        if (!t || t.type !== 'timer' || !t.name || !t.config) {
+          throw new Error(`触发器字段不全：${JSON.stringify(t)}`);
+        }
+        if (String(t.config).split(/\s+/).filter(Boolean).length !== 7) {
+          throw new Error(`cron 必须是 7 位（秒 分 时 日 月 周 年）：${t.config}`);
+        }
+      });
+    } catch (e) {
+      // 宁可让构建失败，也不要静默传一个「触发器永远不生效」的配置上去
+      console.error(`[build] config.json 非法 → 中止：${e.message}`);
+      process.exit(1);
+    }
+    fs.copyFileSync(cfgSrc, path.join(DST, 'config.json'));
+  }
+
   const kb = (Buffer.byteLength(text) / 1024).toFixed(1);
   console.log(`[build] 已打包 ${count} 个模块 → miniprogram/cloudfunctions/${'api'}/${OUT_NAME}（${kb} KB）`);
+  if (fs.existsSync(path.join(DST, 'config.json'))) {
+    console.log('[build] 已带上 config.json（定时触发器，每分钟第 0 秒 → sweepTick）');
+  }
   console.log('[build] 部署只需传根文件：deploy --names api ... -r（**不要**再 inc-deploy 子目录）');
 }
 

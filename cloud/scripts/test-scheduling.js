@@ -1003,6 +1003,170 @@ const byId = (id) => subs().find((r) => Number(r.id) === Number(id));
   eq('V9 未登录取消 → 40101', (await H.call(H.req('DELETE', '/user/submit/1'))).code, 40101);
   eq('V10 未登录放弃候补 → 40101', (await H.call(H.req('POST', '/user/submit/2/leave-queue'))).code, 40101);
 
+  /* ══════════════════ W. 定时闸门 hasPendingWork / sweepTick（阶段 6） ══════════════════ */
+  /**
+   * 阶段 6 把「进程内 60s setInterval」换成「平台定时触发器 + 廉价闸门」。
+   * 这里钉死两件事：
+   *   ① **不许漏**：闸门说没活时，`sweep()` 必须一条都不碰（否则定时任务会悄悄丢活）。
+   *   ② **不许白跑**：真没活时 `hasPendingWork` 必须返回 false（否则空转烧额度）。
+   * 两端都要断言 —— 只测一端会让「保守超集」退化成恒 true（等于没加闸门）。
+   */
+  section('W. 定时闸门 hasPendingWork / sweepTick');
+
+  eq('W0-1 hasPendingWork 已导出', typeof sched.hasPendingWork, 'function');
+  eq('W0-2 sweepTick 已导出', typeof sched.sweepTick, 'function');
+
+  const NOW = Date.now();
+  const TODAY = bj.ymd(bj.shifted(NOW));
+  const TOMORROW = bj.ymd(bj.shifted(NOW + 86400000));
+  const YESTERDAY = bj.ymd(bj.shifted(NOW - 86400000));
+
+  /** 「闸门关闭 ⇒ sweep 必须无动作」—— 阶段 6 的核心安全断言 */
+  async function gateIsSafe(label, seed, now = NOW) {
+    reset(seed);
+    const pending = await sched.hasPendingWork(now);
+    if (pending) {
+      lines.push(`OK  ${label} :: 闸门放行（保守超集，允许多跑）`);
+      return;
+    }
+    const swp = await sched.sweep({ now });
+    const touched = swp.weeks.length > 0 || swp.played > 0;
+    ok(`${label} :: 闸门关闭 ⇒ sweep 必须无动作`, !touched,
+      `weeks=${swp.weeks.length} played=${swp.played}`);
+  }
+
+  const CAP = kv({ song_slot_capacity: '5' });
+
+  // ── W1 三类都是 0 → 闸门关闭 ──
+  reset({ system_setting: CAP });
+  eq('W1a 完全空库 → 闸门关闭', await sched.hasPendingWork(NOW), false);
+  await gateIsSafe('W1b 完全空库', { system_setting: CAP });
+
+  // ── W2 只剩「余波」：周已锁定 + 歌已播放 → 也要关闭（否则永远空转） ──
+  const LOCKED_SEED = {
+    system_setting: CAP,
+    submit: [doc({ id: 1, want: pastSlot, sched: S.SCHEDULE.APPROVED, scheduledSlot: pastSlot, play: S.PLAY.PLAYED, status: S.ST.PLAYED })],
+    weekly_schedule: [weekRow({ status: sched.WEEK_STATUS.LOCKED })],
+  };
+  reset(LOCKED_SEED);
+  eq('W2a 周已锁 + 歌已播放 → 闸门关闭', await sched.hasPendingWork(NOW), false);
+  await gateIsSafe('W2b 只剩余波', LOCKED_SEED);
+
+  // ── W3 ① 开放周 ──
+  reset({ system_setting: CAP, weekly_schedule: [weekRow()] });
+  eq('W3a 有开放周 → 命中', await sched.hasPendingWork(NOW), true);
+  reset({ system_setting: CAP, weekly_schedule: [weekRow({ status: sched.WEEK_STATUS.CANCELLED })] });
+  eq('W3b 周已取消 → 不命中', await sched.hasPendingWork(NOW), false);
+  await gateIsSafe('W3c 只有已取消的周', { system_setting: CAP, weekly_schedule: [weekRow({ status: sched.WEEK_STATUS.CANCELLED })] });
+
+  // ── W4 ② 还没排上的点歌（⚠️ 不按 type 过滤） ──
+  reset({ system_setting: CAP, submit: [doc({ id: 1, want: S1 })] });
+  eq('W4a 未排期的点歌 → 命中', await sched.hasPendingWork(NOW), true);
+  reset({ system_setting: CAP, submit: [doc({ id: 1, want: S1, sched: S.SCHEDULE.WAITING, status: S.ST.QUEUED })] });
+  eq('W4b 候补中的点歌 → 命中', await sched.hasPendingWork(NOW), true);
+  // 征文（type=2）默认也是 UNASSIGNED —— 若闸门写死 type:1，这类周会被漏掉
+  reset({ system_setting: CAP, submit: [doc({ id: 1, type: 2, want: S1 })] });
+  eq('W4c ★ type=2 的未排期也命中（闸门不能只查 type:1）', await sched.hasPendingWork(NOW), true);
+
+  // ── W5 ③ 「播出日期已到、还没标记播放」 ──
+  /**
+   * ⚠️⚠️ **反例钉死（阶段 6 修掉的一个静默漂移）**
+   *
+   * 旧写法：`scheduledSlot: _.lte('<今天> 23:59')` —— 想表达「日期 ≤ 今天」。
+   * 但串是 `YYYY-MM-DD 中文时段名 时刻`，同一天的串前 11 位全同，
+   * 第 11 位开始比「中文名 vs 数字」：`'早'`(U+65E9) > `'2'`(0x32)，
+   * 于是**当天**的串被判为「不小于今天末」→ 当天的歌被当成「没活」→
+   * **要等第二天才被标记已播放**（原 Express 是 60s tick、播完即标）。
+   *
+   * 正确写法：`_.lt('<明天>')`（日期定长零填充 → 时间序 == 字典序）。
+   * 下面这一条先把「旧写法为什么错」钉成可执行断言，再验闸门行为。
+   */
+  ok('W5-0 ★ 反例钉死：中文时段名的串在字典序上大于数字',
+    !(`${TODAY} 早间 07:20` <= `${TODAY} 23:59`),
+    `'${TODAY} 早间 07:20' <= '${TODAY} 23:59' 为 false ⇒ 旧写法必然漏掉「当天」`);
+
+  const TODAY_SLOT = `${TODAY} 早间 07:20`;
+  const TODAY_SEED = {
+    system_setting: CAP,
+    submit: [doc({ id: 1, want: TODAY_SLOT, sched: S.SCHEDULE.APPROVED, scheduledSlot: TODAY_SLOT, status: S.ST.SCHEDULED })],
+  };
+  reset(TODAY_SEED);
+  eq('W5a ★★★ 今天播出、未标记播放 → 必须命中', await sched.hasPendingWork(NOW), true);
+
+  const YESTERDAY_SLOT = `${YESTERDAY} 早间 07:20`;
+  reset({ system_setting: CAP, submit: [doc({ id: 1, want: YESTERDAY_SLOT, sched: S.SCHEDULE.APPROVED, scheduledSlot: YESTERDAY_SLOT, status: S.ST.SCHEDULED })] });
+  eq('W5b 昨天播出、未标记播放 → 命中', await sched.hasPendingWork(NOW), true);
+
+  const TOMORROW_SLOT = `${TOMORROW} 早间 07:20`;
+  const TOMORROW_SEED = {
+    system_setting: CAP,
+    submit: [doc({ id: 1, want: TOMORROW_SLOT, sched: S.SCHEDULE.APPROVED, scheduledSlot: TOMORROW_SLOT, status: S.ST.SCHEDULED })],
+  };
+  reset(TOMORROW_SEED);
+  eq('W5c 明天播出 → 不命中（还没到）', await sched.hasPendingWork(NOW), false);
+  await gateIsSafe('W5d 只有明天的歌', TOMORROW_SEED);
+
+  // 已播放的当日歌 → 与 ③ 无关（playStatus 已 PLAYED）→ 关
+  reset({ system_setting: CAP, submit: [doc({ id: 1, want: TODAY_SLOT, sched: S.SCHEDULE.APPROVED, scheduledSlot: TODAY_SLOT, play: S.PLAY.PLAYED, status: S.ST.PLAYED })] });
+  eq('W5e 当天但已标记播放 → 不命中', await sched.hasPendingWork(NOW), false);
+
+  // ── W6 sweepTick：空转短路 ──
+  reset({ system_setting: CAP });
+  const tk1 = await sched.sweepTick({ now: NOW });
+  eq('W6a 空转 skipped=true', tk1.skipped, true);
+  eq('W6b reason=NO_PENDING_WORK', tk1.reason, 'NO_PENDING_WORK');
+  eq('W6c weeks=0', tk1.weeks, 0);
+  eq('W6d played=0', tk1.played, 0);
+  ok('W6e 短路时不带 detail（证明真的没跑 sweep）', tk1.detail === undefined);
+
+  // ── W7 sweepTick：有活 → 真跑 ──
+  reset({
+    system_setting: kv({ song_slot_capacity: '1' }),
+    submit: [doc({ id: 1, want: S1 }), doc({ id: 2, want: S1 })],
+    weekly_schedule: [weekRow({ status: sched.WEEK_STATUS.APPLICATION, scheduleLockAt: new Date(NOW + 86400000) })],
+  });
+  const tk2 = await sched.sweepTick({ now: NOW });
+  eq('W7a skipped=false', tk2.skipped, false);
+  eq('W7b 涉及 1 个周', tk2.weeks, 1);
+  eq('W7c 真排上 1 条（容量截断）', tk2.detail.weeks[0].assigned, 1);
+  eq('W7d 周状态推进到 SCHEDULING', weeks()[0].status, sched.WEEK_STATUS.SCHEDULING);
+
+  // ── W8 sweepTick：异常必须被吞掉（抛出去会记成函数执行失败） ──
+  reset({
+    system_setting: kv({ song_slot_capacity: '1' }),
+    submit: [doc({ id: 1, want: S1 })],
+    weekly_schedule: [weekRow({ status: sched.WEEK_STATUS.APPLICATION, scheduleLockAt: new Date(NOW + 86400000) })],
+  });
+  const origApplyW = S.applyChange;
+  S.applyChange = async () => { throw new Error('boom'); };
+  const tk3 = await sched.sweepTick({ now: NOW });
+  S.applyChange = origApplyW;
+  eq('W8a 异常被吞、函数正常返回', tk3.error, 'boom');
+  eq('W8b skipped=false（不是短路）', tk3.skipped, false);
+  eq('W8c 异常时 played=0', tk3.played, 0);
+  eq('W8d 抛错的那条没被改', byId(1).scheduleStatus, S.SCHEDULE.UNASSIGNED);
+
+  // ── W9 端到端：定时事件真的能走通 index.js（不是只调 service） ──
+  const TIMER = { Type: 'Timer', TriggerName: 'songSweepTick', TriggerTime: new Date(NOW).toISOString() };
+
+  reset({ system_setting: CAP });
+  let tr = await H.call(TIMER);
+  eq('W9a 定时事件返回 code=0', tr.code, 0);
+  eq('W9b 带 cron 标记', tr.data.cron, true);
+  eq('W9c 空库 → 短路', tr.data.skipped, true);
+  eq('W9d 短路原因', tr.data.reason, 'NO_PENDING_WORK');
+
+  reset({
+    system_setting: kv({ song_slot_capacity: '1' }),
+    submit: [doc({ id: 1, want: S1 })],
+    weekly_schedule: [weekRow({ status: sched.WEEK_STATUS.APPLICATION, scheduleLockAt: new Date(NOW + 86400000) })],
+  });
+  tr = await H.call(TIMER);
+  eq('W9e 有活 → code=0', tr.code, 0);
+  eq('W9f 有活 → skipped=false', tr.data.skipped, false);
+  eq('W9g 有活 → weeks=1', tr.data.weeks, 1);
+  ok('W9h 定时事件不会掉进路由（没有「接口不存在」）', tr.message !== '接口不存在', `message=${tr.message}`);
+
   /* ══════════════════ 汇总 ══════════════════ */
   console.log(lines.join('\n'));
   const total = lines.filter((l) => /^(OK|FAIL) /.test(l)).length;

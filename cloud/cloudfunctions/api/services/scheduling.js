@@ -864,6 +864,93 @@ async function sweep({ now = Date.now(), operatorId = null } = {}) {
 }
 
 /* ------------------------------------------------------------------ *
+ * ⑦ 定时触发入口（阶段 6）
+ * ------------------------------------------------------------------ */
+/**
+ * 「这一轮有没有活干」的**廉价预检** —— 定时器每分钟触发，空转必须极快返回。
+ *
+ * ⚠️⚠️ 为什么需要它：云函数免费额度是 **10 万 GBs/月**，
+ *    `资源使用量 = 配置内存(GB) × 计费时长(s)`（最小粒度 100ms）。
+ *    每分钟一次 = 43,200 次/月；若每次都跑满 3 秒（256MB）就是
+ *    0.25 × 3 × 43200 ≈ **32,400 GBs（32% 额度）**，空转大半时间纯烧钱。
+ *    加上这道闸门后，空转只需 3 次极轻查询 → 单次约 0.05 GBs（**2% 额度**）。
+ *
+ * ⚠️ 三次查询都是 `sweep()` 收集范围的**保守超集** —— 说「没活」时 `sweep()`
+ *    必定返回 `{weeks: [], played: 0}`（不做任何写操作）。宁可多跑一次，不可漏跑。
+ */
+async function hasPendingWork(now = Date.now()) {
+  // ① 有「还没锁定/取消」的周（哪怕里面一条点歌都没有）→ 可能要锁定
+  const openWeeks = await count(C.WEEKLY, {
+    status: _.in([WEEK_STATUS.DRAFT, WEEK_STATUS.APPLICATION, WEEK_STATUS.REVIEW, WEEK_STATUS.SCHEDULING]),
+  });
+  if (openWeeks) return true;
+
+  // ② 有「还没排上」的点歌 → 可能要排期 / 调剂
+  //    ⚠️ 这里**不能**加 `type: 1` —— 源 `sweep()` 收集周时用的条件也不带 type
+  //       （征文 type=2 的 scheduleStatus 默认也是 UNASSIGNED），加了会漏周。
+  const alive = await count(C.SUBMIT, { scheduleStatus: _.in([S.SCHEDULE.UNASSIGNED, S.SCHEDULE.WAITING]) });
+  if (alive) return true;
+
+  // ③ 有「播出日期已到、还没标记播放」的 → 可能要标记已播放
+  //    时段值是 `YYYY-MM-DD 时段 时刻`，日期部分是**定长 10 字符的零填充**，
+  //    所以「日期 ≤ 今天」等价于「整串 < 明天日期」：任何以今天日期开头的串
+  //    在第 9 位就已经小于明天日期串了。
+  //
+  //    ⚠️⚠️ 曾经写成 `_.lte('<今天> 23:59')` —— **这是错的**：
+  //    日期相同的串前 11 位全同，第 11 位开始比中文时段名 vs 数字，
+  //    `'早'`(U+65E9) > `'2'`(0x32) → 判为「不小于」→ **当天播出的歌被判成没活**，
+  //    要等**第二天**才被标记已播放（原 Express 是 60s tick、播完即标）。
+  //    这种漂移不报错、只是晚一天，最容易被忽略，所以用「比明天」而不是「比今天末」。
+  //    这是**保守**过滤：今天但时刻未到的也会被算进来 → 多跑一次，不会漏。
+  const tomorrowDate = bj.ymd(bj.shifted(now + 86400000));
+  const due = await count(C.SUBMIT, {
+    type: 1,
+    reviewStatus: S.REVIEW.APPROVED,
+    scheduleStatus: S.SCHEDULE.APPROVED,
+    playStatus: S.PLAY.NOT_PLAYED,
+    scheduledSlot: _.lt(tomorrowDate),
+  });
+  if (due) return true;
+
+  return false;
+}
+
+/**
+ * 定时触发器入口（原 `songQueueService.startScheduler()` 的 60 秒 tick 的替代）。
+ *
+ * ⚠️ 与源实现的差异（**有意为之**）：
+ *   ① 源用进程内 `setInterval` + `ticking` 标志防重入；云函数**无常驻进程**，
+ *      改成平台的定时触发器（`config.json` 的 `triggers`），触发器只调本函数。
+ *   ② 源有「启动即补跑」（`setTimeout(1s)`）；云函数没有「启动」这个时机，
+ *      由触发器每分钟跑一次天然覆盖。
+ *   ③ 源靠 `if (process.env.NODE_ENV === 'test') return null` 关掉定时器；
+ *      云上不需要这个开关（触发器在平台侧配置，不在代码里）。
+ *
+ * ⚠️ 关于「冷启动导致同一分钟重复执行 / 多实例并发」：**不需要额外的幂等锁**。
+ *    理由：`sweep()` 里所有改状态都经过 `applyChange` 的条件 UPDATE（真乐观锁），
+ *    抢不到的那次影响 0 行、不计数也不写日志 —— 已由 `test-scheduling.js`
+ *    的 D 段（幂等）与 U19–U21（sweep 连跑两次无变化）钉死。
+ *    加一把不原子的「分钟锁」只会带来虚假的安全感。
+ */
+async function sweepTick({ now = Date.now(), operatorId = null } = {}) {
+  try {
+    if (!(await hasPendingWork(now))) {
+      return { skipped: true, reason: 'NO_PENDING_WORK', weeks: 0, played: 0 };
+    }
+    const r = await sweep({ now, operatorId });
+    if (r.weeks.length || r.played) {
+      console.log(`[songSchedule] 定时兜底：涉及 ${r.weeks.length} 个周、标记已播放 ${r.played} 条`);
+    }
+    return { skipped: false, weeks: r.weeks.length, played: r.played, detail: r };
+  } catch (e) {
+    // ⚠️ 定时任务绝不能把异常抛出去（抛了会记成函数执行失败、污染告警）；
+    //    下个周期自然重试（幂等）。
+    console.warn(`[songSchedule] 兜底任务失败（下个周期重试）：${e.message}`);
+    return { skipped: false, error: e.message, weeks: 0, played: 0 };
+  }
+}
+
+/* ------------------------------------------------------------------ *
  * 候补读路径
  * ------------------------------------------------------------------ */
 /** 候选池 / 候补队列快照（管理端与候补卡用） */
@@ -994,4 +1081,6 @@ module.exports = {
   setPlayed,
   manualAssign,
   sweep,
+  hasPendingWork,
+  sweepTick,
 };

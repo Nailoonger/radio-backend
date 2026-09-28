@@ -78,6 +78,35 @@ exports.main = async (event = {}, context) => {
   const { method = 'GET', path: rawPath = '', body = {}, token = '', query: eventQuery = {} } = event || {};
   const { cloud, ApiError, Codes, match } = b;
 
+  /**
+   * ── 定时触发器（阶段 6）─────────────────────────────────────────────
+   * 替换原 `songQueueService.startScheduler()` 的 60 秒 `setInterval`。
+   *
+   * 定时触发时 `event = { Type: 'Timer', TriggerName: 'songSweepTick', TriggerTime: ... }`
+   * ⚠️ 必须在**路由匹配之前**拦掉：定时事件没有 `method` / `path`，
+   *    走路由只会得到「接口不存在」，而且触发器**不关心返回值**，
+   *    那种错误是纯静默的（日志里看着像正常触发）。
+   *
+   * ⚠️ `require` 放在分支内部（惰性）：排期服务的加载失败**不能**影响普通请求。
+   */
+  if (event && (event.Type === 'Timer' || event.TriggerName)) {
+    try {
+      const sched = require('./services/scheduling');
+      const out = await sched.sweepTick({ now: Date.now() });
+      console.log('[cron]', event.TriggerName || 'timer', JSON.stringify({
+        skipped: out.skipped, reason: out.reason, weeks: out.weeks, played: out.played, error: out.error,
+      }));
+      return {
+        code: 0,
+        message: 'ok',
+        data: { cron: true, skipped: out.skipped, reason: out.reason || null, weeks: out.weeks, played: out.played, error: out.error || null },
+      };
+    } catch (e) {
+      console.error('[cron] 未捕获异常', (e && e.message) || e, (e && e.stack) || '');
+      return { code: Codes.SERVER_ERROR, message: '定时任务失败', data: { error: String((e && e.message) || e) } };
+    }
+  }
+
   // 拆出 path 里可能自带的 querystring（兼容 `/user/notice/list?page=1` 写法）
   let reqPath = String(rawPath);
   const inlineQuery = {};

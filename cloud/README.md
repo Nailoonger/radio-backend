@@ -43,7 +43,7 @@
 | 3 | 配置类集合（system_setting / system_switch）+ 首批接口（switch、station） | ✅ 完成 |
 | 4 | 用户端接口移植（登录/改密/投稿/点歌/留言/节目/公告/风采） | ✅ 完成（33/33 接口，云端实测 31 条全绿） |
 | 5 | 点歌状态机（songStatusService + songSchedulingService）重写 | ✅ 完成（12/12 算法函数，本地 783 项全绿；**云端待阶段 7 验收**，见下） |
-| 6 | 定时触发器（原 60s sweep → 云函数定时器） | ⏳ |
+| 6 | 定时触发器（原 60s sweep → 云函数定时器） | ✅ 完成（+廉价闸门把空转从 32% 额度压到 ~2%；**上线前需人工把函数超时 3s → 20s**） |
 | 7 | 管理端接口移植（含学生名册 Excel） | ⏳ |
 | 8 | 数据迁移脚本 + 双向校验 | ⏳ |
 | 9 | admin-web 接云开发 | ⏳ 最后一步 |
@@ -51,18 +51,18 @@
 ### 本地验证（每次改完必跑，秒级）
 
 ```bash
-node cloud/scripts/selfcheck.js        # 静态自检：路由优先级 / 时间工具逐位一致 / 错误码逐值一致（75 项）
+node cloud/scripts/selfcheck.js        # 静态自检：路由优先级 / 时间工具逐位一致 / 错误码逐值一致 / 触发器配置（82 项）
 node cloud/scripts/test-system.js      # /health + 建集合 + 开关（21 项）
 node cloud/scripts/test-gateway.js     # 网关 + lib/db 原语（26 项）
 node cloud/scripts/test-user-readonly.js  # 用户端只读（76 项）
 node cloud/scripts/test-user-auth.js      # 登录 / 改密 / me（62 项）
 node cloud/scripts/test-user-submit.js    # 投稿 / 点歌 11 个接口（206 项）
 node cloud/scripts/test-scheduling-cost.js # 调剂选址成本表（63 项）
-node cloud/scripts/test-scheduling.js      # 排期算法 12 个函数（234 项）
+node cloud/scripts/test-scheduling.js      # 排期算法 12 个函数 + 定时闸门（273 项）
 node cloud/scripts/test-bundle.js          # 打包产物冒烟（20 项）
 ```
 
-合计 **783 项**，全绿才算过。
+合计 **829 项**，全绿才算过。
 
 ⚠️ **产物行为必须与源码一致**：`HARNESS_API_DIR=miniprogram/cloudfunctions/api` 再跑一遍
 `test-scheduling.js` / `test-scheduling-cost.js` / `test-user-submit.js`
@@ -103,7 +103,7 @@ node cloud/scripts/test-bundle.js          # 打包产物冒烟（20 项）
 | 我的 | `GET /user/profile` |
 | **投稿/点歌** | `POST /user/submit`、`GET /user/submit/my`、`quota`、`window`、`week`、`notice`、`timeslots`、`/:id`、`POST /user/submit/notice/ack`、`DELETE /user/submit/:id`、`POST /user/submit/:id/leave-queue` |
 
-### ⚠️ 四个「不报错」的静默漂移（移植时务必对照）
+### ⚠️ 五个「不报错」的静默漂移（移植时务必对照）
 
 1. **`ApiError` 是 4 参**：`(code, message, httpStatus = 200, data = null)`，与 `src/utils/response.js` 一致。
    从 src 逐字移植过来的 service 会写 `new ApiError(code, msg, 200, { opensAt })` ——
@@ -119,6 +119,21 @@ node cloud/scripts/test-bundle.js          # 打包产物冒烟（20 项）
    → 统一走 `scheduling.applyWeekPatch()`。
 4. **字段名一律驼峰**：`sweep()` 里写 `w.week_start_date` 会得到 `undefined`
    → `msOfWeekStartDate` 返回 `null` → 那一周被静默跳过 → **永远锁不上**，且不报错。
+5. **`scheduledSlot` 是 `YYYY-MM-DD 中文时段名 时刻`，字典序只在跨天时等于时间序**。
+   「日期 ≤ 今天」不能写成 `_.lte('<今天> 23:59')` —— 同一天的串前 11 位全同，
+   第 11 位开始比 `早`(U+65E9) vs `2`(0x32) → **当天被判为「不小于」，静默漏掉当天**。
+   → 一律写成 `_.lt('<明天日期>')`（日期定长零填充 → 时间序 == 字典序）。
+   踩点见 `cloud/docs/stage6-timer-plan.md` §4，防回归断言 `test-scheduling.js` `W5-0/W5a`。
+
+### 阶段 6：定时器为什么不直接每分钟裸跑 `sweep()`
+
+免费额度 **10 万 GBs/月**，而 `资源使用量 = 内存(GB) × 时长(s)` ——
+每分钟一次 = 43,200 次/月（调用次数只占 22%，**不紧张**），
+但每次跑满 3 s（256 MB）就是 **32,400 GBs ≈ 32% 额度**。
+
+→ **成本杀手是「时长」不是「次数」**，所以解法是让**空转极快返回**（`hasPendingWork` 三次
+`count()` ≈ 2% 额度），而不是降频（降频会改变行为，原实现就是 60 s 一次）。
+详见 `cloud/docs/stage6-timer-plan.md`。
 
 ## 四、关键设计决策（已在阶段 1 落定）
 
@@ -155,8 +170,9 @@ cloud/
 │   └── data-model-mapping.md      # 17 张 MySQL 表 → 云数据库集合映射
 ├── cloudfunctions/
 │   └── api/                       # 主网关云函数（唯一对外函数）
-│       ├── index.js               # 入口：解析入参 + 分发 + 统一异常
+│       ├── index.js               # 入口：解析入参 + 分发 + 统一异常（含定时事件分支）
 │       ├── router.js              # 路由表 126 条（数组顺序即优先级）
+│       ├── config.json            # ★ 定时触发器配置（阶段 6）—— 随函数一起部署
 │       ├── package.json
 │       ├── handlers/              # 按接口分文件，一个 handlerKey 对应一个方法
 │       │   ├── index.js           #   惰性解析 + 未移植兜底
@@ -178,7 +194,7 @@ cloud/
 │       │   ├── songStatus.js      #   三维状态 + applyChange（乐观锁唯一入口）
 │       │   ├── songQueue.js       #   候选池门面 / 状态卡
 │       │   ├── songRescheduleCost.js  # 调剂选址成本表（纯函数，阶段 5）
-│       │   └── scheduling.js      #   ★ 排期算法 12 函数（阶段 5 已完成）
+│       │   └── scheduling.js      #   ★ 排期算法 12 函数 + 定时闸门（阶段 5/6 已完成）
 │       └── lib/
 │           ├── response.js         # 错误码与统一响应（原样移植）
 │           ├── bjTime.js           # 北京时间工具（原样移植）
@@ -189,7 +205,7 @@ cloud/
     ├── harness.js                 # 内存假数据库（stub 掉 wx-server-sdk）
     ├── sync.js                    # 自研零依赖打包器（产物 = 单文件 index.js）
     ├── test-gateway.js            # 网关 + db 原语
-    ├── test-scheduling.js         # ★ 排期算法 12 函数（234 项）
+    ├── test-scheduling.js         # ★ 排期算法 12 函数 + 定时闸门（273 项）
     ├── test-scheduling-cost.js    # ★ 调剂成本表（63 项）
     ├── verify-user.js             # 云端真实调用验收（需 IDE 自动化端口）
     └── deploy-cloud.js            # 部署（单文件产物）
@@ -229,6 +245,10 @@ node cloud/scripts/sync.js --check   # 只校验一致性（不一致退出码 1
 
 ## 八、首次部署步骤（陛下操作）
 
+0. ⚠️ **先把函数超时从默认 3 秒改成 20 秒**（云开发控制台 → 云函数 → api → 配置 → 超时时间）。
+   CLI 没有改超时的能力，只能手点。**不改的后果**：`sweep()` 在数据多时会 3 秒掐断，
+   表现为「定时任务偶尔什么都没做」，日志里只有一句超时。
+   顺带确认 `config.json` 的触发器已随函数上传（控制台「触发器」页签能看到 `songSweepTick`）。
 1. **开发者工具** → 顶部「云开发」→ 确认环境为 `jy-radio-d1gdwmptl816ee6a9`；
 2. 左侧文件树找到 `cloudfunctions/api` → **右键 → 上传并部署：云端安装依赖**
    （首次约 1~2 分钟；它会在云端装 `wx-server-sdk` / `jsonwebtoken` / `bcryptjs` / `axios` / `exceljs`）；

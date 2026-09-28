@@ -4,6 +4,17 @@
 > 本文件只留：铁律、必须按顺序做的操作、会反复踩的坑。
 > 口径：**「收歌」已全站改名「点播」**（只改展示名，常量仍 `APPLICATION`）。
 
+## 云开发迁移（`cloud/`，阶段 0–6 已完成，7/8/9 待做）
+- **铁律：只做加法** —— 原 Express `src/` + `admin-web/` + Docker 链路一行不删，保留 `requestMode: 'direct'|'cloud'` 开关，随时可切回。陛下原则：「不要删除原来的，以防我想换回来」。
+- **动机**：不再续费服务器，全部走云开发（免费额度：调用 20 万次/月、**资源使用量 10 万 GBs/月**、容量 2GB）。
+- **进度**：0 盘点 / 1 骨架 / 2 数据层+harness / 3 配置类 / 4 用户端 33 接口 / 5 排期算法 12 函数 / 6 定时触发器 —— 全 ✅。回归 **829 项**（`cloud/README.md` 有清单，秒级）。
+- **架构**：源在 `cloud/cloudfunctions/api/`，**运行目录** `miniprogram/cloudfunctions/api/`（微信 `cloudfunctionRoot` 必须在项目内）。`sync.js` 把 33 个模块打成**单文件 index.js**（Windows 上 CLI 会把 `\` 写进压缩包条目名，子目录必坏，只传根文件）+ `config.json`。
+- **会话内速查**：
+  - 改完必跑：`selfcheck` + 8 个 test 脚本；打包产物模式 `HARNESS_API_DIR=miniprogram/cloudfunctions/api` 再跑一遍，**项数必须一致**。
+  - 打包/删 dist 一律 `NODE_OPTIONS=""`（safe-delete 拦截）。
+  - **上报清单（`cloud/README.md` §三）+ `cloud/docs/stage5-scheduling-plan.md` / `stage6-timer-plan.md`** 是权威细节；skill `express-to-cloudfunction-migration` 有 17 条「不报错的静默漂移」。
+- **需陛下动手**：云开发控制台把云函数**超时 3s → 20s**（CLI 无此能力）。
+
 ## 铁律
 - **admin-web 按 v8 落地**（权威 `preview/admin-ui-v8/admin-ui-v8.html`）：唯一强调色 **#0066CC**、无渐变无彩色投影、深色卡为主角。**登录页是唯一例外**（用户 v4 分栏版），勿动。改前备份 `admin-web/_backup/<时间戳>-src/`。
 - **绝不用 `git checkout --`**：工作树全是未提交成果。

@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    {
+      "name": "songSweepTick",
+      "type": "timer",
+      "config": "0 */1 * * * * *"
+    }
+  ]
+}
