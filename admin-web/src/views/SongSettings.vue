@@ -3,161 +3,58 @@
     <!-- v8：子页返回入口 -->
     <div class="back-row">
       <a class="back-link" @click="$router.push('/submit')">‹ 返回投稿 & 点歌审核</a>
-      <span class="micro">点歌设置 · 排期容量 / 候补队列 / 点歌时间窗口 / 提交规则 / 播出时段 / 两份注意事项</span>
+      <span class="micro">点歌设置 · 点播与审核 / 排期 / 播出安排 / 学生端文案</span>
     </div>
 
-    <!-- ══════════ 排期容量与候补 + 提交规则（双栏） ══════════ -->
-    <div class="cols">
-      <!-- 排期容量与候补（v2：日/周名额已退役，改为「每格正式位 × 格子数」+ 一条全局候补队列） -->
-      <div class="sec" style="flex:1">
-        <div class="sec-head">
-          <span class="sec-title">排期容量与候补</span>
-          <span class="tag" :class="auth.isSuperAdmin ? 'tag-pass' : ''">
-            {{ auth.isSuperAdmin ? '仅超管可改' : '只读 · 仅超管可改' }}
-          </span>
-        </div>
-        <div class="card" style="padding:18px 20px">
-          <div class="quota-grid">
-            <div class="quota-item">
-              <div class="rowc" style="justify-content:space-between">
-                <span class="micro">下周正式位</span>
-                <span>
-                  <b class="num quota-num">{{ capUnlimited ? '不限' : (cap.weekCapacity ?? 0) }}</b>
-                  <span class="micro">{{ capUnlimited ? ` 每格不限 × ${gridCount} 格` : ` = ${cap.capacity ?? 0} × ${gridCount} 格` }}</span>
-                </span>
-              </div>
-            </div>
-            <div class="quota-item">
-              <div class="rowc" style="justify-content:space-between">
-                <span class="micro">已占位</span>
-                <span>
-                  <b class="num quota-num">{{ seatedTotal }}</b>
-                  <span class="micro"> / {{ capUnlimited ? '不限' : (cap.weekCapacity ?? 0) }}</span>
-                </span>
-              </div>
-              <div v-if="!capUnlimited" class="bar"><i :style="{ width: pctOf(seatedTotal, cap.weekCapacity) }" /></div>
-            </div>
-            <div class="quota-item">
-              <div class="rowc" style="justify-content:space-between">
-                <span class="micro">候补队列</span>
-                <span>
-                  <b class="num quota-num">{{ queue.total ?? 0 }}</b>
-                  <span class="micro"> / {{ queueUnlimited ? '不限' : (queue.limit ?? 0) }}<template v-if="queue.limitAuto">（自动）</template></span>
-                </span>
-              </div>
-              <div class="bar"><i :style="{ width: pctOf(queue.total, queue.limit) }" /></div>
-            </div>
-            <div class="quota-item quota-item-text">
-              <span class="micro">补位待审（最优先处理）</span>
-              <b class="num quota-num">{{ promotedCount }}</b>
-            </div>
-          </div>
-
-          <div class="quota-edit">
-            <div class="quota-fields">
-              <div class="field">
-                <label class="field-label">每格正式位</label>
-                <el-input-number v-model="capForm.capacity" :min="0" :max="99" controls-position="right" />
-              </div>
-              <div class="field">
-                <label class="field-label">候补队列上限</label>
-                <el-input-number v-model="capForm.queueLimit" :min="0" :max="999" controls-position="right" />
-              </div>
-            </div>
-            <div class="quota-buttons">
-              <!-- 普通管理员：接口已收超管（40301），这里一并置灰，别让人点了才吃 403 -->
-              <el-button
-                type="primary" :loading="capSaving" :disabled="!auth.isSuperAdmin"
-                @click="saveCapacity" class="btn-save"
-              >
-                <IconCheck :size="15" class="btn-icon" />保存
-              </el-button>
-              <el-button
-                :loading="sweeping" plain :disabled="!auth.isSuperAdmin"
-                @click="sweepQueue" class="btn-sweep"
-              >
-                <IconRefresh :size="15" class="btn-icon" />递补 + 定稿检查
-              </el-button>
-            </div>
-          </div>
-
-          <div class="micro" style="margin-top:11px;line-height:1.7">
-            每格正式位填 <b>0</b> = 不限；候补上限填 <b>0</b> = 自动（= 下周正式位总数）。
-            学生<b>提交即占位</b>：格子满了就进全局候补队列（先进先出，跨所有时段）；
-            <b>全部格子占满</b>时，整个候补队列由系统自动驳回（不占学生周次数）。
-          </div>
+    <!-- ══════════ 一个播出周期（页首总览：先把两条时间轴串起来） ══════════ -->
+    <div class="cycle">
+      <div class="cy-side">
+        <span class="cy-flag a">点播周</span>
+        <div class="cy-big">点播 {{ win.windowText || '—' }} <em>· 星期任选，最长可铺满整周</em></div>
+        <div class="cy-sub">
+          到点停止收新歌，已提交的继续审核。审核截止 <b>{{ win.reviewText || '—' }}</b>。<br>
+          到审核截止：自动排期 → 驳回剩余候补 → 锁定本周。
         </div>
       </div>
-
-      <!-- 提交规则段 -->
-      <div class="sec" style="flex:1">
-        <div class="sec-head">
-          <span class="sec-title">提交规则</span>
-          <span class="tag" :class="auth.isSuperAdmin ? 'tag-pass' : ''">
-            {{ auth.isSuperAdmin ? '即时生效 · 仅超管可改' : '只读 · 仅超管可改' }}
-          </span>
-        </div>
-        <div class="card" style="padding:8px 20px">
-          <div class="kv">
-            <span class="k" style="width:132px">每人每周上限</span>
-            <span class="rowc gap8">
-              <el-input-number v-model="ruleForm.weeklyUserLimit" :min="0" :max="99" size="small" :controls="false" />
-              <span class="micro">次 · 填 0 = 不限</span>
-            </span>
-          </div>
-          <div class="kv">
-            <span class="k" style="width:132px">同曲一周去重</span>
-            <span class="rowc gap13">
-              <el-switch v-model="ruleForm.dupBlock" :active-value="1" :inactive-value="0" />
-              <span class="micro">开：同一首歌一周内只能点一次</span>
-            </span>
-          </div>
-          <div class="kv">
-            <span class="k" style="width:132px">生效范围</span>
-            <span class="micro">只算点歌（文稿不受影响）；候补中的歌也算占用；因满额 / 窗口截止被系统驳回的不占个人次数</span>
-          </div>
-          <div class="kv" style="border-bottom:none">
-            <span class="k" style="width:132px">保存</span>
-            <span class="rowc gap13">
-              <el-button
-                type="primary" size="small" :loading="ruleSaving"
-                :disabled="!auth.isSuperAdmin" @click="saveRules" class="btn-save"
-              >
-                <IconCheck :size="14" class="btn-icon" />保存规则
-              </el-button>
-              <span class="micro">
-                {{ auth.isSuperAdmin
-                  ? '改完点这里才生效 · 保存后会显示服务端真正生效的值'
-                  : '只读 · 提交规则由超级管理员维护（后端 40301 把关）' }}
-              </span>
-            </span>
-          </div>
-        </div>
-        <!-- v8：被拦下时用户看到什么（v2 的四个错误码） -->
-        <div class="card" style="padding:14px 20px;margin-top:10px">
-          <div class="micro" style="line-height:1.8">
-            学生提交被拦下时看到的是：<br>
-            · 「本周已经有人点过《晴天》了，换一首吧」／「本周点歌次数已用完」<span class="tag tag-pending">40903</span><br>
-            · 「这个时段已经排满了，换个时段吧」<span class="tag tag-pending">40906</span><br>
-            · 「这个时段和候补队列都满了」<span class="tag tag-pending">40904</span><br>
-            · 「现在不在点歌时间段（每周六 18:00 – 周日 18:00）」<span class="tag tag-pending">40907</span>
-          </div>
+      <div class="cy-mid">
+        <div class="cy-ln" />
+        <div class="cy-tag">到点自动排期<br>按首选时段 + 提交时间</div>
+        <div class="cy-ln" />
+      </div>
+      <div class="cy-side cy-right">
+        <span class="cy-flag b">播出周</span>
+        <div class="cy-big">{{ sched.rangeText || '下一周 周一 ~ 周五' }} <em>· {{ slotTimes.length || 0 }} 场 / 天</em></div>
+        <div class="cy-sub">
+          {{ slotLegend || '—' }}<br>
+          <template v-if="capUnlimited">每格正式位<b>不限</b> —— 本周不设正式位上限</template>
+          <template v-else>
+            每格 <b>{{ cap.capacity || 0 }}</b> 首正式位，共 <b>{{ cap.weekCapacity || 0 }}</b> 个正式位
+          </template>
         </div>
       </div>
     </div>
 
-    <!-- ══════════ 点歌时间窗口（v2 新增）══════════ -->
-    <div class="sec">
-      <div class="sec-head">
-        <span class="sec-title">点歌时间窗口</span>
-        <span class="rowc gap8">
-          <span class="tag" :class="auth.isSuperAdmin ? 'tag-pass' : ''">
+    <!-- ══════════════════ 组 ① 点播与审核 ══════════════════ -->
+    <div class="grp">
+      <div class="grp-head">
+        <span class="gt">① 点播与审核</span>
+        <span class="gd">决定「什么时候能点」和「一个人能点几首」</span>
+      </div>
+
+      <!-- 点歌时间窗口 -->
+      <div class="cfg">
+        <div class="cfg-head">
+          <span class="cfg-t">点歌时间窗口</span>
+          <span class="pill" :class="auth.isSuperAdmin ? 'pass' : ''">
             {{ auth.isSuperAdmin ? '仅超管可改' : '只读 · 仅超管可改' }}
           </span>
-          <span class="micro">点播截止 ≠ 审核截止（本版拆开）</span>
-        </span>
-      </div>
-      <div class="card" style="padding:18px 20px">
+          <span class="sp" v-if="auth.isSuperAdmin">
+            <span class="save-state" :class="winDirty ? 'dirty' : 'ok'">
+              {{ winDirty ? '有未保存的改动' : '已保存 ✓' }}
+            </span>
+          </span>
+        </div>
+
         <!-- 当前状态条（深色）：规则文案与时刻全部来自服务端，前端不硬编码 -->
         <div class="tile win-tile">
           <div class="rowc wrap" style="gap:26px;align-items:flex-start">
@@ -186,14 +83,14 @@
         <!-- 编辑区 -->
         <div class="win-form">
           <div class="kv">
-            <span class="k" style="width:132px">启用窗口限制</span>
-            <span class="rowc gap13">
+            <span class="k">启用窗口限制</span>
+            <span class="rowc gap13 wrap">
               <el-switch v-model="winForm.enabled" :active-value="1" :inactive-value="0" :disabled="!auth.isSuperAdmin" />
               <span class="micro">关掉 = 学生任何时间都能提交（容量与候补仍照常生效）</span>
             </span>
           </div>
           <div class="kv">
-            <span class="k" style="width:132px">点播开始</span>
+            <span class="k">点播开始</span>
             <span class="rowc gap8 wrap">
               <el-select v-model="winForm.startDay" style="width:106px" :disabled="winDisabled">
                 <el-option v-for="d in win.allowedDays || []" :key="d.day" :label="d.name" :value="d.day" />
@@ -206,7 +103,7 @@
             </span>
           </div>
           <div class="kv">
-            <span class="k" style="width:132px">点播结束</span>
+            <span class="k">点播结束</span>
             <span class="rowc gap8 wrap">
               <el-select v-model="winForm.endDay" style="width:106px" :disabled="winDisabled">
                 <el-option v-for="d in win.allowedDays || []" :key="d.day" :label="d.name" :value="d.day" />
@@ -220,81 +117,252 @@
           </div>
           <!-- 审核截止（2026-09-25 与点播截止拆开）：null = 跟随「点播结束 + 偏移」，保住升级前的行为 -->
           <div class="kv">
-            <span class="k" style="width:132px">审核截止</span>
+            <span class="k">审核截止</span>
             <span class="rowc gap8 wrap">
-              <el-select v-model="winForm.reviewDay" style="width:158px" :disabled="winDisabled">
-                <el-option :label="followLabel" :value="null" />
+              <!-- 宽度按最长档位「跟随点播结束 + 6 小时」定，158px 会截断成「跟随点播结束 + …」 -->
+              <el-select v-model="winForm.reviewDay" style="width:200px" :disabled="winDisabled">
+                <el-option :label="followLabel" :value="FOLLOW_REVIEW" />
                 <el-option v-for="d in win.allowedDays || []" :key="d.day" :label="d.name" :value="d.day" />
               </el-select>
               <el-time-select
                 v-model="winForm.reviewTime" start="00:00" step="00:10" end="23:50"
                 placeholder="时刻" style="width:120px"
-                :disabled="winDisabled || winForm.reviewDay === null"
+                :disabled="winDisabled || winForm.reviewDay === FOLLOW_REVIEW"
               />
-              <span class="tag tag-pass" v-if="win.reviewConfigured">已单独配置</span>
+              <span class="pill green" v-if="win.reviewConfigured">已单独配置</span>
               <span class="micro">到点自动排期 + 驳回剩余候补 + 锁定本周</span>
             </span>
           </div>
-          <div class="kv" style="border-bottom:none">
-            <span class="k" style="width:132px">保存</span>
-            <span class="rowc gap13 wrap">
-              <el-button
-                type="primary" size="small" class="btn-save"
-                :loading="winSaving" :disabled="!auth.isSuperAdmin" @click="saveWindow"
-              >
-                <IconCheck :size="14" class="btn-icon" />保存窗口
-              </el-button>
-              <span class="micro">
-                {{ auth.isSuperAdmin
-                  ? '星期任选 周一 → 周日（最长可铺满整周）；审核截止不得早于点播结束、不得晚于播出周周一 00:00'
-                  : '只有超级管理员能修改点歌时间窗口（后端 40301 把关）' }}
-              </span>
-            </span>
-          </div>
+        </div>
+
+        <div class="tip">
+          <IconInfo :size="14" />
+          <span>星期任选 <b>周一 → 周日</b>，最长可铺满整周。审核截止不得早于点播结束、不得晚于<b>播出周周一 00:00</b>。<br>
+          注意与下面的「播出时段」区分：<b>这里配的是点播周</b>（学生什么时候能投），<b>播出时段配的是播出周</b>（歌播在哪几天）。</span>
+        </div>
+
+        <div class="btns">
+          <el-button
+            type="primary" size="small"
+            :loading="winSaving" :disabled="!auth.isSuperAdmin" @click="saveWindow"
+          >
+            <IconCheck :size="14" class="btn-icon" />保存窗口
+          </el-button>
+          <span class="micro" v-if="!auth.isSuperAdmin">只有超级管理员能修改点歌时间窗口（后端 40301 把关）</span>
         </div>
       </div>
-    </div>
 
-    <!-- ══════════ 小程序首页（仅超管，2026-09-21） ══════════ -->
-    <div class="sec" v-if="auth.isSuperAdmin">
-      <div class="sec-head">
-        <span class="sec-title">小程序首页</span>
-        <span class="rowc gap8">
-          <span class="tag tag-pass">即时生效</span>
-          <span class="micro">模块开关 home_song_schedule · 缺行视为开</span>
-        </span>
-      </div>
-      <div class="card" style="padding:8px 20px">
-        <div class="kv" style="border-bottom:none">
-          <span class="k" style="width:132px">展示本周点歌排期</span>
-          <span class="rowc gap13">
-            <el-switch
-              v-model="homeScheduleOn"
-              :disabled="homeScheduleSaving"
-              @change="toggleHomeSchedule"
-            />
-            <span class="micro">
-              开：小程序首页展示「本周点歌排期」（只显示已排期的歌名，<b>不含点歌人信息</b>）；
-              关：区块整体不渲染，接口不下发数据
+      <!-- 提交规则 -->
+      <div class="cfg">
+        <div class="cfg-head">
+          <span class="cfg-t">提交规则</span>
+          <span class="pill" :class="auth.isSuperAdmin ? 'pass' : ''">
+            {{ auth.isSuperAdmin ? '即时生效 · 仅超管可改' : '只读 · 仅超管可改' }}
+          </span>
+          <span class="sp" v-if="auth.isSuperAdmin">
+            <span class="save-state" :class="rulesDirty ? 'dirty' : 'ok'">
+              {{ rulesDirty ? '有未保存的改动' : '已保存 ✓' }}
             </span>
           </span>
         </div>
+        <div>
+          <div class="kv">
+            <span class="k">每人每周上限</span>
+            <span class="rowc gap8">
+              <el-input-number
+                v-model="ruleForm.weeklyUserLimit" :min="0" :max="99"
+                size="small" :controls="false" style="width:78px"
+              />
+              <span class="micro">次 · 填 0 = 不限</span>
+            </span>
+          </div>
+          <div class="kv">
+            <span class="k">同曲一周去重</span>
+            <span class="rowc gap13">
+              <el-switch v-model="ruleForm.dupBlock" :active-value="1" :inactive-value="0" />
+              <span class="micro">开：同一首歌一周内只能点一次</span>
+            </span>
+          </div>
+          <div class="kv" style="border-bottom:none">
+            <span class="k">生效范围</span>
+            <span class="micro">只算点歌（文稿不受影响）；候补中的歌也算占用；因窗口截止被系统驳回的不占个人次数</span>
+          </div>
+        </div>
+        <div class="tip">
+          <IconInfo :size="14" />
+          <span>改完要点下面的「保存规则」才生效，保存后页面会显示服务端真正生效的值。</span>
+        </div>
+        <div class="btns">
+          <el-button
+            type="primary" size="small" :loading="ruleSaving"
+            :disabled="!auth.isSuperAdmin" @click="saveRules"
+          >
+            <IconCheck :size="14" class="btn-icon" />保存规则
+          </el-button>
+          <span class="micro" v-if="!auth.isSuperAdmin">只读 · 提交规则由超级管理员维护（后端 40301 把关）</span>
+        </div>
+      </div>
+
+      <!-- 学生被拦下时看到什么（口径已按点播版订正） -->
+      <div class="cfg">
+        <div class="cfg-head">
+          <span class="cfg-t">学生被拦下时看到什么</span>
+          <span class="pill">只读</span>
+          <span class="sp"><span class="micro">点播版实际会出现的拦截</span></span>
+        </div>
+        <div class="kv">
+          <span class="k">未确认注意事项</span>
+          <span class="rowc gap8 wrap">
+            <span class="micro">「请先阅读并确认点歌注意事项」</span><span class="pill amber">40303</span>
+          </span>
+        </div>
+        <div class="kv">
+          <span class="k">不在点播窗口内</span>
+          <span class="rowc gap8 wrap">
+            <span class="micro">「现在不在点歌时间段（{{ win.windowText || '周六 18:00 → 周日 18:00' }}）」+ 下次开放时刻（小程序据此显示倒计时）</span>
+            <span class="pill amber">40907</span>
+          </span>
+        </div>
+        <div class="kv">
+          <span class="k">时段不是系统下发的</span>
+          <span class="rowc gap8 wrap">
+            <span class="micro">「播出时段只能选下周一到周五内的可选时段，请重新选择」</span>
+            <span class="pill amber">40001</span>
+          </span>
+        </div>
+        <div class="kv">
+          <span class="k">同曲重复 / 次数用完</span>
+          <span class="rowc gap8 wrap">
+            <span class="micro">「本周已经有人点过《晴天》了，换一首吧」／「本周点歌次数已用完（每周最多 N 次），下周再来吧」</span>
+            <span class="pill amber">40903</span>
+          </span>
+        </div>
+        <div class="kv" style="border-bottom:none">
+          <span class="k">一分钟内重复提交</span>
+          <span class="rowc gap8 wrap">
+            <span class="micro">「请勿重复提交」</span><span class="pill amber">40901</span>
+          </span>
+        </div>
+        <div class="tip">
+          <IconInfo :size="14" />
+          <span>已移除 <b>40906 时段已排满</b>、<b>40904 时段和候补队列都满了</b>、<b>40902 名额已满</b> ——
+          点播版提交时不再判容量，这三个码已无任何生产路径抛出。<br>
+          容量相关的自动驳回发生在<b>排期阶段</b>（驳回理由「该播出时段已排满，系统自动驳回」），不在提交那一刻。</span>
+        </div>
       </div>
     </div>
 
-    <!-- ══════════ 播出时段 ══════════ -->
-    <div class="sec">
-      <div class="sec-head">
-        <span class="sec-title">播出时段（用户只能从这儿选）</span>
-        <span class="rowc gap8">
-          <span class="tag tag-pass">后台发布</span>
-          <span class="micro">当前来源：{{ sourceText }}</span>
-        </span>
+    <!-- ══════════════════ 组 ② 排期 ══════════════════ -->
+    <div class="grp">
+      <div class="grp-head">
+        <span class="gt">② 排期</span>
+        <span class="gd">审核通过后，谁排上正式位、谁进候补</span>
       </div>
-      <div class="card" style="padding:18px 20px">
-        <div class="cols" style="gap:26px">
+
+      <div class="cfg">
+        <div class="cfg-head">
+          <span class="cfg-t">排期容量与候补</span>
+          <span class="pill" :class="auth.isSuperAdmin ? 'pass' : ''">
+            {{ auth.isSuperAdmin ? '仅超管可改' : '只读 · 仅超管可改' }}
+          </span>
+          <span class="sp" v-if="auth.isSuperAdmin">
+            <span class="save-state" :class="capDirty ? 'dirty' : 'ok'">
+              {{ capDirty ? '有未保存的改动' : '已保存 ✓' }}
+            </span>
+          </span>
+        </div>
+
+        <!-- 上半：只读统计（数字全部实时统计，不受下面输入框影响） -->
+        <div class="stats">
+          <div class="stat">
+            <div class="sl">下周正式位总数</div>
+            <div class="sv num">
+              {{ capUnlimited ? '不限' : (cap.weekCapacity ?? 0) }}
+              <small>{{ capUnlimited ? `每格不限 × ${gridCount} 格` : `= ${cap.capacity ?? 0} × ${gridCount} 格` }}</small>
+            </div>
+          </div>
+          <div class="stat">
+            <div class="sl">已占位</div>
+            <div class="sv num">{{ seatedTotal }} <small>/ {{ capUnlimited ? '不限' : (cap.weekCapacity ?? 0) }}</small></div>
+            <div v-if="!capUnlimited" class="bar"><i :style="{ width: pctOf(seatedTotal, cap.weekCapacity) }" /></div>
+          </div>
+          <div class="stat">
+            <div class="sl">候补队列</div>
+            <div class="sv num">
+              {{ queue.total ?? 0 }}
+              <small>/ {{ queueUnlimited ? '不限' : (queue.limit ?? 0) }}<template v-if="queue.limitAuto">（自动）</template></small>
+            </div>
+            <div class="bar"><i :style="{ width: pctOf(queue.total, queue.limit) }" /></div>
+          </div>
+          <div class="stat">
+            <div class="sl">补位待审（最优先处理）</div>
+            <div class="sv num">{{ promotedCount }}</div>
+          </div>
+        </div>
+
+        <div class="div-line" />
+
+        <!-- 下半：编辑 -->
+        <div class="two-col" style="max-width:460px">
+          <div>
+            <div class="field-label" style="margin-bottom:7px">每格正式位</div>
+            <el-input-number v-model="capForm.capacity" :min="0" :max="99" controls-position="right" style="width:100%" />
+          </div>
+          <div>
+            <div class="field-label" style="margin-bottom:7px">候补队列上限</div>
+            <el-input-number v-model="capForm.queueLimit" :min="0" :max="999" controls-position="right" style="width:100%" />
+          </div>
+        </div>
+
+        <div class="tip" style="margin-top:var(--s4)">
+          <IconInfo :size="14" />
+          <span>每格正式位填 <b>0</b> = 不限；候补上限填 <b>0</b> = 自动（= 下周正式位总数）。<br>
+          <b>提交不判容量</b>：谁都能投，一律先进待审核。审核通过只拿到候选资格，到审核截止由系统按「首选时段 + 提交时间」统一排；
+          首选时段满了进全局候补（先进先出，跨所有时段），锁定时刻还没排上的才被自动驳回（不占学生周次数）。</span>
+        </div>
+
+        <div class="btns">
+          <!-- 普通管理员：接口已收超管（40301），这里一并置灰，别让人点了才吃 403 -->
+          <el-button
+            type="primary" :loading="capSaving" :disabled="!auth.isSuperAdmin"
+            @click="saveCapacity"
+          >
+            <IconCheck :size="15" class="btn-icon" />保存
+          </el-button>
+          <el-button
+            :loading="sweeping" plain :disabled="!auth.isSuperAdmin"
+            @click="sweepQueue"
+          >
+            <IconRefresh :size="15" class="btn-icon" />递补 + 定稿检查
+          </el-button>
+          <span class="micro" v-if="!auth.isSuperAdmin">只读 · 容量与候补由超级管理员维护（后端 40301 把关）</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════ 组 ③ 播出安排 ══════════════════ -->
+    <div class="grp">
+      <div class="grp-head">
+        <span class="gt">③ 播出安排</span>
+        <span class="gd">播在哪几天、哪几场 · 学生端能看到什么</span>
+      </div>
+
+      <!-- 播出时段 -->
+      <div class="cfg">
+        <div class="cfg-head">
+          <span class="cfg-t">播出时段</span>
+          <span class="pill pass">后台发布</span>
+          <span class="sp">
+            <span class="micro">用户只能从这儿选 · 当前来源：{{ sourceText }}</span>
+            <span class="save-state" :class="slotsDirty ? 'dirty' : 'ok'" v-if="auth.isSuperAdmin">
+              {{ slotsDirty ? '有未保存的改动' : '已保存 ✓' }}
+            </span>
+          </span>
+        </div>
+
+        <div class="two-col" style="gap:var(--s5)">
           <!-- 左：编辑区 -->
-          <div style="flex:1">
+          <div>
             <div class="rowc" style="justify-content:space-between;margin-bottom:13px">
               <span class="field-label">每天开放的场次（最多 6 个）</span>
               <span class="micro">格式 HH:mm，保存后自动按时间排序</span>
@@ -312,11 +380,11 @@
                   <el-option label="午间" value="午间" />
                   <el-option label="晚间" value="晚间" />
                 </el-select>
-                <span class="micro slot-label-hint">标签，用户看到的是「周一 09-21 · 早间 07:20」</span>
+                <span class="micro slot-label-hint">标签 · 用户看到的是「{{ slotSample }}」</span>
                 <a class="link op-delete" :class="{ disabled: slotTimes.length <= 1 }" @click="removeSlot(i)">删除</a>
               </div>
             </div>
-            <div class="rowc gap8" style="margin-top:13px">
+            <div class="btns">
               <el-button
                 :disabled="!auth.isSuperAdmin || slotTimes.length >= (slotConfig?.maxSlots || 6)"
                 @click="addSlot"
@@ -332,15 +400,10 @@
               </el-button>
               <span class="micro" v-if="!auth.isSuperAdmin">只读 · 播出时段由超级管理员维护</span>
             </div>
-            <div class="micro" style="margin-top:11px;line-height:1.7">
-              留空则退回解析「开播时间」设置，再退回默认三个。
-              <b>可选日期范围固定为下一周的周一到周五</b>，不在这里改；
-              每格能排几首在「排期容量与候补」里设（当前每格 <b>{{ cap.capacity || '不限' }}</b> 首）。
-            </div>
           </div>
 
           <!-- 右：用户预览 -->
-          <div style="flex:1">
+          <div>
             <div class="rowc" style="justify-content:space-between;margin-bottom:13px">
               <span class="field-label">
                 用户会看到{{ slotConfig ? `（${slotConfig.weekStart} ~ ${slotConfig.weekEnd}）` : '' }}
@@ -350,7 +413,7 @@
             <div class="stack gap13">
               <div v-for="day in weekDays" :key="day" class="rowc gap13 slot-day-row">
                 <span class="micro slot-day-label">{{ day }}</span>
-                <span class="rowc gap8">
+                <span class="rowc gap8 wrap">
                   <span v-for="slot in slotTimes" :key="slot.time" class="chip-pick on">
                     {{ slot.label }} {{ slot.time }}
                   </span>
@@ -359,86 +422,124 @@
             </div>
           </div>
         </div>
+
+        <div class="tip">
+          <IconInfo :size="14" />
+          <span>可选日期范围固定为<b>下一周的周一 ~ 周五</b>，不在这里改。留空则退回解析「开播时间」设置，再退回默认三个。<br>
+          每格能排几首在 <b>② 排期</b> 里设（当前每格 <b>{{ capUnlimited ? '不限' : `${cap.capacity || 0} 首` }}</b>）。</span>
+        </div>
+      </div>
+
+      <!-- 小程序首页（仅超管，2026-09-21） -->
+      <div class="cfg" v-if="auth.isSuperAdmin">
+        <div class="cfg-head">
+          <span class="cfg-t">小程序首页</span>
+          <span class="pill green">即时生效</span>
+          <span class="sp"><span class="micro">模块开关 home_song_schedule · 缺行视为开</span></span>
+        </div>
+        <div class="kv" style="border-bottom:none">
+          <span class="k">展示本周点歌排期</span>
+          <span class="rowc gap13 wrap">
+            <el-switch
+              v-model="homeScheduleOn"
+              :disabled="homeScheduleSaving"
+              @change="toggleHomeSchedule"
+            />
+            <span class="micro">
+              开：小程序首页展示「本周点歌排期」（只显示已排期的歌名，<b>不含点歌人信息</b>）；
+              关：区块整体不渲染，接口不下发数据
+            </span>
+          </span>
+        </div>
       </div>
     </div>
 
-    <!-- ══════════ 两份注意事项 ══════════ -->
-    <div class="cols">
-      <!-- 点歌注意事项 -->
-      <div class="sec" style="flex:1">
-        <div class="sec-head">
-          <span class="sec-title">点歌注意事项</span>
-          <span class="micro">
-            v{{ noticeList[0].version }} · 已确认 <b class="num">{{ noticeList[0].ackedCount }}</b> 人
-          </span>
-        </div>
-        <div class="card" style="padding:18px 20px">
+    <!-- ══════════════════ 组 ④ 学生端文案 ══════════════════ -->
+    <div class="grp">
+      <div class="grp-head">
+        <span class="gt">④ 学生端文案</span>
+        <span class="gd">两份互相独立，改内容才会让学生重新确认</span>
+      </div>
+
+      <div class="two-col" style="gap:var(--s5)">
+        <!-- 点歌注意事项 -->
+        <div class="cfg">
+          <div class="cfg-head">
+            <span class="cfg-t">点歌注意事项</span>
+            <span class="sp">
+              <span class="micro">
+                v{{ noticeList[0].version }} · 已确认 <b class="num">{{ noticeList[0].ackedCount }}</b> 人
+              </span>
+              <span class="save-state" :class="noticeDirty(noticeList[0]) ? 'dirty' : 'ok'" v-if="auth.isSuperAdmin">
+                {{ noticeDirty(noticeList[0]) ? '有未保存的改动' : '已保存 ✓' }}
+              </span>
+            </span>
+          </div>
           <el-input
             v-model="noticeList[0].content"
             type="textarea"
             :rows="6"
             placeholder="一行一条，例如：&#10;一、点歌前请确认歌曲名与歌手填写正确。&#10;二、每人每周最多点 2 次。（留空 = 不启用）"
           />
-          <div class="warnline" style="margin-top:13px">
+          <div class="tip">
             <IconInfo :size="14" />
             <span>内容有改动才 +1 版本，<b>所有用户需重新确认</b>；只改排版不打扰用户。</span>
           </div>
-          <div class="rowc" style="justify-content:flex-end;gap:8px;margin-top:13px">
-            <el-button size="small">预览用户端</el-button>
+          <div class="btns">
             <el-button type="primary" size="small" :loading="noticeList[0].saving" @click="saveNotice(noticeList[0])">
               <IconCheck :size="14" class="btn-icon" />保存
             </el-button>
+            <el-button size="small">预览用户端</el-button>
           </div>
         </div>
-      </div>
 
-      <!-- 文稿注意事项 -->
-      <div class="sec" style="flex:1">
-        <div class="sec-head">
-          <span class="sec-title">文稿注意事项</span>
-          <span class="rowc gap8">
-            <span class="tag tag-pass">与点歌独立</span>
-            <span class="micro">
-              v{{ noticeList[1].version }} · 已确认 <b class="num">{{ noticeList[1].ackedCount }}</b> 人
+        <!-- 文稿注意事项 -->
+        <div class="cfg">
+          <div class="cfg-head">
+            <span class="cfg-t">文稿注意事项</span>
+            <span class="pill pass">与点歌独立</span>
+            <span class="sp">
+              <span class="micro">
+                v{{ noticeList[1].version }} · 已确认 <b class="num">{{ noticeList[1].ackedCount }}</b> 人
+              </span>
+              <span class="save-state" :class="noticeDirty(noticeList[1]) ? 'dirty' : 'ok'" v-if="auth.isSuperAdmin">
+                {{ noticeDirty(noticeList[1]) ? '有未保存的改动' : '已保存 ✓' }}
+              </span>
             </span>
-          </span>
-        </div>
-        <div class="card" style="padding:18px 20px">
+          </div>
           <el-input
             v-model="noticeList[1].content"
             type="textarea"
             :rows="6"
             placeholder="一行一条，例如：&#10;一、文稿须为原创，禁止抄袭转载。&#10;二、篇幅 300~1500 字，请勿提交纯图片内容。"
           />
-          <div class="micro" style="margin-top:13px;line-height:1.7">
-            两份内容、版本号、确认记录<b>互相独立</b>：改文稿这份不会让点歌那批人重新确认。
+          <div class="tip">
+            <IconInfo :size="14" />
+            <span>两份内容、版本号、确认记录<b>互相独立</b>：改文稿这份不会让点歌那批人重新确认。</span>
           </div>
-          <div class="rowc" style="justify-content:flex-end;gap:8px;margin-top:13px">
-            <el-button size="small">预览用户端</el-button>
+          <div class="btns">
             <el-button type="primary" size="small" :loading="noticeList[1].saving" @click="saveNotice(noticeList[1])">
               <IconCheck :size="14" class="btn-icon" />保存
             </el-button>
+            <el-button size="small">预览用户端</el-button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ══════════ 危险区（仅超管） ══════════ -->
-    <div class="sec danger-sec" v-if="auth.isSuperAdmin">
-      <div class="sec-head">
-        <span class="sec-title danger-title">危险区</span>
-        <span class="rowc gap8">
-          <span class="tag tag-danger">仅超级管理员</span>
-          <span class="micro">服务端校验（40301）</span>
-        </span>
+    <!-- ══════════════════ 组 ⑤ 危险区（仅超管） ══════════════════ -->
+    <div class="grp danger" v-if="auth.isSuperAdmin">
+      <div class="grp-head">
+        <span class="gt">⑤ 危险区</span>
+        <span class="gd">仅超级管理员 · 服务端 40301 把关</span>
       </div>
-      <div class="card dangerzone" style="padding:18px 20px">
+      <div class="dangerzone">
         <div class="rowc danger-row">
           <div class="grow">
             <div class="dz-title">一键清空全部点歌数据</div>
             <div class="dz-desc">
-              删除<b>全部点歌记录</b>，<b>不可恢复</b>；文稿、注意事项确认记录、学生账号一概不动。
-              v2 起容量与候补都是<b>实时统计</b>（直接数投稿记录），没有独立的名额计数器，
+              删除<b>全部点歌记录</b>，<b>不可恢复</b>；文稿、注意事项确认记录、学生账号一概不动。<br>
+              容量与候补都是<b>实时统计</b>（直接数投稿记录），没有独立的名额计数器，
               所以清空数据 = 容量占用与候补队列自然归零，个人每周次数随之归零。
             </div>
             <div class="dz-desc muted">
@@ -513,6 +614,7 @@ async function fetchCapacity() {
   cap.value = await http.get('/admin/submit/capacity');
   capForm.capacity = cap.value?.capacity ?? 0;
   capForm.queueLimit = cap.value?.queue?.limitAuto ? 0 : (cap.value?.queue?.limit ?? 0);
+  base.cap = sigCap.value;   // 服务端值落盘 = 此刻没有未保存改动
 }
 async function fetchSchedule() {
   sched.value = await http.get('/admin/submit/schedule');
@@ -558,6 +660,12 @@ const winSaving = ref(false);
 /** 非超管或未启用窗口 → 表单只读 */
 const winDisabled = computed(() => !auth.isSuperAdmin || !Number(winForm.enabled));
 
+/** 审核截止的「跟随点播结束 + 偏移」档位哨兵值。
+ *  ⚠️ 不能直接用 null 当 el-option 的 value —— Element Plus 把 null 视为「空值」，
+ *  即使存在 value=null 的选项也照样落回 placeholder（实测显示成「请选择」），
+ *  管理员就看不出当前到底是不是跟随档。所以线上传 null、UI 里用字符串哨兵。 */
+const FOLLOW_REVIEW = '__follow__';
+
 /** 「跟随点播结束 + 偏移」档位的文案：偏移分钟数由服务端下发，前端不硬编码 360 */
 const followLabel = computed(() => {
   const m = Number(win.value?.followOffsetMinutes);
@@ -583,19 +691,20 @@ function fillWinForm(d) {
   winForm.endTime = cfg.endTime || '18:00';
   // ⚠️ 未单独配置时必须回 null（下拉落在「跟随…」档），不能拿服务端推导出的生效值冒充配置值 ——
   //    否则管理员只是改了点播时间、顺手保存，就把「点播结束 + 偏移」固化成具体时刻，行为悄悄变了
-  winForm.reviewDay = cfg.reviewDay === null || cfg.reviewDay === undefined ? null : Number(cfg.reviewDay);
+  winForm.reviewDay = cfg.reviewDay === null || cfg.reviewDay === undefined ? FOLLOW_REVIEW : Number(cfg.reviewDay);
   winForm.reviewTime = cfg.reviewTime || '22:00';
 }
 async function fetchWindow() {
   win.value = await http.get('/admin/submit/window');
   fillWinForm(win.value);
+  base.win = sigWin.value;
 }
 async function saveWindow() {
   if (Number(winForm.enabled) && (!winForm.startTime || !winForm.endTime)) {
     ElMessage.warning('请填写点播开始与结束时刻（HH:mm）');
     return;
   }
-  if (Number(winForm.enabled) && winForm.reviewDay !== null && !winForm.reviewTime) {
+  if (Number(winForm.enabled) && winForm.reviewDay !== FOLLOW_REVIEW && !winForm.reviewTime) {
     ElMessage.warning('请填写审核截止时刻（HH:mm）');
     return;
   }
@@ -608,10 +717,11 @@ async function saveWindow() {
       endDay: Number(winForm.endDay),
       endTime: winForm.endTime,
       // null 是合法档位（跟随点播结束 + 偏移），后端不会当非法值拒掉
-      reviewDay: winForm.reviewDay === null ? null : Number(winForm.reviewDay),
+      reviewDay: winForm.reviewDay === FOLLOW_REVIEW ? null : Number(winForm.reviewDay),
       reviewTime: winForm.reviewTime || null,
     });
     fillWinForm(win.value);
+    base.win = sigWin.value;
     await Promise.all([fetchCapacity(), fetchSchedule()]);
     ElMessage.success(`点歌时间已更新：${win.value?.windowText || '—'}（审核截止 ${win.value?.reviewText || '—'}）`);
   } finally { winSaving.value = false; }
@@ -625,6 +735,7 @@ async function fetchRules() {
   const data = await http.get('/admin/submit/rules');
   ruleForm.weeklyUserLimit = data.weeklyUserLimit;
   ruleForm.dupBlock = data.dupBlock;
+  base.rules = sigRules.value;
 }
 async function saveRules() {
   // ⚠️ el-input-number 被「清空」时是 undefined：JSON.stringify 会丢掉这个键，
@@ -643,6 +754,7 @@ async function saveRules() {
       ruleForm.weeklyUserLimit = data.weeklyUserLimit;
       ruleForm.dupBlock = data.dupBlock;
     }
+    base.rules = sigRules.value;
     ElMessage.success(
       data?.weeklyUserLimit === 0
         ? '规则已更新：每人每周点歌不限次数，立即生效'
@@ -663,6 +775,10 @@ const SOURCE_LABEL = {
 };
 const sourceText = computed(() => SOURCE_LABEL[slotConfig.value?.source] || '—');
 
+/** 页首周期总览右侧：播出场次一行速览（早间 07:20 · 午间 12:20 · 晚间 18:00） */
+const slotLegend = computed(() => (slotTimes.value || [])
+  .map((t) => `${t.label || ''} ${t.time || ''}`.trim()).filter(Boolean).join(' · '));
+
 /** 视觉稿右侧预览：根据 slotConfig.weekStart 算下一周周一~周五 */
 const weekDays = computed(() => {
   const start = slotConfig.value?.weekStart;
@@ -679,10 +795,18 @@ const weekDays = computed(() => {
   });
 });
 
+/** 标签提示里的样例串：用真实的第一天 + 第一个时段拼 —— 别再写死日期，写死必然过期 */
+const slotSample = computed(() => {
+  const day = weekDays.value[0] || '周一';
+  const t = slotTimes.value[0];
+  return t ? `${day} · ${t.label || ''} ${t.time || ''}`.replace(/\s+/g, ' ').trim() : day;
+});
+
 async function fetchSlots() {
   // GET 走 /admin/submit/timeslots（/submit/slots 只注册了 PUT，GET 会被 /submit/:id 吃掉）
   slotConfig.value = await http.get('/admin/submit/timeslots');
   slotTimes.value = (slotConfig.value?.times || []).map((t) => ({ time: t.time, label: t.label || '' }));
+  base.slots = sigSlots.value;
 }
 function addSlot() {
   slotTimes.value.push({ time: '', label: '午间' });
@@ -701,6 +825,7 @@ async function saveSlots() {
     //    这里传了就会变成第二个入口，两边改同一个值容易互相覆盖。
     slotConfig.value = await http.put('/admin/submit/slots', { times });
     slotTimes.value = (slotConfig.value?.times || []).map((t) => ({ time: t.time, label: t.label || '' }));
+    base.slots = sigSlots.value;
     await fetchSchedule();   // 时段变了 → 格子数变 → 下周正式位跟着变
     ElMessage.success('已发布，用户端立即生效');
   } finally { slotSaving.value = false; }
@@ -722,6 +847,8 @@ async function fetchNotices() {
       nt.ackedCount = one.ackedCount;
     }
   });
+  base.noticeSong = noticeList.value[0].content || '';
+  base.noticeArticle = noticeList.value[1].content || '';
 }
 async function saveNotice(nt) {
   nt.saving = true;
@@ -729,6 +856,8 @@ async function saveNotice(nt) {
     const data = await http.put('/admin/submit/notice', { content: nt.content, type: nt.type });
     nt.version = data.version;
     nt.ackedCount = data.ackedCount;
+    if (nt.type === 'song') base.noticeSong = nt.content || '';
+    else base.noticeArticle = nt.content || '';
     if (data.bumped) ElMessage.success(`${data.label}已保存，版本号 +1（所有用户需重新确认）`);
     else ElMessage.success('内容没有变化，版本号保持不变');
   } finally { nt.saving = false; }
@@ -780,6 +909,38 @@ async function toggleHomeSchedule(v) {
   }
 }
 
+/* ─────────── 保存状态：每卡一份 baseline 快照，一改就变「有未保存的改动」 ───────────
+ * 只做「提示」，不做拦截：保存按钮始终可点，不清空管理员的操作习惯。
+ * 口径统一为「把表单压成一个顺序固定的字符串再比」，避免对象键序 / undefined 参与比较。
+ * ⚠️ baseline 只在「拉取」与「保存成功」两处落盘，别在别处随手改 —— 否则提示会骗人。 */
+const base = reactive({
+  cap: '', rules: '', win: '', slots: '', noticeSong: '', noticeArticle: '',
+});
+
+const sigCap = computed(() => [
+  Number(capForm.capacity) || 0, Number(capForm.queueLimit) || 0,
+].join('|'));
+const sigRules = computed(() => [
+  Number(ruleForm.weeklyUserLimit) || 0, Number(ruleForm.dupBlock) ? 1 : 0,
+].join('|'));
+const sigWin = computed(() => [
+  Number(winForm.enabled) ? 1 : 0,
+  winForm.startDay, winForm.startTime || '',
+  winForm.endDay, winForm.endTime || '',
+  winForm.reviewDay === FOLLOW_REVIEW ? 'follow' : winForm.reviewDay,
+  winForm.reviewTime || '',
+].join('|'));
+const sigSlots = computed(() => slotTimes.value
+  .map((t) => `${(t.time || '').trim()}/${t.label || ''}`).join('|'));
+
+/** 只对超管显示改动提示（非超管的控件本身是只读的，提示没意义） */
+const capDirty = computed(() => auth.isSuperAdmin && sigCap.value !== base.cap);
+const rulesDirty = computed(() => auth.isSuperAdmin && sigRules.value !== base.rules);
+const winDirty = computed(() => auth.isSuperAdmin && sigWin.value !== base.win);
+const slotsDirty = computed(() => auth.isSuperAdmin && sigSlots.value !== base.slots);
+const noticeDirty = (nt) => auth.isSuperAdmin
+  && String(nt.content || '') !== String(base[nt.type === 'song' ? 'noticeSong' : 'noticeArticle'] ?? '');
+
 onMounted(() => {
   fetchCapacity().catch(() => {});
   fetchSchedule().catch(() => {});
@@ -811,28 +972,17 @@ onBeforeUnmount(() => {
 .back-link:hover { text-decoration: underline; }
 
 /* ══════════ 视觉稿通用件（来自 preview/admin-ui-v8） ══════════ */
-.sec { display: flex; flex-direction: column; gap: 13px; }
-.sec-head { display: flex; align-items: center; justify-content: space-between; gap: 13px; flex-wrap: wrap; }
-.sec-title {
-  font-size: var(--fs-xl); font-weight: 600;
-  letter-spacing: var(--ls-tight-sm); line-height: var(--lh-xl);
-}
-.danger-title { color: var(--red-fg); }
-
-.cols { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
-.cols > * { min-width: 0; }
-.grow { flex: 1; min-width: 0; }
-
-.card {
-  background: var(--canvas);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-card);
-}
 .rowc { display: flex; align-items: center; }
 .wrap { flex-wrap: wrap; }
 .stack { display: flex; flex-direction: column; }
 .gap8 { gap: 8px; }
 .gap13 { gap: 13px; }
+.grow { flex: 1; min-width: 0; }
+
+/* 两等分（排期编辑 / 播出时段 / 两份注意事项） */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4); }
+.two-col > * { min-width: 0; }
+@media (max-width: 980px) { .two-col { grid-template-columns: 1fr; } }
 
 .kv {
   display: flex;
@@ -884,31 +1034,33 @@ onBeforeUnmount(() => {
   background: #f4f9ff;
 }
 
-.warnline {
-  display: flex; align-items: flex-start; gap: 8px;
-  font-size: var(--fs-xs);
-  color: var(--red-fg);
-  background: var(--red-bg);
-  border-radius: 10px;
-  padding: 10px 12px;
-  line-height: 1.6;
+/* 卡底提示条：羊皮纸一整条，视觉上明确「这段不是给你填的」 */
+.tip {
+  display: flex; gap: 9px; align-items: flex-start;
+  background: var(--parchment);
+  border-radius: var(--r-input);
+  padding: 11px 14px;
+  margin-top: var(--s3);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  line-height: 1.75;
 }
-.warnline :deep(svg) { flex-shrink: 0; margin-top: 2px; }
+.tip :deep(svg) { flex: none; margin-top: 3px; color: var(--soft); }
+.tip b { color: var(--ink-2); font-weight: 600; }
 
-/* 视觉稿小标签：pass / danger / pending（与 el-tag 区分，不走 Element 主题） */
-.tag {
-  display: inline-flex; align-items: center; height: 22px;
-  padding: 0 10px;
-  border-radius: var(--r-pill);
+/* 小胶囊：pass / green / amber（与 el-tag 区分，不走 Element 主题） */
+.pill {
+  display: inline-flex; align-items: center;
   font-size: var(--fs-xs);
-  letter-spacing: var(--ls-wide-sm);
-  background: var(--divider);
-  color: var(--muted-2);
-  margin-right: 6px;
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
+  background: var(--parchment);
+  color: var(--muted);
+  white-space: nowrap;
 }
-.tag-pass { background: var(--acc-bg); color: var(--accent); }
-.tag-danger { background: var(--red-bg); color: var(--red-fg); }
-.tag-pending { background: var(--amber-bg); color: var(--amber-fg); }
+.pill.pass { background: var(--acc-bg); color: var(--accent); }
+.pill.green { background: var(--green-bg); color: var(--green-fg); }
+.pill.amber { background: var(--amber-bg); color: var(--amber-fg); }
 
 .num { font-variant-numeric: tabular-nums; }
 .micro {
@@ -917,37 +1069,94 @@ onBeforeUnmount(() => {
   letter-spacing: var(--ls-wide-sm);
 }
 
-/* ══════════ 排期容量段：用量 2×2 网格 ══════════ */
-.quota-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px 26px;
-  margin-bottom: 16px;
+/* ══════════ 页首：一个播出周期 ══════════ */
+.cycle {
+  display: flex; align-items: stretch; gap: var(--s4); flex-wrap: wrap;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-card);
+  padding: var(--s4) var(--s5);
 }
-.quota-item { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.quota-item-text {
-  display: flex; flex-direction: row; justify-content: space-between; align-items: baseline;
-  gap: 8px;
+.cy-side { flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 9px; }
+.cy-right { text-align: right; align-items: flex-end; }
+.cy-flag {
+  align-self: flex-start;
+  font-size: var(--fs-2xs); font-weight: 600;
+  letter-spacing: 0.1em;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
 }
-.quota-num {
-  font-size: var(--fs-xl);
-  font-weight: 600;
-  color: var(--ink);
+.cy-flag.a { background: var(--acc-bg); color: var(--accent); }
+.cy-flag.b { background: var(--tile); color: #fff; }
+.cy-right .cy-flag { align-self: flex-end; }
+.cy-big { font-size: var(--fs-lg); font-weight: 600; letter-spacing: var(--ls-tight-sm); }
+.cy-big em { font-style: normal; color: var(--muted); font-weight: 400; font-size: var(--fs-sm); }
+.cy-sub { font-size: var(--fs-sm); color: var(--muted); line-height: 1.75; }
+.cy-sub b { color: var(--ink-2); font-weight: 600; }
+.cy-mid {
+  flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; padding: 0 var(--s2); min-width: 120px;
 }
-.quota-edit {
-  display: flex; flex-direction: column; gap: 13px;
-  margin-top: 4px;
-}
-.quota-fields { display: flex; gap: 18px; }
-.quota-fields > .field { flex: 1; min-width: 0; }
-.quota-fields :deep(.el-input-number) { width: 100%; }
-.quota-buttons {
-  display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end;
-}
-.quota-buttons .btn-save { min-width: 96px; }
-.quota-buttons .btn-sweep { min-width: 156px; }
+.cy-ln { width: 100%; height: 2px; background: var(--soft); border-radius: 2px; }
+.cy-tag { font-size: var(--fs-xs); color: var(--muted-2); text-align: center; line-height: 1.6; }
 
-/* ══════════ 点歌时间窗口 ══════════ */
+/* ══════════ 分组标题（竖线 + 人话副标题） ══════════ */
+.grp { margin-bottom: var(--s6); }
+.grp:last-child { margin-bottom: 0; }
+.grp-head {
+  display: flex; align-items: flex-end; gap: 11px; flex-wrap: wrap;
+  margin-bottom: var(--s3);
+  padding-left: 12px;
+  border-left: 3px solid var(--ink);
+}
+.grp-head .gt { font-size: var(--fs-lg); font-weight: 600; }
+.grp-head .gd { font-size: var(--fs-sm); color: var(--muted); padding-bottom: 2px; }
+.grp.danger .grp-head { border-left-color: var(--red-fg); }
+.grp.danger .grp-head .gt { color: var(--red-fg); }
+
+/* ══════════ 配置卡 ══════════ */
+.cfg {
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-card);
+  padding: var(--s4) var(--s5);
+}
+.grp > .cfg:not(:last-child) { margin-bottom: var(--s3); }
+.cfg-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: var(--s4);
+}
+.cfg-t { font-size: var(--fs-md); font-weight: 600; }
+.cfg-head .sp { margin-left: auto; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+
+/* 保存状态（卡头右侧）：绿=已保存，琥珀=有未保存的改动 */
+.save-state {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: var(--fs-sm); white-space: nowrap;
+}
+.save-state.ok { color: var(--green-fg); }
+.save-state.dirty { color: var(--amber-fg); }
+
+/* 统计块 */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s3); }
+@media (max-width: 980px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+.stat { background: var(--parchment); border-radius: var(--r-input); padding: 12px 14px; min-width: 0; }
+.stat .sl { font-size: var(--fs-xs); color: var(--muted-2); }
+.stat .sv {
+  font-size: var(--fs-xl); font-weight: 600; line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+.stat .sv small { font-size: var(--fs-sm); font-weight: 400; color: var(--muted); }
+.stat .bar { height: 4px; border-radius: 2px; background: #e6e6e9; margin-top: 8px; }
+.stat .bar i { background: var(--tile); border-radius: 2px; }
+.div-line { height: 1px; background: var(--divider); margin: var(--s4) 0; }
+
+/* 按钮行 */
+.btns { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-top: var(--s4); }
+
+/* ══════════ 点歌时间窗口（深色卡） ══════════ */
+/* 表单行包一层：让末行 .kv:last-child 的 border-bottom 能正常去掉 */
+.win-form { display: flex; flex-direction: column; }
 .win-tile {
   flex-direction: column; gap: 10px;
   padding: 16px 20px; margin-bottom: 16px;
@@ -971,7 +1180,7 @@ onBeforeUnmount(() => {
   border-top: 1px solid rgba(255, 255, 255, 0.14); padding-top: 10px;
 }
 
-/* ══════════ 时段段：编辑行 ══════════ */
+/* ══════════ 播出时段：编辑行 ══════════ */
 .slot-edit-row { align-items: center; }
 .slot-label-hint {
   color: var(--muted-2);
@@ -993,9 +1202,13 @@ onBeforeUnmount(() => {
 .slot-day-label { width: 86px; flex: none; }
 
 /* ══════════ 危险区 ══════════ */
-.danger-sec .sec-title { color: var(--red-fg); }
-.dangerzone { border-color: #f0c4c0; }
-.danger-row { gap: 24px; align-items: flex-start; }
+.dangerzone {
+  background: var(--canvas);
+  border: 1px solid #f0c4c0;
+  border-radius: var(--r-card);
+  padding: var(--s4) var(--s5);
+}
+.danger-row { gap: 24px; align-items: flex-start; flex-wrap: wrap; }
 .dz-title {
   font-size: var(--fs-md); font-weight: 600;
   color: var(--red-fg);
