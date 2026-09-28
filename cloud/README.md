@@ -37,16 +37,40 @@
 
 | 阶段 | 内容 | 状态 |
 |---|---|---|
-| 0 | 后端接口/模型/服务全量盘点 | ✅ 完成（100+ 接口 / 17 表 / 19 服务） |
-| 1 | `cloud/` 骨架 + 核心库移植 + 小程序双通道 | ✅ 本次完成 |
-| 2 | 数据层（`lib/db.js` 集合封装 + 唯一键模拟 + 事务替代） | ⏳ 下一批 |
-| 3 | 配置类集合（system_setting / system_switch）与 KV/开关适配层 | ⏳ |
-| 4 | 用户端接口移植（登录/改密/投稿/点歌/留言/节目/公告/风采） | ⏳ |
+| 0 | 后端接口/模型/服务全量盘点 | ✅ 完成（126 条路由 / 17 表 / 19 服务） |
+| 1 | `cloud/` 骨架 + 核心库移植 + 小程序双通道 | ✅ 完成 |
+| 2 | 数据层（`lib/db.js`）+ 本地测试 harness（内存假库跑真网关） | ✅ 完成 |
+| 3 | 配置类集合（system_setting / system_switch）+ 首批接口（switch、station） | ✅ 完成 |
+| 4 | 用户端接口移植（登录/改密/投稿/点歌/留言/节目/公告/风采） | ⏳ 进行中 |
 | 5 | 点歌状态机（songStatusService + songSchedulingService）重写 | ⏳ 最高风险 |
 | 6 | 定时触发器（原 60s sweep → 云函数定时器） | ⏳ |
 | 7 | 管理端接口移植（含学生名册 Excel） | ⏳ |
 | 8 | 数据迁移脚本 + 双向校验 | ⏳ |
 | 9 | admin-web 接云开发 | ⏳ 最后一步 |
+
+### 本地验证（每次改完必跑，秒级）
+
+```bash
+node cloud/scripts/selfcheck.js      # 静态自检：路由优先级 / 时间工具逐位一致 / 错误码逐值一致（68 项）
+node cloud/scripts/test-gateway.js   # 网关实测：内存假库跑真云函数，25 项断言
+```
+
+`cloud/scripts/harness.js` 把 `wx-server-sdk` 替换成内存假数据库（Map 存集合），
+并**刻意模拟**了三个真实行为，否则测不出问题：
+`add()` 撞 `_id` 抛错（等价 UNIQUE 冲突）、`doc().get()/update()` 不存在抛错、
+`where().update()` 返回 `stats.updated`（等价 affectedRows）。
+→ 新增 handler 时在 `test-gateway.js` 里加断言，不要只靠「部署后手点」。
+
+### 首批已跑通的接口
+
+| 接口 | 说明 |
+|---|---|
+| `GET /health` | 云函数自检，部署后用它验证通道是否打通 |
+| `GET /user/switch/list` | 小程序启动首个请求（tabBar 模块开关） |
+| `GET /user/switch/:key` | 单开关查询，缺行视为 `on` |
+| `GET /user/station/intro` | 广播站介绍（未配置 → 40401「未配置」） |
+| `GET /user/station/schedule` | 开播时间 |
+| `GET /user/station/contact` | 联系方式 |
 
 ## 四、关键设计决策（已在阶段 1 落定）
 
@@ -84,14 +108,26 @@ cloud/
 ├── cloudfunctions/
 │   └── api/                       # 主网关云函数（唯一对外函数）
 │       ├── index.js               # 入口：解析入参 + 分发 + 统一异常
-│       ├── router.js              # 路由表（与 Express 路由一一对应）
+│       ├── router.js              # 路由表 126 条（数组顺序即优先级）
 │       ├── package.json
+│       ├── handlers/              # 按接口分文件，一个 handlerKey 对应一个方法
+│       │   ├── index.js           #   惰性解析 + 未移植兜底
+│       │   ├── system.js          #   /health
+│       │   └── user/
+│       │       ├── switch.js      #   /user/switch/*
+│       │       └── profile.js     #   /user/station/*
+│       ├── services/              # 业务服务（从 src/services 移植）
+│       │   ├── kv.js              #   系统设置 KV
+│       │   └── switch.js          #   模块开关
 │       └── lib/
 │           ├── response.js         # 错误码与统一响应（原样移植）
 │           ├── bjTime.js           # 北京时间工具（原样移植）
 │           ├── auth.js             # JWT 校验 + pv 新鲜度 + 角色
-│           └── db.js               # 云数据库封装（阶段 2 填充）
-└── scripts/                       # 数据迁移脚本（阶段 8）
+│           └── db.js               # 数据层：唯一键模拟 / 数字主键 / 条件更新
+└── scripts/
+    ├── selfcheck.js               # 静态自检（68 项）
+    ├── harness.js                 # 内存假数据库（stub 掉 wx-server-sdk）
+    └── test-gateway.js            # 网关实测（25 项）
 ```
 
 ## 六、小程序端切换开关（阶段 1 已落地）
