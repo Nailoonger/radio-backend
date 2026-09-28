@@ -36,7 +36,10 @@ App({
     // requestMode: 'direct' 走上面的服务器（现状）；'cloud' 走云函数（免备案）
     // 切换方式：改成本行 + 填好 cloudEnvId，重新上传即可；改回 'direct' 立即复原
     requestMode: 'direct',
-    cloudEnvId: 'jy-radio-d1gdwmptl816ee6a9',   // 云开发环境 ID（2026-09-28 创建）
+    // 云环境 ID（2026-09-28）：校园个人版免费额度环境（6 个月 · 40,000 资源点/月）
+    // 换绑过程：小程序绑定账号 100042972115 下环境已销毁 → 解绑 → 绑到校园账号 → 工具内导入本环境
+    cloudEnvId: 'jy-radio-d1gdwmptl816ee6a9',
+    // 历史：cloud1-d3gvbgzbwc22a3511 为换绑前小程序绑定账号下的「微信体验版」环境，已随换绑销毁
     cloudFunctionName: 'api',       // 网关云函数名（与 cloud/cloudfunctions/api 对应）
     // ────────────────────────────────────────────────────────────────
 
