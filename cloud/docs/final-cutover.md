@@ -117,15 +117,23 @@ cd /d/dev/wx-devtools
 
 ## ③ 导出生产库（在服务器 `~/radio` 上跑，只读原库）
 
-容器里 `WORKDIR /app`、`COPY . .`，且 DB_* 由 compose 注入 —— 所以**直接在容器内跑最省事**（服务器不用装 node）：
+容器里 `WORKDIR /app`，且 DB_* 由 compose 注入 —— **在容器内跑最省事**（服务器不用装 node）。
+
+⚠️ **`git pull` 只更新磁盘文件，不会影响已经跑起来的容器**（容器用的是构建那一刻的镜像快照）。
+所以新代码要么重建镜像，要么直接 `docker cp` 塞进去 —— 后者更快、不重启服务：
 
 ```bash
 cd ~/radio
 git pull                                              # 拿到 cloud/migration/
-docker compose build radio-backend                    # 让新代码进镜像
-docker exec -i radio-backend node cloud/migration/export.js
-docker cp radio-backend:/app/cloud/migration/out ./cloud/migration/out
+docker cp cloud/. radio-backend:/app/cloud            # 免 rebuild（注意结尾的 /.）
+docker exec -u root -i radio-backend node cloud/migration/export.js
+docker cp radio-backend:/app/cloud/migration/out ./cloud/migration/
+ls -la cloud/migration/out/
 ```
+
+- `cloud/.` 结尾的 `/.` 是 docker 的语义：只拷**目录内容**；写成 `cloud` 会在目标已存在时套成 `/app/cloud/cloud`。
+- `-u root`：`docker cp` 塞进去的文件属 root，容器默认跑在 `app` 用户下，**写不了 `out/` 目录**。
+- 想走正规路线也行：`docker compose build radio-backend` + `up -d --force-recreate`（代价是几分钟 + 短暂重启）。
 
 再把 `cloud/migration/out/` 整个目录拷回本机（或用 scp）。
 

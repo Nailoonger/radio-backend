@@ -41,6 +41,8 @@
 
 ## 部署（服务器 `~/radio`）
 - `build <svc>` + `up -d --force-recreate <svc>`（restart 不换镜像）。admin-web 只改 views：`build admin-web` → `up -d --force-recreate --no-deps admin-web`；其 Dockerfile 容器内自 build。
+- ⚠️ **`git pull` 不影响运行中的容器**（容器用构建时的镜像快照）→ 跑一次性脚本（如迁移导出）用
+  `docker cp cloud/. radio-backend:/app/cloud` 塞进去（免 rebuild）；⚠️ 必须 `exec -u root`，因为 cp 进去的文件属 root、默认 `app` 用户写不了 `out/`。结尾 `/.` 是「只拷内容」（不写会套成 `/app/cloud/cloud`）。
 - **加表**靠启动 `sync({alter:false})`；**加列/索引必须跑 `scripts/db-repair.js`**（幂等、只加不改不删）。固定顺序：备份 → build → `run --rm radio-backend node scripts/db-repair.js` → `up -d --force-recreate radio-backend` → 幂等回填 UPDATE → `POST /api/admin/submit/queue/sweep`。
 - ⚠️ MySQL `ALTER TABLE ADD COLUMN` **不幂等**（重跑 1060 中断后续）。
 - ⚠️ **关联一律 `constraints: false`**（默认建物理外键，类型不一致 → `sync()` 3780 → 半建表 + 502）。
