@@ -161,13 +161,16 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
-import http from '@/utils/http';
+import http, { requestMode, cloudApiUrl } from '@/utils/http';
 import { useAuthStore } from '@/stores/auth';
 import * as echarts from 'echarts';
 
 const auth = useAuthStore();
 const router = useRouter();
-const baseURL = import.meta.env.VITE_API_BASE;
+// ⚠️ 不能只取 VITE_API_BASE —— 那是 direct 模式的地址（恒为 /api）。
+// cloud 模式下真实请求发往云函数 HTTP 访问服务，这里必须跟着 requestMode 走，
+// 否则「系统信息 → 后端地址」会显示一个根本没被使用的地址（误导排查）。
+const baseURL = requestMode === 'cloud' ? cloudApiUrl || '（未配置）' : import.meta.env.VITE_API_BASE;
 const loading = ref(true);
 const ov = ref({});
 const trend = ref([]);
@@ -366,6 +369,9 @@ onBeforeUnmount(() => {
 .kv:last-child { border-bottom: none; }
 .kv .k { width: 88px; flex: none; color: var(--muted); font-size: var(--fs-sm); }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--fs-sm); color: var(--ink-2); }
+/* 该行的值可能是很长的云函数地址（cloud 模式下 ≈74 字符、无空格）：
+   flex 子项默认 min-width:auto，长串会直接撑破卡片 —— 允许任意位置断行兜底。 */
+.kv .mono { min-width: 0; overflow-wrap: anywhere; }
 .num { font-variant-numeric: tabular-nums; }
 
 /* ---------- 标签 ---------- */

@@ -228,11 +228,11 @@ cd admin-web && npm run build   # 正式产物
 
 截图：`shots/stage9-login.png`、`shots/stage9-dashboard-cloud.png`
 
-> 🐞 **发现一个显示瑕疵（已报告，待陛下裁决）**：`Dashboard.vue:170`
-> `const baseURL = import.meta.env.VITE_API_BASE` ⇒ 系统信息卡「后端地址」恒显示 `/api`（direct 模式的地址）。
-> cloud 模式下实际请求发往云域名，卡片仍显示 `/api`，**是误导**。
-> 改法（一行）：`import { requestMode, cloudApiUrl } from '@/utils/http'` →
-> 显示 `requestMode === 'cloud' ? cloudApiUrl : import.meta.env.VITE_API_BASE`。
+> ✅ **已修（2026-09-29 陛下批准）**：`Dashboard.vue` 的「后端地址」改为跟着 `requestMode` 走 ——
+> `requestMode === 'cloud' ? cloudApiUrl : VITE_API_BASE`；并给 `.kv .mono` 加 `min-width:0; overflow-wrap:anywhere`
+> （云地址 ≈74 字符无空格，flex 子项默认 `min-width:auto` 会撑破卡片）。
+> 实测 1600 视口：值折 2 行、`overflowPx = 0`、卡片与文档均无溢出、页内无 JS 报错。
+> 截图：`shots/stage9-dashboard-sysinfo-fixed.png`
 
 > ⚠️ **两件必须知道的事**（本次实测挖出来的）：
 
@@ -248,19 +248,57 @@ cd admin-web && npm run build   # 正式产物
    - 影响一（功能）：本次登录签发的 token 都挂在兜底密钥上，**之后一旦补配 `JWT_SECRET`，
      这些 token 全部失效**，管理人员/学生要重新登录一次。**要配就趁现在配。**
    - 影响二（安全）：兜底值写死在仓库里，拿到代码的人能**伪造超管 token**。
-   - 建议：控制台 → 云函数 `api` → 配置 → 环境变量，加
-     `JWT_SECRET` = 原服务器 `.env` 里的同一个值（`grep JWT_SECRET ~/radio/.env`）。
-     用同一个值的好处：服务器时代没到期的 token 继续有效，学生不用重新登录。
+   - **操作步骤（陛下已批准补配）**：
+     1. 先去服务器看老值：`grep '^JWT_SECRET' ~/radio/.env`
+     2. 判断取哪个值：
+        - 老值是**强随机串**（几十位乱码）⇒ **直接复用**，服务器时代没到期的 token 继续有效，学生不用重登；
+        - 老值是空 / 占位符（`please-change-me-in-production`）⇒ **换一个新的强随机值**
+          （`node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`），
+          代价是所有人重登一次 —— 迁移期重登一次是合理的。
+     3. 控制台 → 云开发 → 云函数 → `api` → **配置 → 环境变量** → 新增
+        `JWT_SECRET`（值同上）→ 保存。
+        顺便确认 `JWT_EXPIRES_IN`：不填时云端默认 `7d`，与服务器一致，可不填。
+     4. 等配置下发到实例（一般几十秒；保险起见等 1~2 分钟）。
+     5. **反向验证（判据）**：用**兜底密钥**自签一个 token 去调 `/admin/profile`，
+        必须从「能取到数据」变成 **`40101`** ⇒ 说明新 `JWT_SECRET` 真的生效了。
+        ⚠️ 只验证「能登录」是不够的 —— 配错了照样能用兜底值登录成功。
 
-### 上线方式（三选一，待定）
+### 上线方式：先厘清「备案」这件事
 
-| 方案 | 做法 | 代价 |
+**结论：三个方案都不需要「重新」备案。**
+
+| 域名 | 是否需备案 | 依据 |
 |---|---|---|
-| **A 服务器继续托管** | 在服务器 `~/radio/admin-web/.env.local` 放同两行（`admin-web/.dockerignore` 没排 `.env.local`，且 compose 的 build context 就是 `./admin-web`，容器内 `npm run build` **读得到**）→ `docker compose build admin-web && up -d` | 一条命令搞定；但文件未跟踪，重新 clone 会丢。**仍需配控制台跨域**（服务器 IP 不在白名单） |
-| **B 云开发静态托管** | 本机 build → 上传 `dist/` | 最贴合「不续费服务器」；要 CLI 登录 + 配跨域 |
-| **C 服务器 nginx 反代 `/api`** | 在 `admin-web/deploy/nginx-admin.conf` 加一条 `location /api { proxy_pass <云域名>/api; }`，`VITE_CLOUD_API_URL` 写相对路径 `/api` | **永久免 CORS**；但服务器摘不掉 |
+| 服务器上的 `jyradio.online` | **已经备案过** | 境内机器 + 已配 443 证书（`deploy/nginx.conf:99-104`）⇒ 不备案根本用不了 |
+| 云开发默认域名 `*.tcloudbaseapp.com` / `*.app.tcloudbase.com` | **不需要，用户免备案** | 官方明文「**自定义域名**必须完成 ICP 备案」⇒ 反证默认域名不用 |
 
-> 现在**不必马上决定**：本机 `npm run dev` 已经能完整验功能。等确认稳定再选上线方式。
+所以真正该决定的不是备案，而是 **要不要彻底停掉服务器**。
+
+> ⚠️⚠️ **但默认域名有生产限制**（官方 `docs.cloudbase.net/service/alias`，必须知道）：
+> - 浏览器**直接访问**（navigate 请求）会先弹**「访问提示中间页」**，访客要点「确定访问」才进得去；
+> - 非导航请求会被加上 `Content-Disposition: attachment` 头（**实测坐实**：`/api/health` 的响应里就有这个头，
+>   只是 axios 不受影响）；
+> - 官方原话：「**默认域名仅建议用于开发测试，严禁用于正式生产环境或分发给大规模用户**」，
+>   且「若检测到访问量异常波动，平台保留采取禁止访问等风控措施的权利」。
+> - ⇒ 用它给全校学生跑管理后台，体验和稳定性都不合格。
+
+### 三条路
+
+| 方案 | 做法 | 是否需要备案 | 代价 |
+|---|---|---|---|
+| **A 服务器继续托管** | 服务器 `~/radio/admin-web/.env.local` 放同两行（`.dockerignore` 没排它，compose 的 build context 就是 `./admin-web`，容器内 `npm run build` **读得到**）→ `docker compose build admin-web && up -d` | 不用（`jyradio.online` 已备案） | 一条命令搞定；文件未跟踪，重新 clone 会丢。**要配控制台跨域**加 `https://jyradio.online` |
+| **B 云开发静态托管** | 本机 build → 上传 `dist/` | 用默认域名⇒不用；绑自己的域名⇒用已备案的 `jyradio.online` 做**接入变更**（不是新备案） | 最贴合「不续费服务器」。⚠️ 两个待确认：① 静态托管在**当前免费额度下能不能开**（官方历史信息提过需「按量付费」环境，2025–2026 又有「免费体验版不可用静态托管」的说法）② 部署得用 CloudBase CLI（`tcb hosting deploy`）或控制台「文件管理 → 上传」—— **微信开发者工具的 CLI 里没有 hosting 命令**（官方命令索引里云开发只有 `cloud env` / `cloud functions`） |
+| **C 服务器 nginx 反代 `/api`** | `admin-web/deploy/nginx-admin.conf` 加一条 `location /api { proxy_pass <云域名>/api; }`，`VITE_CLOUD_API_URL` 写相对路径 `/api` | 不用 | **永久免 CORS**；但服务器彻底摘不掉 |
+
+> **推荐路线**：先 A 上线（一条命令、零风险、`jyradio.online` 已备案体验最好），观察几天；
+> 等确认稳定、且核实静态托管能开之后，再把已备案的 `jyradio.online` 挪到静态托管（= 方案 B 的完整形态），
+> 这时才真正能退掉服务器。
+>
+> ⚠️ 如果想直接走 B 并停服务器：**退订服务器前先把域名备案的接入信息变更到 CloudBase**，
+> 否则备案可能因「接入信息不符」被注销。
+>
+> 现在**不必马上决定**：本机 `npm run dev` 已经能完整验功能。
+
 
 ---
 

@@ -30,8 +30,15 @@
 > ⚠️ **云函数未配 `JWT_SECRET`**（实测用代码兜底值自签的 token 能过校验）→ **要配就现在配**，配上会让已签发 token 全失效；
 >    不配则兜底值写在仓库里，能伪造超管 token。
 > ⚠️ 网关 **CORS 白名单含 `localhost`（任意端口）、不含服务器 IP** → 本机 dev 免配跨域，**正式上线必须去控制台加域名**。
-> ⚠️ admin-web 上线方式**待定**：A 服务器放 `.env.local` / B 云开发静态托管 / C nginx 反代 `/api`（永久免 CORS）。
-> 只剩三件待陛下裁决：上线方式；`JWT_SECRET` 要不要补配；`Dashboard.vue` 的「后端地址」显示瑕疵要不要改。
+> ✅ `Dashboard.vue` 显示瑕疵已修（cloud 模式改为显示云地址；并给 `.kv .mono` 加
+>    `min-width:0; overflow-wrap:anywhere` 防长 URL 撑破卡片）。
+> ⚠️ **备案：三个上线方案都不用重新备案**（`jyradio.online` 已备案；云开发默认域名是腾讯云的、用户免备案）。
+>    但**默认域名有「访问提示中间页」、官方明文严禁用于生产** ⇒ 想彻底停服务器，要把已备案域名
+>    绑到静态托管（做**接入变更**而非新备案，且退订服务器前必须先变更）。
+> ⚠️ 上线三选一（细则 `cloud/docs/final-cutover.md`）：A 服务器放 `.env.local`（推荐先走）/
+>    B 云开发静态托管 / C nginx 反代 `/api`（永久免 CORS 但摘不掉服务器）。
+> ⚠️ `JWT_SECRET` 已批准补配：**判据必须反向验证** —— 兜底密钥自签的 token 调用要变成 `40101`；
+>    只验「能登录」不够（配错了照样能用兜底值登进去）。
 > ⚠️ 部署脚本 `deploy-cloud.js` 会同时打印两种终端命令（`</dev/null` 在部分终端里报错）。
 
 ## 部署（服务器 `~/radio`）
@@ -68,7 +75,8 @@
   （报 `wait IDE port timeout`）⇒ **必须陛下在自己终端跑**。CLI = `D:\dev\wx-devtools\cli.bat`；服务端口**已开**。
 - ⚠️ **PowerShell `Add-Type` 被安全策略拦**（禁止运行时编译 .NET）→ 图像裁剪走 Python venv：
   `~/.workbuddy/binaries/python/envs/default/Scripts/python.exe`（已装 pillow）。
-- 截图验证配方见 skill `web-ui-screenshot-verify`。
+- 截图验证配方见 skill `web-ui-screenshot-verify`。⚠️ **会话跑久 / 用 `location.href` 导航必出空白页**
+  （截图恒 3680 字节、`localStorage` 报 Access denied）→ 换 **`--session <独立名>`** 立刻恢复（`doctor --fix` 没用）。
 
 ## 后端约定
 - 容器 UTC、MySQL 北京时间；按天/周逻辑禁裸 `dayjs()`，统一 `src/utils/bjTime.js`。
