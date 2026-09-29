@@ -154,7 +154,16 @@ scp -r ubuntu@<IP>:~/radio/cloud/migration/out C:\Users\Administrator\radio-back
 
 控制台 → 数据库 → 逐集合「导入」→ 选对应 `.jsonl` → 冲突处理选 **Upsert**。
 
-需要导入 **18 个集合** = 16 张业务表 + `unique_keys` + `sequence`。
+> ⚠️ **后缀坑**：我们产出的是 `.jsonl`，而控制台的导入对话框通常只列 `.json`。
+> 两种解法（任选）：
+> ① 在文件选择框里把筛选器切到「所有文件」；
+> ② 先复制一份 `.json`（内容不用改 —— 控制台要的 JSON 格式本身就是「**每行一个对象**」，也就是 JSON Lines）：
+> ```powershell
+> cd C:\Users\Administrator\radio-backend\cloud\migration\out
+> Get-ChildItem *.jsonl | ForEach-Object { Copy-Item $_.Name ($_.BaseName + '.json') }
+> ```
+
+需要导入 **17 个**（18 个集合 − 空的 `message`）：
 ⚠️ `message.jsonl` 是**空的**（原表本来 0 行）—— 跳过它，集合已建好，空表就该是空的。
 
 ⚠️ **`unique_keys` 与 `sequence` 千万别漏**（漏了**不报错**）：
