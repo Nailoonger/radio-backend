@@ -13,8 +13,8 @@
 |---|---|---|
 | ① 配 HTTP 访问服务 | ✅ **已完成** | 路由 `/api` 已生效；域名 `jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com` |
 | ② 部署云函数 | ✅ **已完成** | `success: true`、`filesCount: 3`、`packSize 126.3 KB` |
-| ③ 导出生产库 | ⬜ 待做 | 在服务器 `~/radio` 上跑 |
-| ④ 导入云数据库 | ⬜ 待做 | 控制台，18 个集合 |
+| ③ 导出生产库 | ✅ **已完成** | 16 表 / **686 行** / warning 0 / error 0；`unique_keys` 556 条、`sequence` 16 条 |
+| ④ 导入云数据库 | ⬜ 待做 | 控制台，18 个集合（**集合已建齐**，见下） |
 | ⑤ 导出云库做基线 | ⬜ 待做 | 控制台 |
 | ⑥ 双向校验 | ⬜ 待做 | `node cloud/migration/verify.js` |
 | ⑦ admin-web 切 cloud | ⬜ 待做 | 改 `.env.local` 两行 + build |
@@ -142,9 +142,20 @@ ls -la cloud/migration/out/
 
 ## ④ 导入云数据库（控制台）
 
+**先把文件从服务器拿到本机**（控制台只能读本地文件）：
+
+```powershell
+# 在本机终端跑（<IP> 换成服务器 IP）
+scp -r ubuntu@<IP>:~/radio/cloud/migration/out C:\Users\Administrator\radio-backend\cloud\migration\
+```
+> `cloud/migration/out/` 已在 `.gitignore`（含密码哈希），不会进版本库。
+
+**集合已经建齐**（`POST /api/system/init-collections` → 18 个全部 `exists`），直接导入即可。
+
 控制台 → 数据库 → 逐集合「导入」→ 选对应 `.jsonl` → 冲突处理选 **Upsert**。
 
 需要导入 **18 个集合** = 16 张业务表 + `unique_keys` + `sequence`。
+⚠️ `message.jsonl` 是**空的**（原表本来 0 行）—— 跳过它，集合已建好，空表就该是空的。
 
 ⚠️ **`unique_keys` 与 `sequence` 千万别漏**（漏了**不报错**）：
 - 漏 `unique_keys` → 云库没有 UNIQUE 约束 → **能建出重名管理员且不报错**；
