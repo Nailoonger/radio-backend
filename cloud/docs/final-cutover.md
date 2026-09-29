@@ -249,6 +249,17 @@ cd admin-web && npm run build   # 正式产物
    - 影响一（功能）：本次登录签发的 token 都挂在兜底密钥上，**之后一旦补配 `JWT_SECRET`，
      这些 token 全部失效**，管理人员/学生要重新登录一次。**要配就趁现在配。**
    - 影响二（安全）：兜底值写死在仓库里，拿到代码的人能**伪造超管 token**。
+     ⚠️⚠️ **而本项目仓库是公开的**（`https://github.com/Nailoonger/radio-backend` → HTTP 200，
+     `raw.githubusercontent.com` 匿名可拉源码）⇒ **这个兜底值等于全世界都知道**，
+     任何人不登录就能自签一个 `{id:1, username:'teacher', role:0}` 的 token 直接调管理端接口
+     （读/改点歌设置、看学生名单、**导出学生账号 xlsx**）。
+     **不是理论风险 —— 本文档上面那次「8 个管理端接口全绿」的实测，就是我自己用这个办法做的。**
+     三个出处（都是公开文件）：`cloud/cloudfunctions/api/lib/auth.js:21`、
+     `miniprogram/cloudfunctions/api/index.js:1368`（打包产物）、`src/config/index.js:12`（原 Express 侧）。
+     ⇒ **补配 `JWT_SECRET` 是当前最高优先级的一件事。**
+   - 顺带自查（同源问题）：控制台看一眼**云数据库的权限设置**。若被设成「所有人可读」，
+     那么连伪造 token 都不需要，直接读库 —— 走云函数不受该权限限制，所以应保持
+     「仅创建者可读写 / 所有人不可读写」。
    - **操作步骤（陛下已批准补配）**：
      1. 先去服务器看老值：`grep '^JWT_SECRET' ~/radio/.env`
      2. 判断取哪个值：
