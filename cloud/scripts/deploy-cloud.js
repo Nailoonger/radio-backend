@@ -69,8 +69,13 @@ const cmd =
   `./cli.bat cloud functions deploy --env ${ENV_ID} --names ${FN} --project "${PROJECT_POSIX}" -r </dev/null`;
 
 console.log('');
-console.log('──── 复制以下命令到 Git Bash 执行 ────');
+console.log('──── Git Bash：复制以下命令执行 ────');
 console.log(cmd);
+console.log('────────────────────────────────────');
+console.log('');
+console.log('──── PowerShell：复制以下命令执行 ────');
+console.log(`cd D:\\dev\\wx-devtools`);
+console.log(`.\\cli.bat cloud functions deploy --env ${ENV_ID} --names ${FN} --project "${PROJECT_POSIX}" -r`);
 console.log('────────────────────────────────────');
 console.log('');
 console.log('⚠️ 部署返回成功后**等 1~2 分钟**（云端 npm install 未完成时调用会报 Cannot find module）。');

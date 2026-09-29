@@ -7,13 +7,44 @@
 
 ---
 
-## 为什么要你手动做这三类事
+## 进度
+
+| 步 | 状态 | 证据 / 产物 |
+|---|---|---|
+| ① 配 HTTP 访问服务 | ✅ **已完成** | 路由 `/api` 已生效；域名 `jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com` |
+| ② 部署云函数 | ✅ **已完成** | `success: true`、`filesCount: 3`、`packSize 126.3 KB` |
+| ③ 导出生产库 | ⬜ 待做 | 在服务器 `~/radio` 上跑 |
+| ④ 导入云数据库 | ⬜ 待做 | 控制台，18 个集合 |
+| ⑤ 导出云库做基线 | ⬜ 待做 | 控制台 |
+| ⑥ 双向校验 | ⬜ 待做 | `node cloud/migration/verify.js` |
+| ⑦ admin-web 切 cloud | ⬜ 待做 | 改 `.env.local` 两行 + build |
+
+### ①② 的实测结论（2026-09-29 13:53）
+
+```bash
+curl "https://jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com/api/health"
+# → HTTP 200
+# {"code":0,"message":"ok","data":{"ok":true,"jwtReady":true,"dbReady":true,"dbError":null,
+#   "dirs":{"root":["config.json","index.js","node_modules","package.json"],
+#           "lib":"ERR ENOENT…","handlers":"ERR ENOENT…","services":"ERR ENOENT…"}}}
+```
+
+- `root` 四个文件齐、`lib`/`handlers`/`services` 是 `ENOENT` ⇒ **单文件打包在云端结构正确**（子目录本就不该存在）
+- `node_modules` 已在 ⇒ **云端依赖装完了**（不用再等）
+- `dbReady: true` ⇒ 云数据库连通（**注意：只是连通，数据还没导入，见 ③④**）
+- **路径剥离行为已实测**：`/api/health` 正常返回；不带 `/api` 的 `/health` 被网关直接
+  404 `INVALID_PATH`（**根本没进函数**）⇒ 关闭路径透传时**触发路径确实会被剥离**。
+  信封模式请求的就是 `/api` 本身、真实路由在 body 里，**不受这个行为影响**。
+
+---
+
+## 为什么剩下的步骤要你手动做
 
 | 类别 | 卡点 |
 |---|---|
-| 部署云函数 | 本机沙箱把 **`reg.exe` 列入程序黑名单**（安全中心 → 命令安全），CLI 初始化即被拦。**服务端口本身是开的**（`enableServicePort: true`），换到你自己的终端跑就正常 |
-| 控制台操作 | 配触发路径 / 导入 / 导出 —— 只有控制台能点 |
 | 导出生产库 | 本机 `.env` 是 **sqlite**（`DB_DIALECT=sqlite`、`DB_STORAGE=./data/radio.db`），连不到服务器 MySQL |
+| 控制台导入 / 导出 | 只有控制台能点 |
+| ~~部署云函数~~ | ~~本机沙箱把 `reg.exe` 列入程序黑名单~~ —— **已完成，见 ②** |
 
 ---
 
@@ -28,25 +59,32 @@
    jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com
    ```
    形态为 `<envId>-<数字>.ap-shanghai.app.tcloudbase.com`（**不是**老的 `<envId>.service.tcloudbase.com`）
-3. **路由管理** → 右上角 **「新增路由」**：
-   - 触发路径：`/api`
-   - 资源类型：**云函数**
-   - 资源对象：**`api`**
-   - 其余保持默认（身份认证选「免认证」），保存
+3. **路由管理** → 右上角 **「新增路由」**（弹窗标题「配置路由信息」）：
+
+   | 字段 | 填什么 |
+   |---|---|
+   | 路由启用 | 保持**开** |
+   | **访问路径** | **`/api`** ← 唯一必填项（不填时「确定」是灰的） |
+   | 关联资源 | **云函数** + **`api`** |
+   | 跨域设置 | 保持**开**；之后若 admin-web 与 API 不同源，要去左侧「跨域设置」把它的域名加进来 |
+   | **路径透传** | **保持关闭**（信封模式不需要，见下） |
+   | 身份认证 | 保持**关闭** |
+
+   点「确定」。
 
 > ⚠️ **「路由管理」配之前是空的（显示「暂无数据」）—— 空着等于这个域名下一个接口都不可用。**
 > ⚠️ 我们用的是**信封模式**：真实 `method` / `path` / `body` / `token` / `query` 全放在 POST 的**请求体**里
->    （见 `api/httpBridge.js`），**所以不依赖控制台的「路径透传」设置**，一条 `/api` 路由就够了。
+>    （见 `api/httpBridge.js`）。控制台对「路径透传」的原文说明是：
+>    *「关闭路径透传时，后端服务（资源）将收到**不带触发路径**的请求」* ——
+>    而我们请求的就是触发路径本身（`/api`），真实路由在 body 里，因此**关着最省事**，一条路由就够。
 
 - ⚠️ **不需要备案** —— 腾讯云自己的域名已备案。只有你想绑**自有域名**时才需要备案。
 - ⚠️ 默认域名**有有效期**（且限频，官方说明仅限开发测试），到期在控制台点「**续期**」。
   失效表现是全站突然 404/502，最难查。
-- ✅ 判据（信封模式，不依赖路径是否被剥离 —— 最可靠）：
-  ```bash
-  curl -s -X POST "https://jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com/api" \
-    -H "Content-Type: application/json" -d '{"method":"GET","path":"/health"}'
-  ```
-  返回 JSON 即通（不是控制台 404 页）。
+- ✅ 判据（**已实测通过**）：浏览器直接打开
+  `https://jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com/api/health`
+  → 返回 `{"code":0,"message":"ok",…}`（不是控制台 404 页）。
+  等价命令行：`curl "https://<域名>/api/health"`。
 
 ## ② 部署云函数
 

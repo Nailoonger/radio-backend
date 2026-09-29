@@ -28,6 +28,9 @@
 - **口径**：业务查询一律用**数字 `id`**（`parseId`）；4 张表用业务键当 `_id`（`setting:`/`switch:`/`ack:`/`week:`）；字段名一律**驼峰**；⚠️ `insertOne` 之后改这行必须用**返回的 `_id`**。
 
 ## 真机收尾（陛下动手，顺序不能乱）
+> 进度：① HTTP 路由 ✅ ② 部署云函数 ✅（2026-09-29 本机实测 `GET /api/health` → HTTP 200）；③④⑤⑥⑦ 待做。
+> ⚠️ `dbReady: true` 只代表云库**连得上**，业务数据还没导（阶段 8 的 ③④⑤）。
+> ⚠️ 实测：关路径透传时**触发路径会被剥掉**（`/api/health` 通、`/health` 网关直 404 `INVALID_PATH`）。
 1. 控制台 → HTTP 访问服务 → 给 `api` 配触发路径 `/api`，记下默认域名
 2. 部署云函数（产物已含 httpBridge）：`node cloud/scripts/deploy-cloud.js` 看命令 → 手动跑 → 等 1~2 分钟
 3. 生产 MySQL 跑 `node cloud/migration/export.js` → `out/`（**已 gitignore**，含密码哈希）
