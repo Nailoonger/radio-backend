@@ -11,6 +11,11 @@
   （陛下：「不要删除原来的，以防我想换回来」）。
 - **绝不用 `git checkout --`**（工作树全是未提交成果）。
 - UI/视觉改动**先出静态 HTML 预览并标版本号（v1/v2…），点头前不写业务代码**；版本只增不删。被否或含糊 → 先问清形态。
+- ⚠️⚠️ **设计不许用通用范式**（2026-09-29 被当面否：「不要去找别人做好的方案，你自己做」）：
+  深色头+白卡 / 全屏深色沉浸 / 极简白这类"换给别的 App 也成立"的一律不算。要**从项目自身的业务隐喻长出来**
+  （已用：调频刻度、录音电平、收听证钢印、骑缝孔、点唱机唱针）。
+- ✅ **登录页是唯一获批突破配色的页面**（2026-09-30 陛下开口）：可不用深色卡、可不守「#0066CC / 无渐变 / 无彩色投影」。
+  v6 走奶油 #FFF8EF + 橘红 #FF6B35 暖色盘。其余页面仍守设计系统。
 - 提交身份用全局 `Nailoonger <1493586497@qq.com>`，不写仓库级 user.*。
 
 ## 云开发迁移（`cloud/`）
@@ -78,9 +83,11 @@
   admin-web 走 vite dev（路由 `/submit/settings`，**不是** `/#/...`）；`localStorage` 存 `admin_token` + `admin_info`(role:0)。
   ⚠️ 复用服务**会跨会话掉线**（`curl` 返 502 是本机代理在拦）→ 截图前探活。**`_shot.db` schema 变过要先 `rm` 再 db:init**。
 - jest 基线：56 条里 15 条失败全是已删 member 模块（member.test 14 + switch.test 1），别当新回归。
-- ⚠️ **push 本机推不了**（GCM 非交互取不到凭据）⇒ commit 我负责，**push 由陛下在自己 PowerShell 敲**。
-  先 `curl` 预热探活，再 `git -c credential.guiPrompt=false -c credential.interactive=never push --progress origin master`。
-  ⚠️⚠️ **唯一可信判据是 `git status -sb` 无 `ahead N`**（`| tail` 会吞进度，已误判过一次）。
+- ⚠️⚠️ **push 本机做不了（已穷尽排查，别再试）**：GCM 非交互取不到凭据 →
+  `fatal: unable to get password from user`；**无任何已存凭据**（无 `.git-credentials` / `.netrc`、
+  无 `GITHUB_TOKEN` / `GH_TOKEN` / `GIT_ASKPASS`），**`gh` CLI 也未安装**。
+  ⇒ commit 我负责，**push 由陛下在自己终端敲**（会弹 GCM 登录窗，登录一次即缓存）。
+  判据：**`git status -sb` 里没有 `ahead N`**（别用 `| tail`，会吞进度、已误判过一次）。
 - ⚠️⚠️ **部署云函数本机做不了**：沙箱把 `reg.exe` 列入程序黑名单（安全中心 → 命令安全），`cli.bat` 初始化即失败
   （报 `wait IDE port timeout`）⇒ **必须陛下在自己终端跑**。CLI = `D:\dev\wx-devtools\cli.bat`；服务端口**已开**。
 - ⚠️ **PowerShell `Add-Type` 被安全策略拦**（禁止运行时编译 .NET）→ 图像裁剪走 Python venv：
