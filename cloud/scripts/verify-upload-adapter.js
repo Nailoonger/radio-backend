@@ -26,7 +26,9 @@ const CLOUD_API = 'https://jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app
 const SECRET = process.env.JWT_SECRET || '';
 
 let failed = 0;
+let total = 0;
 function ok(name, cond, extra = '') {
+  total++;
   if (!cond) failed++;
   console.log(`  ${cond ? 'OK  ' : 'FAIL'} ${name}${extra ? ' :: ' + extra : ''}`);
 }
@@ -180,6 +182,7 @@ const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.s
     }
   }
 
-  console.log(`\n══ 汇总 ══\n${failed === 0 ? '全部通过' : failed + ' 项失败'}`);
+  console.log(`\n════ 汇总 ════\n${failed === 0 ? '全部通过' : failed + ' 项失败'}`);
+  console.log(`\n结论：断言 ${total} 项 / 失败 ${failed} 项`);
   process.exit(failed === 0 ? 0 : 1);
 })();

@@ -53,6 +53,11 @@ const SUITE = [
   ['test-gateway.js', true],
   ['test-migration.js', true],
   ['test-http-bridge.js', true],
+  // ⚠️ 标 false：它测的是 **admin-web 前端**那一层（`admin-web/src/utils/http.js` 的上传适配），
+  //    跟「云函数源码 vs 打包产物」无关，跑两遍没意义。
+  //    2026-09-30 加：切云后「带文件上传」的接口会静默全坏（FormData 进 JSON 信封变 {}），
+  //    这条以前不在网里，所以坏了整整一个阶段没人发现 —— 现在钉进来。
+  ['verify-upload-adapter.js', false],
   ['test-bundle.js', false],
   ['selfcheck.js', false],
 ];

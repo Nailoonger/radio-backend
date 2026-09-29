@@ -63,6 +63,18 @@
 >    修：服务器 `~/radio/admin-web/.env.local` 写 `VITE_REQUEST_MODE=cloud` + 云地址；控制台
 >    「跨域设置」加 `http://129.28.26.180`；再 `build admin-web` + `up -d --force-recreate --no-deps admin-web`。
 >    细则 `cloud/docs/final-cutover.md` §⑨。
+> ⚠️⚠️ **切云会静默弄坏「带文件上传」的接口**（stage 9 那 8 条全是 JSON，一条文件流都没有）：
+>    direct 走 `multipart/form-data`（multer 收），**cloud 的请求体是 JSON 信封，`FormData`
+>    一 `JSON.stringify` 就变 `{}` ⇒ 文件直接丢**（云端报 `40001 缺少文件内容（fileBase64）`）。
+>    云端契约是 `{ filename, fileBase64 }`。
+>    ✅ **学生账号导入已修**（2026-09-30）：`admin-web/src/utils/http.js` 的 `cloudRequest()` 里
+>    认出 `FormData` 就自己读成 base64 换形 —— **只改公共请求层一处，direct 行为零变化、业务代码一行未改**。
+>    验证 `node cloud/scripts/verify-upload-adapter.js`（单元跑真实源码 + 本地假库端到端 + 反证修复前确实 40001）。
+>    ⏳ **头像上传未定方向**：`Cadre.vue` 的 `POST /admin/upload/avatar` 云端 `40401 接口不存在`
+>    （router 里没这条路由，`/uploads/` 也是老后端在服务）。选：接云存储 / 去掉入口 / 先放着。
+>    ⇒ **自查法：前端凡是 `new FormData()` 或传 `Blob` 的调用，切云后都要单验一遍。**
+>    另：改 `http.js` 时踩过 `body` 重名（新 `let body` 撞原有 `const body = resp.data`）——
+>    **vite build 会直接报 `The symbol "body" has already been declared`**，构建就是最便宜的语法检查。
 > ⚠️⚠️ **`jyradio.online` 未备案**（2026-09-29 实测：`https://jyradio.online` **TLS 握手被 RST**，
 >    而 `https://129.28.26.180` 正常 200 ⇒ 按 SNI 拦域名；这正是小程序当初 `url not in domain list` 的根因）。
 >    ⚠️ **证书 ≠ 备案** —— 别再拿「配了 443 证书」当成备案证据（我踩过一次）。

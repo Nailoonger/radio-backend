@@ -564,6 +564,32 @@ location = /api {
    或者老师在管理端批量重置一次。数量少（当前云库里只有 4 个已激活账号），但要知道这件事。
 2. 切完之后**管理端才第一次真正看到云库的真实状态** —— 之前看到的「未激活」都是老库的旧数据。
 
+### ⚠️⚠️ 切云会**静默弄坏**一类接口：带文件上传的（2026-09-30 已修一个、剩一个）
+
+**为什么静默**：stage 9 那轮「8 个接口全绿」用的是 JSON 接口，**没有一条走文件流**。
+
+**根因（两条通道的请求体根本不是一回事）**：
+
+| | direct | cloud |
+|---|---|---|
+| 请求体 | `multipart/form-data`（multer 收） | **JSON 信封** `{ method, path, body, token, query }` |
+| FormData 的命运 | 正常 | 一 `JSON.stringify` 就变 `{}` ⇒ **文件直接丢** |
+| 云端契约 | — | `{ filename, fileBase64 }` |
+
+**① 学生账号导入 —— 已修 ✅**（`admin-web/src/utils/http.js` 的 `cloudRequest()`）
+在公共请求层认出 `FormData` → 自己读成 base64 → 换成云端契约。**direct 模式行为零变化、业务代码一行未改。**
+验证：`node cloud/scripts/verify-upload-adapter.js`
+（① 单元跑 `http.js` 真实源码 ② 本地假库端到端：真 FormData → 真 `importPreview` 断言 `code=0`
++ 反证「修复前的发法」确实回 `40001 缺少文件内容（fileBase64）` ③ 有 `JWT_SECRET` 时加打真云端）
+
+**② 头像上传 —— 云端没有这条路由 ⏳ 方向未定**
+`admin-web/src/views/Cadre.vue` 的 `POST /admin/upload/avatar` → 云端 `40401 接口不存在`
+（`router.js` 里一条 upload 路由都没有；`/uploads/` 静态目录也是老后端在服务）。
+三个选项：① 接云开发存储（补路由 + 存储 SDK）② 直接去掉这个入口（若头像本就定死
+「姓名首字圆形、不允许更换」）③ 先放着。**陛下的口径定了再动。**
+
+> 清单式自查法：凡是「前端用 `new FormData()` 或传 `Blob`」的调用，切云后都要单独验一遍。
+
 ---
 
 ## 随时切回（两条线各回各的）
