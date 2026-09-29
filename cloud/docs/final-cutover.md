@@ -486,8 +486,19 @@ VITE_API_BASE=/api
 VITE_API_PROXY_TARGET=http://localhost:3000
 ENVEOF
 
-# ② 云开发控制台 → 环境 → 「跨域设置」→ 把 http://129.28.26.180 加进白名单
-#    （网关原本只白名单了 localhost，不含服务器 IP —— 不加这一条，浏览器会直接拦掉请求）
+# ② 云开发控制台 → 「HTTP 访问服务」→「跨域设置」→「添加跨域域名」
+#    值填 129.28.26.180       ← ⚠️ 不带 http://，也不带端口（走 80 就写裸主机）
+#
+#    ⚠️⚠️ 别走错门：控制台里还有个「安全域名 / 添加授权域名」
+#       （环境 → 安全配置，说明文字提到「网页应用中使用云开发的身份验证服务」），
+#       那是**网页端 SDK 身份认证**的访问控制，跟接口跨域不是一回事 —— 填进去没用。
+#       正确的按钮叫「添加跨域域名」，字段只有「域名 / 类型」。
+#    出处：https://cloud.tencent.com/document/product/876/130728 §三「跨域设置」
+#
+#    生效时间：控制台弹窗说约 10 分钟，官方文档说 1-2 分钟 —— 配完别立刻下结论。
+#
+#    ⚠️ 未确认项：该列表给的示例**全是域名**（www.qcloud.com / *.qcloud.com / host:8080），
+#       **纯 IP 能不能加没验证过**。若被拒 → 直接走下面的「方案 B」。
 
 # ③ 重建（Dockerfile 容器内自 build；.dockerignore 只排 node_modules/dist/_backup，
 #    所以 .env.local 会被打进构建、vite 读得到）
@@ -499,6 +510,42 @@ docker compose up -d --force-recreate --no-deps admin-web
 `.env.local` 里 `VITE_CLOUD_API_URL=/api`，再把 `deploy/nginx.conf` 的 `location /api`
 上游从 `radio-backend:3000` 改成云函数 HTTP 地址。
 同源请求天然无跨域，也不需要控制台加白名单；代价是 nginx 得能反代到外部 HTTPS。
+
+### 方案 B：nginx 同源反代（完全不碰控制台，推荐给「纯 IP 加不进 CORS 列表」的情况）
+
+**原理**：admin-web 在 cloud 模式下发的是**信封请求**，就是往 `CLOUD_URL` 发一个 POST。
+把 `CLOUD_URL` 换成**相对路径 `/api`** → 浏览器发到同源 → 由 nginx 转发到云函数。
+**同源请求浏览器根本不做 CORS 校验**，因此网关的白名单是什么样都无所谓。
+
+⚠️ 关键细节：信封请求打的是 **`/api`（不带尾斜杠）**，而 nginx 里现有的是 `location /api/`（带尾斜杠）
+—— 两者**不匹配**，必须补一条 `location = /api`，否则会落到 `location /` 上被 SPA 吃掉。
+
+```nginx
+# deploy/nginx.conf —— 放在 `listen 80; server_name _;`（default_server）那个 server 块里
+# ⚠️ 用变量 + resolver 形式，让 nginx 在**请求时**解析域名。
+#    写成字面量（proxy_pass https://xxx.tcloudbase.com/api;）会在启动时解析，
+#    一旦容器 DNS 解析不到，nginx 直接起不来（整站 502）。
+resolver 119.29.29.29 8.8.8.8 valid=300s ipv6=off;
+
+location = /api {
+    set $cloud_upstream "jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com";
+    proxy_pass https://$cloud_upstream/api;
+    proxy_ssl_server_name on;                 # 必须：云网关按 SNI 分发
+    proxy_set_header Host $cloud_upstream;
+    proxy_set_header Origin "";               # 顺手去掉 Origin，避免网关按白名单挑刺
+    proxy_http_version 1.1;
+    client_max_body_size 30m;                 # 导出 xlsx 走这条
+    proxy_read_timeout 60s;                   # 云函数冷启动
+}
+```
+
+配套：`.env.local` 里写 `VITE_CLOUD_API_URL=/api`（其余同方案 A）。
+
+改完生效：`docker compose restart nginx`（nginx.conf 是 volume 挂载进去的，重启即可，不用重建镜像）。
+应用改动：`docker compose build admin-web && docker compose up -d --force-recreate --no-deps admin-web`。
+
+**验证**：浏览器 F12 → Network，看请求是打到 `http://129.28.26.180/api`（同源）
+而不是 `https://xxx.tcloudbase.com/api`（跨域）。同源那条不会出现 CORS 报错。
 
 ### ⚠️ 切完之后的两个后果
 
