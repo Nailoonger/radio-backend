@@ -25,14 +25,14 @@
   字段名一律**驼峰**；⚠️ `insertOne` 之后改这行必须用**返回的 `_id`**。
 
 ## 真机收尾（陛下动手，顺序不能乱）
-> 清单 `cloud/docs/final-cutover.md`。①②③④⑤⑥ **全部完成**；⑦（admin-web 切 cloud）**代码侧完成、待浏览器确认**。
-> ⑦ 实测（2026-09-29）：8 个管理端接口全绿（含真返回 xlsx）；`POST /admin/login` 真账号+错密码 → `40101`（bcryptjs 正常）。
+> 清单 `cloud/docs/final-cutover.md`。**①–⑦ 全部完成**（2026-09-29 陛下浏览器登录成功，闭环）。
+> ⑦ 实测：8 个管理端接口全绿（含真返回 xlsx）；真实 Chromium 跨域直连成功、`/dashboard` 渲染出云端数据；`dist/` 无 direct 残留。
 > ⚠️ **云函数未配 `JWT_SECRET`**（实测用代码兜底值自签的 token 能过校验）→ **要配就现在配**，配上会让已签发 token 全失效；
 >    不配则兜底值写在仓库里，能伪造超管 token。
 > ⚠️ 网关 **CORS 白名单含 `localhost`（任意端口）、不含服务器 IP** → 本机 dev 免配跨域，**正式上线必须去控制台加域名**。
 > ⚠️ admin-web 上线方式**待定**：A 服务器放 `.env.local` / B 云开发静态托管 / C nginx 反代 `/api`（永久免 CORS）。
-> 只剩：⑦ 浏览器实测登录+页面，然后择一上线。
-> ⚠️ 部署脚本 `deploy-cloud.js` 会同时打印 Git Bash 与 PowerShell 两种命令（`</dev/null` 在 PowerShell 里报错）。
+> 只剩三件待陛下裁决：上线方式；`JWT_SECRET` 要不要补配；`Dashboard.vue` 的「后端地址」显示瑕疵要不要改。
+> ⚠️ 部署脚本 `deploy-cloud.js` 会同时打印两种终端命令（`</dev/null` 在部分终端里报错）。
 
 ## 部署（服务器 `~/radio`）
 - `build <svc>` + `up -d --force-recreate <svc>`（restart 不换镜像）。admin-web 只改 views：`build admin-web` →
