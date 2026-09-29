@@ -14,10 +14,10 @@
 | ① 配 HTTP 访问服务 | ✅ **已完成** | 路由 `/api` 已生效；域名 `jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com` |
 | ② 部署云函数 | ✅ **已完成** | `success: true`、`filesCount: 3`、`packSize 126.3 KB` |
 | ③ 导出生产库 | ✅ **已完成** | 16 表 / **686 行** / warning 0 / error 0；`unique_keys` 556 条、`sequence` 16 条 |
-| ④ 导入云数据库 | ⬜ 待做 | 控制台，18 个集合（**集合已建齐**，见下） |
-| ⑤ 导出云库做基线 | ⬜ 待做 | 控制台 |
-| ⑥ 双向校验 | ⬜ 待做 | `node cloud/migration/verify.js` |
-| ⑦ admin-web 切 cloud | ⬜ 待做 | 改 `.env.local` 两行 + build |
+| ④ 导入云数据库 | ✅ **已完成** | 控制台导入 17 个集合（`message` 本就空，跳过）；Upsert |
+| ⑤ 导出云库做基线 | ✅ **已完成** | `cloud/migration/cloud-dump/`（17 个 `<集合名>.json`） |
+| ⑥ 双向校验 | ✅ **已完成** | 表 16 / 失败 0；行 源 686 = 云 686；缺 0 / 孤 0 / 字段差 0 / 结构问题 0 |
+| ⑦ admin-web 切 cloud | 🟡 **代码侧完成** | 8 个管理端接口实测全绿（见下）；**待陛下浏览器确认登录+页面** |
 
 ### ①② 的实测结论（2026-09-29 13:53）
 
@@ -186,7 +186,7 @@ node cloud/migration/verify.js
 
 ## ⑦ admin-web 切 cloud
 
-`admin-web/.env.local` 已经建好骨架，改两行即可：
+`admin-web/.env.local` 已建好（**已在 `.gitignore`，不进版本库**），核心就是两行：
 
 ```ini
 VITE_REQUEST_MODE=cloud
@@ -196,10 +196,70 @@ VITE_CLOUD_API_URL=https://jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app
 然后：
 
 ```bash
-cd admin-web && npm run build
+cd admin-web && npm run dev     # 本机看效果
+cd admin-web && npm run build   # 正式产物
 ```
 
 ✅ 判据：能正常登录、投稿列表能加载、导出 xlsx 能下载。
+
+### ⑦ 的实测结论（2026-09-29 14:51）
+
+**8 个真实管理端接口全部通过**（本机 → 云函数 HTTP 访问服务，信封模式）：
+
+| 接口 | 结果 |
+|---|---|
+| `GET /admin/profile` | ✅ 返回 `teacher`（id 1 / role 0），无 password 字段 |
+| `GET /admin/submit/list` | ✅ `total=18`，返回 5 条 |
+| `GET /admin/stats/overview` | ✅ 四段汇总齐全 |
+| `GET /admin/submit/week` | ✅ 周状态（含 `reviewEndAt` 等锚点） |
+| `GET /admin/setting/list` | ✅ 17 条 |
+| `GET /admin/switch/list` | ✅ 6 条 |
+| `GET /admin/program/list` | ✅ `total=5` |
+| `GET /admin/student/export` | ✅ 真返回 xlsx（`学生账号_2024级_xxx.xlsx`，base64 15 KB） |
+
+另外验证：`POST /admin/login`（真账号 `teacher` + 错密码）→ `40101`，
+说明云端 **bcryptjs 比对确实跑起来了**（依赖是纯 JS，无原生编译风险）。
+
+**真实浏览器端到端**（Chromium 实机，非 curl）：勾 `XMLHttpRequest` 后用错密码点登录，抓到
+`POST https://<域名>/api -> 200 | {"code":40101,...}` ⇒ **浏览器跨域直连成功**；
+再注入 token 进 `/dashboard`，真实云端数据全部渲染（投稿总数 18 / 累计 258 人 / 近 7 天趋势 /
+热门点歌 Top 5），**页内 JS 报错为空**。
+
+截图：`shots/stage9-login.png`、`shots/stage9-dashboard-cloud.png`
+
+> 🐞 **发现一个显示瑕疵（已报告，待陛下裁决）**：`Dashboard.vue:170`
+> `const baseURL = import.meta.env.VITE_API_BASE` ⇒ 系统信息卡「后端地址」恒显示 `/api`（direct 模式的地址）。
+> cloud 模式下实际请求发往云域名，卡片仍显示 `/api`，**是误导**。
+> 改法（一行）：`import { requestMode, cloudApiUrl } from '@/utils/http'` →
+> 显示 `requestMode === 'cloud' ? cloudApiUrl : import.meta.env.VITE_API_BASE`。
+
+> ⚠️ **两件必须知道的事**（本次实测挖出来的）：
+
+1. **云函数的 CORS 白名单含 `localhost`（任意端口），不含服务器 IP。**
+   实测 `Origin: http://localhost:5173` / `:8080` → 回 `access-control-allow-origin`；
+   `Origin: http://129.28.26.180` / `https://example.com` → **不回 CORS 头**。
+   ⇒ 本机 `npm run dev` **不用配跨域**就能调云端；
+   **正式上线时必须去控制台「跨域设置」加 admin-web 的真实域名**，否则浏览器会拦。
+
+2. **云函数没有配 `JWT_SECRET`，正在用代码里的兜底值。**
+   实测：用兜底密钥 `radio-station-default-secret` 自签的 token 能通过云端校验并取到数据
+   ⇒ `process.env.JWT_SECRET` 为空。
+   - 影响一（功能）：本次登录签发的 token 都挂在兜底密钥上，**之后一旦补配 `JWT_SECRET`，
+     这些 token 全部失效**，管理人员/学生要重新登录一次。**要配就趁现在配。**
+   - 影响二（安全）：兜底值写死在仓库里，拿到代码的人能**伪造超管 token**。
+   - 建议：控制台 → 云函数 `api` → 配置 → 环境变量，加
+     `JWT_SECRET` = 原服务器 `.env` 里的同一个值（`grep JWT_SECRET ~/radio/.env`）。
+     用同一个值的好处：服务器时代没到期的 token 继续有效，学生不用重新登录。
+
+### 上线方式（三选一，待定）
+
+| 方案 | 做法 | 代价 |
+|---|---|---|
+| **A 服务器继续托管** | 在服务器 `~/radio/admin-web/.env.local` 放同两行（`admin-web/.dockerignore` 没排 `.env.local`，且 compose 的 build context 就是 `./admin-web`，容器内 `npm run build` **读得到**）→ `docker compose build admin-web && up -d` | 一条命令搞定；但文件未跟踪，重新 clone 会丢。**仍需配控制台跨域**（服务器 IP 不在白名单） |
+| **B 云开发静态托管** | 本机 build → 上传 `dist/` | 最贴合「不续费服务器」；要 CLI 登录 + 配跨域 |
+| **C 服务器 nginx 反代 `/api`** | 在 `admin-web/deploy/nginx-admin.conf` 加一条 `location /api { proxy_pass <云域名>/api; }`，`VITE_CLOUD_API_URL` 写相对路径 `/api` | **永久免 CORS**；但服务器摘不掉 |
+
+> 现在**不必马上决定**：本机 `npm run dev` 已经能完整验功能。等确认稳定再选上线方式。
 
 ---
 

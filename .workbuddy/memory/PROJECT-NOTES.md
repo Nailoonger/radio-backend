@@ -2,6 +2,32 @@
 
 > `MEMORY.md` 放铁律与主线；本文件放体量大、可自查的细则坑。改动相关模块前读对应小节。
 
+## 云开发迁移细则（`cloud/`）
+- 起因：小程序正式版 `url not in domain list`（合法域名需 ICP 备案）→ 陛下裁决**不续费服务器、整体走云开发**
+  （免费额度：调用 20 万次/月、资源 10 万 GBs/月、容量 2GB）。环境 `jy-radio-d1gdwmptl816ee6a9`，appid `wxa88836729f07a976`。
+- **阶段 9（admin-web 接云）＝HTTP 访问服务通道**：「要不要备案」**都不需要**（官方默认域名已备案，只有绑自有域名才要）。
+  - `api/httpBridge.js` 把「集成请求」还原成 `{method,path,body,token,query}`。⚠️ 适配必须放在 index.js **解构 event 之前**
+    （放错完全不生效且不报错）；判据只认 `httpMethod || requestContext`（收窄，否则误伤小程序请求）。
+    信封模式（admin-web 用，真实路由在 body 里、**不依赖路径透传**）+ RESTful 兜底。
+  - admin-web `src/utils/http.js`＝**门面**：`direct` 导出原 axios 实例（行为逐字不变），`cloud` 导出同形状门面
+    → 全站 114 处调用零改动。xlsx 改走 `{filename,base64,mime}` → `atob` 还原 Blob。
+    ⚠️ 认证分支**别再加** `body?.code === 40101`（原后端失败统一返 HTTP 401，与 cloud 模式已对齐，加了就是改行为）。
+- **阶段 8 数据迁移（`cloud/migration/`，手册 `README.md`）**：只 SELECT 原库 → JSON Lines → 控制台导入 → 控制台导出 → `verify.js` 双向校验。
+  - 官方三约束：JSON **Lines**、时间必须 `{"$date":"<ISO>"}`（裸 ISO 串 → 导入后是普通字符串，**时间条件静默失效**）、Upsert 可重复。
+  - 三个「不报错」陷阱：① **`unique_keys` 必须补登记**（文档库无 UNIQUE，不补＝能建重名管理员**且不报错**），
+    **NULL 一律不登记**（MySQL UNIQUE 允许多行 NULL）② **`sequence` 预置 = `max(id)` 不是 +1**（`nextId` 先 inc 再返回）
+    ③ `weekStartDate` 是 DATEONLY，**保持字符串**（转 Date 会把 `_id` 拼成 `week:Mon Oct 05 2026…`，周行再也查不到）。
+  - 迁移脚本一律纯函数无 IO；**大整数 id 走 `Number()` 归一**（BIGINT 经 mysql2 返字符串）。
+  - ⚠️ `.jsonl` 后缀坑：控制台导入对话框通常只列 `.json` → 复制一份同内容 `.json`（控制台要的格式本身就是「每行一个对象」）。
+  - ⚠️ `verify.js` 按「**文件名 = 集合名**」认集合（无关文件自动忽略）→ 导出时文件名写错会报「源 N / 云 0 缺 N」。
+- **两处源实现瑕疵（陛下已裁决 2026-09-29）**：① `overview.approved` 与 `topSongs()` 的 `status:1` → **均改 `status ∈ {1,5,6}`**
+  （⚠️ 别再"顺手"改回）② `previewSchedule(dryRun)` 的 `promoted/rescheduled/stillWaiting` 恒 0 已修
+  （`reschedule` 加 dryRun 专用字段，**按 id 去重**），顺带修 `autoRejectedIfLocked` 虚高 → 漂移 #23。
+  教训：**「把恒 X 改成真实值」必须补反向用例**（造「值该不为 X」的场景）；自检 `git diff --stat` 里测试脚本必须同时在列。
+- **速查**：改完跑 `node cloud/scripts/regression.js`（一键双轮）；⚠️ 本机沙箱**禁子进程**（`spawnSync` 返 `EBUSY`）→ 只能手工双跑，
+  脚本会列出两轮命令。⚠️ 产物模式 `HARNESS_API_DIR=miniprogram/cloudfunctions/api` **项数必须与源码模式一致**。
+  打包/删 dist 一律 `NODE_OPTIONS=""`（safe-delete 拦 `fs.rmSync`）。云端端到端验收：`MSYS_NO_PATHCONV=1 node cloud/scripts/verify-user.js ws://127.0.0.1:9420`。
+
 ## 点歌体系（现行＝协议版，细则 `docs/song-protocol.md`）
 - 提交**不判容量**；审核通过只拿候选资格，`initialAllocate` 按首选时段分组、组内按提交时间升序取前 capacity，其余 `WAITING`；到 `schedule_lock_at` 跑 `lockWeek`，剩余 `AUTO_REJECTED`。
 - ⛔ **点播截止前 `reschedule` 只做原位递补、绝不跨时段**（`canCrossSlot()` = `now >= applicationEndAt`）；只有 `lockWeek()` 与超管手动「执行排期」传 `crossSlot:true`。选址成本表在 `songRescheduleCost.js`。
