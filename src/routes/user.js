@@ -70,7 +70,7 @@ router.post('/login', auth.login);
  *     tags: [用户端-登录]
  *     summary: 学生账号密码登录（主通道）
  *     description: |
- *       账号 = 入学年级 + 班级 + 序号，如 `20240101`；初始密码统一 `usr123456`。
+ *       账号 = 入学年级 + 班级 + 序号，如 `20240101`；**初始密码 = `user` + 学号**，如 `user20240101`。
  *       账号不存在 / 密码错误返回同一句文案（防学号枚举）；账号被停用返回 40301。
  *       返回体里的 `user.isDefaultPwd=true` 表示还是初始密码，前端应引导改密。
  *     requestBody:
@@ -82,7 +82,7 @@ router.post('/login', auth.login);
  *             required: [username, password]
  *             properties:
  *               username: { type: string, example: '20240101' }
- *               password: { type: string, example: usr123456 }
+ *               password: { type: string, example: user20240101 }
  *     responses:
  *       200:
  *         description: 登录成功，返回 token + user

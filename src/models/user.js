@@ -71,7 +71,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         allowNull: true,
         field: 'pwd_changed_at',
-        comment: '为空 = 仍是初始密码 usr123456',
+        comment: '为空 = 仍是初始密码（user+学号，如 user20240101）',
       },
       lastLoginAt: {
         type: DataTypes.DATE,

@@ -1457,7 +1457,7 @@ router.get('/student/batches', adminAuth, requireSuperAdmin, student.batches);
  * /api/admin/student/reset-password/batch:
  *   post:
  *     tags: [管理端-学生账号]
- *     summary: 批量重置密码为 usr123456
+ *     summary: 批量重置密码为各自的初始密码（user+学号）
  *     description: 传 `ids` 数组，或传 `grade` / `classNo` 按班级重置；两者都不传会被拒绝（防手滑全量重置）。
  *     security: [{ bearerAuth: [] }]
  *     responses:
@@ -1543,7 +1543,7 @@ router.put('/student/:id/status', adminAuth, requireSuperAdmin, student.setStatu
  * /api/admin/student/{id}/reset-password:
  *   put:
  *     tags: [管理端-学生账号]
- *     summary: 重置单个账号密码为 usr123456
+ *     summary: 重置单个账号密码为初始密码（user+学号）
  *     security: [{ bearerAuth: [] }]
  *     responses:
  *       200: { description: ok }

@@ -105,3 +105,9 @@
 - **三维状态保持数字**：接口同时下发数字 + 名字（`songStatusService.statusView()`）。⚠️ 数字↔常量名只允许在 `songStatusService` 一处定义。
 - **新开关不进 seed.js**（switch.test 断言恰好 4 条）：走 `switchService.KNOWN_SWITCHES` + 管理端补默认行；缺行视为 on。
 - `/admin/submit/list` 排序＝**先提交先审**：`create_time ASC, id ASC`。
+- ⚠️⚠️ **学生初始密码 = `user` + 学号**（`20240101` → `user20240101`），**不是 `usr123456`**（2026-09-18 前的旧规则）。
+  定义只在 `studentAccountService.initPasswordFor()`（cost 8；改密后 cost 10）。「学生登不上」先跑
+  `node cloud/scripts/whois-student.js <学号>`（需 `JWT_SECRET`）—— 一次给出「库里有没有 / 状态 / 初始密码能不能登」；
+  排查手册 `docs/student-account.md` §4.5。
+  ⚠️ 管理端学生 DTO 的字段是 **`activated`**（= 已改密），**不是** `isDefaultPwd`（那个只在学生端 `/user/me`）。
+  ⚠️ **老服务器 ↔ 云库会分叉**：正式版 direct→老 MySQL、体验版 cloud→云库，在一边改的密码另一边不知道。
