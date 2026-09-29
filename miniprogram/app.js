@@ -33,9 +33,13 @@ App({
     baseURL: 'http://129.28.26.180/api',
 
     // ── 云开发通道（2026-09-28 新增，用于免备案发布正式版）──────────────
-    // requestMode: 'direct' 走上面的服务器（现状）；'cloud' 走云函数（免备案）
-    // 切换方式：改成本行 + 填好 cloudEnvId，重新上传即可；改回 'direct' 立即复原
-    requestMode: 'direct',
+    // requestMode: 'direct' 走上面的服务器；'cloud' 走云函数（免备案）
+    // ⚠️ 2026-09-29 切成 'cloud'：direct 的 baseURL 是 **http + IP**，而微信正式版
+    //    只允许 **HTTPS + 已备案域名**（request 合法域名校验）⇒ 学生侧一直报
+    //    `url not in domain list`。云通道走 wx.cloud.callFunction，**同环境调用不过域名校验**，
+    //    是当前唯一「免备案、别人也能用」的路径。
+    // 改回直连：把本行改回 'direct' 即可（服务器与上面的 baseURL 一行未动）。
+    requestMode: 'cloud',
     // 云环境 ID（2026-09-28）：校园个人版免费额度环境（6 个月 · 40,000 资源点/月）
     // 换绑过程：小程序绑定账号 100042972115 下环境已销毁 → 解绑 → 绑到校园账号 → 工具内导入本环境
     cloudEnvId: 'jy-radio-d1gdwmptl816ee6a9',

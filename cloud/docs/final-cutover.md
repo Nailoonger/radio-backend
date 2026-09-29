@@ -18,6 +18,7 @@
 | ⑤ 导出云库做基线 | ✅ **已完成** | `cloud/migration/cloud-dump/`（17 个 `<集合名>.json`） |
 | ⑥ 双向校验 | ✅ **已完成** | 表 16 / 失败 0；行 源 686 = 云 686；缺 0 / 孤 0 / 字段差 0 / 结构问题 0 |
 | ⑦ admin-web 切 cloud | ✅ **已完成** | 8 个接口实测全绿 + 真实浏览器登录成功（2026-09-29）；`dist/` 已含云域名、无 direct 残留 |
+| ⑧ 小程序切 cloud | 🟡 **代码已改，待重新上传** | `requestMode: 'direct'` → `'cloud'`；这是学生侧 `url not in domain list` 的**真正卡点**（见下文 ⑧） |
 
 ### ①② 的实测结论（2026-09-29 13:53）
 
@@ -332,9 +333,56 @@ cd admin-web && npm run build   # 正式产物
 
 ---
 
-## 随时切回
+## ⑧ 小程序切 cloud —— 「别人也能用」的真正卡点（2026-09-29 发现）
 
-把 `VITE_REQUEST_MODE` 改回 `direct`（或删掉这一行）重新 build 即可 ——
+⚠️ **先说结论：学生侧一直不可用，卡点不在服务器、不在备案，在 `miniprogram/app.js` 一行配置。**
+
+```js
+// 改之前
+baseURL: 'http://129.28.26.180/api',   // ❌ IP + http
+requestMode: 'direct',                  // ❌ 走 wx.request，触发「request 合法域名」校验
+```
+
+微信正式版**只允许 HTTPS + 已备案域名**，所以 `direct` 模式下学生端必然报
+`url not in domain list` —— 这正是当初启动整个云开发迁移的那个报错，但**开关一直没拨过去**。
+
+✅ **已改成** `requestMode: 'cloud'`（2026-09-29）：
+
+- `cloud` 走 `wx.cloud.callFunction`，**同环境调用不过「合法域名」校验** ⇒ **免备案**；
+- 全项目实测：小程序里**没有** `wx.uploadFile` / `wx.downloadFile` / `wx.connectSocket`，
+  唯一的网络调用就是 `utils/request.js`（`direct` 分支）⇒ 切 `cloud` 后**所有请求都走云函数，
+  一条都不再需要域名**；
+- 云通道实现是完整的（`request.js:93-127` 有真正的 `callFunction` 分支，
+  两种模式返回值与错误语义一致，页面代码无感）；
+- 云函数侧实测：`POST /user/login/account`（真学号 `20240201` + 错密码）
+  → `40101 账号或密码错误`（HTTP 200）⇒ **查库 + bcryptjs 全正常**；数据也已迁移完毕。
+- `node --check miniprogram/app.js` 通过。
+
+### ⚠️ 必须陛下动手：重新上传小程序（改代码不重新上传 = 没生效）
+
+1. 微信开发者工具打开 `miniprogram/`
+2. **先发体验版**，拉 2~3 个学生试：能登录、能看到节目单、能点歌
+3. 没问题再上传正式版 → 提交审核 → 发布
+
+> ⚠️ 体验版/正式版**必须用微信客户端验证**。开发者工具会自动跳过「合法域名」校验，
+> 工具里跑得通**不代表**手机上跑得通 —— 这正是之前"我这儿看着没问题、别人却用不了"的原因。
+
+### 回退
+
+把 `requestMode` 改回 `'direct'` 重新上传即可 —— `baseURL`、服务器、MySQL、Docker 一行未动。
+
+> 注：admin-web（老师用）是网页，不受「合法域名」限制，用 IP 就能开；
+> 要"干净无感"才需要备案（见上文备案一节）。**学生侧和老师侧是两条独立的线。**
+
+---
+
+## 随时切回（两条线各回各的）
+
+**admin-web（老师侧）**：把 `VITE_REQUEST_MODE` 改回 `direct`（或删掉这一行）重新 build 即可 ——
 原 Express 后端、MySQL、Docker 链路**一行都没动**。
 
+**小程序（学生侧）**：把 `miniprogram/app.js` 的 `requestMode` 改回 `'direct'` 重新上传即可 ——
+`baseURL`、云函数、云数据库都还在。
+
 **建议：切 cloud 后先别急着停服务器**，观察几天确认稳定，再决定要不要停。
+
