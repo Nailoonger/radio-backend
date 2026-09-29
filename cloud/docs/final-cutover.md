@@ -243,8 +243,8 @@ cd admin-web && npm run build   # 正式产物
    ⇒ 本机 `npm run dev` **不用配跨域**就能调云端；
    **正式上线时必须去控制台「跨域设置」加 admin-web 的真实域名**，否则浏览器会拦。
 
-2. **云函数没有配 `JWT_SECRET`，正在用代码里的兜底值。**
-   实测：用兜底密钥 `radio-station-default-secret` 自签的 token 能通过云端校验并取到数据
+2. ~~**云函数没有配 `JWT_SECRET`，正在用代码里的兜底值。**~~ → ✅ **2026-09-30 已补配并验证通过**（详见下方「补配结果」）。
+   当初的实测：用兜底密钥 `radio-station-default-secret` 自签的 token 能通过云端校验并取到数据
    ⇒ `process.env.JWT_SECRET` 为空。
    - 影响一（功能）：本次登录签发的 token 都挂在兜底密钥上，**之后一旦补配 `JWT_SECRET`，
      这些 token 全部失效**，管理人员/学生要重新登录一次。**要配就趁现在配。**
@@ -276,6 +276,27 @@ cd admin-web && npm run build   # 正式产物
      5. **反向验证（判据）**：用**兜底密钥**自签一个 token 去调 `/admin/profile`，
         必须从「能取到数据」变成 **`40101`** ⇒ 说明新 `JWT_SECRET` 真的生效了。
         ⚠️ 只验证「能登录」是不够的 —— 配错了照样能用兜底值登录成功。
+
+   **✅ 补配结果（2026-09-30，陛下已配，我复验）**
+
+   验证脚本：`cloud/scripts/verify-jwt-secret.js`（纯 Node 手写 HS256，不引依赖）
+   ```bash
+   NEW_JWT_SECRET='<填的那串>' node cloud/scripts/verify-jwt-secret.js
+   ```
+
+   | 项 | 用例 | 实测 | 结论 |
+   |---|---|---|---|
+   | A | 兜底值 `radio-station-default-secret` 自签 → `GET /admin/profile` | `{"code":40101,"message":"登录已过期，请重新登录","data":null}` | ✅ 已失效 |
+   | B | 新值自签 → `GET /admin/profile` | `{"code":0,"data":{"id":1,"username":"teacher","nickname":"指导老师","role":0,...}}` | ✅ 生效 |
+
+   ⇒ **兜底密钥伪造超管 token 的路已被堵死**，新密钥签发/校验自洽。
+
+   ⚠️ 两点实测教训（下次别踩）：
+   1. **判据只能看响应体的 `code`，不能看 HTTP 状态码、也不能看 `data` 有没有值。**
+      本项目 **HTTP 恒 200**，业务结果全在 `code` 里；被拒时 `data` 是 `null`，
+      而 `null !== undefined` 为真 —— 脚本初版用 `data !== undefined` 判断，
+      把「拒绝」误报成了「通过」（差点得出相反结论）。
+   2. 配好后**所有存量 token 作废**（学生 + admin-web 都要重登一次）—— 预期行为，不是故障。
 
 ### 上线方式：备案是硬约束（先把事实钉死）
 
