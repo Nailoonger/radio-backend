@@ -101,12 +101,75 @@ function isFilePayload(data) {
   return !!(data && typeof data === 'object' && typeof data.base64 === 'string');
 }
 
+/* ══════════════════ 上传适配：FormData → 云端契约 ══════════════════ */
+
+/**
+ * ⚠️⚠️ 文件上传在两条通道下的形状不一样（2026-09-30 实测踩到）：
+ *
+ *   direct：`http.post(url, formData, { 'Content-Type': 'multipart/form-data' })`
+ *           → 原后端用 multer 收 multipart，业务代码就是这么写的。
+ *   cloud ：请求体是 **JSON 信封**，FormData 一 `JSON.stringify` 就变成 `{}`，
+ *           文件直接丢 —— 云端 `importPreview` 报 `40001 缺少文件内容（fileBase64）`。
+ *
+ * 云端的真实契约是 **`{ filename, fileBase64 }`**（`handlers/admin/student.js`）。
+ * 这里做**唯一一处**适配：认出 FormData 就自己读成 base64 换个体积发出去。
+ * ⇒ direct 模式一行不受影响，业务代码（ImportSheet.vue 等）也一行不用改。
+ *
+ * @param {FormData} fd
+ * @returns {Promise<object>} `{ filename, fileBase64, ...其余标量字段 }`
+ */
+function formDataToFilePayload(fd, bizError) {
+  return new Promise((resolve, reject) => {
+    let pick = null;                 // 第一个 Blob/File 当作要上传的文件
+    const extra = {};                // 其余标量字段原样带上（云端不认识的字段会被忽略，无害）
+    fd.forEach((v, k) => {
+      if (!pick && v && typeof v === 'object' && typeof v.arrayBuffer === 'function') {
+        pick = { key: k, blob: v };
+      } else if (v !== null && typeof v !== 'object') {
+        extra[k] = v;
+      }
+    });
+
+    if (!pick) return reject(bizError(40001, '没有找到要上传的文件'));
+
+    const reader = new FileReader();
+    reader.onerror = () => reject(bizError(40001, '读取文件失败，请重试'));
+    reader.onload = () => {
+      const s = String(reader.result || '');
+      const comma = s.indexOf(',');
+      resolve({
+        filename: pick.blob.name || '',
+        fileBase64: comma >= 0 ? s.slice(comma + 1) : s,   // 去掉 data:...;base64, 前缀
+        ...extra,
+      });
+    };
+    reader.readAsDataURL(pick.blob);
+  });
+}
+
+/** 浏览器环境下才可能是 FormData（Node/SSR 里这个构造器不存在） */
+function isFormData(v) {
+  return typeof FormData !== 'undefined' && v instanceof FormData;
+}
+
 async function cloudRequest({ method, url, params, data, responseType }) {
   const p = String(url || '');
+
+  // 上传适配（见 formDataToFilePayload 的说明）
+  let body = data || {};
+  if (isFormData(body)) {
+    try {
+      body = await formDataToFilePayload(body, bizError);
+    } catch (e) {
+      ElMessage.error(e.message || '文件读取失败');
+      return Promise.reject(e);
+    }
+  }
+
   const envelope = {
     method: String(method || 'GET').toUpperCase(),
     path: p,
-    body: data || {},
+    body,
     token: readToken() || '',
     // GET 参数按原约定落在 query 里；direct 模式下 axios 会拼成 querystring，这里显式对齐
     query: params || {},
@@ -125,9 +188,9 @@ async function cloudRequest({ method, url, params, data, responseType }) {
     return Promise.reject(e);
   }
 
-  const body = resp.data;
+  const raw = resp.data;
   // 有些配置下云接入会把函数返回值原样塞进 body 字符串，这里兜一层
-  const parsed = typeof body === 'string' ? (() => { try { return JSON.parse(body); } catch (e) { return null; } })() : body;
+  const parsed = typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch (e) { return null; } })() : raw;
   if (!parsed || typeof parsed !== 'object') {
     ElMessage.error('云函数返回了非 JSON 响应');
     return Promise.reject(bizError(50001, '云函数返回了非 JSON 响应'));
