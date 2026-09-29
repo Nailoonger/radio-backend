@@ -16,6 +16,8 @@
   （已用：调频刻度、录音电平、收听证钢印、骑缝孔、点唱机唱针）。
 - ✅ **登录页是唯一获批突破配色的页面**（2026-09-30 陛下开口）：可不用深色卡、可不守「#0066CC / 无渐变 / 无彩色投影」。
   v6 走奶油 #FFF8EF + 橘红 #FF6B35 暖色盘。其余页面仍守设计系统。
+- ⚠️⚠️ **隐私口径文案不对外展示**（2026-09-30 陛下明示「以后都得记着」）：「不收集头像与手机号 / 头像由姓名生成」
+  这类自我说明一律**不写进任何 UI**——咱们自己知道就行，不需要告诉用户。已有页面里出现就删。
 - 提交身份用全局 `Nailoonger <1493586497@qq.com>`，不写仓库级 user.*。
 
 ## 云开发迁移（`cloud/`）
@@ -53,6 +55,14 @@
 > ⚠️ 网关 **CORS 白名单含 `localhost`（任意端口）、不含服务器 IP** → 本机 dev 免配跨域，**正式上线必须去控制台加域名**。
 > ✅ `Dashboard.vue` 显示瑕疵已修（cloud 模式改为显示云地址；并给 `.kv .mono` 加
 >    `min-width:0; overflow-wrap:anywhere` 防长 URL 撑破卡片）。
+> ⚠️⚠️ **服务器上那个 admin-web 实测是 `direct`**（2026-09-30：抓 `/assets/index-CFUEG3k_.js` →
+>    含 `"/api"`、无云地址；判据脚本 `cloud/scripts/probe-admin-web-mode.js`）。
+>    因为 `.env.local` 在 `.gitignore` 里 ⇒ 服务器 `git pull` 永远拿不到 ⇒ `VITE_REQUEST_MODE` 回落 `direct`。
+>    ⇒ **老师侧走老 MySQL、学生侧走云库＝两个库各写各的**（学生激活后管理端仍显示「未激活」、
+>    管理端重置成功但学生登不上、同账号同密码两边结果相反）。
+>    修：服务器 `~/radio/admin-web/.env.local` 写 `VITE_REQUEST_MODE=cloud` + 云地址；控制台
+>    「跨域设置」加 `http://129.28.26.180`；再 `build admin-web` + `up -d --force-recreate --no-deps admin-web`。
+>    细则 `cloud/docs/final-cutover.md` §⑨。
 > ⚠️⚠️ **`jyradio.online` 未备案**（2026-09-29 实测：`https://jyradio.online` **TLS 握手被 RST**，
 >    而 `https://129.28.26.180` 正常 200 ⇒ 按 SNI 拦域名；这正是小程序当初 `url not in domain list` 的根因）。
 >    ⚠️ **证书 ≠ 备案** —— 别再拿「配了 443 证书」当成备案证据（我踩过一次）。

@@ -437,6 +437,78 @@ requestMode: 'direct',                  // ❌ 走 wx.request，触发「request
 
 ---
 
+## ⑨ ⚠️⚠️ 老师侧必须也切到 cloud，否则会「两个库各写各的」（2026-09-30 实测踩到）
+
+**这是当前最危险的一个坑，不是理论风险 —— 它已经真实地困惑了陛下半天。**
+
+### 症状（四条同时出现，就是这个问题）
+
+- 学生在**体验版**上改完密码，**再用初始密码登不上**（正常，密码已换）；
+- 改完密码后在**管理端学生账号列表里仍显示「未激活」**；
+- 在管理端**重置密码提示成功，但学生还是登不上**；
+- 同一个账号、同一个初始密码，**两边结果相反**。
+
+### 根因
+
+`admin-web` 的 Dockerfile 在**容器内** `npm run build`，而生产配置读的是 `.env.local`，
+**偏偏 `.env.local` 在 `.gitignore` 里** ⇒ 服务器上 `git pull` **永远拿不到它**
+⇒ `VITE_REQUEST_MODE` 回落成默认值 **`direct`**（`admin-web/src/utils/http.js:28`）
+
+⇒ **服务器上部署的管理端打的是老 Express + MySQL，而体验版小程序打的是云库。**
+一个账号的密码/激活状态被记录在其中一个库里，另一个库完全不知情。
+
+### 实测判据（一条命令定性）
+
+```bash
+node cloud/scripts/probe-admin-web-mode.js         # 默认探 http://129.28.26.180
+# 或探别的地址：ADMIN_WEB_URL=http://<host> node cloud/scripts/probe-admin-web-mode.js
+```
+
+拉首页引用的 JS bundle，看里面有没有云地址：
+
+| 输出 | 含义 |
+|---|---|
+| `含云地址=true` | 该管理端走 cloud ✅ |
+| `含云地址=false  含"/api"=true` | **走 direct，就是它造成了分叉** ❌ |
+
+> 实测（2026-09-30）：`/assets/index-CFUEG3k_.js` → `含云地址=false  含"/api"=true` ⇒ 服务器上那个是 direct。
+
+另一条并行的判据（不需要脚本）：同一账号同一初始密码，分别打两个入口，看结果是否相反。
+
+### 修复（服务器上三步）
+
+```bash
+# ── 在服务器 ~/radio 下 ──────────────────────────────────
+cat > admin-web/.env.local <<'ENVEOF'
+VITE_REQUEST_MODE=cloud
+VITE_CLOUD_API_URL=https://jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com/api
+VITE_API_BASE=/api
+VITE_API_PROXY_TARGET=http://localhost:3000
+ENVEOF
+
+# ② 云开发控制台 → 环境 → 「跨域设置」→ 把 http://129.28.26.180 加进白名单
+#    （网关原本只白名单了 localhost，不含服务器 IP —— 不加这一条，浏览器会直接拦掉请求）
+
+# ③ 重建（Dockerfile 容器内自 build；.dockerignore 只排 node_modules/dist/_backup，
+#    所以 .env.local 会被打进构建、vite 读得到）
+docker compose build admin-web
+docker compose up -d --force-recreate --no-deps admin-web
+```
+
+**免掉第②步（CORS）的替代做法**：把云地址写成**相对路径**，让 nginx 同源反代 ——
+`.env.local` 里 `VITE_CLOUD_API_URL=/api`，再把 `deploy/nginx.conf` 的 `location /api`
+上游从 `radio-backend:3000` 改成云函数 HTTP 地址。
+同源请求天然无跨域，也不需要控制台加白名单；代价是 nginx 得能反代到外部 HTTPS。
+
+### ⚠️ 切完之后的两个后果
+
+1. **老 MySQL 里那些学生自己改过的密码，云库里没有。**
+   所以正式版发出去之前，凡是在旧版上改过密码的学生，**在新版里要用初始密码（`user`+学号）重登**，
+   或者老师在管理端批量重置一次。数量少（当前云库里只有 4 个已激活账号），但要知道这件事。
+2. 切完之后**管理端才第一次真正看到云库的真实状态** —— 之前看到的「未激活」都是老库的旧数据。
+
+---
+
 ## 随时切回（两条线各回各的）
 
 **admin-web（老师侧）**：把 `VITE_REQUEST_MODE` 改回 `direct`（或删掉这一行）重新 build 即可 ——
