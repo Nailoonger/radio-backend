@@ -582,13 +582,26 @@ location = /api {
 （① 单元跑 `http.js` 真实源码 ② 本地假库端到端：真 FormData → 真 `importPreview` 断言 `code=0`
 + 反证「修复前的发法」确实回 `40001 缺少文件内容（fileBase64）` ③ 有 `JWT_SECRET` 时加打真云端）
 
-**② 头像上传 —— 云端没有这条路由 ⏳ 方向未定**
-`admin-web/src/views/Cadre.vue` 的 `POST /admin/upload/avatar` → 云端 `40401 接口不存在`
-（`router.js` 里一条 upload 路由都没有；`/uploads/` 静态目录也是老后端在服务）。
-三个选项：① 接云开发存储（补路由 + 存储 SDK）② 直接去掉这个入口（若头像本就定死
-「姓名首字圆形、不允许更换」）③ 先放着。**陛下的口径定了再动。**
+**② 头像上传 —— ⚠️ 更正：这**不是**切云弄坏的，它**两条通道下都不能用**（本来就坏的）**
+`admin-web/src/views/Cadre.vue` 与 `Staff.vue` 都调 `POST /admin/upload/avatar`。
+- cloud：`40401 接口不存在`（`router.js` 里没有这条路由）。
+- direct：**老后端也 404** —— `src/routes/admin.js:17` 把
+  `controllers/admin/uploadController.js` `require` 进来了，但**从未挂路由**
+  （全仓 `grep upload/avatar` 只命中「它自己的定义 + 注释」，无任何 `router.post`）。
+  ⇒ `exports.uploadAvatar` 是**死代码**，当时的开发就没接上。
 
-> 清单式自查法：凡是「前端用 `new FormData()` 或传 `Blob`」的调用，切云后都要单独验一遍。
+**判据（区分「切云弄坏的」vs「本来就坏的」）**：别只看云端有没有这条路由 ——
+去老后端里 `grep` 那条 `router.<method>('<路径>'`。**没挂 ⇒ 不是切云的锅**，别记到迁移账上。
+
+**方向仍待定**（这是 UI 改动 ⇒ 按项目铁律要先出静态预览、标版本号、点头后才动）：
+① 真把它接上（云端要选个文件存放方案：云开发存储 / 或干脆只存 URL 手填）
+② **去掉这个入口** —— 项目现有设计其实站在这一边：`handlers/user/auth.js` 明确
+   「用户**不允许**更换头像，客户端传 `avatar` 也直接丢弃、不落库」，
+   头像本来就是「姓名首字 / 圆形」生成的。若老师侧也不需要真头像，②是最省事且最一致的选择。
+③ 先放着。
+
+> 清单式自查法：凡是「前端 `new FormData()` 或传 `Blob`」的调用，切云后都要单独验一遍。
+> 本次全仓只有 3 处 `FormData`：导入（✅ 已修）、Cadre 头像、Staff 头像（同一条死路由）。
 
 ---
 

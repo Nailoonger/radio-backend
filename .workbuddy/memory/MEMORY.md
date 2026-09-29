@@ -70,8 +70,12 @@
 >    ✅ **学生账号导入已修**（2026-09-30）：`admin-web/src/utils/http.js` 的 `cloudRequest()` 里
 >    认出 `FormData` 就自己读成 base64 换形 —— **只改公共请求层一处，direct 行为零变化、业务代码一行未改**。
 >    验证 `node cloud/scripts/verify-upload-adapter.js`（单元跑真实源码 + 本地假库端到端 + 反证修复前确实 40001）。
->    ⏳ **头像上传未定方向**：`Cadre.vue` 的 `POST /admin/upload/avatar` 云端 `40401 接口不存在`
->    （router 里没这条路由，`/uploads/` 也是老后端在服务）。选：接云存储 / 去掉入口 / 先放着。
+>    ⏳ **头像上传：更正——不是切云弄坏的**。`Cadre.vue` / `Staff.vue` 的
+>    `POST /admin/upload/avatar` 在**两条通道下都 404**：云端没这条路由，而老后端的
+>    `src/routes/admin.js:17` 把 `uploadController` require 进来却**从未挂路由**
+>    （`exports.uploadAvatar` 是死代码，全仓无引用）。
+>    ⇒ **判据：别只看云端有没有路由，去老后端 grep `router.<m>('<路径>'` —— 没挂就不是切云的锅。**
+>    方向待定（要动 UI ⇒ 先出静态预览点头）：真接上 / 去掉入口（现有设计本就「不允许换头像」）/ 先放着。
 >    ⇒ **自查法：前端凡是 `new FormData()` 或传 `Blob` 的调用，切云后都要单验一遍。**
 >    另：改 `http.js` 时踩过 `body` 重名（新 `let body` 撞原有 `const body = resp.data`）——
 >    **vite build 会直接报 `The symbol "body" has already been declared`**，构建就是最便宜的语法检查。
