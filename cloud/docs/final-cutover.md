@@ -19,14 +19,34 @@
 
 ## ① 配 HTTP 访问服务（云开发控制台）
 
-1. 打开云开发控制台 → 选环境 `jy-radio-d1gdwmptl816ee6a9`
-2. 左侧 **HTTP 访问服务** → **添加路径**
-3. 路径填 `/api`，指向云函数 **`api`**，保存
-4. 记下**默认域名**，形如 `https://jy-radio-d1gdwmptl816ee6a9.service.tcloudbase.com`
+路径：控制台 → 环境 `jy-radio-d1gdwmptl816ee6a9` → 左侧 **HTTP 访问服务**
 
-- ⚠️ **不需要备案** —— 腾讯云自己的域名已备案。只有你想绑**自有域名**时才要备案。
-- ⚠️ 默认域名**有有效期**，到期控制台点「**续期**」。失效表现是全站突然 404/502，最难查。
-- ✅ 判据：浏览器访问 `https://<默认域名>/api/health` 能返回 JSON（不是控制台 404 页）。
+1. 确认页面顶部 **「HTTP 网关」** 开关是**打开**状态
+2. **域名管理** 里的**默认域名会自动生成并启用**（域名状态开关为开），记下它。
+   本环境实际是：
+   ```
+   jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com
+   ```
+   形态为 `<envId>-<数字>.ap-shanghai.app.tcloudbase.com`（**不是**老的 `<envId>.service.tcloudbase.com`）
+3. **路由管理** → 右上角 **「新增路由」**：
+   - 触发路径：`/api`
+   - 资源类型：**云函数**
+   - 资源对象：**`api`**
+   - 其余保持默认（身份认证选「免认证」），保存
+
+> ⚠️ **「路由管理」配之前是空的（显示「暂无数据」）—— 空着等于这个域名下一个接口都不可用。**
+> ⚠️ 我们用的是**信封模式**：真实 `method` / `path` / `body` / `token` / `query` 全放在 POST 的**请求体**里
+>    （见 `api/httpBridge.js`），**所以不依赖控制台的「路径透传」设置**，一条 `/api` 路由就够了。
+
+- ⚠️ **不需要备案** —— 腾讯云自己的域名已备案。只有你想绑**自有域名**时才需要备案。
+- ⚠️ 默认域名**有有效期**（且限频，官方说明仅限开发测试），到期在控制台点「**续期**」。
+  失效表现是全站突然 404/502，最难查。
+- ✅ 判据（信封模式，不依赖路径是否被剥离 —— 最可靠）：
+  ```bash
+  curl -s -X POST "https://jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com/api" \
+    -H "Content-Type: application/json" -d '{"method":"GET","path":"/health"}'
+  ```
+  返回 JSON 即通（不是控制台 404 页）。
 
 ## ② 部署云函数
 
@@ -104,7 +124,7 @@ node cloud/migration/verify.js
 
 ```ini
 VITE_REQUEST_MODE=cloud
-VITE_CLOUD_API_URL=https://jy-radio-d1gdwmptl816ee6a9.service.tcloudbase.com/api
+VITE_CLOUD_API_URL=https://jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com/api
 ```
 
 然后：

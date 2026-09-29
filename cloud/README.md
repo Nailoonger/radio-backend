@@ -267,7 +267,7 @@ $env:HARNESS_API_DIR="$PWD/miniprogram/cloudfunctions/api"; node cloud/scripts/t
 适配层是我们自己的代码（能被回归网钉住）。
 
 > ⚠️ 「要不要备案」的答案：**都不需要** —— 用腾讯云给的官方默认域名
-> （`<env>.service.tcloudbase.com`）即可；只有绑**自有域名**才需要备案。
+> （`<envId>-<数字>.ap-shanghai.app.tcloudbase.com`）即可；只有绑**自有域名**才需要备案。
 > 代价是默认域名有**有效期**，到期在控制台点「续期」（5 分钟生效）。
 > 另一条路（`@cloudbase/js-sdk`）没有有效期问题，但要新增 npm 依赖 + 开匿名登录，
 > 且通道本身在本地测不了 —— 若嫌续期麻烦可换。

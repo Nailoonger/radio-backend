@@ -34,7 +34,7 @@
 4. 控制台逐集合导入（16 表 + `unique_keys` + `sequence`，**Upsert**）
 5. 控制台逐集合导出 JSON → `cloud/migration/cloud-dump/<集合名>.json`（**文件名必须＝集合名**）
 6. `node cloud/migration/verify.js` 看双向报告
-7. admin-web `.env.local` 填 `VITE_REQUEST_MODE=cloud` + `VITE_CLOUD_API_URL=https://<envId>.service.tcloudbase.com/api` → 重新 build
+7. admin-web `.env.local` 填 `VITE_REQUEST_MODE=cloud` + `VITE_CLOUD_API_URL=https://<envId>-<数字>.ap-shanghai.app.tcloudbase.com/api` → 重新 build
 
 ## 部署（服务器 `~/radio`）
 - `build <svc>` + `up -d --force-recreate <svc>`（restart 不换镜像）。admin-web 只改 views：`build admin-web` → `up -d --force-recreate --no-deps admin-web`；其 Dockerfile 容器内自 build。
@@ -55,6 +55,8 @@
 - ⚠️⚠️ **部署云函数本机做不了**：沙箱把 `reg.exe` 列入程序黑名单（安全中心 → 命令安全），
   `cli.bat` 初始化即失败（报 `wait IDE port timeout`）⇒ **必须陛下在自己终端跑**。
   CLI = `D:\dev\wx-devtools\cli.bat`；服务端口**已开**（`enableServicePort: true`）。收尾清单：`cloud/docs/final-cutover.md`。
+- ⚠️ **PowerShell `Add-Type` 被安全策略拦**（禁止运行时编译 .NET）→ 图像裁剪走 Python venv：
+  `~/.workbuddy/binaries/python/envs/default/Scripts/python.exe`（已装 pillow）。
 - 截图验证配方见 skill `web-ui-screenshot-verify`。
 
 ## 后端约定

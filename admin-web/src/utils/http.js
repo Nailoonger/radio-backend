@@ -7,13 +7,13 @@ import router from '@/router';
  *
  *   direct（现状）：axios 直连原 Express 后端，baseURL = VITE_API_BASE（默认 /api）
  *   cloud（阶段 9）：走云开发的「HTTP 访问服务」
- *                   POST https://<envId>.service.tcloudbase.com/<触发路径>
+ *                   POST https://<envId>-<数字>.ap-shanghai.app.tcloudbase.com/<触发路径>
  *                   请求体 = 信封 { method, path, body, token }
  *
  * ⚠️ 切通道**只改环境变量**，业务代码一行不动：
  *     .env.local 里写
  *         VITE_REQUEST_MODE=cloud
- *         VITE_CLOUD_API_URL=https://<envId>.service.tcloudbase.com/api
+ *         VITE_CLOUD_API_URL=https://<envId>-<数字>.ap-shanghai.app.tcloudbase.com/api
  *     不带这两个变量（或写 direct）就是原来的行为。
  *
  * ⚠️⚠️ 云函数侧由 `cloud/cloudfunctions/api/httpBridge.js` 把「集成请求」还原成

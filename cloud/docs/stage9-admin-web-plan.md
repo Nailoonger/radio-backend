@@ -15,11 +15,11 @@ admin-web 是浏览器页面，没有 wx 环境，只剩两条路：
 
 | 方案 | 做法 | 备案 | 代价 |
 |---|---|---|---|
-| **A. HTTP 访问服务**（选它） | 云函数开 HTTP 触发，网页 POST 到 `https://<env>.service.tcloudbase.com/<触发路径>` | **不需要**（用官方默认域名） | 默认域名有**有效期**，到期控制台点「续期」 |
+| **A. HTTP 访问服务**（选它） | 云函数开 HTTP 触发，网页 POST 到 `https://<envId>-<数字>.ap-shanghai.app.tcloudbase.com/<触发路径>` | **不需要**（用官方默认域名） | 默认域名有**有效期**，到期控制台点「续期」 |
 | B. `@cloudbase/js-sdk` | 网页直接 `app.callFunction()`，event 形状与小程序一致 → 云函数零改动 | **不需要** | 新增 npm 依赖；需开匿名登录 + 配 Web 安全域名；通道本身本地测不了 |
 
 > ⚠️ **「要不要备案」的结论：两条都不需要。**
-> 腾讯云给的官方默认域名（`<env>.service.tcloudbase.com` / `*.tcloudbaseapp.com`）已备案。
+> 腾讯云给的官方默认域名（`<envId>-<数字>.ap-shanghai.app.tcloudbase.com` / `*.tcloudbaseapp.com`）已备案。
 > 只有**绑自有域名**（如 `admin.xxx.edu.cn`）才需要备案 —— 那正是本次迁移要绕开的东西。
 
 选 A 的理由：零新增依赖；适配层是**我们自己的代码**，能被回归网钉住（B 的通道正确性只能上真机验证）。
@@ -117,7 +117,7 @@ cloud 模式下用 `atob` 还原成 `Blob` —— 调用方 `URL.createObjectURL
 3. admin-web 根目录建 `.env.local`：
    ```
    VITE_REQUEST_MODE=cloud
-   VITE_CLOUD_API_URL=https://<envId>.service.tcloudbase.com/api
+   VITE_CLOUD_API_URL=https://<envId>-<数字>.ap-shanghai.app.tcloudbase.com/api
    ```
 4. 重新构建 admin-web；若放到**静态网站托管**，把托管域名加进「Web 安全域名」
 
