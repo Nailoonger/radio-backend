@@ -55,10 +55,13 @@ if (!bundleOk) {
   process.exit(1);
 }
 
-if (entries.length !== 2) {
+// 产物应为 index.js + package.json（+ config.json 定时触发器配置，sync.js 会原样带上）
+const EXPECTED_FILES = ['index.js', 'package.json', 'config.json'];
+const extras = entries.filter((n) => !EXPECTED_FILES.includes(n));
+if (extras.length) {
   console.warn('');
-  console.warn('⚠️  产物目录里还有多余文件（应为 2 个）。多余文件不致命，但可能带上旧代码。');
-  console.warn('   建议重跑：node cloud/scripts/sync.js（它会清空目录后重建）');
+  console.warn(`⚠️  产物目录里有预期外的文件：${extras.join(', ')}`);
+  console.warn('   多余文件不致命，但可能带上旧代码 → 建议重跑：node cloud/scripts/sync.js（清空后重建）');
 }
 
 const cmd =
