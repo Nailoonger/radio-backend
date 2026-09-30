@@ -53,6 +53,8 @@ F1/F2 的 Git 整理：将 `_kit.js`、`_people.js` 精确放行并跟踪。停�
 
 `functions.updateFunctionCode({func, functionPath, deployMode:'cos'})` 只更新代码，不调用创建、覆盖配置或触发器接口。func 的 name 固定 api，handler/runtime/installDependency 使用线上原值，isWaitInstall=true。产物提前安装锁定的生产依赖；线上原先启用云端安装时 SDK 自动忽略 node_modules，原先关闭时上传完整依赖。两种情况都保留原安装开关。
 
+首次平台验收修正：触发器保护按线上实际列表执行，允许完整的空列表或不同任务名称。校验返回元数据的完整性，并比较部署前后所有触发器字段；不能把源码 config.json 中的预设任务名作为现有环境的部署前提，也不能在代码发布时自动补建任务。
+
 更新前后通过 `env.describeHttpServiceRoute({EnvId,Offset,Limit})` 分页读取域名/路由，比较现有 `/api` 配置；更新后等待 Active 状态，并使用现有网关入口的 POST 信封调用 `/health`，要求业务 code=0、dbReady=true、jwtReady=true。检查配置差异时只输出字段名称，绝不输出 Environment 值。更新接口返回的 SCFErrorCode 也必须检查；任何失败阻止网页发布。
 
 ### 网页更新

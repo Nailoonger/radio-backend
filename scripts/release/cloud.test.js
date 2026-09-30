@@ -198,12 +198,72 @@ test('missing environment metadata fails before production mutation', async (t) 
   assert.ok(!f.calls.some(([name]) => name === 'updateFunctionCode'));
 });
 
-test('missing timer fails before production mutation', async (t) => {
+test('an existing empty trigger set is allowed and no timer is created', async (t) => {
   const before = detailFixture();
   before.Triggers = [];
   const f = await fixture(t, { before });
-  await assert.rejects(f.adapter.publishApi(), { code: 'MISSING_TIMER' });
-  assert.ok(!f.calls.some(([name]) => name === 'updateFunctionCode'));
+  await f.adapter.publishApi();
+  assert.equal(f.healthCalls, 1);
+  assert.equal(f.calls.filter(([name]) => name === 'updateFunctionCode').length, 1);
+  assert.ok(f.calls.every(([name, request]) => name !== 'getFunction' || request.Action === 'GetFunction'));
+  const update = f.calls.find(([name]) => name === 'updateFunctionCode')[1];
+  assert.ok(!Object.hasOwn(update.func, 'triggers'));
+  assert.match(f.logs.join('\n'), /0 个原有触发器/);
+});
+
+test('other existing trigger names and types are preserved without creating repository timers', async (t) => {
+  const before = detailFixture();
+  before.Triggers = [
+    { TriggerName: 'existingMaintenance', Type: 'timer', TriggerDesc: '0 0 * * * * *', Enable: 1 },
+    { Name: 'existingGateway', Type: 'apigw', Config: '{"serviceId":"test-service"}', Enable: 1 },
+  ];
+  const f = await fixture(t, { before });
+  await f.adapter.publishApi();
+  assert.equal(f.healthCalls, 1);
+  assert.match(f.logs.join('\n'), /2 个原有触发器/);
+  assert.doesNotMatch(f.logs.join('\n'), /songSweepTick|existingMaintenance|test-service/);
+  const update = f.calls.find(([name]) => name === 'updateFunctionCode')[1];
+  assert.ok(!Object.hasOwn(update.func, 'triggers'));
+});
+
+test('incomplete trigger entries fail before code mutation without exposing their values', async (t) => {
+  const malformedEntries = [null, {}, { Name: 'private-test-value', Type: 'timer' },
+    { Name: 'private-test-value', Config: 'private-test-value' },
+    { Name: '', Type: 'timer', Config: 'private-test-value' },
+    { Name: 'private-test-value', Type: 'timer', Config: null }];
+  for (const entry of malformedEntries) {
+    const before = detailFixture();
+    before.Triggers = [entry];
+    const f = await fixture(t, { before });
+    await assert.rejects(f.adapter.publishApi(), (error) => {
+      assert.equal(error.code, 'INCOMPLETE_TRIGGER_CONFIG');
+      assert.doesNotMatch(error.message, /private-test-value/);
+      return true;
+    });
+    assert.ok(!f.calls.some(([name]) => name === 'updateFunctionCode'));
+  }
+});
+
+test('trigger deletion, addition, renaming, configuration and enabled-state changes fail comparison', async (t) => {
+  const changes = [
+    (detail) => { detail.Triggers = []; },
+    (detail) => { detail.Triggers.push({ Name: 'unexpectedTask', Type: 'timer', Config: 'private-test-value' }); },
+    (detail) => { detail.Triggers[0].Name = 'renamedTask'; },
+    (detail) => { detail.Triggers[0].Config = 'private-test-value'; },
+    (detail) => { detail.Triggers[0].Enable = 0; },
+  ];
+  for (const change of changes) {
+    const after = detailFixture();
+    change(after);
+    const f = await fixture(t, { after });
+    await assert.rejects(f.adapter.publishApi(), (error) => {
+      assert.equal(error.code, 'CONFIG_CHANGED');
+      assert.match(error.message, /Triggers/);
+      assert.doesNotMatch(error.message, /private-test-value|unexpectedTask|renamedTask/);
+      return true;
+    });
+    assert.equal(f.healthCalls, 0);
+  }
 });
 
 test('missing locked artifact fails before any cloud request', async (t) => {

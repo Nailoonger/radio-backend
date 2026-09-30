@@ -71,12 +71,19 @@ function functionConfig(detail) {
       || !Array.isArray(detail.Triggers)) {
     throw fail('云函数配置不完整或不是现有事件函数，已停止发布', 'INCOMPLETE_FUNCTION_CONFIG');
   }
-  const timer = detail.Triggers.find((item) => item
-    && (item.Name === 'songSweepTick' || item.TriggerName === 'songSweepTick')
-    && String(item.Type).toLowerCase() === 'timer'
-    && typeof (item.Config || item.TriggerDesc) === 'string' && (item.Config || item.TriggerDesc));
-  if (!timer) {
-    throw fail('线上缺少 songSweepTick 定时触发器，已停止发布', 'MISSING_TIMER');
+  // Code releases preserve the actual trigger set, including an empty set. A
+  // repository config file is not authority to create or require a production timer.
+  const completeTriggers = detail.Triggers.every((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)
+        || typeof item.Type !== 'string' || !item.Type.trim()) return false;
+    const name = item.Name || item.TriggerName;
+    if (typeof name !== 'string' || !name.trim()) return false;
+    const descriptionKeys = ['Config', 'TriggerDesc'].filter((key) => Object.hasOwn(item, key));
+    return descriptionKeys.length > 0
+      && descriptionKeys.every((key) => typeof item[key] === 'string');
+  });
+  if (!completeTriggers) {
+    throw fail('云函数触发器信息不完整，已停止发布', 'INCOMPLETE_TRIGGER_CONFIG');
   }
   return stable(Object.fromEntries(Object.entries(detail)
     .filter(([key]) => !FUNCTION_VOLATILE.has(key))), NESTED_VOLATILE);
@@ -222,7 +229,7 @@ function createCloudAdapter({
     const detail = await readFunction();
     const before = functionConfig(detail);
     const routesBefore = await readRoutes();
-    logger('云函数：已验证运行配置、定时触发器和 API 入口');
+    logger('云函数：已验证运行配置、' + detail.Triggers.length + ' 个原有触发器和 API 入口');
     const result = await platform('更新云函数代码', () => manager.functions.updateFunctionCode({
       func: { name: 'api', handler: detail.Handler, runtime: detail.Runtime,
         installDependency: detail.InstallDependency, isWaitInstall: true },
