@@ -232,8 +232,9 @@ function makeFacade() {
   const call = (method) => (url, a, b) => {
     // axios 的签名：get(url, config) / post(url, data, config)
     const isBody = method === 'post' || method === 'put' || method === 'patch';
-    const data = isBody ? a : undefined;
     const config = (isBody ? b : a) || {};
+    // DELETE 与 GET 的请求体来自 config.data，保持 axios 的参数约定。
+    const data = isBody ? a : config.data;
     return cloudRequest({ method, url, params: config.params, data, responseType: config.responseType });
   };
 
