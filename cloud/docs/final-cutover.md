@@ -659,6 +659,86 @@ location = /api {
 > （浏览器直接打开会变成下载）。静态资源正常在页面里加载不受影响，但如果遇到
 > 「点某个链接变成下载」，先怀疑这个头。
 
+### 实操：方案 A「静态托管 + 默认域名」怎么落地（2026-09-30 已备好产物）
+
+**① 本机构建（已做，产物就在仓库里）**
+
+```bash
+cd admin-web
+node ./node_modules/vite/bin/vite.js build --outDir _hosting
+```
+
+- ⚠️ **不要构建到默认的 `dist/`** —— 本机装了 safe-delete 垫片，
+  vite 清空已存在的 `dist/` 会报 `SAFE_DELETE_BULK_CONFIRM_REQUIRED`（拦删，不是代码错）。
+  用一个**不存在的新目录**（如 `_hosting`）就绕过这一步。
+- 用 `_` 前缀还有个好处：根 `.gitignore` 有 `_*` ⇒ 产物不进版本库。
+- 产物：`admin-web/_hosting/`（76 个文件 / 3.5MB；打包 zip 后 1.1MB）。
+- 构建读的是 `admin-web/.env.local` ⇒ **必须是 `VITE_REQUEST_MODE=cloud` + 云地址**，
+  否则打出来是 direct 包（判据：`grep -c "jy-radio-" assets/*.js` 要命中）。
+
+**② 上传（控制台，最省事）**
+
+云开发控制台 → 目标环境 → 左侧「**静态网站托管**」→「**新建部署**」→「**上传文件夹**」/
+「**上传代码包**」，选 `admin-web/_hosting`（或刚打的 zip）。
+- 文档明确：「如果静态文件已经是构建产物（如 dist/ 下的文件），**直接上传该目录即可**」。
+- 纯静态项目 ⇒ **安装命令 / 构建命令留空**，产物目录 `.`，部署路径 `/`。
+- 备选（以后改前端更快）：`npm i -g @cloudbase/cli` → `tcb login` →
+  `tcb hosting deploy _hosting -e jy-radio-d1gdwmptl816ee6a9`
+  ⚠️ 命令名在文档里有 `tcb` / `cloudbase` 两种写法，以装完后的实际提示为准。
+
+**③ ⚠️⚠️ 必配：SPA 路由 fallback（跳过这步 = 子路由一刷新就 404）**
+
+本项目路由是 **history 模式**（`createWebHistory`），物理上云端只有 `index.html` 一个文件 ⇒
+访问 `/dashboard` 时 CDN 找不到 `/dashboard.html`，返回 404。
+
+> 症状：**首页能打开，但任何子路由刷新或直接访问都 404。**
+
+修法：控制台 → 静态网站托管 →「**设置**」标签页 →「**错误页面**」填 `index.html` → 保存。
+配完后访问 `/dashboard` 会返回 **index.html + 200**（注意是 200，不是 404 改了响应体），
+Vue Router 拿到 URL 自己解析。
+
+**④ 跨域白名单**
+
+拿到静态托管的**默认域名**后，把它加进 **HTTP 网关 → 跨域设置 → 添加跨域域名**。
+（值不带 `http://` 前缀、不带端口 —— 就是加 `129.28.26.180` 的那个地方。）
+不加 ⇒ 页面能打开，但所有接口被浏览器拦掉。
+
+**⑤ 本机已做的通路验证（可复现）**
+
+构建产物 → 本机起静态服务器 → 真实 Chromium 打开 → 断言：
+
+| 检查项 | 结果 |
+|---|---|
+| 页面渲染 | 截图 248KB（非空白页），3 个输入框 |
+| history 路由 | 打开 `/` 自动 302 到 `/login?redirect=/dashboard` ✅ |
+| 跨域连云端 | 返回 `{"code":40101,"message":"登录已过期，请重新登录","data":null}` ✅ |
+| 页内 JS 报错 | 无 ✅ |
+
+复现方式：`python -m http.server 8123`（在 `_hosting` 目录）+ agent-browser 截图，
+形如 `fetch('https://<云地址>/api', {method:'POST', headers:{'Content-Type':'application/json'},
+body: JSON.stringify({method:'GET', path:'/admin/profile', body:{}, token:'x'})})`。
+能读到 `code:40101` 就说明**跨域通了、云端在响应**（被拦的话 fetch 直接 reject）。
+顺带提醒：本机 `localhost` / `127.0.0.1` 在云网关白名单里（任意端口），所以本机能验。
+
+**⑥ ⚠️⚠️ 上公网前必须先处理的安全问题（历史遗留，与本次迁移无关）**
+
+`admin-web/src/views/Login.vue`：
+
+```js
+// 第 123 行 —— 无条件渲染，任何人都看得见
+<p class="hint">默认超级管理员 teacher / admin123456</p>
+// 第 152 行 —— 密码框预填
+const form = reactive({ username: savedUsername, password: 'admin123456' });
+// 第 151 行 —— 账号默认 teacher
+const savedUsername = localStorage.getItem(REMEMBER_KEY) || 'teacher';
+```
+
+⇒ **把管理端挂到公网，等于把默认管理员账号密码写在门口。**
+（服务器上的 `http://129.28.26.180` 早就存在这个问题，只是那时访问面窄。）
+上线前必须删掉这行提示 + 去掉密码预填。**属 UI 改动 ⇒ 先出静态预览、点头后再动。**
+
+---
+
 ### 建议的顺序
 
 1. **先把 A 做出来跑通** —— 目标是让「服务器停不停」都不影响老师登录。
