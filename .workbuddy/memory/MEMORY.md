@@ -88,6 +88,26 @@
 > ✅ `JWT_SECRET` 反向验证脚本：`cloud/scripts/verify-jwt-secret.js`（纯 Node 手写 HS256，不引依赖）。
 > ⚠️ 部署脚本 `deploy-cloud.js` 会同时打印两种终端命令（`</dev/null` 在部分终端里报错）。
 
+## 服务器到期后怎么办（2026-09-30 查证）
+- **先看清服务器现在在干什么**：切云后学生走 `callFunction`（不碰服务器）、
+  admin-web 的接口请求**直连云端**（不打服务器 `/api`）⇒ **服务器实质上只是「静态网页托管机」**，
+  只为了放 admin-web 的 dist。这就是「改个前端还要上服务器更新」的原因 —— **那张网页在那儿**。
+  ⚠️ 停后端容器前先看 `docker compose logs --tail=200 radio-backend` 有无近期请求（旧版 direct 可能还在打）。
+- **admin-web 三个去向**：A 云开发**静态网站托管 + 默认域名**（免费、几十分钟）
+  ／B 静态托管 + **备案**自定义域名（最正规）／C 续服务器。
+- ⚠️ **默认域名现口径（官方 docs.cloudbase.net/service/alias）**：首次浏览器访问弹「访问提示中间页」，
+  点「确定访问」后**同域名在 Cookie 有效期内不再弹**（不是每次）；政策已放宽为
+  「**只有软性提醒，不再硬性禁止访问**」，但仍写「严禁用于正式生产环境或分发给大规模用户」，
+  且保留「访问量异常 → 风控关停」权利。⇒ **几个老师内部用够；对外分发别用**。
+- ⚠️⚠️ **云开发里备案的 3 个准入条件（必须同时满足）**：① 套餐个人版及以上 ——
+  **免费体验环境不支持备案** ② 环境剩余有效期 **> 6 个月** ③ 已开启「**云托管固定 IP**」（本项目没开云托管）。
+  管局审核 **1–20 个工作日**；SSL 证书可免费申请；一个环境最多备 **2 个**站。
+  别家备过案的域名要办「新增接入备案（转入）」才能绑。
+- ⚠️ **静态域名的后缀与 HTTP 网关不同**（`tcloudbaseapp.com` vs `app.tcloudbase.com`）⇒ 是**跨域**
+  ⇒ 必须把静态托管域名加进 **HTTP 网关 → 跨域设置**（同加 `129.28.26.180` 那里），否则页面打得开但接口全被拦。
+  另：默认域名会给非导航请求加 `Content-Disposition: attachment`（「点链接变下载」先怀疑它）。
+- 细则与代价对比：`cloud/docs/final-cutover.md`「服务器不续费之后：admin-web 放哪」。
+
 ## 部署（服务器 `~/radio`）
 - `build <svc>` + `up -d --force-recreate <svc>`（restart 不换镜像）。admin-web 只改 views：`build admin-web` →
   `up -d --force-recreate --no-deps admin-web`；其 Dockerfile 容器内自 build（build context = `./admin-web`，
