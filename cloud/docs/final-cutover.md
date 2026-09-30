@@ -748,10 +748,54 @@ https://jy-radio-d1gdwmptl816ee6a9-1491709115.tcloudbaseapp.com/
 | 包内明文凭据 `admin123456` / 「默认超级管理员」/ `teacher /` | **各 0 处** |
 | 是不是 cloud 模式产物 | ✅ 命中 `jy-radio-` |
 | **跨域**（带 `Origin` 预检 + 实际 POST） | ✅ `access-control-allow-origin` 回显了静态托管域名；POST 返回 `{"code":40101}` 而非被拦 ⇒ **页面可以正常调接口** |
-| `GET /login`（子路由） | **404** ⇒ SPA fallback 还没配（正是下面 ③ 要做的事） |
+| `GET /login`（子路由） | **404** · 465B · `<title>404 Not Found</title>` ⇒ **静态托管自己的 404 页**，说明 SPA fallback 还没配（正是下面 ③ 要做的事） |
 
-> ⚠️ **首次在浏览器打开默认域名会先弹一个「访问提示中间页」**，点「确定访问」即可，
-> 之后同域名在 Cookie 有效期内不再弹（见前面「默认域名政策」一节）。
+> ⚠️ 别把这个 404 和上面的「风险提醒」中间页弄混，**两者长得很像、都返回 404**：
+>
+> | | 中间页 | 静态托管 404 |
+> |---|---|---|
+> | 触发条件 | 带 `Sec-Fetch-Mode: navigate` 且**没有**那个 Cookie | 路径在云端找不到对应文件 |
+> | body | ~18KB，`<title>风险提醒</title>` | **~465B**，`<title>404 Not Found</title>` |
+> | 怎么办 | 点「确定访问」，**正常** | 去配 ③，**才是真问题** |
+>
+> 判据：**看 body 大小**（18KB vs 0.5KB）+ 看 title，最快。
+
+**②-b-1 「风险提醒」中间页：实测机制（2026-09-30 查清，别被吓到）**
+
+在浏览器里第一次打开上面那个域名，会先看到一个 **404 状态码**的「风险提醒 / 页面访问提示」页。
+**这不是部署坏了** —— 官方 `docs.cloudbase.net/service/alias` 的明文规定：
+
+> 当访客使用浏览器通过「默认域名」访问云开发资源时，**用户通过浏览器直接访问的请求
+> （`Sec-Fetch-Mode` 请求头的值为 `navigate`）将会展示"访问提示中间页"**；
+> **对其他请求会添加 `Content-Disposition: attachment` 响应头**。
+
+**实测把机制彻底钉死了**（本机 Node `https` 直连，逐项加请求头二分）：
+
+| 请求 | 结果 |
+|---|---|
+| 不带 `Sec-Fetch-Mode`（模拟 XHR / 子资源） | **200** + 真实页面 417B ✅ |
+| 带 `Sec-Fetch-Mode: navigate`（模拟地址栏） | **404** + `<title>风险提醒</title>` 18KB ⚠️ |
+| `navigate` + **同域 `Referer`** | **200** + 真实页面，且下发<br>`set-cookie: cloudbase_confirm_domain_access=…; Max-Age=28800` ✅ |
+
+⇒ 机制是完整的：**中间页上有个「确定访问」按钮（3 秒倒计时后可用），它执行
+`window.location.href = "/"`；这次跳转带上了同域 `Referer`，服务端就放行并下发那个 Cookie
+（有效期 8 小时）。之后同域名在这 8 小时内不再弹。**
+
+- ⚠️ **判断"是不是中间页"只看两点**：① HTTP 状态码 **404** ② body 里有 `<title>风险提醒</title>`
+  （约 17.8–18.1KB，`server: tcbgw`）。别把它当成"静态托管没配对"。
+- ⚠️ **中间页正文里那句「当前访问量已达上限，如需继续访问，请联系开发者」是这一版模板的固定文案**，
+  不是"你的环境真被限流了" —— 实测带上同域 `Referer` 立刻 200 返回真实页面，说明并未被阻断。
+- ⚠️ **`Content-Disposition: attachment` 只出现在非导航请求上**（导航请求不带）。
+  所以"点链接变下载"只可能出现在直接打开子资源时；**浏览器正常加载页面不受影响**
+  （子资源上的 `content-disposition` 本来就被浏览器忽略）。
+  ⇒ 我一度用不带 `Sec-Fetch-Mode` 的裸请求探测，看到两个域名的 HTML/JS 都带 `attachment`，
+  **误报过"会变成下载"** —— 教训：**探测默认域名必须带浏览器同款请求头，否则结论会反。**
+  （本机代理还会**剥掉自定义请求头**，所以只能用 Node `https` 直连，不能用 `curl`。）
+- ⚠️ **API 不受影响**：网关域 `…ap-shanghai.app.tcloudbase.com` 在 `navigate` 模式下同样返回中间页，
+  但前端发的是 `Sec-Fetch-Mode: cors` 的 XHR ⇒ **放行**（实测 `/api/admin/profile` 返回 200 + 正常 JSON）。
+
+> ⇒ **给老师用的时候提前说一句**：第一次打开会先看到一个腾讯云的提示页，**点「确定访问」**就进去了；
+> 8 小时内不用再点。**不是网站坏了、也不是被封了。**
 
 **③ ⚠️⚠️ 必配：SPA 路由 fallback（跳过这步 = 子路由一刷新就 404）**
 
@@ -763,6 +807,23 @@ https://jy-radio-d1gdwmptl816ee6a9-1491709115.tcloudbaseapp.com/
 修法：控制台 → 静态网站托管 →「**设置**」标签页 →「**错误页面**」填 `index.html` → 保存。
 配完后访问 `/dashboard` 会返回 **index.html + 200**（注意是 200，不是 404 改了响应体），
 Vue Router 拿到 URL 自己解析。
+
+> 官方专门有一篇讲这个的配方：`docs.cloudbase.net/recipes/add-hosting-vue`
+> （「第四步：配 SPA fallback」），原文的路径就是「控制台 → 静态网站托管 → 切到『设置』标签页 →
+> 找到『错误页面』配置 → 把 4xx 错误页面填为 `index.html`」。
+> 底层机制是「重定向规则 → 错误码重定向」（支持 4xx，可自定义页面）。
+
+**③ 的判据（配之前 / 配之后各测一次，本机就能测）**：
+
+```bash
+# 在仓库根目录，本机 PowerShell 或 bash 都行
+node -e "const h=require('https');['/', '/login','/dashboard'].forEach(p=>h.get({host:'admin-web-jy-radio-d1gdwmptl816ee6a9.webapps.tcloudbase.com',path:p,headers:{'Sec-Fetch-Mode':'navigate','Sec-Fetch-Site':'same-origin','Referer':'https://admin-web-jy-radio-d1gdwmptl816ee6a9.webapps.tcloudbase.com/'}},r=>{let b='';r.setEncoding('utf8');r.on('data',c=>b+=c);r.on('end',()=>console.log(p,r.statusCode,b.length,(b.match(/<title>([^<]*)</)||[])[1]))}))"
+```
+
+- ⚠️ **那段 `Referer` 不能省** —— 不带的话子路由会被中间页截胡，一律返回 404，**看不出真实状态**。
+- **配之前**：`/` → `200 3xx~4xx 校园广播站 - 管理后台`；`/login` → `404 465 404 Not Found`
+  （`/` 那行的字节数会随 `Accept` 头在 399~417 之间浮动，**别拿它当判据**）
+- **配之后（期望）**：三个都是 `200 ` + `校园广播站 - 管理后台` ⇒ **只看 `/login` 那行的状态码和 title 变了即可**。
 
 **④ 跨域白名单**
 

@@ -56,6 +56,27 @@
 - 管理端 v2＝单页 + 条件条 + 胶囊 + 批量＝筛选结果，**不要目录树**。页头动作组走 MainLayout `#ph-actions` + `Teleport`，**必须 onMounted+nextTick 后再挂**。⚠️ `bulkCreate` 必须传模型**驼峰**属性名（下划线名被静默丢弃）。
 - 顶栏 v8：**没有全局搜索、没有刷新按钮**；副标题＝`共 N 个账号 · X 届 · 已激活 M`。
 
+## ⚠️⚠️ 动 UI / 编内容之前，先读这三处源
+> 起因：做官网介绍页时没读文档就自起配色、自编内容，被陛下当面点名（同类错已犯两次）。
+
+1. **设计 token 源** = `admin-web/src/styles/theme.css`（继承 `miniprogram/app.wxss`）。
+   三硬规则：① 唯一强调色 `--accent #0066cc` ② 无装饰性渐变 ③ 无彩色投影。
+   token：`--tile #272729`（深色卡主角）/ `--parchment #f5f5f7` / `--canvas #fff` / `--ink #1d1d1f` /
+   `--muted #7a7a7a` / `--soft #c7c7cc` / `--hairline #e0e0e0` / `--divider #f0f0f0` / `--live #ff453a`；
+   圆角 `--r-card 18 / --r-input 12 / --r-tile 20 / --r-pill`；间距 `--s1..s6 = 4/8/13/18/26/34`。
+   ⚠️ **别自起私有配色**（admin-login v1/v2 栽过，v3 才接回 token）。
+2. **真实内容源** = `src/utils/seed.js` 的 `seedSettings()`：**2005 年**成立（口号"菁菁校园情，悠悠广播声"）；
+   开播 **午间 12:30-13:00｜下午 17:00-17:30**；社长电话 13800138000（疑似占位）。
+   ⚠️ `seedPrograms()` 那 3 个是**示例种子，不是真栏目**。
+   ⚠️ **校园广播站没有 FM 频率** —— "87.6MHz"是假的，早因瞎编被点过 → **别再编任何业务事实**。
+3. **结构事实源** = `AGENTS.md`：社干 `cadre` = 站长/副站长/纪检长/站长助理（无部门字段）；
+   部员 `staff` = 播音部/主持部/编辑部。
+4. 信息架构从 `pages/about` 长出来（品牌区 + 一卡三块 + 分隔线）；真站徽 `preview/assets/station-badge.png`（+ `-mono.png`）。
+
+**自检配方**（参考 `preview/_check-website-v3.cjs`）：gradient 数=0（**必须先剥 `/* */` 注释**，
+否则注释里提到 gradient 会误报）、无彩色投影、禁词扫描（FM/假人名/假栏目）、真内容必须在、
+JS 过 `new Function`、id/锚点可解析、图片存在、无乱码字符。
+
 ## 已废弃（别捡回来）
 - v2 点歌口径（提交即占位 / 全局候补队 / `song_queue_limit`）。
 - 登录页 v1（AI 底图 + 插画）全删且被否；概念稿 v2–v7 在 `design-preview/`（未跟踪）。
