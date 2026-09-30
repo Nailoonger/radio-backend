@@ -120,7 +120,6 @@
           </div>
         </div>
 
-        <p class="hint">默认超级管理员 teacher / admin123456</p>
       </section>
     </main>
 
@@ -148,8 +147,14 @@ const auth = useAuthStore();
 
 const REMEMBER_KEY = 'admin_remember_username';
 
-const savedUsername = localStorage.getItem(REMEMBER_KEY) || 'teacher';
-const form = reactive({ username: savedUsername, password: 'admin123456' });
+/**
+ * ⚠️ 不预填任何账号/密码（2026-09-30）：
+ *   原来写死预填了默认管理员账号与密码，登录页上还渲染一行明文提示。
+ *   挂到公网等于把管理员凭据写在门口 —— 已全部移除。
+ *   账号仍支持「记住账号」：勾选过就从 localStorage 回填，那是用户自己的选择。
+ */
+const savedUsername = localStorage.getItem(REMEMBER_KEY) || '';
+const form = reactive({ username: savedUsername, password: '' });
 const remember = ref(Boolean(localStorage.getItem(REMEMBER_KEY)));
 const loading = ref(false);
 
@@ -406,13 +411,6 @@ button.submit-btn:active {
 .help-text {
   font-size: 12px;
   color: #787d85;
-}
-
-/* 默认账号提示 */
-.hint {
-  margin: 0;
-  font-size: 12px;
-  color: #8a9199;
 }
 
 /* ==================== 页脚 ==================== */

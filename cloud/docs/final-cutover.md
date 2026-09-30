@@ -720,22 +720,44 @@ body: JSON.stringify({method:'GET', path:'/admin/profile', body:{}, token:'x'})}
 能读到 `code:40101` 就说明**跨域通了、云端在响应**（被拦的话 fetch 直接 reject）。
 顺带提醒：本机 `localhost` / `127.0.0.1` 在云网关白名单里（任意端口），所以本机能验。
 
-**⑥ ⚠️⚠️ 上公网前必须先处理的安全问题（历史遗留，与本次迁移无关）**
+**⑥ ✅ 登录页的默认凭据已清除（2026-09-30 已修）**
 
-`admin-web/src/views/Login.vue`：
+原来是这么写的（`admin-web/src/views/Login.vue`）：
 
 ```js
-// 第 123 行 —— 无条件渲染，任何人都看得见
-<p class="hint">默认超级管理员 teacher / admin123456</p>
-// 第 152 行 —— 密码框预填
-const form = reactive({ username: savedUsername, password: 'admin123456' });
-// 第 151 行 —— 账号默认 teacher
+// 模板里 —— 无条件渲染，任何人都看得见
+<p class="hint">默认超级管理员 teacher / <默认密码明文></p>
+// script 里 —— 密码框预填 + 账号默认值
 const savedUsername = localStorage.getItem(REMEMBER_KEY) || 'teacher';
+const form = reactive({ username: savedUsername, password: '<默认密码明文>' });
 ```
 
 ⇒ **把管理端挂到公网，等于把默认管理员账号密码写在门口。**
 （服务器上的 `http://129.28.26.180` 早就存在这个问题，只是那时访问面窄。）
-上线前必须删掉这行提示 + 去掉密码预填。**属 UI 改动 ⇒ 先出静态预览、点头后再动。**
+
+**改法（3 处，只动这几行）**：
+1. 删掉模板里那行 `<p class="hint">…</p>`，并删掉配套的 `.hint` 样式（scoped，无别处引用）
+2. `password: '<默认密码明文>'` → `password: ''`
+3. `|| 'teacher'` → `|| ''`
+
+保留「记住账号」：勾选过仍从 `localStorage` 回填——那是用户自己的选择，不是我们替他把凭据摆出来。
+
+**验收（本机静态服务器 + 真实 Chromium 探针）**：
+
+| 检查项 | 结果 |
+|---|---|
+| 账号输入框初值 | `""` |
+| 密码输入框初值 | `""` |
+| 页面文本含默认密码 | `false` |
+| 页面文本含「默认超级管理员」 | `false` |
+| `.hint` 元素个数 | `0` |
+| 渲染 | 截图 239KB，布局无塌陷，无 JS 报错 |
+
+> ⚠️ 注意：修复后**源码/文档里也不要再写明文密码**（仓库会 push 出去）。
+> 提交信息、注释、文档一律用「默认密码明文」这类指代。
+
+⚠️ 顺带：服务器上那份 admin-web 是**同一份源码**构建的，这个修补也适用于它 ——
+下次在服务器 `build admin-web` 时会一并生效。
 
 ---
 
