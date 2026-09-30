@@ -316,12 +316,21 @@
 
               <!-- 删除：v8 就有、协议版重做操作列时被弄丢了（2026-09-27 补回）。
                    后端 DELETE /submit/:id 是 requireAdmin（普通管理员也能删，影响范围只有一条），
-                   但点歌若属于「已锁定的周」后端会拒（assertWeekOpen）→ 这里同步置灰。 -->
+                   但点歌若属于「已锁定的周」后端会拒（assertWeekOpen）→ 这里同步置灰。
+
+                   ⚠️ 两种类型**故意不同形**（风险量级不同，别去"统一"）：
+                     · 点歌 → 套 `.op-del`，即上面「危险操作走文字链接」的既定样式（删除会释放正式位
+                       + 服务端重跑该周调剂，属常见操作，降调性即可）；
+                     · 文稿 → 不套 `.op-del`（套了会把边框扒掉），保持 `type="danger" plain` 的实体描边
+                       按钮 + 四字文案，把危险感抬上来。`op-article-del` 只是**语义标记**，
+                       CSS 里刻意没有它 —— 别加规则、也别把这里改成 `.op-del`。 -->
               <el-button
-                size="small" class="op-del"
-                :disabled="row.type === 1 && weekLocked"
+                size="small" type="danger" plain
+                :class="Number(row.type) === 2 ? 'op-article-del' : 'op-del'"
+                :disabled="Number(row.type) === 1 && weekLocked || deletingId !== null"
+                :loading="deletingId === row.id"
                 @click="removeRow(row)"
-              >删除</el-button>
+              >{{ Number(row.type) === 2 ? '删除文稿' : '删除' }}</el-button>
             </div>
           </template>
         </el-table-column>
@@ -1697,7 +1706,13 @@ async function fetch() {
 }
 
 function search() { query.page = 1; fetch(); }
-function setType(v) { query.type = v; search(); }
+function setType(v) {
+  query.type = v;
+  query.status = '';
+  query.slot = '';
+  selection.value = [];
+  search();
+}
 function setStatus(v) { query.status = v; search(); }
 function clearSelection() { selection.value = []; }
 function goSettings() { router.push('/submit/settings'); }
@@ -1770,20 +1785,30 @@ async function revoke(row) {
  *   - 占着正式位的点歌被删 → 服务端**自动释放位子并重跑该周调剂**，候补最合适的会被提上来，
  *     所以提示里要说明「位子会释放」，别让人以为删了就空着。
  */
+const deletingId = ref(null);
 async function removeRow(row) {
+  if (deletingId.value !== null) return;
   const isSong = Number(row.type) === 1;
   const name = isSong
     ? `${row.songName || '点歌'}${row.singer ? ' · ' + row.singer : ''}`
     : (row.articleTitle || '文稿');
-  await ElMessageBox.confirm(
-    `删除后不可恢复。\n《${name}》`
-    + (isSong ? '\n若这条已占正式位，位子会立刻释放，并自动重跑该周调剂（候补会补上来）。' : ''),
-    '删除这条投稿',
-    { type: 'warning', confirmButtonText: '删除', confirmButtonClass: 'el-button--danger' },
-  );
-  await http.delete(`/admin/submit/${row.id}`);
-  ElMessage.success('已删除');
-  await refreshAll();
+  try {
+    await ElMessageBox.confirm(
+      `删除后不可恢复。\n《${name}》`
+      + (isSong ? '\n若这条已占正式位，位子会立刻释放，并自动重跑该周调剂（候补会补上来）。' : ''),
+      isSong ? '删除这条点歌' : '删除这篇文稿',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消', confirmButtonClass: 'el-button--danger' },
+    );
+  } catch { return; }
+  deletingId.value = row.id;
+  try {
+    await http.delete(`/admin/submit/${row.id}`);
+    selection.value = selection.value.filter((item) => item.id !== row.id);
+    if (rows.value.length === 1 && query.page > 1) query.page -= 1;
+    ElMessage.success(isSong ? '已删除点歌' : '已删除文稿');
+    await refreshAll();
+  } catch { /* 拦截器已提示 */ }
+  finally { deletingId.value = null; }
 }
 
 async function batchApprove() {
