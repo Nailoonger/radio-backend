@@ -6,6 +6,8 @@ Git 记录源码版本；GitHub Actions 工作流“云端校验与发布”负�
 
 以下步骤是首次启用需要完成的平台配置。仅提交这些文件并不表示线上自动发布已经启用。
 
+2026-09-30 已完成本项目首次启用：用户保存发布凭据和环境变量后，[校验与首次发布成功](https://github.com/Nailoonger/radio-backend/actions/runs/36705057250)，管理后台和 `api` 云函数均建立了成功发布基线。当前仓库日常更新直接按第 5 节操作，下面的首次配置步骤供重新设置或新环境使用。
+
 ## 1. 在 GitHub 配置发布凭据
 
 打开仓库 [Nailoonger/radio-backend](https://github.com/Nailoonger/radio-backend)，进入 **Settings → Secrets and variables → Actions**。
