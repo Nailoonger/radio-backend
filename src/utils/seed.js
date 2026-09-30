@@ -9,6 +9,7 @@
  * 启动时自动执行一次（幂等）
  */
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const dayjs = require('dayjs');
 const { sequelize, Admin, Program, SystemSetting, SystemSwitch } = require('../models');
 const config = require('../config');
@@ -20,7 +21,16 @@ async function seedAdmin() {
     logger.info(`[seed] 管理员 ${config.initAdmin.username} 已存在，跳过`);
     return exists;
   }
-  const hash = await bcrypt.hash(config.initAdmin.password, 10);
+
+  // ⚠️ 没配 INIT_ADMIN_PASSWORD 就随机生成一次（2026-09-30）：
+  //    原来回落到一个公开的固定默认密码，等于把后台入口写在仓库里。
+  //    随机密码只在这一次启动日志里打印，之后日志上再也拿不到。
+  const generated = !config.initAdmin.password;
+  const plain = generated
+    ? crypto.randomBytes(12).toString('base64url')
+    : config.initAdmin.password;
+
+  const hash = await bcrypt.hash(plain, 10);
   const admin = await Admin.create({
     username: config.initAdmin.username,
     password: hash,
@@ -29,6 +39,16 @@ async function seedAdmin() {
     status: 1,
   });
   logger.info(`[seed] 已创建超级管理员: ${admin.username}`);
+
+  if (generated) {
+    logger.warn('=====================================================');
+    logger.warn('[seed] 未配置 INIT_ADMIN_PASSWORD，已生成一次性随机密码：');
+    logger.warn(`[seed]     ${plain}`);
+    logger.warn('[seed] 请立刻登录并改密 —— 此密码只在本次启动日志里出现。');
+    logger.warn('=====================================================');
+  } else {
+    logger.info('[seed] 初始密码取自环境变量 INIT_ADMIN_PASSWORD');
+  }
   return admin;
 }
 

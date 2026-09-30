@@ -15,10 +15,11 @@ afterAll(async () => {
 });
 
 describe('管理员登录 & 当前账号', () => {
-  test('默认超管登录成功', async () => {
+  test('超管登录成功', async () => {
+    // 密码须与 helpers.seedAdmin() 的默认值一致（内存库，只在测试进程内使用）
     const res = await request(app)
       .post('/api/admin/login')
-      .send({ username: 'teacher', password: 'admin123456' });
+      .send({ username: 'teacher', password: 'test-pwd-for-jest' });
     expect(res.status).toBe(200);
     expect(res.body.code).toBe(0);
     expect(res.body.data.token).toBeTruthy();

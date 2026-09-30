@@ -1,7 +1,7 @@
 # 菁悠广播站管理后台
 
 > Vue 3 + Vite + Element Plus 单页应用，对接 `radio-backend` 后端。
-> 默认账号：**teacher / admin123456**
+> 初始账号：**teacher**（密码见后端 `.env` 的 `INIT_ADMIN_PASSWORD`，或后端首次启动日志）
 
 ## 启动
 

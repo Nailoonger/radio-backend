@@ -56,7 +56,8 @@ services:
       WECHAT_APPID: ${WECHAT_APPID:-}
       WECHAT_SECRET: ${WECHAT_SECRET:-}
       INIT_ADMIN_USERNAME: ${INIT_ADMIN_USERNAME:-teacher}
-      INIT_ADMIN_PASSWORD: ${INIT_ADMIN_PASSWORD:-admin123456}
+      # 留空则由后端随机生成，并在首次启动日志里打印一次（见 .env.example）
+      INIT_ADMIN_PASSWORD: ${INIT_ADMIN_PASSWORD:-}
       INIT_ADMIN_NICKNAME: ${INIT_ADMIN_NICKNAME:-指导老师}
     volumes:
       - ./data/uploads:/app/uploads

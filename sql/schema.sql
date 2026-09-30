@@ -366,12 +366,16 @@ INSERT INTO `system_setting`(`key`,`value`,`desc`) VALUES
 ('contact', '广播站社长 13800138000', '联系方式');
 
 -- -----------------------------------------------------------------
---  初始超级管理员（密码：admin123456，bcrypt hash）
---  生成方式: bcrypt.hashSync('admin123456', 10)
---  注意: 首次部署后请立即修改密码！
+--  初始超级管理员
+--  ⚠️ 这里刻意不写死任何账号（2026-09-30）：原先直接插了一条「密码等于公开
+--     默认值」的 teacher 记录，连 bcrypt hash 一起进了仓库 —— 等于把后台入口
+--     连同验证材料一起公开。任何拿到这张表的人都能确认密码就是那个默认值。
+--     现在改由后端启动时的 seedAll() 创建：密码取自环境变量 INIT_ADMIN_PASSWORD，
+--     留空则随机生成、并在启动日志里打印一次（见 src/utils/seed.js）。
+--     纯 SQL 建库后，只要后端启动过一次，账号就会自动补上。
 -- -----------------------------------------------------------------
-INSERT INTO `admin`(`username`,`password`,`nickname`,`role`,`status`) VALUES
-('teacher', '$2a$10$Kx9GZSF3FFxgJ9uKViIne.jndmwowJaWkNecq.Uwv5CeriBkUfqfy', '指导老师', 0, 1);
+-- INSERT INTO `admin`(`username`,`password`,`nickname`,`role`,`status`) VALUES
+-- ('teacher', '<用 bcrypt.hashSync(你的密码, 10) 生成>', '指导老师', 0, 1);
 
 -- -----------------------------------------------------------------
 --  初始示例节目（用于演示）

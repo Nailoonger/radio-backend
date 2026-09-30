@@ -107,7 +107,7 @@
 - AC3：浏览器访问 `https://localhost/` 自动跳转 / 显示管理后台登录页
 - AC4：浏览器访问 `https://localhost/api/health` 返回 `{"code":0,...}`
 - AC5：浏览器访问 `https://localhost/api-docs/` 看到 Swagger UI，46+ 接口
-- AC6：管理后台能登录 teacher/admin123456（数据库 seed 自动创建）
+- AC6：管理后台能用 `teacher` + `INIT_ADMIN_PASSWORD` 登录（数据库 seed 自动创建）
 - AC7：管理后台能创建成员、上传头像、图片存到 `./data/uploads`
 - AC8：`docker compose down` 停止后，`./data/mysql` 和 `./data/uploads` 数据仍在
 - AC9：重启 `docker compose up -d` 后，之前创建的管理员 / 成员 / 公告仍在

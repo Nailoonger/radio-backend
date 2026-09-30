@@ -123,7 +123,7 @@ npm run dev
 🚀 菁悠广播站后端已启动
 📍 地址: http://localhost:3000
 📚 API文档: http://localhost:3000/api-docs
-🔐 默认超管账号: teacher  密码: admin123456
+🔐 超管账号: teacher（密码见 .env 的 INIT_ADMIN_PASSWORD；留空则只打印这一遍）
 ```
 
 ### 3. 跑测试
@@ -193,7 +193,7 @@ bash deploy/start.sh
 | **http://127.0.0.1/** | 管理后台（推荐用这个） |
 | **http://127.0.0.1/api-docs/** | Swagger API 文档 |
 | **http://127.0.0.1/health** | 后端健康检查 |
-| 默认账号 | `teacher` / `admin123456` |
+| 初始账号 | `teacher`（密码见 `.env` 的 `INIT_ADMIN_PASSWORD`）|
 
 如一定要用 `localhost`，参考 [排错章节](#十二排错指南) 清 Edge HSTS。
 
@@ -481,12 +481,20 @@ docker exec -it radio-mysql mysql -uroot -proot123
 
 ### 管理员密码忘了
 
+**⚠️ 不要用「改成某个固定密码」的现成 SQL** —— 那种写法等于把后门一起提交进仓库。
+正确做法是自己生成 hash：
+
 ```bash
-docker exec -it radio-mysql mysql -uroot -proot123 radio_station -e "
-UPDATE admin SET password='\$2a\$10\$Kx9GZSF3FFxgJ9uKViIne.jndmwowJaWkNecq.Uwv5CeriBkUfqfy' WHERE username='teacher';
+# 1) 先生成新密码的 bcrypt hash（在本机项目目录跑）
+node -e "console.log(require('bcryptjs').hashSync('你的新密码', 10))"
+
+# 2) 把上一步输出的 hash 填进下面这行（注意别丢那个 $ 符号本身）
+docker exec -it radio-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" radio_station -e "
+UPDATE admin SET password='<把上一步输出的 hash 粘这里>' WHERE username='teacher';
 "
 ```
-（上面 hash 对应 `admin123456`）
+
+顺手把 `.env` 里的 `INIT_ADMIN_PASSWORD` 也改成同一个新密码，免得将来重装时又回到旧值。
 
 ---
 
@@ -670,4 +678,4 @@ docker compose up -d                      # 自动检测变更
 **项目版本**：v1.0.0
 **站名**：菁悠广播站
 **站口号**：菁菁校园情，悠悠广播声
-**默认账号**：`teacher` / `admin123456`（首次登录后请立即改密）
+**初始账号**：`teacher`（密码见 `.env` 的 `INIT_ADMIN_PASSWORD`；首次登录后请立即改密）

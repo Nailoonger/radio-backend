@@ -18,12 +18,12 @@ async function resetDB() {
   await sequelize.sync();
 }
 
-async function seedAdmin({ username = 'teacher', password = 'admin123456', role = 0, nickname = '指导老师' } = {}) {
+async function seedAdmin({ username = 'teacher', password = 'test-pwd-for-jest', role = 0, nickname = '指导老师' } = {}) {
   const hash = await bcrypt.hash(password, 10);
   return Admin.create({ username, password: hash, nickname, role, status: 1 });
 }
 
-async function loginAdmin(app, { username = 'teacher', password = 'admin123456' } = {}) {
+async function loginAdmin(app, { username = 'teacher', password = 'test-pwd-for-jest' } = {}) {
   const res = await request(app)
     .post('/api/admin/login')
     .send({ username, password });

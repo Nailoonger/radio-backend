@@ -16,7 +16,10 @@ function req(options, body) {
 
 (async () => {
   // 1. 登录
-  const loginBody = JSON.stringify({ username: 'teacher', password: 'admin123456' });
+  const loginBody = JSON.stringify({
+    username: process.env.ADMIN_USERNAME || 'teacher',
+    password: process.env.ADMIN_PASSWORD || '',
+  });
   const login = await req({
     host: '127.0.0.1', port: 80, path: '/api/admin/login', method: 'POST',
     headers: { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(loginBody) }

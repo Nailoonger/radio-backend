@@ -1,24 +1,24 @@
 # 真机收尾清单（阶段 9 之后 · 一次性）
 
-> 目标：把「服务器 Express + MySQL」整体切到「云开发 + 云数据库 + HTTP 访问服务」。
-> 原则：**原链路一行不删、随时可切回**（admin-web 只改一个环境变量）。
-> 现状：阶段 0–9 的代码 / 断言 / 文档全完成；本机回归 **3115 项 / 0 失败**。
+> 目标：把「服务器 Express + MySQL」整体切到「云开发 + 云数据库 + HTTP 访问服务」。  
+> 原则：**原链路一行不删、随时可切回**（admin-web 只改一个环境变量）。  
+> 现状：阶段 0–9 的代码 / 断言 / 文档全完成；本机回归 **3115 项 / 0 失败**。  
 > 相关：迁移三步的细节见 `cloud/migration/README.md`；通道选型见 `stage9-admin-web-plan.md`。
 
 ---
 
 ## 进度
 
-| 步 | 状态 | 证据 / 产物 |
-|---|---|---|
-| ① 配 HTTP 访问服务 | ✅ **已完成** | 路由 `/api` 已生效；域名 `jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com` |
-| ② 部署云函数 | ✅ **已完成** | `success: true`、`filesCount: 3`、`packSize 126.3 KB` |
-| ③ 导出生产库 | ✅ **已完成** | 16 表 / **686 行** / warning 0 / error 0；`unique_keys` 556 条、`sequence` 16 条 |
-| ④ 导入云数据库 | ✅ **已完成** | 控制台导入 17 个集合（`message` 本就空，跳过）；Upsert |
-| ⑤ 导出云库做基线 | ✅ **已完成** | `cloud/migration/cloud-dump/`（17 个 `<集合名>.json`） |
-| ⑥ 双向校验 | ✅ **已完成** | 表 16 / 失败 0；行 源 686 = 云 686；缺 0 / 孤 0 / 字段差 0 / 结构问题 0 |
-| ⑦ admin-web 切 cloud | ✅ **已完成** | 8 个接口实测全绿 + 真实浏览器登录成功（2026-09-29）；`dist/` 已含云域名、无 direct 残留 |
-| ⑧ 小程序切 cloud | ✅ **体验版已验证，待发正式版** | 陛下真机实测：**不再报错、可正常登录**，且**无需再开「不校验合法域名」**；另 13 个学生端只读接口云端全绿（见下文 ⑧） |
+| 步                   | 状态                 | 证据 / 产物                                                                                 |
+| ------------------- | ------------------ | --------------------------------------------------------------------------------------- |
+| ① 配 HTTP 访问服务       | ✅ **已完成**          | 路由 `/api` 已生效；域名 `jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com` |
+| ② 部署云函数             | ✅ **已完成**          | `success: true`、`filesCount: 3`、`packSize 126.3 KB`                                     |
+| ③ 导出生产库             | ✅ **已完成**          | 16 表 / **686 行** / warning 0 / error 0；`unique_keys` 556 条、`sequence` 16 条              |
+| ④ 导入云数据库            | ✅ **已完成**          | 控制台导入 17 个集合（`message` 本就空，跳过）；Upsert                                                   |
+| ⑤ 导出云库做基线           | ✅ **已完成**          | `cloud/migration/cloud-dump/`（17 个 `<集合名>.json`）                                        |
+| ⑥ 双向校验              | ✅ **已完成**          | 表 16 / 失败 0；行 源 686 = 云 686；缺 0 / 孤 0 / 字段差 0 / 结构问题 0                                  |
+| ⑦ admin-web 切 cloud | ✅ **已完成**          | 8 个接口实测全绿 + 真实浏览器登录成功（2026-09-29）；`dist/` 已含云域名、无 direct 残留                             |
+| ⑧ 小程序切 cloud        | ✅ **体验版已验证，待发正式版** | 陛下真机实测：**不再报错、可正常登录**，且**无需再开「不校验合法域名」**；另 13 个学生端只读接口云端全绿（见下文 ⑧）                       |
 
 ### ①② 的实测结论（2026-09-29 13:53）
 
@@ -33,19 +33,19 @@ curl "https://jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.c
 - `root` 四个文件齐、`lib`/`handlers`/`services` 是 `ENOENT` ⇒ **单文件打包在云端结构正确**（子目录本就不该存在）
 - `node_modules` 已在 ⇒ **云端依赖装完了**（不用再等）
 - `dbReady: true` ⇒ 云数据库连通（**注意：只是连通，数据还没导入，见 ③④**）
-- **路径剥离行为已实测**：`/api/health` 正常返回；不带 `/api` 的 `/health` 被网关直接
-  404 `INVALID_PATH`（**根本没进函数**）⇒ 关闭路径透传时**触发路径确实会被剥离**。
+- **路径剥离行为已实测**：`/api/health` 正常返回；不带 `/api` 的 `/health` 被网关直接  
+  404 `INVALID_PATH`（**根本没进函数**）⇒ 关闭路径透传时**触发路径确实会被剥离**。  
   信封模式请求的就是 `/api` 本身、真实路由在 body 里，**不受这个行为影响**。
 
 ---
 
 ## 为什么剩下的步骤要你手动做
 
-| 类别 | 卡点 |
-|---|---|
-| 导出生产库 | 本机 `.env` 是 **sqlite**（`DB_DIALECT=sqlite`、`DB_STORAGE=./data/radio.db`），连不到服务器 MySQL |
-| 控制台导入 / 导出 | 只有控制台能点 |
-| ~~部署云函数~~ | ~~本机沙箱把 `reg.exe` 列入程序黑名单~~ —— **已完成，见 ②** |
+| 类别         | 卡点                                                                                    |
+| ---------- | ------------------------------------------------------------------------------------- |
+| 导出生产库      | 本机 `.env` 是 **sqlite**（`DB_DIALECT=sqlite`、`DB_STORAGE=./data/radio.db`），连不到服务器 MySQL |
+| 控制台导入 / 导出 | 只有控制台能点                                                                               |
+| ~~部署云函数~~  | ~~本机沙箱把 `reg.exe` 列入程序黑名单~~ —— **已完成，见 ②**                                            |
 
 ---
 
@@ -54,42 +54,42 @@ curl "https://jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.c
 路径：控制台 → 环境 `jy-radio-d1gdwmptl816ee6a9` → 左侧 **HTTP 访问服务**
 
 1. 确认页面顶部 **「HTTP 网关」** 开关是**打开**状态
-2. **域名管理** 里的**默认域名会自动生成并启用**（域名状态开关为开），记下它。
+2. **域名管理** 里的**默认域名会自动生成并启用**（域名状态开关为开），记下它。  
    本环境实际是：
+
+
    ```
    jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com
    ```
    形态为 `<envId>-<数字>.ap-shanghai.app.tcloudbase.com`（**不是**老的 `<envId>.service.tcloudbase.com`）
 3. **路由管理** → 右上角 **「新增路由」**（弹窗标题「配置路由信息」）：
-
-   | 字段 | 填什么 |
-   |---|---|
-   | 路由启用 | 保持**开** |
-   | **访问路径** | **`/api`** ← 唯一必填项（不填时「确定」是灰的） |
-   | 关联资源 | **云函数** + **`api`** |
-   | 跨域设置 | 保持**开**；之后若 admin-web 与 API 不同源，要去左侧「跨域设置」把它的域名加进来 |
-   | **路径透传** | **保持关闭**（信封模式不需要，见下） |
-   | 身份认证 | 保持**关闭** |
-
+   | 字段       | 填什么                                                |
+   | -------- | -------------------------------------------------- |
+   | 路由启用     | 保持**开**                                            |
+   | **访问路径** | **`/api`** ← 唯一必填项（不填时「确定」是灰的）                     |
+   | 关联资源     | **云函数** + **`api`**                                |
+   | 跨域设置     | 保持**开**；之后若 admin-web 与 API 不同源，要去左侧「跨域设置」把它的域名加进来 |
+   | **路径透传** | **保持关闭**（信封模式不需要，见下）                               |
+   | 身份认证     | 保持**关闭**                                           |
    点「确定」。
 
-> ⚠️ **「路由管理」配之前是空的（显示「暂无数据」）—— 空着等于这个域名下一个接口都不可用。**
-> ⚠️ 我们用的是**信封模式**：真实 `method` / `path` / `body` / `token` / `query` 全放在 POST 的**请求体**里
->    （见 `api/httpBridge.js`）。控制台对「路径透传」的原文说明是：
->    *「关闭路径透传时，后端服务（资源）将收到**不带触发路径**的请求」* ——
->    而我们请求的就是触发路径本身（`/api`），真实路由在 body 里，因此**关着最省事**，一条路由就够。
+> ⚠️ **「路由管理」配之前是空的（显示「暂无数据」）—— 空着等于这个域名下一个接口都不可用。**  
+> ⚠️ 我们用的是**信封模式**：真实 `method` / `path` / `body` / `token` / `query` 全放在 POST 的**请求体**里  
+> （见 `api/httpBridge.js`）。控制台对「路径透传」的原文说明是：  
+> *「关闭路径透传时，后端服务（资源）将收到**不带触发路径**的请求」* ——  
+> 而我们请求的就是触发路径本身（`/api`），真实路由在 body 里，因此**关着最省事**，一条路由就够。
 
 - ⚠️ **不需要备案** —— 腾讯云自己的域名已备案。只有你想绑**自有域名**时才需要备案。
-- ⚠️ 默认域名**有有效期**（且限频，官方说明仅限开发测试），到期在控制台点「**续期**」。
+- ⚠️ 默认域名**有有效期**（且限频，官方说明仅限开发测试），到期在控制台点「**续期**」。  
   失效表现是全站突然 404/502，最难查。
-- ✅ 判据（**已实测通过**）：浏览器直接打开
-  `https://jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com/api/health`
-  → 返回 `{"code":0,"message":"ok",…}`（不是控制台 404 页）。
+- ✅ 判据（**已实测通过**）：浏览器直接打开  
+  `https://jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com/api/health`  
+  → 返回 `{"code":0,"message":"ok",…}`（不是控制台 404 页）。  
   等价命令行：`curl "https://<域名>/api/health"`。
 
 ## ② 部署云函数
 
-产物已经是打好的**单文件**（`miniprogram/cloudfunctions/api/` 下只有 `index.js` + `package.json` + `config.json`）。
+产物已经是打好的**单文件**（`miniprogram/cloudfunctions/api/` 下只有 `index.js` + `package.json` + `config.json`）。  
 想确认，先跑：
 
 ```bash
@@ -107,7 +107,7 @@ cd /d/dev/wx-devtools
 （PowerShell 里把行尾的 `</dev/null` 去掉即可。）
 
 - `-r` = 云端安装依赖，**必须加**（本地没有 `node_modules`，不加传上去是空壳）。
-- ⚠️ **部署命令返回成功 ≠ 装完了**：云端 `npm install` 还要跑 1~3 分钟。窗口期内调用会报
+- ⚠️ **部署命令返回成功 ≠ 装完了**：云端 `npm install` 还要跑 1~3 分钟。窗口期内调用会报  
   `-504002 ... Cannot find module`，**这长得像「文件没传上去」，其实是时序问题，等 1~2 分钟再验。**
 - ✅ 判据：
   ```bash
@@ -118,9 +118,9 @@ cd /d/dev/wx-devtools
 
 ## ③ 导出生产库（在服务器 `~/radio` 上跑，只读原库）
 
-容器里 `WORKDIR /app`，且 DB_* 由 compose 注入 —— **在容器内跑最省事**（服务器不用装 node）。
+容器里 `WORKDIR /app`，且 DB\_* 由 compose 注入 —— **在容器内跑最省事**（服务器不用装 node）。
 
-⚠️ **`git pull` 只更新磁盘文件，不会影响已经跑起来的容器**（容器用的是构建那一刻的镜像快照）。
+⚠️ **`git pull` 只更新磁盘文件，不会影响已经跑起来的容器**（容器用的是构建那一刻的镜像快照）。  
 所以新代码要么重建镜像，要么直接 `docker cp` 塞进去 —— 后者更快、不重启服务：
 
 ```bash
@@ -149,25 +149,28 @@ ls -la cloud/migration/out/
 # 在本机终端跑（<IP> 换成服务器 IP）
 scp -r ubuntu@<IP>:~/radio/cloud/migration/out C:\Users\Administrator\radio-backend\cloud\migration\
 ```
+
 > `cloud/migration/out/` 已在 `.gitignore`（含密码哈希），不会进版本库。
 
 **集合已经建齐**（`POST /api/system/init-collections` → 18 个全部 `exists`），直接导入即可。
 
 控制台 → 数据库 → 逐集合「导入」→ 选对应 `.jsonl` → 冲突处理选 **Upsert**。
 
-> ⚠️ **后缀坑**：我们产出的是 `.jsonl`，而控制台的导入对话框通常只列 `.json`。
-> 两种解法（任选）：
-> ① 在文件选择框里把筛选器切到「所有文件」；
+> ⚠️ **后缀坑**：我们产出的是 `.jsonl`，而控制台的导入对话框通常只列 `.json`。  
+> 两种解法（任选）：  
+> ① 在文件选择框里把筛选器切到「所有文件」；  
 > ② 先复制一份 `.json`（内容不用改 —— 控制台要的 JSON 格式本身就是「**每行一个对象**」，也就是 JSON Lines）：
+>
 > ```powershell
 > cd C:\Users\Administrator\radio-backend\cloud\migration\out
 > Get-ChildItem *.jsonl | ForEach-Object { Copy-Item $_.Name ($_.BaseName + '.json') }
 > ```
 
-需要导入 **17 个**（18 个集合 − 空的 `message`）：
+需要导入 **17 个**（18 个集合 − 空的 `message`）：  
 ⚠️ `message.jsonl` 是**空的**（原表本来 0 行）—— 跳过它，集合已建好，空表就该是空的。
 
 ⚠️ **`unique_keys` 与 `sequence` 千万别漏**（漏了**不报错**）：
+
 - 漏 `unique_keys` → 云库没有 UNIQUE 约束 → **能建出重名管理员且不报错**；
 - 漏 `sequence` → 新建记录从 1 开始发号 → **与历史 id 撞号**，详情页点开是别人的数据。
 
@@ -201,81 +204,81 @@ cd admin-web && npm run dev     # 本机看效果
 cd admin-web && npm run build   # 正式产物
 ```
 
-✅ 判据：能正常登录、投稿列表能加载、导出 xlsx 能下载。 —— **三项均已满足**（2026-09-29 陛下浏览器登录成功；
+✅ 判据：能正常登录、投稿列表能加载、导出 xlsx 能下载。 —— **三项均已满足**（2026-09-29 陛下浏览器登录成功；  
 接口层含 xlsx 导出全绿）。另确认 `dist/` 内已含云域名、无 direct 的 `localhost:3000` 残留。
 
 ### ⑦ 的实测结论（2026-09-29 14:51）
 
 **8 个真实管理端接口全部通过**（本机 → 云函数 HTTP 访问服务，信封模式）：
 
-| 接口 | 结果 |
-|---|---|
-| `GET /admin/profile` | ✅ 返回 `teacher`（id 1 / role 0），无 password 字段 |
-| `GET /admin/submit/list` | ✅ `total=18`，返回 5 条 |
-| `GET /admin/stats/overview` | ✅ 四段汇总齐全 |
-| `GET /admin/submit/week` | ✅ 周状态（含 `reviewEndAt` 等锚点） |
-| `GET /admin/setting/list` | ✅ 17 条 |
-| `GET /admin/switch/list` | ✅ 6 条 |
-| `GET /admin/program/list` | ✅ `total=5` |
+| 接口                          | 结果                                             |
+| --------------------------- | ---------------------------------------------- |
+| `GET /admin/profile`        | ✅ 返回 `teacher`（id 1 / role 0），无 password 字段    |
+| `GET /admin/submit/list`    | ✅ `total=18`，返回 5 条                            |
+| `GET /admin/stats/overview` | ✅ 四段汇总齐全                                       |
+| `GET /admin/submit/week`    | ✅ 周状态（含 `reviewEndAt` 等锚点）                     |
+| `GET /admin/setting/list`   | ✅ 17 条                                         |
+| `GET /admin/switch/list`    | ✅ 6 条                                          |
+| `GET /admin/program/list`   | ✅ `total=5`                                    |
 | `GET /admin/student/export` | ✅ 真返回 xlsx（`学生账号_2024级_xxx.xlsx`，base64 15 KB） |
 
-另外验证：`POST /admin/login`（真账号 `teacher` + 错密码）→ `40101`，
+另外验证：`POST /admin/login`（真账号 `teacher` + 错密码）→ `40101`，  
 说明云端 **bcryptjs 比对确实跑起来了**（依赖是纯 JS，无原生编译风险）。
 
-**真实浏览器端到端**（Chromium 实机，非 curl）：勾 `XMLHttpRequest` 后用错密码点登录，抓到
-`POST https://<域名>/api -> 200 | {"code":40101,...}` ⇒ **浏览器跨域直连成功**；
-再注入 token 进 `/dashboard`，真实云端数据全部渲染（投稿总数 18 / 累计 258 人 / 近 7 天趋势 /
+**真实浏览器端到端**（Chromium 实机，非 curl）：勾 `XMLHttpRequest` 后用错密码点登录，抓到  
+`POST https://<域名>/api -> 200 | {"code":40101,...}` ⇒ **浏览器跨域直连成功**；  
+再注入 token 进 `/dashboard`，真实云端数据全部渲染（投稿总数 18 / 累计 258 人 / 近 7 天趋势 /  
 热门点歌 Top 5），**页内 JS 报错为空**。
 
 截图：`shots/stage9-login.png`、`shots/stage9-dashboard-cloud.png`
 
-> ✅ **已修（2026-09-29 陛下批准）**：`Dashboard.vue` 的「后端地址」改为跟着 `requestMode` 走 ——
-> `requestMode === 'cloud' ? cloudApiUrl : VITE_API_BASE`；并给 `.kv .mono` 加 `min-width:0; overflow-wrap:anywhere`
-> （云地址 ≈74 字符无空格，flex 子项默认 `min-width:auto` 会撑破卡片）。
-> 实测 1600 视口：值折 2 行、`overflowPx = 0`、卡片与文档均无溢出、页内无 JS 报错。
+> ✅ **已修（2026-09-29 陛下批准）**：`Dashboard.vue` 的「后端地址」改为跟着 `requestMode` 走 ——  
+> `requestMode === 'cloud' ? cloudApiUrl : VITE_API_BASE`；并给 `.kv .mono` 加 `min-width:0; overflow-wrap:anywhere`  
+> （云地址 ≈74 字符无空格，flex 子项默认 `min-width:auto` 会撑破卡片）。  
+> 实测 1600 视口：值折 2 行、`overflowPx = 0`、卡片与文档均无溢出、页内无 JS 报错。  
 > 截图：`shots/stage9-dashboard-sysinfo-fixed.png`
 
 > ⚠️ **两件必须知道的事**（本次实测挖出来的）：
 
-1. **云函数的 CORS 白名单含 `localhost`（任意端口），不含服务器 IP。**
-   实测 `Origin: http://localhost:5173` / `:8080` → 回 `access-control-allow-origin`；
-   `Origin: http://129.28.26.180` / `https://example.com` → **不回 CORS 头**。
-   ⇒ 本机 `npm run dev` **不用配跨域**就能调云端；
+1. **云函数的 CORS 白名单含 `localhost`（任意端口），不含服务器 IP。**  
+   实测 `Origin: http://localhost:5173` / `:8080` → 回 `access-control-allow-origin`；  
+   `Origin: http://129.28.26.180` / `https://example.com` → **不回 CORS 头**。  
+   ⇒ 本机 `npm run dev` **不用配跨域**就能调云端；  
    **正式上线时必须去控制台「跨域设置」加 admin-web 的真实域名**，否则浏览器会拦。
-
-2. ~~**云函数没有配 `JWT_SECRET`，正在用代码里的兜底值。**~~ → ✅ **2026-09-30 已补配并验证通过**（详见下方「补配结果」）。
-   当初的实测：用兜底密钥 `radio-station-default-secret` 自签的 token 能通过云端校验并取到数据
+2. ~~**云函数没有配 `JWT_SECRET`，正在用代码里的兜底值。**~~ → ✅ **2026-09-30 已补配并验证通过**（详见下方「补配结果」）。  
+   当初的实测：用兜底密钥 `radio-station-default-secret` 自签的 token 能通过云端校验并取到数据  
    ⇒ `process.env.JWT_SECRET` 为空。
-   - 影响一（功能）：本次登录签发的 token 都挂在兜底密钥上，**之后一旦补配 `JWT_SECRET`，
+   - 影响一（功能）：本次登录签发的 token 都挂在兜底密钥上，**之后一旦补配 `JWT_SECRET`，  
      这些 token 全部失效**，管理人员/学生要重新登录一次。**要配就趁现在配。**
-   - 影响二（安全）：兜底值写死在仓库里，拿到代码的人能**伪造超管 token**。
-     ⚠️⚠️ **而本项目仓库是公开的**（`https://github.com/Nailoonger/radio-backend` → HTTP 200，
-     `raw.githubusercontent.com` 匿名可拉源码）⇒ **这个兜底值等于全世界都知道**，
-     任何人不登录就能自签一个 `{id:1, username:'teacher', role:0}` 的 token 直接调管理端接口
-     （读/改点歌设置、看学生名单、**导出学生账号 xlsx**）。
-     **不是理论风险 —— 本文档上面那次「8 个管理端接口全绿」的实测，就是我自己用这个办法做的。**
-     三个出处（都是公开文件）：`cloud/cloudfunctions/api/lib/auth.js:21`、
-     `miniprogram/cloudfunctions/api/index.js:1368`（打包产物）、`src/config/index.js:12`（原 Express 侧）。
+   - 影响二（安全）：兜底值写死在仓库里，拿到代码的人能**伪造超管 token**。  
+     ⚠️⚠️ **而本项目仓库是公开的**（`https://github.com/Nailoonger/radio-backend` → HTTP 200，  
+     `raw.githubusercontent.com` 匿名可拉源码）⇒ **这个兜底值等于全世界都知道**，  
+     任何人不登录就能自签一个 `{id:1, username:'teacher', role:0}` 的 token 直接调管理端接口  
+     （读/改点歌设置、看学生名单、**导出学生账号 xlsx**）。  
+     **不是理论风险 —— 本文档上面那次「8 个管理端接口全绿」的实测，就是我自己用这个办法做的。**  
+     三个出处（都是公开文件）：`cloud/cloudfunctions/api/lib/auth.js:21`、  
+     `miniprogram/cloudfunctions/api/index.js:1368`（打包产物）、`src/config/index.js:12`（原 Express 侧）。  
      ⇒ **补配 `JWT_SECRET` 是当前最高优先级的一件事。**
-   - 顺带自查（同源问题）：控制台看一眼**云数据库的权限设置**。若被设成「所有人可读」，
-     那么连伪造 token 都不需要，直接读库 —— 走云函数不受该权限限制，所以应保持
+   - 顺带自查（同源问题）：控制台看一眼**云数据库的权限设置**。若被设成「所有人可读」，  
+     那么连伪造 token 都不需要，直接读库 —— 走云函数不受该权限限制，所以应保持  
      「仅创建者可读写 / 所有人不可读写」。
    - **操作步骤（陛下已批准补配）**：
      1. 先去服务器看老值：`grep '^JWT_SECRET' ~/radio/.env`
      2. 判断取哪个值：
         - 老值是**强随机串**（几十位乱码）⇒ **直接复用**，服务器时代没到期的 token 继续有效，学生不用重登；
-        - 老值是空 / 占位符（`please-change-me-in-production`）⇒ **换一个新的强随机值**
-          （`node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`），
+        - 老值是空 / 占位符（`please-change-me-in-production`）⇒ **换一个新的强随机值**  
+          （`node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`），  
           代价是所有人重登一次 —— 迁移期重登一次是合理的。
-     3. 控制台 → 云开发 → 云函数 → `api` → **配置 → 高级配置 → 环境变量** → 新增
-        `JWT_SECRET`（值同上）→ 保存。
-        （界面已确认，2026-09-30：`api` 的「配置」页里，「高级配置」分组下有「环境变量」区域。）
-        顺便确认 `JWT_EXPIRES_IN`：不填时云端默认 `7d`，与服务器一致，可不填。
+     3. 控制台 → 云开发 → 云函数 → `api` → **配置 → 高级配置 → 环境变量** → 新增  
+        `JWT_SECRET`（值同上）→ 保存。  
+        （界面已确认，2026-09-30：`api` 的「配置」页里，「高级配置」分组下有「环境变量」区域。）  
+        顺便确认 `JWT_EXPIRES_IN`：不填时云端默认 `7d`，与服务器一致，可不填。  
         ⚠️ 只需加 `JWT_SECRET` **一行**；保存后**等 1~2 分钟**让配置下发到实例再验。
      4. 等配置下发到实例（一般几十秒；保险起见等 1~2 分钟）。
-     5. **反向验证（判据）**：用**兜底密钥**自签一个 token 去调 `/admin/profile`，
-        必须从「能取到数据」变成 **`40101`** ⇒ 说明新 `JWT_SECRET` 真的生效了。
+     5. **反向验证（判据）**：用**兜底密钥**自签一个 token 去调 `/admin/profile`，  
+        必须从「能取到数据」变成 **`40101`** ⇒ 说明新 `JWT_SECRET` 真的生效了。  
         ⚠️ 只验证「能登录」是不够的 —— 配错了照样能用兜底值登录成功。
+
 
    **✅ 补配结果（2026-09-30，陛下已配，我复验）**
 
@@ -554,6 +557,7 @@ location = /api {
 改完生效：`docker compose restart nginx`（nginx.conf 是 volume 挂载进去的，重启即可，不用重建镜像）。
 应用改动：`docker compose build admin-web && docker compose up -d --force-recreate --no-deps admin-web`。
 
+
 **验证**：浏览器 F12 → Network，看请求是打到 `http://129.28.26.180/api`（同源）
 而不是 `https://xxx.tcloudbase.com/api`（跨域）。同源那条不会出现 CORS 报错。
 
@@ -758,6 +762,40 @@ const form = reactive({ username: savedUsername, password: '<默认密码明文>
 
 ⚠️ 顺带：服务器上那份 admin-web 是**同一份源码**构建的，这个修补也适用于它 ——
 下次在服务器 `build admin-web` 时会一并生效。
+
+---
+
+**⑥-b 全仓默认凭据清理（2026-09-30 已完成）**
+
+清完登录页顺手全仓扫了一遍：`admin123456` 原来散在 **30 个文件 / 47 处**。
+**不是一律替换**，按性质分三类：
+
+| 类别 | 位置 | 处理 |
+|---|---|---|
+| 真会生效的默认值 | `src/config/index.js`、`docker-compose.yml`、`.env.example`、`sql/schema.sql` | **去掉默认值** |
+| 文档 / 启动提示 | `README.md`×4、`AGENTS.md`、`CLAUDE.md`、`admin-web/README.md`、`docs/specs/08-docker-deploy.md`、`deploy/start.sh｜ps1`、`src/docs/swagger.js` | 改成「见 `INIT_ADMIN_PASSWORD`」 |
+| 测试 / 预览 / 一次性脚本 | `tests/*`、`scripts/http-test.js`、`preview/*`、根目录 `_*.js`、`admin-web/_backup` | 中性占位（测试串 / `PWD_PLACEHOLDER` / 读环境变量） |
+
+**三处重点（都不是「文档里写了个密码」那么轻）**：
+
+1. `src/config/index.js` 的 `password: … || '默认值'` ⇒ 后端**每次在空库上启动都会真的创建**这个账号。
+   现改为**留空即随机生成**（`src/utils/seed.js` → `crypto.randomBytes(12)`），
+   且**只在首次启动日志里打印一次**，之后再也拿不到。
+2. `sql/schema.sql` **直接插了一条密码等于公开默认值的 `teacher` 记录**，连 `bcrypt hash` 一起进了仓库
+   ⇒ 任何人都能"验证"出密码。现在整条 INSERT 注释掉，账号交给后端 `seedAll()` 建（行为等价）。
+3. `README.md` 的「管理员密码忘了」给了一条把密码**重置回已知值**的现成 SQL
+   ⇒ 读到 README 就能一步拿回后台。现改成「自己先生成 hash」的两步法。
+
+**验收**：
+- 全仓 `grep -rn admin123456`（排除 `node_modules` / `.git`）⇒ **只剩本机 `.env` 一行**
+  （不在版本库、也不影响线上；那行本来就是失效的旧默认值）
+- `src/utils/seed.js` 新逻辑 6 项断言全通过：随机密码长度 16 / 能用它登录 / 不再是旧默认值 /
+  已存在则跳过不覆盖 / 配了就用配置值 / 配了就不打印
+- `tests/auth.test.js` 6/6 通过
+
+> ⚠️ **还剩一处更重的刻意没动**：MySQL **root 密码 `root123`** 硬编码在 `docker-compose.yml`（3 处默认值）、
+> `README.md`、`AGENTS.md`、`CLAUDE.md`、`docs/*`、`scripts/*`，约 **25 处**。
+> 它连着线上 MySQL，改默认值有真实影响 ⇒ **不擅自扩大范围**，等单独拍板。
 
 ---
 

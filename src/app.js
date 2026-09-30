@@ -97,7 +97,7 @@ async function start() {
       logger.info(`📍 地址: http://localhost:${config.port}`);
       logger.info(`📚 API文档: http://localhost:${config.port}/api-docs`);
       logger.info(`💾 数据库: ${process.env.DB_DIALECT || 'sqlite'}`);
-      logger.info(`🔐 默认超管账号: ${config.initAdmin.username}`);
+      logger.info(`🔐 超管账号: ${config.initAdmin.username}（密码不落日志，见 INIT_ADMIN_PASSWORD）`);
       logger.info(`=============================================`);
     });
 

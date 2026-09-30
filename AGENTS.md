@@ -280,7 +280,7 @@ deploy/
 | 决策 | 原因 |
 |---|---|
 | admin-web Dockerfile 只 COPY dist/ | 容器内 npm build 因 rollup native 模块失败 |
-| 启动后立即 `seedAll()` 自动建默认超管 | teacher/admin123456（已 bcrypt）|
+| 启动后立即 `seedAll()` 自动建超管 | teacher；密码取自 `INIT_ADMIN_PASSWORD`，留空则随机生成并只在首次启动日志打印一次 |
 | `module_disabled` 错误码 40302 | 区别于普通 40301 禁止 |
 | 模块开关缓存 30 秒 + set 时立即预热 | 减少 DB 查询 |
 | 头像用本地 /uploads（不上云）| 学习场景简化 |

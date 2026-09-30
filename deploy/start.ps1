@@ -54,7 +54,7 @@ Write-Host "  管理后台：  https://localhost/"
 Write-Host "  Swagger：   https://localhost/api-docs/"
 Write-Host "  健康检查：  https://localhost/api/health"
 Write-Host ""
-Write-Host "默认账号：teacher / admin123456"
+Write-Host "初始账号：teacher（密码见 .env 的 INIT_ADMIN_PASSWORD；留空则看首次启动日志）"
 Write-Host ""
 $logScript = Join-Path $PSScriptRoot 'logs.ps1'
 $stopScript = Join-Path $PSScriptRoot 'stop.ps1'

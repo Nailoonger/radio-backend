@@ -28,7 +28,10 @@ module.exports = {
 
   initAdmin: {
     username: process.env.INIT_ADMIN_USERNAME || 'teacher',
-    password: process.env.INIT_ADMIN_PASSWORD || 'admin123456',
+    // ⚠️ 这里不设默认值（2026-09-30）：留空则由 src/utils/seed.js 随机生成，
+    //    且只在首次启动日志里打印一次。原来回落到一个公开的固定密码，
+    //    等于把管理员凭据写死在仓库里 —— 谁 clone 一下就知道后台怎么进。
+    password: process.env.INIT_ADMIN_PASSWORD || '',
     nickname: process.env.INIT_ADMIN_NICKNAME || '指导老师',
   },
 
