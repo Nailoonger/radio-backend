@@ -28,7 +28,9 @@
   `/api/admin/profile` 直接 `code:0`（`adminAuth` **只验签名、从不查库** ⇒ 绕过密码即超管）。
   已在 `src/config/index.js` 加护栏：命中已知公开串 + `NODE_ENV=production` ⇒ **拒绝启动**（本机开发只警告）。
   复验：`node scripts/verify-backend-jwt.js`（退出码 1 = 没过）。⚠️ 判据只看响应体 `code`（HTTP 恒 200）。
-  ⏳ **待陛下在服务器改 `.env` 的 `JWT_SECRET` 再重建容器** —— 护栏不改线上，只拦下次部署。
+  ✅ **2026-09-30 已修复**（陛下改服务器 `.env` + 重建容器；三条公开串**全部未命中**，退出码 0）。
+  ⚠️ 改时踩过：`${X:-兜底值}` 把**空串当未设置** ⇒ 写空值会**静默回落到另一串公开兜底值**，探测显示"还是旧值"。
+  ⇒ **判据必须是"全部未命中"，不是"命中的串变了"**；排查先读容器实际值 `docker compose exec <svc> printenv X`。
 - ✅ **MySQL `root123` 确认不改**（陛下 2026-09-30 拍板「无所谓」）：已查实 `docker-compose.yml` **没有端口映射**，
   MySQL 只在 `radionet` 内网、外网不可达 ⇒ 风险确实低。**别再去清它。**
 - 提交身份用全局 `Nailoonger <1493586497@qq.com>`，不写仓库级 user.*。
