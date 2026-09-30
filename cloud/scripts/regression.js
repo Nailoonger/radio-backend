@@ -58,6 +58,8 @@ const SUITE = [
   //    2026-09-30 加：切云后「带文件上传」的接口会静默全坏（FormData 进 JSON 信封变 {}），
   //    这条以前不在网里，所以坏了整整一个阶段没人发现 —— 现在钉进来。
   ['verify-upload-adapter.js', false],
+  // 同一套浏览器请求门面检查一次，防 DELETE 确认参数在云通道里丢失。
+  ['test-request-facade.js', false],
   ['test-bundle.js', false],
   ['selfcheck.js', false],
 ];

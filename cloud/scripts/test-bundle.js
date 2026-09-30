@@ -48,7 +48,11 @@ const bundleFile = path.join(BUNDLE_DIR, 'index.js');
   eq('产物是单文件（无 lib/services 子目录依赖）', fs.existsSync(path.join(BUNDLE_DIR, 'lib')), false);
   // ⚠️ 阶段 6 起产物目录多了 config.json（定时触发器配置）。
   //    它必须随 index.js 一起进产物根目录 —— 漏传的表现是「部署成功、定时任务从来不跑」。
-  eq('产物目录只有 3 个文件（含触发器配置）', fs.readdirSync(BUNDLE_DIR).sort().join(','), 'config.json,index.js,package.json');
+  eq('产物文件完整，额外目录仅允许已安装的依赖',
+    fs.readdirSync(BUNDLE_DIR).filter((name) => name !== 'node_modules').sort().join(','),
+    'config.json,index.js,package-lock.json,package.json');
+  eq('产物依赖锁与源文件一致', fs.readFileSync(path.join(BUNDLE_DIR, 'package-lock.json'), 'utf8') ===
+    fs.readFileSync(path.join(ROOT, 'cloud', 'cloudfunctions', 'api', 'package-lock.json'), 'utf8'), true);
 
   // 1. 能启动 + 基本接口可用
   H.reset({});

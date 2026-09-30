@@ -1,0 +1,102 @@
+name: 云端校验与发布
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: check 只校验；publish 校验并发布两端，用于首次接通或补发
+        type: choice
+        options: [check, publish]
+        default: check
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: 源码与发布产物校验
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      deployments: read
+    outputs:
+      full: ${{ steps.scope.outputs.full }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 判断检查范围及尚未发布的改动
+        id: scope
+        run: node scripts/release/detect.js
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: 安装锁定的依赖
+        if: steps.scope.outputs.full == 'true'
+        run: |
+          npm ci --no-audit --no-fund
+          npm ci --prefix admin-web --no-audit --no-fund
+          npm ci --prefix cloud/cloudfunctions/api --no-audit --no-fund
+          npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
+      - name: 执行对应校验并构建云通道产物
+        run: node scripts/release/verify.js --scope "${{ steps.scope.outputs.scope }}"
+        env:
+          RELEASE_REVISION: ${{ github.sha }}
+          VITE_REQUEST_MODE: cloud
+          VITE_CLOUD_API_URL: ${{ github.event_name == 'pull_request' && 'https://example.invalid/api' || vars.VITE_CLOUD_API_URL }}
+      - name: 保存本次提交的部署产物
+        if: steps.scope.outputs.full == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: radio-release-${{ github.sha }}
+          path: |
+            admin-web/dist/
+            miniprogram/cloudfunctions/api/
+          include-hidden-files: true
+          overwrite: true
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: 更新现有云端环境
+    needs: verify
+    if: needs.verify.outputs.full == 'true' && github.ref == 'refs/heads/master' && github.event_name != 'pull_request' && (github.event_name == 'push' || inputs.mode == 'publish')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      deployments: write
+    concurrency:
+      group: radio-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/download-artifact@v4
+        with:
+          name: radio-release-${{ github.sha }}
+          path: .
+      - name: 安装固定版本的云端发布 SDK
+        run: npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
+      - name: 串行发布并验证配置和服务
+        run: node scripts/release/publish.js
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_MANUAL: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'publish' }}
+          TCB_SECRET_ID: ${{ secrets.TCB_SECRET_ID }}
+          TCB_SECRET_KEY: ${{ secrets.TCB_SECRET_KEY }}
+          TCB_CODE_SECRET: ${{ secrets.TCB_CODE_SECRET }}
+          TCB_ENV_ID: ${{ vars.TCB_ENV_ID }}
+          VITE_CLOUD_API_URL: ${{ vars.VITE_CLOUD_API_URL }}
+          ADMIN_WEB_URL: ${{ vars.ADMIN_WEB_URL }}

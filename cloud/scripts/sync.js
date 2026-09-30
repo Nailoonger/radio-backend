@@ -173,6 +173,8 @@ function run(checkOnly) {
 
   // package.json 仍要单独带上（云端靠它装依赖）
   fs.copyFileSync(path.join(SRC, 'package.json'), path.join(DST, 'package.json'));
+  // 依赖锁随源码和部署产物一起保存，干净检出后使用 npm ci 安装同一版本。
+  fs.copyFileSync(path.join(SRC, 'package-lock.json'), path.join(DST, 'package-lock.json'));
   fs.writeFileSync(outFile, text, 'utf8');
 
   /**

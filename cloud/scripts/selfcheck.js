@@ -112,10 +112,11 @@ function walkFiles(dir, base = '') {
   return out;
 }
 
-const dstEntries = fs.existsSync(DST_DIR) ? fs.readdirSync(DST_DIR).sort() : [];
+const dstEntries = fs.existsSync(DST_DIR)
+  ? fs.readdirSync(DST_DIR).filter((name) => name !== 'node_modules').sort() : [];
 // ⚠️ config.json 是**云函数触发器配置**（阶段 6）—— 漏传的表现是
 //    「部署成功、日志正常、定时任务从来不跑」的纯静默故障，所以钉死在断言里。
-eq('产物目录只有 index.js + package.json + config.json', dstEntries.join(','), 'config.json,index.js,package.json');
+eq('产物文件完整，额外目录仅允许已安装的依赖', dstEntries.join(','), 'config.json,index.js,package-lock.json,package.json');
 
 // 触发器配置必须是合法 JSON 且 cron 为 7 位（平台只认 7 位；写错会静默不触发）
 let triggerCfg = null;
