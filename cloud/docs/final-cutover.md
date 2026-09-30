@@ -845,6 +845,21 @@ node scripts/verify-backend-jwt.js
 
 ⚠️ 配后**存量 token 全作废**（学生 + admin-web 各重登一次），预期行为。
 
+> ⚠️ **踩过的坑：改完复验"还是命中"先别急着改文件。**
+> `docker-compose.yml` 的 `${JWT_SECRET:-兜底值}` 把**空串当成"没设置"**，所以如果写入时粘空了，
+> 探测脚本会显示"还是命中某个公开值" —— 看着像文件没改，**其实是改成了空、然后回落到了兜底值**。
+> 实测就是这样：改之前命中 `.env.example` 的示例值，改完变成命中 compose 的兜底值（**两个都是公开的，等于换了一把钥匙**）。
+>
+> 排查顺序（**先从容器读实际值，再回头查文件**）：
+> ```bash
+> cd ~/radio
+> docker compose exec radio-backend printenv JWT_SECRET   # ① 实际生效值是什么
+> grep -n '^JWT_SECRET' .env                              # ② 文件里到底写了什么
+> sed -n '19p' .env | cut -c1-24                          # ③ 值在不在（只截前几字符）
+> ```
+> 另外两条同样会造成"改了没用"：`docker compose restart` **不重读 `.env`**（必须 `up -d --force-recreate`）；
+> **在非项目目录跑 `docker compose`** 时 `.env` 压根不加载。
+
 **代码侧已加护栏**（`src/config/index.js`）：命中这三串之一 + `NODE_ENV=production`
 ⇒ **直接拒绝启动**并打印修法；本机开发只警告。`docker-compose.yml` 的兜底值也已清空。
 
