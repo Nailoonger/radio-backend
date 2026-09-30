@@ -719,6 +719,40 @@ node ./node_modules/vite/bin/vite.js build --outDir _hosting
   `tcb hosting deploy _hosting -e jy-radio-d1gdwmptl816ee6a9`
   ⚠️ 命令名在文档里有 `tcb` / `cloudbase` 两种写法，以装完后的实际提示为准。
 
+**②-b ✅ 部署完成并实测验收（2026-09-30）**
+
+**默认域名（就是这个，控制台「静态网站托管」页首行也能看到）**：
+
+```
+https://jy-radio-d1gdwmptl816ee6a9-1491709115.tcloudbaseapp.com/
+```
+
+⚠️ 注意**别和 HTTP 访问服务那个域名搞混**，两个后缀不一样、是跨域的：
+
+| 用途 | 域名 |
+|---|---|
+| 静态托管（网页） | `jy-radio-d1gdwmptl816ee6a9-1491709115.tcloudbaseapp.com` |
+| HTTP 访问服务（云函数 API） | `jy-radio-d1gdwmptl816ee6a9-1491709115.ap-shanghai.app.tcloudbase.com` |
+
+> 另：`jy-radio-d1gdwmptl816ee6a9.tcloudbaseapp.com`（**没有** `-1491709115`）会返回 **418**，
+> 不是我们的站点 —— 环境 ID 只写前一半是打不开的，**完整的那串才带后缀**。
+
+**实测验收（从本机直接打外网，只读 GET）**：
+
+| 检查 | 结果 |
+|---|---|
+| `GET /` | **200** · `text/html` · 417B，`<title>校园广播站 - 管理后台</title>` |
+| `GET /assets/index-trTo0p4x.js` | **200** · 1,118,077 B ⇒ **部署路径 `/` 是对的**（子目录的话这里必 404） |
+| `GET /assets/index-CFpHcIjy.css` | **200** · 371,932 B |
+| `GET /assets/index-tjibFikZ.js`（改凭据**前**的旧包 hash） | **404** ⇒ 证明传上去的是新包 |
+| 包内明文凭据 `admin123456` / 「默认超级管理员」/ `teacher /` | **各 0 处** |
+| 是不是 cloud 模式产物 | ✅ 命中 `jy-radio-` |
+| **跨域**（带 `Origin` 预检 + 实际 POST） | ✅ `access-control-allow-origin` 回显了静态托管域名；POST 返回 `{"code":40101}` 而非被拦 ⇒ **页面可以正常调接口** |
+| `GET /login`（子路由） | **404** ⇒ SPA fallback 还没配（正是下面 ③ 要做的事） |
+
+> ⚠️ **首次在浏览器打开默认域名会先弹一个「访问提示中间页」**，点「确定访问」即可，
+> 之后同域名在 Cookie 有效期内不再弹（见前面「默认域名政策」一节）。
+
 **③ ⚠️⚠️ 必配：SPA 路由 fallback（跳过这步 = 子路由一刷新就 404）**
 
 本项目路由是 **history 模式**（`createWebHistory`），物理上云端只有 `index.html` 一个文件 ⇒
