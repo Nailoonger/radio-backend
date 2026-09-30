@@ -107,6 +107,11 @@
   ⚠️ **本机 push 与服务器 pull/build 绝不写进同一代码块**（他整段贴服务器会报只读；deploy key 只读属正常设计）。
 
 ## 本机坑
+- ⚠️⚠️ **给陛下的命令要分两台机器写，语法不同，别混**：
+  **本机（他在 PowerShell 里敲）** → 路径写 `C:\...`（**不是** `/c/...`，`cd /c/...` 会报
+  「找不到路径 C:\c\Users\...」）、**`&&` 不可用**（PS 5.1 不支持，要 `;` 或分行）、没有 `tail`。
+  **服务器（Linux bash）** → `cd ~/radio`、`&&`、管道随便用。
+  ⇒ **本机段与服务器段必须是两个独立代码块**（合在一起他整段贴服务器会报只读）。
 - Bash 可用（管道/heredoc/git）；PowerShell stdout 不回显 → 落盘再 Read。⚠️ **同一文件多处改动必须串行 Edit**（并发静默吞前一个）。
 - **改前端先跑两个源码自检**：`node scripts/check-vue-bindings.js`（未声明 `_ctx.` 引用 —— 构建不报错、运行时只渲染空白）、
   `node scripts/check-wxml-classes.js`。⚠️ 前者「未声明 N 个」含白名单，**判据是下一行 missing 有没有列名字**。
