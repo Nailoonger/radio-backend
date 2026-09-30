@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>学生登录 · 「来信」原创方案</title>
+<style>
+  :root {
+    --ink:#1D1D1F; --ink-2:#333; --muted:#7A7A7A; --soft:#C7C7CC;
+    --hairline:#E4E0D6; --divider:#EFEBE2; --parchment:#F6F2E9;
+    --paper:#FDFBF6; --canvas:#fff; --accent:#0066CC; --live:#FF453A;
+    --red-bg:#FDE8E8; --red-fg:#B42318;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:-apple-system,"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei",sans-serif;
+    background:#EFEDE8; color:var(--ink); padding:32px 30px 60px;
+  }
+  .head { max-width:720px; margin:0 auto 20px; }
+  .head h1 { font-size:20px; font-weight:600; letter-spacing:-0.3px; }
+  .head h1 .ver { color:var(--accent); }
+  .head p { font-size:13px; color:var(--muted); margin-top:9px; line-height:1.9; }
+  .head b { color:var(--ink); }
+
+  .statebar { max-width:720px; margin:0 auto 26px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .statebar .lbl { font-size:12.5px; color:var(--muted); margin-right:4px; }
+  .st { font-size:12.5px; padding:7px 16px; border-radius:999px; border:1px solid #D8D4CA;
+        background:#fff; color:var(--ink-2); cursor:pointer; transition:all .15s; font-family:inherit; }
+  .st.on { background:var(--ink); border-color:var(--ink); color:#fff; font-weight:500; }
+
+  .stage { display:flex; gap:30px; justify-content:center; flex-wrap:wrap; align-items:flex-start; }
+  .phone-wrap { display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .phone { width:340px; height:700px; border-radius:44px; background:#0b0b0f; padding:10px;
+           box-shadow:0 30px 60px -22px rgba(60,50,30,0.35); flex:none; }
+  .screen { width:100%; height:100%; border-radius:35px; overflow:hidden;
+            display:flex; flex-direction:column; font-size:14px; background:var(--parchment); }
+  .cap { font-size:12.5px; color:var(--muted); text-align:center; line-height:1.7; }
+  .cap b { color:var(--ink); font-size:13.5px; }
+  .cap .why { display:block; font-size:11.5px; margin-top:3px; }
+
+  .statusbar { height:34px; display:flex; align-items:center; justify-content:space-between;
+               padding:0 22px; font-size:11.5px; font-weight:600; flex:none; color:var(--ink); }
+  .topbar { height:40px; padding:0 18px; display:flex; align-items:center; flex:none; }
+  .back { width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,0.6);
+          display:flex; align-items:center; justify-content:center; flex:none; cursor:pointer; }
+  .back .chev { width:9px; height:9px; border-left:2px solid var(--ink-2); border-bottom:2px solid var(--ink-2);
+                transform:rotate(45deg); margin-left:3px; }
+
+  .pane { display:none; flex:1; flex-direction:column; min-height:0; }
+  .pane.on { display:flex; }
+  .body { flex:1; min-height:0; display:flex; flex-direction:column; padding:2px 20px 14px; }
+
+  /* ══════════ 信封 ══════════ */
+  .env-scene { perspective:1300px; padding:6px 0 2px; flex:none; }
+  .envelope {
+    position:relative; width:236px; height:152px; margin:6px auto 0;
+    background:#fff; border:1px solid var(--hairline); border-radius:9px;
+    box-shadow:0 14px 28px -14px rgba(80,66,40,0.4);
+  }
+  .flap {
+    position:absolute; top:0; left:0; width:100%; height:84px; z-index:4;
+    background:#F1EADD; clip-path:polygon(0 0,100% 0,50% 100%);
+    transform-origin:50% 0; transition:transform .6s cubic-bezier(.5,0,.3,1);
+  }
+  .envelope.open .flap { transform:rotateX(180deg); z-index:1; }
+
+  .wax {
+    position:absolute; top:52px; left:50%; margin-left:-21px; z-index:5;
+    width:42px; height:42px; border-radius:50%; background:var(--accent);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:inset 0 2px 5px rgba(0,0,0,0.25),0 3px 7px rgba(0,0,0,0.22);
+    transition:all .5s;
+  }
+  .wax.ready { animation:waxPulse 1.4s ease-in-out infinite; }
+  @keyframes waxPulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.08);} }
+  .wax.bad { background:var(--live); animation:waxShake .4s; }
+  @keyframes waxShake { 0%,100%{transform:translateX(0);} 25%{transform:translateX(-4px);} 75%{transform:translateX(4px);} }
+  .envelope.open .wax { transform:scale(0.5) rotate(-20deg); opacity:0; }
+
+  .stamp {
+    position:absolute; top:11px; right:11px; z-index:3;
+    width:40px; height:48px; padding:4px; background:#fff;
+    border:1.5px dashed var(--accent); border-radius:3px;
+  }
+  .stamp img { width:100%; height:100%; object-fit:contain; }
+
+  .postmark {
+    position:absolute; right:58px; top:14px; z-index:2;
+    width:46px; height:46px; border-radius:50%;
+    border:2px solid rgba(0,102,204,0.28);
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    color:rgba(0,102,204,0.5); font-size:6.5px; letter-spacing:0.5px;
+    transform:rotate(-12deg); opacity:0; transition:opacity .4s;
+  }
+  .postmark.show { opacity:1; }
+
+  .addr { position:absolute; left:15px; bottom:13px; z-index:2; }
+  .addr .to { font-size:10px; color:var(--muted); margin-bottom:5px; }
+  .addr .to b { color:var(--accent); font-weight:600; letter-spacing:0.5px; }
+  .addr .line { width:120px; height:0; border-top:1px solid var(--divider); margin-top:7px; }
+
+  /* 信纸（抽出） */
+  .letter {
+    position:absolute; left:15px; right:15px; top:12px; height:128px; z-index:2;
+    background:var(--paper); border:1px solid var(--hairline); border-radius:6px;
+    padding:12px 13px; text-align:center;
+    transform:translateY(6px); opacity:0;
+    transition:transform .7s .25s, opacity .4s .25s;
+    box-shadow:0 6px 16px -8px rgba(80,66,40,0.3);
+  }
+  .envelope.open .letter { transform:translateY(-66px); opacity:1; z-index:6; }
+  .letter .lt { font-size:12px; font-weight:700; color:var(--ink); }
+  .letter .ls { font-size:9.5px; color:var(--muted); margin-top:6px; line-height:1.6; }
+  .letter .lg { margin-top:9px; font-size:10px; color:var(--accent); cursor:pointer; }
+
+  /* ══════════ 表单 ══════════ */
+  .fld { margin-top:13px; }
+  .fld-hd { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
+  .fld-hd .lb { font-size:12px; font-weight:600; color:var(--ink-2); }
+  .fld-hd .hint { font-size:10.5px; color:var(--soft); }
+  .inp {
+    display:flex; align-items:center; height:43px;
+    background:#fff; border-radius:11px; padding:0 14px; gap:10px;
+    box-shadow:inset 0 0 0 1px var(--hairline); transition:box-shadow .18s;
+  }
+  .inp.focus { box-shadow:inset 0 0 0 1.5px var(--accent); }
+  .inp.err { box-shadow:inset 0 0 0 1.5px #D64541; background:#FDECEB; }
+  .inp input { flex:1; min-width:0; border:none; background:transparent; outline:none;
+               font-size:14px; color:var(--ink); font-family:inherit; letter-spacing:0.5px; }
+  .inp input::placeholder { color:var(--soft); }
+  .inp .eye { font-size:10.5px; color:var(--soft); cursor:pointer; flex:none; }
+
+  .error-bar { margin-top:11px; background:var(--red-bg); color:var(--red-fg);
+               font-size:11.5px; line-height:1.6; border-radius:10px; padding:9px 12px;
+               display:flex; gap:7px; align-items:flex-start; }
+  .error-bar .dot { width:5px; height:5px; border-radius:50%; background:var(--red-fg); margin-top:6px; flex:none; }
+
+  .submit {
+    width:100%; height:46px; border:none; border-radius:11px;
+    background:var(--accent); color:#fff; font-size:14.5px; font-weight:600; letter-spacing:2px;
+    display:flex; align-items:center; justify-content:center; line-height:1;
+    margin-top:15px; cursor:pointer; font-family:inherit;
+  }
+  .submit.dis { background:#B9CBE4; }
+  .wxline { margin-top:12px; text-align:center; font-size:12.5px; color:var(--accent); cursor:pointer; }
+  .foot { margin-top:auto; padding-top:10px; text-align:center; }
+  .foot .slogan { font-size:10.5px; color:#A99E86; letter-spacing:2px; }
+
+  /* ══════════ 激活：摊开的信纸 ══════════ */
+  .sheet-paper {
+    background:var(--paper); border:1px solid var(--hairline); border-radius:12px;
+    padding:16px 16px 14px; position:relative; box-shadow:0 12px 26px -16px rgba(80,66,40,0.4);
+  }
+  .sheet-paper .ph-title { font-size:13px; font-weight:700; text-align:center; color:var(--ink); letter-spacing:1px; }
+  .sheet-paper .ph-sub { font-size:9.5px; text-align:center; color:var(--muted); margin-top:4px; letter-spacing:1px; }
+  .hello { display:flex; align-items:center; gap:11px; margin:13px 0 4px; }
+  .avatar { width:40px; height:40px; border-radius:50%; background:var(--accent); color:#fff;
+            display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:600; flex:none; }
+  .hello .t1 { font-size:15px; font-weight:600; }
+  .hello .t2 { font-size:11px; color:var(--muted); margin-top:2px; }
+  .sheet-paper .fld { margin-top:11px; }
+  .pwd-rule { display:flex; gap:6px; margin-top:8px; }
+  .rule { font-size:10px; padding:3px 9px; border-radius:999px; background:var(--divider); color:var(--muted); }
+  .rule.on { background:rgba(0,102,204,0.08); color:var(--accent); font-weight:500; }
+  .seal {
+    position:absolute; right:10px; bottom:8px; width:46px; height:46px; border-radius:50%;
+    border:2px solid rgba(0,102,204,0.55); color:rgba(0,102,204,0.7);
+    display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700;
+    transform:rotate(-12deg); text-align:center; line-height:1.1;
+  }
+  .skip { text-align:center; margin-top:12px; font-size:12px; color:var(--muted);
+          text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>学生登录 · <span class="ver">「来信」原创方案</span>（可交互原型，未写业务代码）</h1>
+  <p>
+    <b>概念：</b>广播站给每位新生寄了一封<b>「声音邀请函」</b>。登录不是填表，是<b>拆开属于你的那封信</b> ——
+    输学号 = 找到信封上你的收件名、邮戳盖上；输密码 = 解封火漆；提交后火漆裂开、信封翻开、信纸抽出，欢迎入社。
+    密码错 = 火漆变红、封印解不开。首登激活 = 在摊开的信纸上设置新密码、落款盖章。<br>
+    <b>全新元素：</b>信封、邮票、火漆封印、邮戳、信纸、落款印章（不再是收音机/调频/电平那套硬件面板）。
+    配色仍守单强调色 #0066CC、无渐变、无彩色投影。<b>填好学号密码点「拆开邀请函」看动画。</b>
+  </p>
+</div>
+
+<div class="statebar">
+  <span class="lbl">状态预览：</span>
+  <button class="st on" data-pane="login">① 来信（登录）</button>
+  <button class="st" data-pane="error">② 封印不符（密码错）</button>
+  <button class="st" data-pane="activate">③ 信纸（首登激活）</button>
+</div>
+
+<div class="stage">
+  <div class="phone-wrap">
+    <div class="phone"><div class="screen">
+
+      <!-- ① 来信 -->
+      <div class="pane on" data-pane="login">
+        <div class="statusbar"><span>9:41</span><span>100%</span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div></div>
+        <div class="body">
+
+          <div class="env-scene">
+            <div class="envelope" id="env1">
+              <div class="letter">
+                <div class="lt">邀请函 · 已开启</div>
+                <div class="ls">欢迎来到菁悠广播站<br>这里有属于你的频道与歌声</div>
+                <div class="lg" id="goActivate">首次登录，去设置新密码 →</div>
+              </div>
+              <div class="postmark" id="pm1"><span>校园</span><span>POST</span></div>
+              <div class="stamp"><img src="assets/station-badge.png" alt="邮票"></div>
+              <div class="addr">
+                <div class="to">致：<b id="addrName">________</b></div>
+                <div class="line"></div><div class="line" style="width:90px;"></div>
+              </div>
+              <div class="flap"></div>
+              <div class="wax" id="wax1">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 13 Q7 6 12 13 T20 13" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M4 17 Q7 11 12 17 T20 17" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">学号</span><span class="hint">信封上的收件编号</span></div>
+            <div class="inp" id="uBox1"><input id="u1" type="text" placeholder="输入学号" maxlength="12"/></div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">密码</span><span class="hint">初始密码 = user + 学号</span></div>
+            <div class="inp" id="pBox1"><input id="p1" type="password" placeholder="解封火漆" maxlength="20"/><span class="eye" data-eye="p1">显示</span></div>
+          </div>
+
+          <div class="submit dis" id="btn1">拆开邀请函</div>
+          <div class="wxline">用微信一键登录</div>
+
+          <div class="foot"><div class="slogan">菁菁校园情 · 悠悠广播声</div></div>
+        </div>
+      </div>
+
+      <!-- ② 封印不符 -->
+      <div class="pane" data-pane="error">
+        <div class="statusbar"><span>9:41</span><span>100%</span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div></div>
+        <div class="body">
+
+          <div class="env-scene">
+            <div class="envelope">
+              <div class="postmark show"><span>校园</span><span>POST</span></div>
+              <div class="stamp"><img src="assets/station-badge.png" alt="邮票"></div>
+              <div class="addr">
+                <div class="to">致：<b>20240101</b></div>
+                <div class="line"></div><div class="line" style="width:90px;"></div>
+              </div>
+              <div class="flap"></div>
+              <div class="wax bad">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M6 6 L18 18 M18 6 L6 18" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">学号</span><span class="hint">收件编号</span></div>
+            <div class="inp"><input type="text" value="20240101"/></div>
+          </div>
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">密码</span><span class="hint">封印解不开</span></div>
+            <div class="inp err"><input type="password" value="1234"/><span class="eye">显示</span></div>
+          </div>
+
+          <div class="error-bar"><i class="dot"></i>学号或密码不对，这封邀请函不是你的。初始密码为 user + 学号，例如 user20240101</div>
+
+          <div class="submit">重新拆封</div>
+          <div class="wxline">用微信一键登录</div>
+
+          <div class="foot"><div class="slogan">连续输错不会锁号，慢慢来</div></div>
+        </div>
+      </div>
+
+      <!-- ③ 信纸激活 -->
+      <div class="pane" data-pane="activate">
+        <div class="statusbar"><span>9:41</span><span>100%</span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div></div>
+        <div class="body">
+
+          <div class="sheet-paper">
+            <div class="ph-title">菁悠广播站 · 邀请函</div>
+            <div class="ph-sub">菁菁校园情 · 悠悠广播声</div>
+
+            <div class="hello">
+              <div class="avatar">张</div>
+              <div>
+                <div class="t1">你好，张同学</div>
+                <div class="t2">高二（3）班 · 请在信纸上设置新密码</div>
+              </div>
+            </div>
+
+            <div class="fld">
+              <div class="fld-hd"><span class="lb">新密码</span><span class="hint">至少 8 位</span></div>
+              <div class="inp"><input id="p3" type="password" value="abcd1234"/><span class="eye" data-eye="p3">显示</span></div>
+            </div>
+            <div class="pwd-rule">
+              <span class="rule on">至少 8 位</span><span class="rule on">含字母</span><span class="rule on">含数字</span>
+            </div>
+
+            <div class="fld">
+              <div class="fld-hd"><span class="lb">再输一遍</span><span class="hint">两次需一致</span></div>
+              <div class="inp"><input type="password" placeholder="再输一遍新密码"/></div>
+            </div>
+
+            <div class="seal">菁悠<br>广播</div>
+          </div>
+
+          <div class="submit">落款盖章 · 入社</div>
+          <div class="skip">暂时跳过，下次登录再改</div>
+
+          <div class="foot"><div class="slogan">改完即激活，旧密码立即失效</div></div>
+        </div>
+      </div>
+
+    </div></div>
+    <div class="cap"><b>「来信」</b>
+      <span class="why">学号找收件名 → 密码解封火漆 → 信封翻开、信纸抽出</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  var u1=document.getElementById('u1'), p1=document.getElementById('p1');
+  var env1=document.getElementById('env1'), wax1=document.getElementById('wax1');
+  var pm1=document.getElementById('pm1'), addrName=document.getElementById('addrName');
+  var btn1=document.getElementById('btn1');
+
+  function reset(){ env1.classList.remove('open'); }
+  function sync(){
+    reset();
+    var u=(u1.value||''), p=(p1.value||'').length;
+    addrName.textContent = u ? u : '________';
+    pm1.classList.toggle('show', u.length>=1);
+    wax1.classList.toggle('ready', u.length>=8 && p>=1);
+    wax1.classList.remove('bad');
+    btn1.classList.toggle('dis', !(u.length>=1 && p>=1));
+  }
+  u1.addEventListener('input',sync); p1.addEventListener('input',sync); sync();
+
+  btn1.addEventListener('click',function(){
+    if(btn1.classList.contains('dis'))return;
+    env1.classList.add('open');
+  });
+
+  document.getElementById('goActivate').addEventListener('click',function(){
+    document.querySelector('.st[data-pane="activate"]').click();
+  });
+
+  ['uBox1','pBox1'].forEach(function(id){
+    var box=document.getElementById(id), ipt=box.querySelector('input');
+    ipt.addEventListener('focus',function(){box.classList.add('focus');});
+    ipt.addEventListener('blur',function(){box.classList.remove('focus');});
+  });
+
+  document.querySelectorAll('.eye').forEach(function(el){
+    el.addEventListener('click',function(){
+      var t=document.getElementById(el.getAttribute('data-eye')); if(!t)return;
+      var show=t.type==='text'; t.type=show?'password':'text';
+      el.textContent=show?'显示':'隐藏';
+    });
+  });
+
+  var bts=document.querySelectorAll('.st');
+  bts.forEach(function(b){
+    b.addEventListener('click',function(){
+      bts.forEach(function(x){x.classList.remove('on');}); b.classList.add('on');
+      var key=b.getAttribute('data-pane');
+      document.querySelectorAll('.pane').forEach(function(p){
+        p.classList.toggle('on',p.getAttribute('data-pane')===key);
+      });
+    });
+  });
+</script>
+</body>
+</html>

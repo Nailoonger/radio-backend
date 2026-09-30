@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>学生登录 v8.4 · 点唱机（右下轴座 + 斜跨长臂）</title>
+<style>
+  :root {
+    /* ══════ 小程序设计系统 v2 token（app.wxss 同源，rpx÷2=px）══════ */
+    --ink: #1D1D1F;
+    --ink-2: #333333;
+    --muted: #7A7A7A;
+    --soft: #C7C7CC;
+    --hairline: #E0E0E0;
+    --divider: #F0F0F0;
+    --parchment: #F5F5F7;
+    --canvas: #FFFFFF;
+    --tile: #272729;
+    --accent: #0066CC;
+    --accent-tint: #EAF3FD;
+    --red-bg: #FDE8E8;
+    --red-fg: #B42318;
+    --r-input: 12px;
+    --r-pill: 999px;
+    --vinyl: #1C1C1E;
+    --sh-soft: 0 12px 28px -16px rgba(15,28,46,0.22);
+    --sh-disc: 0 8px 18px -8px rgba(15,28,46,0.50);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei", sans-serif;
+    background: var(--parchment); color: var(--ink); padding: 32px 30px 60px;
+    font-size: 14px; line-height: 1.5;
+  }
+
+  .head { max-width: 760px; margin: 0 auto 18px; }
+  .head h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+  .head h1 .ver { color: var(--accent); }
+  .head p { font-size: 13px; color: var(--muted); margin-top: 9px; line-height: 1.9; }
+  .head b { color: var(--ink); }
+
+  .bars { max-width: 760px; margin: 0 auto 24px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .bars .lbl { font-size: 12.5px; color: var(--muted); margin-right: 4px; }
+  .st { font-size: 12.5px; padding: 7px 16px; border-radius: var(--r-pill); border: 1px solid var(--hairline);
+        background: #fff; color: var(--ink-2); cursor: pointer; transition: all .15s; }
+  .st:hover { border-color: var(--soft); }
+  .st.on { background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 500; }
+
+  .stage { display: flex; gap: 30px; justify-content: center; flex-wrap: wrap; align-items: flex-start; }
+
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .phone { width: 340px; height: 700px; border-radius: 44px; background: #0b0b0f; padding: 10px;
+           box-shadow: 0 30px 60px -22px rgba(15,28,46,0.35); flex: none; }
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 35px; overflow: hidden;
+            display: flex; flex-direction: column; background: var(--canvas); }
+  .cap { font-size: 12.5px; color: var(--muted); text-align: center; line-height: 1.7; }
+  .cap b { color: var(--ink); font-size: 13.5px; }
+  .cap .why { display: block; font-size: 11.5px; margin-top: 3px; }
+
+  .statusbar { height: 34px; display: flex; align-items: center; justify-content: space-between;
+               padding: 0 22px; font-size: 11.5px; font-weight: 600; color: var(--ink); flex: none; }
+  .statusbar .sig { display: flex; gap: 4px; align-items: center; }
+  .sig i { display: block; background: currentColor; border-radius: 1px; }
+  .topbar { height: 44px; padding: 0 18px; display: flex; align-items: center; flex: none; }
+  .back { width: 36px; height: 36px; border-radius: var(--r-pill); background: var(--parchment);
+          display: flex; align-items: center; justify-content: center; flex: none; }
+  .back .chev { width: 9px; height: 9px; border-left: 2px solid var(--ink-2); border-bottom: 2px solid var(--ink-2);
+                transform: rotate(45deg); margin-left: 3px; }
+
+  .pane { display: none; flex: 1; flex-direction: column; min-height: 0; }
+  .pane.on { display: flex; }
+  .body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 20px 14px; }
+
+  /* ══════════════════════════════════════════
+     唱机 v8.4：右下轴座 + 斜跨长臂（照参考图）
+     坐标系：deck 280×240；凹槽/盘心 (140,110) R76；轴座中心 (248,185)
+     臂长 70（转轴→臂尖），唱头中心距转轴 65（唱头在元素左端 = 转轴 -65px 一侧）
+     ⚠️ 唱头方向 = -(cosθ, sinθ)（元素 +x 指向配重那头）
+     落针 rotate(35°)  → 唱头 (194.8,147.7)，距盘心 66.5（压在外圈唱纹上）
+     收起 rotate(110°) → 唱头 (270.2,123.9)，距盘心 131（盘外右上，从右下往右上打）
+     ══════════════════════════════════════════ */
+  .player { flex: none; height: 256px; }
+  .deck {
+    position: relative; width: 280px; height: 240px;
+    margin: 8px auto 0;
+    border-radius: 26px;
+    background: var(--parchment);
+    box-shadow: var(--sh-soft), inset 0 1px 0 rgba(255,255,255,0.9), inset 0 0 0 1px rgba(15,28,46,0.05);
+  }
+  /* 左上：小站徽刻印 */
+  .deck .mark { position: absolute; left: 16px; top: 14px; width: 22px; height: 22px; }
+  /* 右上：机身铭牌 */
+  .plate {
+    position: absolute; right: 16px; top: 14px;
+    display: flex; align-items: center; gap: 7px;
+    padding: 5px 9px; border-radius: 6px;
+    background: var(--canvas);
+    box-shadow: inset 0 0 0 1px rgba(15,28,46,0.10), 0 1px 3px -1px rgba(15,28,46,0.18);
+  }
+  .plate i { width: 3px; height: 3px; border-radius: 50%; background: var(--soft); flex: none; }
+  .plate span { font-size: 8px; font-weight: 600; letter-spacing: 2.5px; color: var(--ink-2); line-height: 1; }
+
+  /* 凹槽：唱片嵌在里面 */
+  .well {
+    position: absolute; left: 52px; top: 22px;
+    width: 176px; height: 176px; border-radius: 50%;
+    background: var(--hairline);
+    box-shadow: inset 0 3px 8px rgba(15,28,46,0.20), inset 0 -1px 0 rgba(255,255,255,0.75);
+  }
+  /* 黑胶：盘心 (140,110)，R=76 */
+  .platter {
+    position: absolute; left: 64px; top: 34px;
+    width: 152px; height: 152px; border-radius: 50%;
+    background: var(--vinyl);
+    box-shadow: var(--sh-disc);
+  }
+  .grooves { position: absolute; inset: 0; border-radius: 50%;
+             animation: spin 3.6s linear infinite; animation-play-state: paused; }
+  .spinning .grooves { animation-play-state: running; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .grooves i { position: absolute; border-radius: 50%; border: 1px solid rgba(255,255,255,0.07); }
+  .grooves .flash {
+    position: absolute; left: 50%; top: 20px; margin-left: -1px;
+    width: 2px; height: 36px; border: none; border-radius: 1px;
+    background: rgba(255,255,255,0.13);
+  }
+  .rim { position: absolute; inset: 2px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.10); }
+
+  /* 中心标签：站徽铺满 */
+  .label {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 58px; height: 58px; border-radius: 50%;
+    overflow: hidden;
+    box-shadow: 0 0 0 2px var(--canvas), 0 0 0 3px rgba(15,28,46,0.12);
+  }
+  .label img { display: block; width: 100%; height: 100%; }
+
+  /* 右下轴座：深色金属圆 + 中心镂空孔，长臂从孔里穿出 */
+  .hub {
+    position: absolute; left: 231px; top: 168px;   /* 中心 (248,185) */
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--tile);
+    box-shadow: 0 3px 8px -4px rgba(15,28,46,0.45), inset 0 0 0 1px rgba(255,255,255,0.14);
+    z-index: 3;
+  }
+  .hub::after {  /* 镂空孔 */
+    content: ''; position: absolute; left: 50%; top: 50%;
+    width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px;
+    border-radius: 50%; background: var(--parchment);
+    box-shadow: inset 0 0 0 1px rgba(15,28,46,0.12);
+  }
+
+  /* 长臂：元素总宽 82 = 臂 70 + 臂尾配重 12；origin 在距左端 70px（即转轴）。
+     臂体 --soft 金属灰，左端唱头 --ink-2，右端配重 --ink-2。 */
+  .arm {
+    position: absolute; left: 178px; top: 182px;
+    width: 82px; height: 6px; border-radius: 3px;
+    background: var(--soft);
+    transform-origin: 70px center; transform: rotate(110deg);
+    transition: transform .55s cubic-bezier(0.34, 1.2, 0.5, 1);
+    box-shadow: inset 0 0 0 1px rgba(15,28,46,0.10), 0 2px 6px -3px rgba(15,28,46,0.32);
+    z-index: 2;
+  }
+  .arm::after {   /* 唱头（左端） */
+    content: ''; position: absolute; left: -3px; top: -4px;
+    width: 16px; height: 13px; border-radius: 3px;
+    background: var(--ink-2);
+  }
+  .arm::before {  /* 臂尾配重（转轴另一侧，伸出轴座下缘） */
+    content: ''; position: absolute; right: -14px; top: -3px;
+    width: 15px; height: 12px; border-radius: 4px;
+    background: var(--ink-2);
+  }
+  .arm.down { transform: rotate(35deg); }
+
+  /* 左下：ON AIR 灯 */
+  .onair {
+    position: absolute; left: 16px; bottom: 14px;
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 11px; border-radius: var(--r-pill);
+    background: var(--divider); color: var(--muted);
+    font-size: 9.5px; font-weight: 700; letter-spacing: 1.5px;
+    transition: background .25s, color .25s;
+  }
+  .onair i { width: 6px; height: 6px; border-radius: 50%; background: var(--soft); }
+  .onair.live { background: var(--accent); color: #fff; }
+  .onair.live i { background: #fff; }
+
+  .stat-line { text-align: center; font-size: 12.5px; color: var(--muted); letter-spacing: 0.5px; margin-top: 8px; }
+  .stat-line b { color: var(--accent); font-weight: 600; }
+
+  /* ══════════ 表单 ══════════ */
+  .fld { margin-top: 12px; }
+  .fld-hd { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; }
+  .fld-hd .lb { font-size: 11.5px; font-weight: 600; color: var(--ink-2); letter-spacing: 0.5px; }
+  .fld-hd .hint { font-size: 10.5px; color: var(--soft); letter-spacing: 0.3px; }
+  .inp { display: flex; align-items: center; height: 46px; background: var(--parchment);
+         border-radius: var(--r-input); padding: 0 14px; gap: 10px;
+         box-shadow: inset 0 0 0 1px rgba(10,26,46,0.06); transition: box-shadow .18s; }
+  .inp.focus { box-shadow: inset 0 0 0 2px var(--accent); }
+  .inp.err { box-shadow: inset 0 0 0 2px var(--red-fg); background: var(--red-bg); }
+  .inp input { flex: 1; min-width: 0; border: none; background: transparent; outline: none;
+               font-size: 14px; color: var(--ink); font-family: inherit; letter-spacing: 0.5px;
+               font-variant-numeric: tabular-nums; }
+  .inp input::placeholder { color: var(--soft); letter-spacing: 0; }
+  .inp .eye { font-size: 10.5px; color: var(--muted); cursor: pointer; flex: none; }
+
+  .error-bar { margin-top: 12px; background: var(--red-bg); color: var(--red-fg); font-size: 11.5px;
+               line-height: 1.6; border-radius: var(--r-input); padding: 9px 12px;
+               display: flex; gap: 7px; align-items: flex-start; }
+  .error-bar .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--red-fg); margin-top: 6px; flex: none; }
+
+  .submit { width: 100%; height: 48px; border: none; border-radius: var(--r-input);
+            background: var(--accent); color: #fff; font-size: 15px; font-weight: 600; letter-spacing: 2px;
+            display: flex; align-items: center; justify-content: center; line-height: 1;
+            margin-top: 14px; cursor: pointer; transition: background .2s; }
+  .submit.dis { background: #B9D2EE; }
+  .wxline { margin-top: 10px; text-align: center; font-size: 12.5px; color: var(--accent); }
+  .foot { margin-top: auto; padding-top: 10px; text-align: center; }
+  .foot .slogan { font-size: 10.5px; color: var(--soft); letter-spacing: 2px; }
+
+  .pwd-rule { display: flex; gap: 6px; margin-top: 9px; }
+  .rule { font-size: 10.5px; padding: 3px 10px; border-radius: var(--r-pill);
+          background: var(--divider); color: var(--muted); }
+  .rule.on { background: var(--accent-tint); color: var(--accent); font-weight: 500; }
+  .skip { text-align: center; margin-top: 12px; font-size: 12px; color: var(--muted);
+          text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>学生登录 <span class="ver">v8.4</span> · 点唱机（右下轴座 + 斜跨长臂）</h1>
+  <p>
+    <b>v8.3 → v8.4 修正：</b>v8.3 的唱头朝向<b>反了 180°</b>（探针量的是配重那头，截图放大才抓到：
+    待机唱头垂到底座外、落针是配重翘上盘）。本版按「唱头 = 转轴 -65px 一侧」重算角度：
+    收起 <b>rotate(110°)</b>，长臂从右下轴座<b>拨向右上</b>（唱头距盘心 131，盘外）；
+    落针 <b>rotate(35°)</b>，唱头压到盘面外圈唱纹（距盘心 66.5）。<br>
+    其余沿用：① 轴座在<b>右下角</b>（深色金属圆 + 中心镂空孔）；② 长臂 70（原 50）；③ 臂尾配重伸出轴座下缘；
+    ④ 元素重排避让长臂：左上小站徽刻印、<b>右上铭牌</b>、<b>左下 ON AIR 灯</b>、右下轴座。<br>
+    凹槽嵌唱片、站徽满标、无渐变（7 个 border 唱纹环）、无彩色投影、#0066CC 照旧；隐私文案已删。
+  </p>
+</div>
+
+<div class="bars">
+  <span class="lbl">状态：</span>
+  <button class="st on" data-pane="login">① 待机（登录）</button>
+  <button class="st" data-pane="error">② 跳针（密码错）</button>
+  <button class="st" data-pane="activate">③ 播放中（激活）</button>
+</div>
+
+<div class="stage">
+  <div class="phone-wrap">
+    <div class="phone"><div class="screen">
+
+      <!-- ══════ ① 待机 ══════ -->
+      <div class="pane on" data-pane="login">
+        <div class="statusbar"><span>9:41</span><span class="sig"><i style="width:14px;height:8px"></i><i style="width:6px;height:8px"></i></span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div></div>
+        <div class="body">
+
+          <div class="player" id="player1">
+            <div class="deck">
+              <img class="mark" src="../assets/station-badge.png" alt="" />
+              <div class="plate"><i></i><span>菁悠广播站</span><i></i></div>
+              <div class="well"></div>
+              <div class="platter">
+                <div class="grooves" id="grooves1"><span class="flash"></span></div>
+                <div class="rim"></div>
+                <div class="label"><img src="../assets/station-badge.png" alt="站徽" /></div>
+              </div>
+              <div class="arm" id="arm1"></div>
+              <div class="hub"></div>
+              <div class="onair" id="onair1"><i></i>OFF AIR</div>
+            </div>
+          </div>
+          <div class="stat-line" id="stat1">放上唱片 · <b>先报学号</b></div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">学号</span><span class="hint">学校分发，如 20240101</span></div>
+            <div class="inp" id="uBox1"><input id="u1" type="text" placeholder="输入学号，唱盘开始对轨" maxlength="12" /></div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">密码</span><span class="hint">初始密码 = user + 学号</span></div>
+            <div class="inp" id="pBox1"><input id="p1" type="password" placeholder="输入密码，唱针落下" maxlength="20" /><span class="eye" data-eye="p1">显示</span></div>
+          </div>
+
+          <div class="submit dis" id="btn1">开始播放 · 进入广播站</div>
+          <div class="wxline">用微信一键登录</div>
+
+          <div class="foot">
+            <div class="slogan">菁菁校园情 · 悠悠广播声</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════ ② 跳针 ══════ -->
+      <div class="pane" data-pane="error">
+        <div class="statusbar"><span>9:41</span><span class="sig"><i style="width:14px;height:8px"></i><i style="width:6px;height:8px"></i></span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div></div>
+        <div class="body">
+
+          <div class="player">
+            <div class="deck">
+              <img class="mark" src="../assets/station-badge.png" alt="" />
+              <div class="plate"><i></i><span>菁悠广播站</span><i></i></div>
+              <div class="well"></div>
+              <div class="platter">
+                <div class="grooves"><span class="flash"></span></div>
+                <div class="rim"></div>
+                <div class="label"><img src="../assets/station-badge.png" alt="站徽" /></div>
+              </div>
+              <div class="arm"></div>
+              <div class="hub"></div>
+              <div class="onair"><i></i>OFF AIR</div>
+            </div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">学号</span><span class="hint">学校分发，如 20240101</span></div>
+            <div class="inp"><input type="text" value="20240101" /></div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">密码</span><span class="hint">初始密码 = user + 学号</span></div>
+            <div class="inp err"><input type="password" value="1234" /><span class="eye" data-eye="x2">显示</span></div>
+          </div>
+
+          <div class="error-bar"><i class="dot"></i>学号或密码不对。初始密码为 user + 学号，例如 user20240101</div>
+
+          <div class="submit">重新对轨</div>
+          <div class="wxline">用微信一键登录</div>
+
+          <div class="foot">
+            <div class="slogan">菁菁校园情 · 悠悠广播声</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════ ③ 播放中 ══════ -->
+      <div class="pane" data-pane="activate">
+        <div class="statusbar"><span>9:41</span><span class="sig"><i style="width:14px;height:8px"></i><i style="width:6px;height:8px"></i></span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div></div>
+        <div class="body">
+
+          <div class="player">
+            <div class="deck">
+              <img class="mark" src="../assets/station-badge.png" alt="" />
+              <div class="plate"><i></i><span>菁悠广播站</span><i></i></div>
+              <div class="well"></div>
+              <div class="platter">
+                <div class="grooves" style="animation-play-state: running"><span class="flash"></span></div>
+                <div class="rim"></div>
+                <div class="label"><img src="../assets/station-badge.png" alt="站徽" /></div>
+              </div>
+              <div class="arm down"></div>
+              <div class="hub"></div>
+              <div class="onair live"><i></i>ON AIR</div>
+            </div>
+          </div>
+          <div class="stat-line">你好，张同学 · <b>唱片已就位，设个新密码</b></div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">新密码</span><span class="hint">至少 8 位</span></div>
+            <div class="inp"><input id="p3" type="password" value="abcd1234" /><span class="eye" data-eye="p3">显示</span></div>
+            <div class="pwd-rule"><span class="rule on">至少 8 位</span><span class="rule on">含字母</span><span class="rule on">含数字</span></div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">再输一遍</span><span class="hint">两次需一致</span></div>
+            <div class="inp"><input type="password" placeholder="再输一遍新密码" /></div>
+          </div>
+
+          <div class="submit">激活并播放</div>
+          <div class="skip">暂时跳过，下次登录再改</div>
+
+          <div class="foot">
+            <div class="slogan">菁菁校园情 · 悠悠广播声</div>
+          </div>
+        </div>
+      </div>
+
+    </div></div>
+    <div class="cap"><b>v8.4 · 点唱机（右下轴座 + 斜跨长臂 70）</b>
+      <span class="why">学号 → 唱盘转；密码 → 长臂从右下轴座斜落盘面；错 = 跳针</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* 唱纹环：border 描边，无渐变（盘 152px → 环 inset 8..62） */
+  var INSETS = [8, 17, 26, 35, 44, 53, 62];
+  document.querySelectorAll('.grooves').forEach(function (g) {
+    INSETS.forEach(function (n) {
+      var i = document.createElement('i');
+      i.style.inset = n + 'px';
+      g.appendChild(i);
+    });
+  });
+
+  /* ══════ 唱机交互 ══════ */
+  var u1 = document.getElementById('u1');
+  var p1 = document.getElementById('p1');
+  var player1 = document.getElementById('player1');
+  var arm1 = document.getElementById('arm1');
+  var onair1 = document.getElementById('onair1');
+  var stat1 = document.getElementById('stat1');
+  var btn1 = document.getElementById('btn1');
+
+  function sync() {
+    var u = u1.value || '';
+    var p = p1.value || '';
+
+    player1.classList.toggle('spinning', u.length > 0);   // 学号 → 唱盘转
+    arm1.classList.toggle('down', p.length > 0);          // 密码 → 长臂落
+
+    var txt;
+    if (u.length === 0) txt = '放上唱片 · <b>先报学号</b>';
+    else if (u.length < 8) txt = '唱盘对轨中 · <b>' + u.length + '/8</b>';
+    else if (p.length === 0) txt = '轨道已对准 · <b>落针请输密码</b>';
+    else txt = '唱针已落 · <b>准备好播放</b>';
+    stat1.innerHTML = txt;
+
+    var ready = u.length > 0 && p.length > 0;
+    onair1.classList.toggle('live', ready);
+    onair1.innerHTML = '<i></i>' + (ready ? 'ON AIR' : 'OFF AIR');
+    btn1.className = 'submit' + (ready ? '' : ' dis');
+  }
+  u1.addEventListener('input', sync);
+  p1.addEventListener('input', sync);
+  sync();
+
+  ['uBox1', 'pBox1'].forEach(function (id) {
+    var box = document.getElementById(id);
+    var ipt = box.querySelector('input');
+    ipt.addEventListener('focus', function () { box.classList.add('focus'); });
+    ipt.addEventListener('blur', function () { box.classList.remove('focus'); });
+  });
+
+  document.querySelectorAll('.eye').forEach(function (el) {
+    el.addEventListener('click', function () {
+      var t = document.getElementById(el.getAttribute('data-eye'));
+      if (!t) return;
+      var show = t.type === 'text';
+      t.type = show ? 'password' : 'text';
+      el.textContent = show ? '显示' : '隐藏';
+    });
+  });
+
+  var btns = document.querySelectorAll('.st');
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      btns.forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      var key = b.getAttribute('data-pane');
+      document.querySelectorAll('.pane').forEach(function (p) {
+        p.classList.toggle('on', p.getAttribute('data-pane') === key);
+      });
+    });
+  });
+</script>
+</body>
+</html>

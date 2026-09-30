@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>学生登录 · 「接通」原创方案</title>
+<style>
+  :root {
+    --ink:#1D1D1F; --ink-2:#333; --muted:#7A7A7A; --soft:#C7C7CC;
+    --hairline:#E0E0E0; --divider:#F0F0F0; --parchment:#F5F5F7;
+    --canvas:#fff; --accent:#0066CC; --live:#FF453A;
+    --red-bg:#FDE8E8; --red-fg:#B42318;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:-apple-system,"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei",sans-serif;
+    background:#F5F5F7; color:var(--ink); padding:32px 30px 60px;
+  }
+  .head { max-width:720px; margin:0 auto 20px; }
+  .head h1 { font-size:20px; font-weight:600; letter-spacing:-0.3px; }
+  .head h1 .ver { color:var(--accent); }
+  .head p { font-size:13px; color:var(--muted); margin-top:9px; line-height:1.9; }
+  .head b { color:var(--ink); }
+
+  .statebar { max-width:720px; margin:0 auto 26px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .statebar .lbl { font-size:12.5px; color:var(--muted); margin-right:4px; }
+  .st { font-size:12.5px; padding:7px 16px; border-radius:999px; border:1px solid var(--hairline);
+        background:#fff; color:var(--ink-2); cursor:pointer; transition:all .15s; font-family:inherit; }
+  .st.on { background:var(--ink); border-color:var(--ink); color:#fff; font-weight:500; }
+
+  .stage { display:flex; gap:30px; justify-content:center; flex-wrap:wrap; align-items:flex-start; }
+  .phone-wrap { display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .phone { width:340px; height:700px; border-radius:44px; background:#0b0b0f; padding:10px;
+           box-shadow:0 30px 60px -22px rgba(15,28,46,0.35); flex:none; }
+  .screen { width:100%; height:100%; border-radius:35px; overflow:hidden;
+            display:flex; flex-direction:column; font-size:14px; background:var(--canvas); }
+  .cap { font-size:12.5px; color:var(--muted); text-align:center; line-height:1.7; }
+  .cap b { color:var(--ink); font-size:13.5px; }
+  .cap .why { display:block; font-size:11.5px; margin-top:3px; }
+
+  .statusbar { height:34px; display:flex; align-items:center; justify-content:space-between;
+               padding:0 22px; font-size:11.5px; font-weight:600; flex:none; }
+  .topbar { height:44px; padding:0 18px; display:flex; align-items:center; flex:none; }
+  .back { width:34px; height:34px; border-radius:50%; background:var(--parchment);
+          display:flex; align-items:center; justify-content:center; flex:none; cursor:pointer; }
+  .back .chev { width:9px; height:9px; border-left:2px solid var(--ink-2); border-bottom:2px solid var(--ink-2);
+                transform:rotate(45deg); margin-left:3px; }
+
+  .pane { display:none; flex:1; flex-direction:column; min-height:0; }
+  .pane.on { display:flex; }
+  .body { flex:1; min-height:0; display:flex; flex-direction:column; padding:0 20px 16px; }
+
+  /* ══════════ 接线板（核心） ══════════ */
+  .board {
+    background:var(--canvas);
+    border:1px solid var(--hairline);
+    border-radius:17px;
+    padding:8px 10px 10px;
+    flex:none;
+  }
+  .board-top { display:flex; align-items:center; justify-content:space-between; padding:2px 6px 4px; }
+  .board-title { font-size:12px; font-weight:600; color:var(--ink-2); letter-spacing:0.5px; }
+  .air { display:flex; align-items:center; gap:5px; }
+  .air .lamp { width:7px; height:7px; border-radius:50%; background:#D6D6DB; flex:none; }
+  .air.live .lamp { background:var(--live); box-shadow:0 0 0 3px rgba(255,69,58,0.16); }
+  .air .t { font-size:9px; letter-spacing:1.4px; color:var(--soft); font-weight:600; }
+  .air.live .t { color:var(--live); }
+  .board svg { width:100%; height:218px; display:block; }
+
+  /* 连线与节点状态（JS 切 class） */
+  .seg { stroke:#E2E2E7; stroke-width:2.5; stroke-dasharray:4 4; stroke-linecap:round; transition:stroke .25s; }
+  .seg.on { stroke:var(--accent); stroke-dasharray:none; }
+  .seg.bad { stroke:var(--live); stroke-dasharray:4 4; }
+  .node { fill:#fff; stroke:#D6D6DB; stroke-width:2; transition:all .25s; }
+  .node.on { fill:var(--accent); stroke:var(--accent); }
+  .node.bad { fill:var(--live); stroke:var(--live); }
+  .hub { fill:#fff; stroke:#D6D6DB; stroke-width:2.5; transition:all .25s; }
+  .hub.on { fill:var(--accent); stroke:var(--accent); }
+  .hub-label { font-size:9.5px; fill:var(--muted); text-anchor:middle; }
+  .flowdot { opacity:0; }
+  .flowdot.run { opacity:1; }
+
+  /* ══════════ 表单 ══════════ */
+  .fld { margin-top:16px; }
+  .fld-hd { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:7px; }
+  .fld-hd .lb { font-size:12px; font-weight:600; color:var(--ink-2); }
+  .fld-hd .hint { font-size:10.5px; color:var(--soft); }
+  .inp {
+    display:flex; align-items:center; height:44px;
+    background:var(--parchment); border-radius:11px; padding:0 14px; gap:10px;
+    box-shadow:inset 0 0 0 1px rgba(10,26,46,0.05); transition:box-shadow .18s;
+  }
+  .inp.focus { box-shadow:inset 0 0 0 1.5px var(--accent); }
+  .inp.err { box-shadow:inset 0 0 0 1.5px #D64541; background:#FDECEB; }
+  .inp input { flex:1; min-width:0; border:none; background:transparent; outline:none;
+               font-size:14px; color:var(--ink); font-family:inherit; letter-spacing:0.5px; }
+  .inp input::placeholder { color:var(--soft); }
+  .inp .eye { font-size:10.5px; color:var(--soft); cursor:pointer; flex:none; }
+
+  .error-bar { margin-top:13px; background:var(--red-bg); color:var(--red-fg);
+               font-size:11.5px; line-height:1.6; border-radius:10px; padding:9px 12px;
+               display:flex; gap:7px; align-items:flex-start; }
+  .error-bar .dot { width:5px; height:5px; border-radius:50%; background:var(--red-fg); margin-top:6px; flex:none; }
+
+  .submit {
+    width:100%; height:46px; border:none; border-radius:11px;
+    background:var(--accent); color:#fff; font-size:14.5px; font-weight:600; letter-spacing:2px;
+    display:flex; align-items:center; justify-content:center; gap:8px; line-height:1;
+    margin-top:18px; cursor:pointer; font-family:inherit;
+  }
+  .submit.dis { background:#B9D2EE; }
+  .wxline { margin-top:14px; text-align:center; font-size:12.5px; color:var(--accent); cursor:pointer; }
+  .foot { margin-top:auto; padding-top:12px; text-align:center; }
+  .foot .slogan { font-size:10.5px; color:var(--soft); letter-spacing:2px; }
+  .foot .tip { font-size:10.5px; color:var(--soft); margin-top:4px; }
+
+  /* 激活 */
+  .hello { display:flex; align-items:center; gap:12px; margin-top:16px; }
+  .avatar { width:42px; height:42px; border-radius:50%; background:var(--accent); color:#fff;
+            display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:600; flex:none; }
+  .hello .t1 { font-size:16px; font-weight:600; }
+  .hello .t2 { font-size:11.5px; color:var(--muted); margin-top:2px; }
+  .pwd-rule { display:flex; gap:6px; margin-top:9px; }
+  .rule { font-size:10.5px; padding:3px 10px; border-radius:999px; background:var(--divider); color:var(--muted); }
+  .rule.on { background:rgba(0,102,204,0.08); color:var(--accent); font-weight:500; }
+  .skip { text-align:center; margin-top:13px; font-size:12px; color:var(--muted);
+          text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>学生登录 · <span class="ver">「接通」原创方案</span>（可交互原型，未写业务代码）</h1>
+  <p>
+    <b>概念：</b>登录不是填表，是<b>把你和广播站接通</b>。电台/录音棚里靠跳线盘插线建立信号通路 ——
+    输学号时，信号线路从「你」这头逐段通电、节点逐个点亮；输满 8 位学号 → 连到广播站门口，
+    输密码 → 最后一根线插上，整条线路变蓝、信号开始流动，广播站「ON AIR」。密码错 → 最后一段线插不进、红色断路。<br>
+    <b>和「调频」的区别：</b>调频是<b>接收</b>（拧收音机，被动找台）；接通是<b>连接</b>（插线，主动建立通路）。
+    配色仍守设计系统：单强调色 #0066CC、无渐变、无彩色投影。<b>可以真输入试试。</b>
+  </p>
+</div>
+
+<div class="statebar">
+  <span class="lbl">状态预览：</span>
+  <button class="st on" data-pane="login">① 接通（登录）</button>
+  <button class="st" data-pane="error">② 断路（密码错）</button>
+  <button class="st" data-pane="activate">③ ON AIR（首登激活）</button>
+</div>
+
+<div class="stage">
+  <div class="phone-wrap">
+    <div class="phone"><div class="screen">
+
+      <!-- ① 登录 -->
+      <div class="pane on" data-pane="login">
+        <div class="statusbar"><span>9:41</span><span>100%</span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div></div>
+        <div class="body">
+
+          <div class="board">
+            <div class="board-top">
+              <span class="board-title">信号接线板</span>
+              <div class="air" id="air1"><i class="lamp"></i><span class="t">OFF AIR</span></div>
+            </div>
+            <svg viewBox="0 0 280 224">
+              <!-- 广播站 hub -->
+              <circle class="hub" id="hub1" cx="140" cy="26" r="19"/>
+              <image href="assets/station-badge.png" x="125" y="11" width="30" height="30"/>
+              <text class="hub-label" x="140" y="60">菁悠广播站</text>
+              <!-- 连线 seg0..seg4（从上到下） -->
+              <line class="seg" id="s0" x1="140" y1="45" x2="140" y2="80"/>
+              <line class="seg" id="s1" x1="140" y1="92" x2="140" y2="118"/>
+              <line class="seg" id="s2" x1="140" y1="130" x2="140" y2="156"/>
+              <line class="seg" id="s3" x1="140" y1="168" x2="140" y2="194"/>
+              <line class="seg" id="s4" x1="140" y1="180" x2="140" y2="200"/>
+              <!-- 中间节点 n1..n4 -->
+              <circle class="node" id="n1" cx="140" cy="86" r="6.5"/>
+              <circle class="node" id="n2" cx="140" cy="124" r="6.5"/>
+              <circle class="node" id="n3" cx="140" cy="162" r="6.5"/>
+              <circle class="node" id="n4" cx="140" cy="200" r="6.5"/>
+              <!-- 你 -->
+              <circle class="node" id="you1" cx="140" cy="216" r="9"/>
+              <!-- 流动光点 -->
+              <circle class="flowdot" id="flow1" r="3.5" fill="#fff">
+                <animateMotion dur="1.6s" repeatCount="indefinite"
+                  path="M140,216 L140,30"/>
+              </circle>
+            </svg>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">学号</span><span class="hint" id="uProg1">尚未接线</span></div>
+            <div class="inp" id="uBox1"><input id="u1" type="text" placeholder="输入学号" maxlength="12"/></div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">密码</span><span class="hint">初始密码 = user + 学号</span></div>
+            <div class="inp" id="pBox1"><input id="p1" type="password" placeholder="输入密码" maxlength="20"/><span class="eye" data-eye="p1">显示</span></div>
+          </div>
+
+          <div class="submit dis" id="btn1">接通广播站</div>
+          <div class="wxline">用微信一键登录</div>
+
+          <div class="foot">
+            <div class="slogan">菁菁校园情 · 悠悠广播声</div>
+            <div class="tip">不收集头像与手机号，头像由姓名生成</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ② 断路 -->
+      <div class="pane" data-pane="error">
+        <div class="statusbar"><span>9:41</span><span>100%</span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div></div>
+        <div class="body">
+
+          <div class="board">
+            <div class="board-top">
+              <span class="board-title">信号接线板</span>
+              <div class="air"><i class="lamp"></i><span class="t">OFF AIR</span></div>
+            </div>
+            <svg viewBox="0 0 280 224">
+              <circle class="hub" cx="140" cy="26" r="19"/>
+              <image href="assets/station-badge.png" x="125" y="11" width="30" height="30"/>
+              <text class="hub-label" x="140" y="60">未能接通</text>
+              <line class="seg bad" x1="140" y1="45" x2="140" y2="80"/>
+              <line class="seg on" x1="140" y1="92" x2="140" y2="118"/>
+              <line class="seg on" x1="140" y1="130" x2="140" y2="156"/>
+              <line class="seg on" x1="140" y1="168" x2="140" y2="194"/>
+              <line class="seg on" x1="140" y1="180" x2="140" y2="200"/>
+              <circle class="node" cx="140" cy="86" r="6.5"/>
+              <circle class="node on" cx="140" cy="124" r="6.5"/>
+              <circle class="node on" cx="140" cy="162" r="6.5"/>
+              <circle class="node on" cx="140" cy="200" r="6.5"/>
+              <circle class="node on" cx="140" cy="216" r="9"/>
+              <!-- 断路标记 X -->
+              <text x="152" y="66" font-size="13" fill="#FF453A" font-weight="700">✕</text>
+            </svg>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">学号</span><span class="hint">已接通</span></div>
+            <div class="inp"><input type="text" value="20240101"/></div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">密码</span><span class="hint">最后一根线未插上</span></div>
+            <div class="inp err"><input type="password" value="1234"/><span class="eye">显示</span></div>
+          </div>
+
+          <div class="error-bar"><i class="dot"></i>学号或密码不对。初始密码为 user + 学号，例如 user20240101</div>
+
+          <div class="submit">重新接通</div>
+          <div class="wxline">用微信一键登录</div>
+
+          <div class="foot">
+            <div class="slogan">连续输错不会锁号，慢慢来</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ③ 激活 -->
+      <div class="pane" data-pane="activate">
+        <div class="statusbar"><span>9:41</span><span>100%</span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div></div>
+        <div class="body">
+
+          <div class="board">
+            <div class="board-top">
+              <span class="board-title">信号接线板</span>
+              <div class="air live"><i class="lamp"></i><span class="t">ON AIR</span></div>
+            </div>
+            <svg viewBox="0 0 280 224">
+              <circle class="hub on" cx="140" cy="26" r="19"/>
+              <text class="hub-label" x="140" y="60" style="fill:#0066CC;font-weight:600;">已接通</text>
+              <line class="seg on" x1="140" y1="45" x2="140" y2="80"/>
+              <line class="seg on" x1="140" y1="92" x2="140" y2="118"/>
+              <line class="seg on" x1="140" y1="130" x2="140" y2="156"/>
+              <line class="seg on" x1="140" y1="168" x2="140" y2="194"/>
+              <line class="seg on" x1="140" y1="180" x2="140" y2="200"/>
+              <circle class="node on" cx="140" cy="86" r="6.5"/>
+              <circle class="node on" cx="140" cy="124" r="6.5"/>
+              <circle class="node on" cx="140" cy="162" r="6.5"/>
+              <circle class="node on" cx="140" cy="200" r="6.5"/>
+              <circle class="node on" cx="140" cy="216" r="9"/>
+              <circle class="flowdot run" r="3.5" fill="#fff">
+                <animateMotion dur="1.6s" repeatCount="indefinite" path="M140,216 L140,30"/>
+              </circle>
+            </svg>
+          </div>
+
+          <div class="hello">
+            <div class="avatar">张</div>
+            <div>
+              <div class="t1">你好，张同学</div>
+              <div class="t2">高二（3）班 · 建立你的专属线路</div>
+            </div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">新密码</span><span class="hint">至少 8 位</span></div>
+            <div class="inp"><input id="p3" type="password" value="abcd1234"/><span class="eye" data-eye="p3">显示</span></div>
+          </div>
+          <div class="pwd-rule">
+            <span class="rule on">至少 8 位</span><span class="rule on">含字母</span><span class="rule on">含数字</span>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">再输一遍</span><span class="hint">两次需一致</span></div>
+            <div class="inp"><input type="password" placeholder="再输一遍新密码"/></div>
+          </div>
+
+          <div class="submit">建立专属线路</div>
+          <div class="skip">暂时跳过，下次登录再改</div>
+
+          <div class="foot">
+            <div class="slogan">改完即激活，旧密码立即失效</div>
+          </div>
+        </div>
+      </div>
+
+    </div></div>
+    <div class="cap"><b>「接通」</b>
+      <span class="why">学号 → 线路从你这头逐段通电；密码 → 最后一根线插上、信号流动</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* 学号/密码 → 接线状态（登录 pane） */
+  var u1=document.getElementById('u1'), p1=document.getElementById('p1');
+  var s=[0,1,2,3,4].map(function(i){return document.getElementById('s'+i);});
+  var n=[1,2,3,4].map(function(i){return document.getElementById('n'+i);});
+  var you1=document.getElementById('you1'), hub1=document.getElementById('hub1');
+  var flow1=document.getElementById('flow1'), air1=document.getElementById('air1');
+  var btn1=document.getElementById('btn1'), uProg1=document.getElementById('uProg1');
+
+  function setOn(el,on){ el.classList.toggle('on',on); }
+  function sync(){
+    var u=(u1.value||'').length, p=(p1.value||'').length;
+    // 学号：从你往上，每 2 位通一段（s4→s1 / n4→n1）
+    var seg=[0,0,0,0];
+    for(var k=0;k<4;k++){ if(u>=2*(k+1)) seg[k]=1; }
+    setOn(s[4],u>=2); setOn(n[3],u>=2);
+    setOn(s[3],u>=4); setOn(n[2],u>=4);
+    setOn(s[2],u>=6); setOn(n[1],u>=6);
+    setOn(s[1],u>=8); setOn(n[0],u>=8);
+    setOn(you1,u>=1);
+    // 密码：最后一段 s0（n1→hub）
+    var last = u>=8 && p>=1;
+    setOn(s[0],last);
+    var live = u>=8 && p>=6;
+    setOn(hub1,live);
+    flow1.classList.toggle('run',live);
+    air1.classList.toggle('live',live);
+    air1.querySelector('.t').textContent=live?'ON AIR':'OFF AIR';
+    var ready=u>=1&&p>=1;
+    btn1.classList.toggle('dis',!ready);
+    uProg1.textContent = u===0?'尚未接线':(u<8?'接线中… '+u+'/8':'已到广播站门口');
+  }
+  u1.addEventListener('input',sync); p1.addEventListener('input',sync); sync();
+
+  /* 聚焦态 */
+  ['uBox1','pBox1'].forEach(function(id){
+    var box=document.getElementById(id), ipt=box.querySelector('input');
+    ipt.addEventListener('focus',function(){box.classList.add('focus');});
+    ipt.addEventListener('blur',function(){box.classList.remove('focus');});
+  });
+
+  /* 密码显示 */
+  document.querySelectorAll('.eye').forEach(function(el){
+    el.addEventListener('click',function(){
+      var t=document.getElementById(el.getAttribute('data-eye')); if(!t)return;
+      var show=t.type==='text'; t.type=show?'password':'text';
+      el.textContent=show?'显示':'隐藏';
+    });
+  });
+
+  /* pane 切换 */
+  var bts=document.querySelectorAll('.st');
+  bts.forEach(function(b){
+    b.addEventListener('click',function(){
+      bts.forEach(function(x){x.classList.remove('on');}); b.classList.add('on');
+      var key=b.getAttribute('data-pane');
+      document.querySelectorAll('.pane').forEach(function(p){
+        p.classList.toggle('on',p.getAttribute('data-pane')===key);
+      });
+    });
+  });
+</script>
+</body>
+</html>

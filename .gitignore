@@ -5,6 +5,8 @@ node_modules/
 .env
 .env.local
 .env.*.local
+.env.*
+!.env.example
 
 # =============== 日志 ===============
 logs/
@@ -19,6 +21,10 @@ pnpm-debug.log*
 data/mysql/
 # Docker uploads 持久化（用户上传文件）
 data/uploads/
+# 本机运行时上传文件
+/uploads/
+# 业务数据库备份（数据库结构和迁移脚本仍入库）
+/sql/backup-*.sql
 # 旧 SQLite（已弃用）
 data/radio.db*
 *.sqlite
@@ -32,6 +38,8 @@ data/radio.db*
 # =============== 构建产物 ===============
 dist/
 admin-web/dist/
+# 云函数打包产物，由 cloud/scripts/sync.js 从正式源码生成
+/miniprogram/cloudfunctions/api/
 *.tsbuildinfo
 
 # =============== Docker / 证书（自签证书含私钥，不入库）===============
@@ -49,12 +57,22 @@ coverage/
 *~
 .DS_Store
 Thumbs.db
+# 微信开发者工具的本机配置
+/miniprogram/project.private.config.json
 
 # =============== 调试 / 临时文件（下划线开头 = 本机排查垃圾）===============
 _*
+# 管理接口共用的正式源码，不属于临时文件
+!/cloud/cloudfunctions/api/handlers/admin/_kit.js
+!/cloud/cloudfunctions/api/handlers/admin/_people.js
 radio-deploy.tar.gz
 uploads.tar.gz
 radio_data.sql
+# 可复跑验证脚本的输出；脚本本身仍入库
+/scripts/*-output.txt
+# 设计验证截图；设计源码和实际引用资源仍入库
+/design-preview/*.png
+/preview/student-login-v*/shots/
 
 # =============== 备份目录 ===============
 admin-web/_backup/

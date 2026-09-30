@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>菁悠广播站 · 管理端登录 · 方案 v2「播控台·实用版」</title>
+<style>
+  :root{
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --rail: #0B0D0F;
+    --panel-top: #252A2F;
+    --panel-bot: #1A1E22;
+    --ink: #E9ECEF;
+    --silk: #8B939B;          /* 丝印标签字色 */
+    --silk-dim: #5D656D;
+    --live: #E5342B;          /* ON AIR 红（设备语义，非装饰色） */
+    --amber: #FFB627;
+    --green: #37D067;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    min-height:100vh;
+    background: radial-gradient(1200px 620px at 50% -10%, #1D2228 0%, #0D0F12 62%, #08090B 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color:var(--ink);
+    display:flex; align-items:center; justify-content:center;
+    padding:48px 20px 64px;
+  }
+
+  /* ============ 演示工具条（不进产品） ============ */
+  .demo-bar{
+    position:fixed; top:14px; right:16px; z-index:99;
+    display:flex; gap:6px; align-items:center;
+    padding:6px 8px; border-radius:10px;
+    background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.10);
+    backdrop-filter: blur(8px);
+  }
+  .demo-bar span{ font:600 10px/1 var(--mono); color:#7C858D; letter-spacing:.12em; padding:0 4px; }
+  .demo-bar button{
+    font:600 11px/1 inherit; color:#C9D0D6; cursor:pointer;
+    padding:6px 10px; border-radius:7px;
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.10);
+  }
+  .demo-bar button:hover{ background:rgba(255,255,255,.13); color:#fff; }
+  .demo-bar button.warn:hover{ background:rgba(229,52,43,.28); border-color:rgba(229,52,43,.6); }
+
+  /* ============ 机架 ============ */
+  .stage{ width:100%; max-width:980px; }
+  .rack{
+    display:flex; align-items:stretch;
+    background:linear-gradient(180deg,#0E1114,#070809);
+    border-radius:12px; padding:12px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 40px 80px -28px rgba(0,0,0,.9), 0 2px 0 rgba(255,255,255,.03);
+  }
+  .rack-rail{
+    width:30px; flex:none; border-radius:6px;
+    background:linear-gradient(90deg,#14181C,#0C0F12 60%,#14181C);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.05), inset 0 0 22px rgba(0,0,0,.8);
+    display:flex; flex-direction:column; align-items:center; justify-content:space-around; padding:26px 0;
+  }
+  .screw{
+    position:relative; width:13px; height:13px; border-radius:50%; flex:none;
+    background:radial-gradient(circle at 34% 28%, #7E868D 0%, #4A5157 45%, #23282C 100%);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,.35), 0 1px 2px rgba(0,0,0,.7);
+  }
+  .screw::after{ content:''; position:absolute; inset:0; margin:auto; width:8px; height:1.4px; background:rgba(0,0,0,.55); border-radius:1px; }
+  .screw.s1::after{ transform:rotate(24deg); } .screw.s2::after{ transform:rotate(-58deg); }
+  .screw.s3::after{ transform:rotate(72deg); } .screw.s4::after{ transform:rotate(-12deg); }
+
+  /* ============ 面板 ============ */
+  .panel{
+    flex:1; min-width:0; border-radius:6px; position:relative;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,.013) 0 1px, rgba(0,0,0,0) 1px 3px),
+      linear-gradient(180deg, var(--panel-top) 0%, #1F2429 55%, var(--panel-bot) 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.12), inset 0 -1px 0 rgba(0,0,0,.65), inset 0 0 60px rgba(0,0,0,.35);
+  }
+  .panel.shake{ animation: shake .42s cubic-bezier(.36,.07,.19,.97) both; }
+  @keyframes shake{ 10%,90%{transform:translateX(-2px)} 20%,80%{transform:translateX(4px)} 30%,50%,70%{transform:translateX(-7px)} 40%,60%{transform:translateX(7px)} }
+
+  /* 顶部铭牌 */
+  .bezel{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:12px 22px; border-bottom:1px solid rgba(0,0,0,.55); box-shadow:0 1px 0 rgba(255,255,255,.055);
+  }
+  .bezel-l{ display:flex; align-items:center; gap:11px; }
+  .badge{ width:26px; height:26px; flex:none; opacity:.92; }
+  .brand-cn{ font-size:13.5px; font-weight:650; letter-spacing:.06em; color:#D8DEE4; }
+  .brand-en{ font:600 9px/1.4 var(--mono); letter-spacing:.24em; color:var(--silk-dim); }
+  .bezel-r{ font:600 9px/1.5 var(--mono); letter-spacing:.2em; color:var(--silk-dim); text-align:right; }
+
+  /* 主体两栏 */
+  .main{ display:flex; align-items:stretch; }
+  .col-info{ flex:0 0 380px; padding:30px 30px 26px; }
+  .divider-v{ flex:none; border-left:1px solid rgba(0,0,0,.55); box-shadow: inset 1px 0 0 rgba(255,255,255,.05); }
+  .col-form{ flex:1; min-width:0; padding:30px 32px 26px; display:flex; flex-direction:column; }
+
+  /* ---- 左：今日运营看板（不是插画） ---- */
+  .slogan{ font-size:17px; font-weight:600; letter-spacing:.04em; color:#E4E9EE; margin:14px 0 2px; }
+  .slogan-sub{ font-size:11.5px; color:var(--silk); letter-spacing:.02em; }
+  .liveboard{ margin-top:26px; display:flex; flex-direction:column; gap:0; }
+  .lrow{ display:flex; align-items:center; justify-content:space-between; gap:14px; padding:13px 0; border-bottom:1px solid rgba(255,255,255,.055); }
+  .lrow:first-child{ padding-top:0; }
+  .lrow .lk{ display:flex; align-items:center; gap:9px; font:600 9.5px/1 var(--mono); letter-spacing:.14em; color:var(--silk); text-transform:uppercase; }
+  .lrow .lv{ font-size:12.5px; color:#C7CED5; text-align:right; }
+  .lrow .lv b{ color:#E9ECEF; font-weight:600; }
+  .lrow .lv .led{ font:600 12px/1 var(--mono); color:#6FE29B; text-shadow:0 0 9px rgba(111,226,155,.55); letter-spacing:.1em; }
+  .ico{ width:14px; height:14px; flex:none; opacity:.7; }
+
+  /* 三灯（鉴权状态，轻量） */
+  .lamps{ display:flex; gap:18px; margin-top:26px; padding:14px 0 0; border-top:1px solid rgba(255,255,255,.055); }
+  .lamp{ display:flex; flex-direction:column; align-items:center; gap:7px; }
+  .bulb{ width:15px; height:15px; border-radius:50%; position:relative;
+    background:radial-gradient(circle at 35% 30%, rgba(255,255,255,.16), rgba(0,0,0,.35) 60%), #2B3136;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.8), 0 1px 0 rgba(255,255,255,.07); border:1px solid rgba(0,0,0,.7); }
+  .bulb::after{ content:''; position:absolute; inset:3px; border-radius:50%; background:#3A4147; transition:background .18s, box-shadow .18s; }
+  .lamp.on.power .bulb::after{ background:var(--amber); box-shadow:0 0 10px 1px rgba(255,182,39,.7); }
+  .lamp.on.id    .bulb::after{ background:var(--green); box-shadow:0 0 10px 1px rgba(55,208,103,.7); }
+  .lamp.on.air   .bulb::after{ background:var(--live);  box-shadow:0 0 14px 2px rgba(229,52,43,.85); }
+  .lamp.blink .bulb::after{ animation: blinklamp .5s steps(1) 3; }
+  @keyframes blinklamp{ 50%{ background:#2B3136; box-shadow:none; } }
+  .lamp-lab{ font:600 8px/1 var(--mono); letter-spacing:.16em; color:var(--silk-dim); }
+
+  /* ---- 右：登录卡 ---- */
+  .card{ flex:1; display:flex; flex-direction:column; }
+  .card-head{ margin-bottom:22px; }
+  .card-title{ margin:0 0 6px; font-size:21px; font-weight:650; letter-spacing:.02em; color:#EDEFF2; }
+  .card-sub{ margin:0; font-size:12px; color:var(--silk); letter-spacing:.02em; }
+  .field{ margin-bottom:16px; }
+  .field-label{ display:block; font:600 9.5px/1 var(--mono); letter-spacing:.16em; color:var(--silk); text-transform:uppercase; margin-bottom:9px; }
+  .slot{
+    display:flex; align-items:center; gap:10px; height:48px; padding:0 14px; border-radius:4px;
+    background:linear-gradient(180deg,#12161A,#191E23);
+    box-shadow: inset 0 2px 5px rgba(0,0,0,.75), inset 0 -1px 0 rgba(255,255,255,.05), 0 1px 0 rgba(255,255,255,.05);
+    border:1px solid #000; transition: box-shadow .16s;
+  }
+  .slot:focus-within{ box-shadow: inset 0 2px 5px rgba(0,0,0,.8), 0 0 0 1px rgba(229,52,43,.55), 0 0 12px -2px rgba(229,52,43,.4); }
+  .slot.err{ box-shadow: inset 0 2px 5px rgba(0,0,0,.8), 0 0 0 1px rgba(229,52,43,.8), 0 0 14px -2px rgba(229,52,43,.5); }
+  .slot svg{ flex:none; }
+  .slot input{ flex:1; min-width:0; border:0; outline:0; background:transparent; color:var(--ink); font:500 14px/1 var(--mono); letter-spacing:.12em; }
+  .slot input::placeholder{ color:#4E565E; letter-spacing:.04em; font-family:inherit; }
+  .slot .prefix{ font:600 9px/1 var(--mono); letter-spacing:.12em; color:#727B83; padding-right:9px; border-right:1px solid rgba(255,255,255,.07); }
+  .eye{ cursor:pointer; background:none; border:0; padding:2px; display:flex; }
+  .hintline{ min-height:16px; margin:2px 0 14px; font-size:11.5px; color:var(--live); letter-spacing:.02em; opacity:0; transition:opacity .2s; }
+  .hintline.show{ opacity:1; }
+
+  /* 拨动开关 */
+  .toggle{ display:flex; align-items:center; gap:11px; margin-bottom:24px; cursor:pointer; user-select:none; }
+  .tg{ position:relative; width:38px; height:22px; border-radius:3px; flex:none;
+    background:linear-gradient(180deg,#0F1317,#1B2025);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,.8), 0 1px 0 rgba(255,255,255,.06); border:1px solid #000; }
+  .tg i{ position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:2px;
+    background:linear-gradient(180deg,#9AA3AB,#5F686F 55%,#3C4349);
+    box-shadow:0 1px 2px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.45); transition:left .16s ease; }
+  .toggle.on .tg i{ left:20px; }
+  .toggle.on .tg{ background:linear-gradient(180deg,#152026,#1D2A31); }
+  .tg-lab{ font-size:12px; color:#98A0A8; }
+  .tg-lab small{ display:block; font:400 9.5px/1.4 var(--mono); color:var(--silk-dim); margin-top:2px; }
+
+  /* 推钮 */
+  .push{
+    width:100%; height:52px; border:0; cursor:pointer; border-radius:5px;
+    font-family:inherit; font-size:15px; font-weight:650; letter-spacing:.18em;
+    display:flex; align-items:center; justify-content:center; gap:12px; color:#6C757D;
+    background:linear-gradient(180deg,#262B31,#1C2126);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.10), inset 0 -2px 4px rgba(0,0,0,.45), 0 2px 4px rgba(0,0,0,.5);
+    transition: all .18s ease;
+  }
+  .push .sub{ font:600 8.5px/1 var(--mono); letter-spacing:.2em; opacity:.7; }
+  .push:disabled{ cursor:not-allowed; }
+  .push.armed{ color:#fff; background:linear-gradient(180deg,#F05349 0%, var(--live) 55%, #B2231B 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -3px 6px rgba(0,0,0,.35), 0 6px 16px -6px rgba(229,52,43,.85), 0 0 0 1px rgba(229,52,43,.5);
+    animation: breathe 2.4s ease-in-out infinite; }
+  @keyframes breathe{ 50%{ box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -3px 6px rgba(0,0,0,.35), 0 6px 22px -4px rgba(229,52,43,1), 0 0 0 1px rgba(229,52,43,.8); } }
+  .push.armed:active{ transform:translateY(2px); box-shadow: inset 0 2px 5px rgba(0,0,0,.5); }
+  .push.fail{ color:#FFB4AE; background:linear-gradient(180deg,#3A2120,#2A1817); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 1px rgba(229,52,43,.55); animation:none; }
+  .push.ok{ color:#fff; background:linear-gradient(180deg,#2E7D4F,#1B5C36); box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 6px 16px -6px rgba(27,92,54,.9); animation:none; }
+
+  /* 页脚 */
+  .panel-foot{ border-top:1px solid rgba(0,0,0,.6); box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+    padding:14px 24px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+  .foot-links{ display:flex; gap:20px; }
+  .foot-link{ font-size:11px; color:var(--silk-dim); letter-spacing:.02em; }
+  .foot-copy{ margin:0; font:400 10px/1 var(--mono); color:#4E565E; letter-spacing:.04em; }
+
+  @media (max-width: 880px){
+    .rack-rail{ display:none; }
+    .main{ flex-direction:column; }
+    .divider-v{ border-left:0; border-top:1px solid rgba(0,0,0,.55); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+    .col-info{ flex:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="demo-bar">
+  <span>DEMO</span>
+  <button data-act="fill">填入超管</button>
+  <button data-act="wrong">填入错误</button>
+  <button data-act="clear">清空</button>
+  <button class="warn" data-act="submit">点登录</button>
+</div>
+
+<div class="stage">
+  <div class="rack">
+    <div class="rack-rail"><i class="screw s1"></i><i class="screw s3"></i><i class="screw s2"></i><i class="screw s4"></i></div>
+
+    <div class="panel" id="panel">
+      <div class="bezel">
+        <div class="bezel-l">
+          <svg class="badge" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <circle cx="20" cy="20" r="18" stroke="#8B939B" stroke-width="1.2"/>
+            <circle cx="20" cy="20" r="12" stroke="#6B737B" stroke-width="1"/>
+            <circle cx="20" cy="20" r="3.4" fill="#8B939B"/>
+            <path d="M8.5 15.5 A14 14 0 0 1 31.5 15.5" stroke="#8B939B" stroke-width="1.2" stroke-linecap="round" opacity=".85"/>
+            <path d="M5.5 11.5 A20 20 0 0 1 34.5 11.5" stroke="#8B939B" stroke-width="1.2" stroke-linecap="round" opacity=".5"/>
+          </svg>
+          <div>
+            <div class="brand-cn">菁悠广播站 · 管理后台</div>
+            <div class="brand-en">JINGYOU RADIO · STUDIO 308</div>
+          </div>
+        </div>
+        <div class="bezel-r">MASTER CONTROL · SIGN-IN</div>
+      </div>
+
+      <div class="main">
+        <!-- 左：今日运营看板 -->
+        <div class="col-info">
+          <svg class="badge" viewBox="0 0 40 40" fill="none" style="width:40px;height:40px" aria-hidden="true">
+            <circle cx="20" cy="20" r="18" stroke="#6B737B" stroke-width="1.4"/>
+            <circle cx="20" cy="20" r="3.6" fill="#E9ECEF"/>
+            <path d="M7 15 A15 15 0 0 1 33 15" stroke="#C9CFD4" stroke-width="1.4" stroke-linecap="round" opacity=".8"/>
+          </svg>
+          <div class="slogan">菁菁校园情，悠悠广播声</div>
+          <div class="slogan-sub">菁悠广播站 · 校园之声</div>
+
+          <div class="liveboard">
+            <div class="lrow">
+              <span class="lk"><svg class="ico" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.2" stroke="#8B939B" stroke-width="1.3"/><path d="M7 4.2V7l2 1.2" stroke="#8B939B" stroke-width="1.3" stroke-linecap="round"/></svg>北京时间</span>
+              <span class="lv"><span class="led" id="clock">--:--:--</span></span>
+            </div>
+            <div class="lrow">
+              <span class="lk"><svg class="ico" viewBox="0 0 14 14" fill="none"><rect x="2.4" y="3" width="9.2" height="8" rx="1.2" stroke="#8B939B" stroke-width="1.3"/><path d="M4.6 6.4l1.5 1.5 3-3" stroke="#8B939B" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>今日播出</span>
+              <span class="lv"><b>午间 12:20</b> · 傍晚 18:10</span>
+            </div>
+            <div class="lrow">
+              <span class="lk"><svg class="ico" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="5" r="2.2" stroke="#8B939B" stroke-width="1.3"/><path d="M3.4 11.4a3.6 3.6 0 0 1 7.2 0" stroke="#8B939B" stroke-width="1.3" stroke-linecap="round"/></svg>当前轮值</span>
+              <span class="lv"><b>播音部</b> · 下午档</span>
+            </div>
+            <div class="lrow">
+              <span class="lk"><svg class="ico" viewBox="0 0 14 14" fill="none"><path d="M2.6 7h8.8M2.6 7a1.6 1.6 0 1 0 0-3.2h8.8A1.6 1.6 0 1 1 11.4 7M2.6 7a1.6 1.6 0 1 1 0 3.2h8.8A1.6 1.6 0 1 0 11.4 7" stroke="#8B939B" stroke-width="1.1" stroke-linejoin="round"/></svg>系统状态</span>
+              <span class="lv"><b style="color:#37D067">在线</b> · 通道就绪</span>
+            </div>
+          </div>
+
+          <div class="lamps">
+            <div class="lamp power on" id="lampPower"><div class="bulb"></div><div class="lamp-lab">POWER</div></div>
+            <div class="lamp id" id="lampId"><div class="bulb"></div><div class="lamp-lab">ID</div></div>
+            <div class="lamp air" id="lampAir"><div class="bulb"></div><div class="lamp-lab">ON AIR</div></div>
+          </div>
+        </div>
+
+        <div class="divider-v"></div>
+
+        <!-- 右：登录卡 -->
+        <div class="col-form">
+          <div class="card">
+            <div class="card-head">
+              <h1 class="card-title">管理员登录</h1>
+              <p class="card-sub">请使用管理员账号进入播控台</p>
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="inpId">账号 / ADMIN ID</label>
+              <div class="slot" id="slotId">
+                <span class="prefix">CH</span>
+                <input id="inpId" type="text" placeholder="如 teacher / 工号" autocomplete="username" maxlength="24" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="inpKey">密码 / KEY</label>
+              <div class="slot" id="slotKey">
+                <span class="prefix">KEY</span>
+                <input id="inpKey" type="password" placeholder="输入登录密码" autocomplete="current-password" maxlength="24" />
+                <button class="eye" id="btnEye" type="button" aria-label="显示密码">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M1.6 8S4 3.6 8 3.6 14.4 8 14.4 8 12 12.4 8 12.4 1.6 8 1.6 8Z" stroke="#7C858D" stroke-width="1.3"/>
+                    <circle cx="8" cy="8" r="1.9" stroke="#7C858D" stroke-width="1.3"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="hintline" id="hint">账号或密码错误，请核对后重试</div>
+
+            <div class="toggle on" id="tgRemember">
+              <div class="tg"><i></i></div>
+              <div class="tg-lab">记住本机账号<small>KEEP SIGNED ON THIS UNIT</small></div>
+            </div>
+
+            <button class="push" id="btnPush" disabled>
+              <span id="pushText">待机</span>
+              <span class="sub" id="pushSub">STANDBY</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-foot">
+        <div class="foot-links">
+          <span class="foot-link">使用帮助</span>
+          <span class="foot-link">关于我们</span>
+          <span class="foot-link">校园广播中心</span>
+        </div>
+        <p class="foot-copy">JINGYOU BROADCAST STATION · MADE IN STUDIO 308</p>
+      </div>
+    </div>
+
+    <div class="rack-rail"><i class="screw s2"></i><i class="screw s4"></i><i class="screw s1"></i><i class="screw s3"></i></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var panel = $('panel'), inpId = $('inpId'), inpKey = $('inpKey');
+  var slotId = $('slotId'), slotKey = $('slotKey'), hint = $('hint');
+  var lampId = $('lampId'), lampAir = $('lampAir');
+  var btnPush = $('btnPush'), pushText = $('pushText'), pushSub = $('pushSub');
+  var tgRemember = $('tgRemember');
+  var phase = 'idle'; // idle | working | fail | ok
+
+  function pad(n){ return n < 10 ? '0'+n : ''+n; }
+  function tick(){ var d = new Date(); $('clock').textContent = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); }
+  tick(); setInterval(tick, 1000);
+
+  function setLamp(el, on, blink){
+    el.className = 'lamp ' + el.getAttribute('data-k') + (on ? ' on' : '') + (blink ? ' blink' : '');
+    if (blink){ el.style.display = 'none'; void el.offsetWidth; el.style.display = ''; }
+  }
+  lampId.setAttribute('data-k','id'); lampAir.setAttribute('data-k','air');
+
+  function armed(){ return inpId.value.trim().length > 0 && inpKey.value.length >= 6; }
+
+  function render(){
+    if (phase === 'working'){ btnPush.className='push'; btnPush.disabled=true; pushText.textContent='正在登录'; pushSub.textContent='SIGNING IN'; return; }
+    if (phase === 'ok'){ return; }
+    if (phase === 'fail'){ return; }
+
+    setLamp(lampId, inpId.value.trim().length > 0, false);
+    setLamp(lampAir, false, false);
+
+    if (inpId.value.trim().length === 0){
+      btnPush.className='push'; btnPush.disabled=true; pushText.textContent='待机'; pushSub.textContent='STANDBY';
+    } else if (inpKey.value.length < 6){
+      btnPush.className='push'; btnPush.disabled=true; pushText.textContent='等待密码'; pushSub.textContent='WAITING KEY';
+    } else {
+      btnPush.className='push armed'; btnPush.disabled=false; pushText.textContent='进入播控台'; pushSub.textContent='PUSH TO AIR';
+    }
+  }
+
+  inpId.addEventListener('input', function(){ if (phase==='fail'){ resetFail(); } render(); });
+  inpKey.addEventListener('input', function(){ if (phase==='fail'){ resetFail(); } render(); });
+
+  $('btnEye').addEventListener('click', function(){ inpKey.type = inpKey.type==='password' ? 'text' : 'password'; });
+
+  tgRemember.addEventListener('click', function(){ tgRemember.classList.toggle('on'); });
+
+  function resetFail(){
+    phase = 'idle'; slotId.classList.remove('err'); slotKey.classList.remove('err'); hint.classList.remove('show');
+  }
+
+  function submit(){
+    if (phase==='working' || phase==='ok') return;
+    if (!armed()) return;
+    phase='working'; render();
+    setTimeout(function(){
+      if (inpId.value.trim()==='teacher' && inpKey.value==='admin123456'){
+        phase='ok';
+        setLamp(lampAir, true, false);
+        btnPush.className='push ok'; btnPush.disabled=true; pushText.textContent='已进入播控台'; pushSub.textContent='ON AIR';
+        hint.classList.remove('show');
+      } else {
+        phase='fail';
+        slotId.classList.add('err'); slotKey.classList.add('err');
+        hint.classList.add('show');
+        panel.classList.remove('shake'); void panel.offsetWidth; panel.classList.add('shake');
+        setLamp(lampId, true, true); setLamp(lampAir, true, true);
+        setTimeout(function(){ setLamp(lampId, inpId.value.trim().length>0, false); setLamp(lampAir, false, false); }, 1500);
+        btnPush.className='push fail'; btnPush.disabled=false; pushText.textContent='认证失败 · 重试'; pushSub.textContent='RETRY';
+      }
+    }, 900);
+  }
+  btnPush.addEventListener('click', submit);
+
+  document.querySelector('.demo-bar').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (!b) return;
+    var act = b.getAttribute('data-act');
+    hint.classList.remove('show'); slotId.classList.remove('err'); slotKey.classList.remove('err'); phase='idle';
+    if (act==='fill'){ inpId.value='teacher'; inpKey.value='admin123456'; }
+    else if (act==='wrong'){ inpId.value='teacher'; inpKey.value='wrongpwd'; }
+    else if (act==='clear'){ inpId.value=''; inpKey.value=''; }
+    else if (act==='submit'){ submit(); return; }
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

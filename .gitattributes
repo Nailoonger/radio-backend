@@ -1,0 +1,17 @@
+* text=auto
+
+# 在 Windows 编辑后，Linux 构建和运行时仍使用 LF。
+*.sh text eol=lf
+*.js text eol=lf
+*.cjs text eol=lf
+*.mjs text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# 设计和品牌资源保持二进制内容。
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary

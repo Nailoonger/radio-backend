@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="#0066CC" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="soundmark-title">
+  <title id="soundmark-title">声窗</title>
+  <path d="M22 10h-8q-6 0-6 8v28q0 8 8 8h6M42 10h8q6 0 6 8v28q0 8-8 8h-6"/>
+  <path d="M24 26v12M32 18v28M40 24v16"/>
+</svg>

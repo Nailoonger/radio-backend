@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>学生登录 v4 · 「调频」原创方案</title>
+<style>
+  :root {
+    /* 小程序设计系统 v2 token（app.wxss 同源，rpx÷2） */
+    --ink: #1D1D1F;
+    --ink-2: #333333;
+    --muted: #7A7A7A;
+    --soft: #C7C7CC;
+    --hairline: #E0E0E0;
+    --divider: #F0F0F0;
+    --parchment: #F5F5F7;
+    --canvas: #FFFFFF;
+    --tile: #272729;
+    --tile-2: #3A3A3C;
+    --accent: #0066CC;
+    --accent-on-dark: #2997FF;
+    --live: #FF453A;
+    --red-bg: #FDE8E8;
+    --red-fg: #B42318;
+    --r-card: 17px;
+    --r-input: 12px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei", sans-serif;
+    background: #F5F5F7;
+    color: var(--ink);
+    padding: 32px 30px 60px;
+  }
+
+  /* ══════════ 页头 ══════════ */
+  .head { max-width: 720px; margin: 0 auto 20px; }
+  .head h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+  .head h1 .ver { color: var(--accent); }
+  .head p { font-size: 13px; color: var(--muted); margin-top: 9px; line-height: 1.9; }
+  .head b { color: var(--ink); }
+
+  .statebar { max-width: 720px; margin: 0 auto 26px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .statebar .lbl { font-size: 12.5px; color: var(--muted); margin-right: 4px; }
+  .st { font-size: 12.5px; padding: 7px 16px; border-radius: 999px; border: 1px solid var(--hairline);
+        background: #fff; color: var(--ink-2); cursor: pointer; transition: all .15s; }
+  .st:hover { border-color: var(--soft); }
+  .st.on { background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 500; }
+
+  .stage { display: flex; gap: 30px; justify-content: center; flex-wrap: wrap; align-items: flex-start; }
+
+  /* ══════════ 手机框 ══════════ */
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .phone { width: 340px; height: 700px; border-radius: 44px; background: #0b0b0f; padding: 10px;
+           box-shadow: 0 30px 60px -22px rgba(15,28,46,0.35); flex: none; }
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 35px; overflow: hidden;
+            display: flex; flex-direction: column; font-size: 14px; line-height: 1.5; background: var(--canvas); }
+  .cap { font-size: 12.5px; color: var(--muted); text-align: center; line-height: 1.7; }
+  .cap b { color: var(--ink); font-size: 13.5px; }
+  .cap .why { display: block; font-size: 11.5px; margin-top: 3px; }
+
+  .statusbar { height: 34px; display: flex; align-items: center; justify-content: space-between;
+               padding: 0 22px; font-size: 11.5px; font-weight: 600; color: var(--ink); flex: none; }
+  .statusbar .sig { display: flex; gap: 4px; align-items: center; }
+  .sig i { display: block; background: currentColor; border-radius: 1px; }
+  .topbar { height: 44px; padding: 0 18px; display: flex; align-items: center; flex: none; }
+  .back { width: 34px; height: 34px; border-radius: 50%; background: var(--parchment);
+          display: flex; align-items: center; justify-content: center; flex: none; }
+  .back .chev { width: 9px; height: 9px; border-left: 2px solid var(--ink-2); border-bottom: 2px solid var(--ink-2);
+                transform: rotate(45deg); margin-left: 3px; }
+
+  .pane { display: none; flex: 1; flex-direction: column; min-height: 0; }
+  .pane.on { display: flex; }
+  .body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 20px 16px; }
+
+  /* ══════════════════════════════════════════
+     主角：频率窗（深色卡）
+     ══════════════════════════════════════════ */
+  .dial {
+    background: var(--tile); border-radius: var(--r-card);
+    padding: 14px 16px 13px; flex: none;
+  }
+  .dial-top { display: flex; align-items: center; justify-content: space-between; }
+  .dial-brand { display: flex; align-items: center; gap: 8px; }
+  .dial-brand img { width: 26px; height: 26px; }
+  .dial-brand .nm { font-size: 13.5px; font-weight: 600; color: #fff; letter-spacing: 0.5px; }
+  .air { display: flex; align-items: center; gap: 6px; }
+  .air .lamp { width: 7px; height: 7px; border-radius: 50%; background: var(--tile-2); flex: none; }
+  .air.on .lamp { background: var(--live); box-shadow: 0 0 0 3px rgba(255,69,58,0.18); }
+  .air .t { font-size: 9.5px; letter-spacing: 1.6px; color: rgba(255,255,255,0.4); font-weight: 600; }
+  .air.on .t { color: var(--live); }
+
+  /* 刻度尺 */
+  .scale { position: relative; margin: 16px 0 0; }
+  .ticks { display: flex; align-items: flex-start; justify-content: space-between; height: 12px; }
+  .ticks i { width: 1px; background: rgba(255,255,255,0.28); height: 6px; display: block; }
+  .ticks i.maj { height: 12px; background: rgba(255,255,255,0.5); }
+  .needle {
+    position: absolute; top: -4px; left: 0; width: 2px; height: 22px;
+    background: var(--live); border-radius: 1px;
+    transition: left .38s cubic-bezier(0.34, 1.3, 0.5, 1), background .2s;
+  }
+  .needle::before {
+    content: ''; position: absolute; top: -5px; left: -3px;
+    width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 5px solid var(--live);
+  }
+  .needle.lock { background: var(--accent-on-dark); }
+  .needle.lock::before { border-top-color: var(--accent-on-dark); }
+  .needle.bad { background: var(--live); }
+  .nums { display: flex; justify-content: space-between; margin-top: 5px; }
+  .nums span { font-size: 9px; color: rgba(255,255,255,0.32); letter-spacing: 0.3px;
+               font-variant-numeric: tabular-nums; }
+
+  .dial-foot { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 13px; }
+  .freq { display: flex; align-items: baseline; gap: 3px; }
+  .freq b { font-size: 23px; font-weight: 600; color: #fff; letter-spacing: -0.5px;
+            font-variant-numeric: tabular-nums; line-height: 1; }
+  .freq em { font-size: 9.5px; font-style: normal; color: rgba(255,255,255,0.4); letter-spacing: 1px; }
+  .stat { font-size: 11.5px; color: rgba(255,255,255,0.5); letter-spacing: 0.5px; text-align: right; }
+  .stat.lock { color: var(--accent-on-dark); font-weight: 600; }
+  .stat.bad { color: var(--live); font-weight: 600; }
+
+  /* ══════════ 表单 ══════════ */
+  .fld { margin-top: 18px; }
+  .fld-hd { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; }
+  .fld-hd .lb { font-size: 12px; font-weight: 600; color: var(--ink-2); letter-spacing: 0.5px; }
+  .fld-hd .hint { font-size: 10.5px; color: var(--soft); letter-spacing: 0.3px; }
+  .inp {
+    display: flex; align-items: center; height: 46px;
+    background: var(--parchment); border-radius: var(--r-input); padding: 0 14px; gap: 10px;
+    box-shadow: inset 0 0 0 1px rgba(10,26,46,0.05);
+    transition: box-shadow .18s;
+  }
+  .inp.focus { box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .inp.err { box-shadow: inset 0 0 0 1.5px #D64541; background: #FDECEB; }
+  .inp input { flex: 1; min-width: 0; border: none; background: transparent; outline: none;
+               font-size: 14px; color: var(--ink); font-family: inherit;
+               font-variant-numeric: tabular-nums; letter-spacing: 0.5px; }
+  .inp input::placeholder { color: var(--soft); letter-spacing: 0; }
+  .inp .eye { font-size: 10.5px; color: var(--soft); cursor: pointer; flex: none; }
+
+  /* 电平条：密码输入时的录音电平 */
+  .vu { display: flex; align-items: flex-end; gap: 3px; height: 26px; margin-top: 10px; }
+  .vu i { flex: 1; border-radius: 2px; background: var(--divider); height: 3px;
+          transition: height .22s cubic-bezier(0.34,1.2,0.5,1), background .18s; }
+  .vu i.on { background: var(--accent); }
+  .vu i.hot { background: var(--live); }
+  .vu-cap { font-size: 10px; color: var(--soft); margin-top: 6px; letter-spacing: 0.3px; height: 14px; }
+
+  .error-bar { margin-top: 14px; background: var(--red-bg); color: var(--red-fg);
+               font-size: 11.5px; line-height: 1.6; border-radius: 10px; padding: 9px 12px;
+               display: flex; gap: 7px; align-items: flex-start; }
+  .error-bar .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--red-fg); margin-top: 6px; flex: none; }
+
+  .submit {
+    width: 100%; height: 48px; border: none; border-radius: var(--r-input);
+    background: var(--accent); color: #fff; font-size: 15px; font-weight: 600; letter-spacing: 2px;
+    display: flex; align-items: center; justify-content: center; gap: 8px; line-height: 1;
+    margin-top: 22px; cursor: pointer; transition: background .2s;
+  }
+  .submit.dis { background: #B9D2EE; }
+  .submit .led { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.45); }
+  .submit:not(.dis) .led { background: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,0.22); }
+
+  .wxline { margin-top: 16px; text-align: center; font-size: 12.5px; color: var(--accent); }
+  .foot { margin-top: auto; padding-top: 14px; text-align: center; }
+  .foot .slogan { font-size: 10.5px; color: var(--soft); letter-spacing: 2px; }
+  .foot .tip { font-size: 10.5px; color: var(--soft); margin-top: 5px; letter-spacing: 0.3px; }
+
+  /* ══════════ 激活屏 ══════════ */
+  .hello { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+  .avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--tile); color: #fff;
+            display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600; flex: none; }
+  .hello .t1 { font-size: 17px; font-weight: 600; letter-spacing: -0.2px; }
+  .hello .t2 { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+  .pwd-rule { display: flex; gap: 6px; margin-top: 9px; }
+  .rule { font-size: 10.5px; padding: 3px 10px; border-radius: 999px; background: var(--divider); color: var(--muted); }
+  .rule.on { background: rgba(0,102,204,0.08); color: var(--accent); font-weight: 500; }
+  .skip { text-align: center; margin-top: 14px; font-size: 12px; color: var(--muted);
+          text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>学生登录 <span class="ver">v4</span> · 「调频」原创方案（可交互原型，未写业务代码）</h1>
+  <p>
+    <b>上一轮否掉的原因：</b>v3 那三版是通用范式（深色头+白卡 / 全屏深色 / 极简白），谁家都能用，不是广播站的。
+    这一版是从<b>项目自身</b>长出来的 —— 广播站的本质是「调频」。<br>
+    <b>概念：</b>登录不是填表，是<b>调到你的频道</b>。输学号时频率窗里的红指针在刻度尺上滑动、频率数字跟着走，输满 8 位 → 指针变蓝、显示「信号已锁定」；
+    输密码时下方<b>录音电平条</b>像播音电平一样起伏。全部是这一个项目才成立的隐喻，配色仍守设计系统（单强调色 #0066CC、深色卡 #272729、无渐变无彩色投影）。<br>
+    <b>可以真输入试试：</b>在学号框里打字看指针，密码框里打字看电平。
+  </p>
+</div>
+
+<div class="statebar">
+  <span class="lbl">状态预览：</span>
+  <button class="st on" data-pane="login">① 调频（登录）</button>
+  <button class="st" data-pane="error">② 信号中断（密码错）</button>
+  <button class="st" data-pane="activate">③ ON AIR（首登激活）</button>
+</div>
+
+<div class="stage">
+  <div class="phone-wrap">
+    <div class="phone"><div class="screen">
+
+      <!-- ══════ ① 登录 ══════ -->
+      <div class="pane on" data-pane="login">
+        <div class="statusbar"><span>9:41</span><span class="sig"><i style="width:14px;height:8px"></i><i style="width:6px;height:8px"></i></span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div></div>
+        <div class="body">
+
+          <div class="dial">
+            <div class="dial-top">
+              <div class="dial-brand">
+                <img src="../assets/station-badge-mono.png" alt="站徽" />
+                <span class="nm">菁悠广播站</span>
+              </div>
+              <div class="air" id="air1"><i class="lamp"></i><span class="t">OFF AIR</span></div>
+            </div>
+            <div class="scale">
+              <div class="ticks" id="ticks1"></div>
+              <div class="needle" id="needle1" style="left:0%"></div>
+              <div class="nums"><span>88</span><span>92</span><span>96</span><span>100</span><span>104</span><span>108</span></div>
+            </div>
+            <div class="dial-foot">
+              <div class="freq"><b id="freq1">87.6</b><em>MHz</em></div>
+              <div class="stat" id="stat1">调到你的频道</div>
+            </div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">学号</span><span class="hint">学校分发，如 20240101</span></div>
+            <div class="inp" id="uBox1"><input id="u1" type="text" placeholder="输入学号" maxlength="12" /></div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">密码</span><span class="hint">初始密码 = user + 学号</span></div>
+            <div class="inp" id="pBox1"><input id="p1" type="password" placeholder="输入密码" maxlength="20" /><span class="eye" data-eye="p1">显示</span></div>
+            <div class="vu" id="vu1"></div>
+            <div class="vu-cap" id="vuCap1">电平静止 · 等待输入</div>
+          </div>
+
+          <div class="submit dis" id="btn1"><i class="led"></i>进入广播站</div>
+          <div class="wxline">用微信一键登录</div>
+
+          <div class="foot">
+            <div class="slogan">菁菁校园情 · 悠悠广播声</div>
+            <div class="tip">不收集头像与手机号，头像由姓名生成</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════ ② 信号中断 ══════ -->
+      <div class="pane" data-pane="error">
+        <div class="statusbar"><span>9:41</span><span class="sig"><i style="width:14px;height:8px"></i><i style="width:6px;height:8px"></i></span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div></div>
+        <div class="body">
+
+          <div class="dial">
+            <div class="dial-top">
+              <div class="dial-brand">
+                <img src="../assets/station-badge-mono.png" alt="站徽" />
+                <span class="nm">菁悠广播站</span>
+              </div>
+              <div class="air" id="air2"><i class="lamp"></i><span class="t">OFF AIR</span></div>
+            </div>
+            <div class="scale">
+              <div class="ticks" id="ticks2"></div>
+              <div class="needle bad" id="needle2" style="left:62%"></div>
+              <div class="nums"><span>88</span><span>92</span><span>96</span><span>100</span><span>104</span><span>108</span></div>
+            </div>
+            <div class="dial-foot">
+              <div class="freq"><b>100.2</b><em>MHz</em></div>
+              <div class="stat bad">信号中断 · 频率偏离</div>
+            </div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">学号</span><span class="hint">学校分发，如 20240101</span></div>
+            <div class="inp"><input type="text" value="20240101" /></div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">密码</span><span class="hint">初始密码 = user + 学号</span></div>
+            <div class="inp err"><input type="password" value="1234" /><span class="eye" data-eye="x2">显示</span></div>
+            <div class="vu" id="vu2"></div>
+            <div class="vu-cap">电平异常 · 未能接通</div>
+          </div>
+
+          <div class="error-bar"><i class="dot"></i>学号或密码不对。初始密码为 user + 学号，例如 user20240101</div>
+
+          <div class="submit"><i class="led"></i>重新调频</div>
+          <div class="wxline">用微信一键登录</div>
+
+          <div class="foot">
+            <div class="slogan">菁菁校园情 · 悠悠广播声</div>
+            <div class="tip">连续输错不会锁号，慢慢来</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════ ③ ON AIR 激活 ══════ -->
+      <div class="pane" data-pane="activate">
+        <div class="statusbar"><span>9:41</span><span class="sig"><i style="width:14px;height:8px"></i><i style="width:6px;height:8px"></i></span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div></div>
+        <div class="body">
+
+          <div class="dial">
+            <div class="dial-top">
+              <div class="dial-brand">
+                <img src="../assets/station-badge-mono.png" alt="站徽" />
+                <span class="nm">菁悠广播站</span>
+              </div>
+              <div class="air on"><i class="lamp"></i><span class="t">ON AIR</span></div>
+            </div>
+            <div class="scale">
+              <div class="ticks" id="ticks3"></div>
+              <div class="needle lock" style="left:100%"></div>
+              <div class="nums"><span>88</span><span>92</span><span>96</span><span>100</span><span>104</span><span>108</span></div>
+            </div>
+            <div class="dial-foot">
+              <div class="freq"><b>107.9</b><em>MHz</em></div>
+              <div class="stat lock">信号已锁定</div>
+            </div>
+          </div>
+
+          <div class="hello">
+            <div class="avatar">张</div>
+            <div>
+              <div class="t1">你好，张同学</div>
+              <div class="t2">高二（3）班 · 请设置你的新密码</div>
+            </div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">新密码</span><span class="hint">至少 8 位</span></div>
+            <div class="inp"><input id="p3" type="password" value="abcd1234" /><span class="eye" data-eye="p3">显示</span></div>
+            <div class="vu" id="vu3"></div>
+            <div class="vu-cap">电平正常 · 可以播音</div>
+          </div>
+
+          <div class="pwd-rule" style="margin-top:12px">
+            <span class="rule on">至少 8 位</span><span class="rule on">含字母</span><span class="rule on">含数字</span>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">再输一遍</span><span class="hint">两次需一致</span></div>
+            <div class="inp"><input type="password" placeholder="再输一遍新密码" /></div>
+          </div>
+
+          <div class="submit"><i class="led"></i>激活账号</div>
+          <div class="skip">暂时跳过，下次登录再改</div>
+
+          <div class="foot">
+            <div class="slogan">菁菁校园情 · 悠悠广播声</div>
+            <div class="tip">改完即激活，旧密码立即失效</div>
+          </div>
+        </div>
+      </div>
+
+    </div></div>
+    <div class="cap"><b>v4 · 调频</b>
+      <span class="why">指针随学号滑动 → 锁定信号；电平条随密码起伏 → 可以播音</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* 刻度尺：21 条，每 5 条加长 */
+  ['ticks1', 'ticks2', 'ticks3'].forEach(function (id) {
+    var box = document.getElementById(id);
+    if (!box) return;
+    for (var i = 0; i <= 20; i++) {
+      var s = document.createElement('i');
+      if (i % 5 === 0) s.className = 'maj';
+      box.appendChild(s);
+    }
+  });
+
+  /* 电平条：14 根，高度按一条固定的播音电平曲线 */
+  var VU_N = 14;
+  var VU_H = [7, 13, 20, 15, 22, 11, 18, 24, 14, 20, 9, 16, 21, 12];
+  ['vu1', 'vu2', 'vu3'].forEach(function (id) {
+    var box = document.getElementById(id);
+    if (!box) return;
+    for (var i = 0; i < VU_N; i++) {
+      box.appendChild(document.createElement('i'));
+    }
+  });
+
+  function paintVu(id, n) {
+    var box = document.getElementById(id);
+    if (!box) return;
+    var bars = box.children;
+    for (var i = 0; i < bars.length; i++) {
+      var lit = i < n;
+      bars[i].className = lit ? (VU_H[i] >= 20 ? 'hot' : 'on') : '';
+      bars[i].style.height = lit ? VU_H[i] + 'px' : '3px';
+    }
+  }
+
+  /* 初始态绘制 */
+  paintVu('vu1', 0);
+  paintVu('vu2', 4);
+  paintVu('vu3', 8);
+
+  /* 学号 → 指针 / 频率 / 状态 */
+  var F0 = 87.6, F1 = 107.9;
+  var u1 = document.getElementById('u1');
+  var p1 = document.getElementById('p1');
+  var needle1 = document.getElementById('needle1');
+  var freq1 = document.getElementById('freq1');
+  var stat1 = document.getElementById('stat1');
+  var air1 = document.getElementById('air1');
+  var btn1 = document.getElementById('btn1');
+  var vuCap1 = document.getElementById('vuCap1');
+
+  function syncLogin() {
+    var u = u1.value || '';
+    var p = p1.value || '';
+    var t = Math.min(u.length, 8) / 8;
+    needle1.style.left = (t * 100) + '%';
+    freq1.textContent = (F0 + t * (F1 - F0)).toFixed(1);
+    var locked = u.length >= 8;
+    needle1.className = 'needle' + (locked ? ' lock' : '');
+    stat1.className = 'stat' + (locked ? ' lock' : '');
+    stat1.textContent = u.length === 0 ? '调到你的频道' : (locked ? '信号已锁定' : '正在搜索… ' + u.length + '/8');
+    air1.className = 'air' + (locked && p.length >= 6 ? ' on' : '');
+    air1.querySelector('.t').textContent = (locked && p.length >= 6) ? 'ON AIR' : 'OFF AIR';
+    var ready = u.length > 0 && p.length > 0;
+    btn1.className = 'submit' + (ready ? '' : ' dis');
+    btn1.lastChild.textContent = ready ? '进入广播站' : '进入广播站';
+    paintVu('vu1', Math.min(p.length, VU_N));
+    vuCap1.textContent = p.length === 0 ? '电平静止 · 等待输入'
+      : (p.length < 6 ? '电平偏弱 · 再输入几位' : '电平正常 · 可以播音');
+  }
+  u1.addEventListener('input', syncLogin);
+  p1.addEventListener('input', syncLogin);
+  syncLogin();
+
+  /* 聚焦态 */
+  ['uBox1', 'pBox1'].forEach(function (id) {
+    var box = document.getElementById(id);
+    var ipt = box.querySelector('input');
+    ipt.addEventListener('focus', function () { box.classList.add('focus'); });
+    ipt.addEventListener('blur', function () { box.classList.remove('focus'); });
+  });
+
+  /* 显示/隐藏密码 */
+  document.querySelectorAll('.eye').forEach(function (el) {
+    el.addEventListener('click', function () {
+      var t = document.getElementById(el.getAttribute('data-eye'));
+      if (!t) return;
+      var show = t.type === 'text';
+      t.type = show ? 'password' : 'text';
+      el.textContent = show ? '显示' : '隐藏';
+    });
+  });
+
+  /* 状态切换 */
+  var btns = document.querySelectorAll('.st');
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      btns.forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      var key = b.getAttribute('data-pane');
+      document.querySelectorAll('.pane').forEach(function (p) {
+        p.classList.toggle('on', p.getAttribute('data-pane') === key);
+      });
+    });
+  });
+</script>
+</body>
+</html>

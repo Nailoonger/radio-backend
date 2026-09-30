@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>菁悠广播站 · 小程序登录页概念稿</title>
+<style>
+  * { box-sizing: border-box; }
+  :root { --accent:#06c; --ink:#1d1d1f; --muted:#86868b; --paper:#f5f5f7; --tile:#272729; --line:#e7e7eb; }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; background:#e9e9ec; color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+  .stage { display:flex; gap:32px; align-items:center; padding:32px; }
+  .phone { width:390px; height:844px; border:10px solid #171719; border-radius:48px; overflow:hidden; background:var(--paper); box-shadow:0 28px 80px #15151a30; position:relative; }
+  .screen { height:100%; padding:0 25px 28px; display:flex; flex-direction:column; }
+  .status { height:52px; padding:14px 8px 0; display:flex; justify-content:space-between; font-size:13px; font-weight:650; }
+  .sys { display:flex; gap:5px; align-items:center; }
+  .top { height:48px; display:flex; align-items:center; justify-content:space-between; }
+  .back { width:36px;height:36px;border-radius:50%;background:#e9e9ec;display:grid;place-items:center;font-size:21px;line-height:1; }
+  .brand-mini { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:650; }
+  .brand-mini img { width:28px;height:28px; }
+  .spacer { width:36px; }
+  .hero { padding:43px 0 25px; }
+  .eyebrow { font-size:11px; letter-spacing:2px; color:var(--accent); font-weight:700; }
+  h1 { font-size:32px; line-height:1.25; letter-spacing:-1px; margin:10px 0 8px; }
+  .sub { color:var(--muted); font-size:14px; line-height:1.65; }
+  .tile { margin-top:23px; min-height:112px; border-radius:27px; background:var(--tile); color:white; padding:19px 20px; position:relative; overflow:hidden; }
+  .tile:after { content:""; position:absolute; width:118px;height:118px;border:1px solid #ffffff20;border-radius:50%;right:-19px;top:-38px;box-shadow:0 0 0 15px #ffffff08,0 0 0 31px #ffffff05; }
+  .tile-label { font-size:11px;color:#b7b7bc;letter-spacing:1.4px; }
+  .tile-title { font-weight:650;font-size:18px;margin-top:9px; }
+  .tile-foot { font-size:11px;color:#b7b7bc;margin-top:5px; }
+  .card { margin-top:2px; background:#fff; border-radius:28px; padding:23px 20px 19px; box-shadow:0 8px 30px #17171a08; }
+  .card-head { display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:20px; }
+  .card-head strong { font-size:19px; }
+  .card-head span { font-size:11px;color:var(--muted); }
+  .field { margin-top:14px; }
+  label { display:block;font-size:12px;color:#66666c;margin:0 0 8px 2px; }
+  .input { height:50px;border-radius:14px;background:#f5f5f7;display:flex;align-items:center;padding:0 14px;gap:11px;color:#a1a1a6; }
+  .input svg { width:17px;height:17px;stroke:#85858b;fill:none;stroke-width:1.7; }
+  .placeholder { color:#a1a1a6;font-size:13px;flex:1; }
+  .eye { color:#77777d;font-size:11px; }
+  .hint { font-size:10px;color:#96969c;margin:8px 2px 0;line-height:1.5; }
+  .button { margin-top:20px;height:51px;border-radius:16px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:15px;font-weight:650;letter-spacing:1px; }
+  .divider { display:flex;align-items:center;gap:12px;color:#aaaab0;font-size:11px;margin:17px 0 13px; }
+  .divider:before,.divider:after { content:"";height:1px;background:var(--line);flex:1; }
+  .wechat { height:45px;border:1px solid var(--line);border-radius:15px;display:flex;align-items:center;justify-content:center;gap:9px;font-size:13px;font-weight:550;color:#36363a; }
+  .wx { width:19px;height:16px;position:relative; }
+  .wx:before,.wx:after { content:"";position:absolute;border-radius:50%;background:#09bb07;width:13px;height:11px;top:0;left:0; }
+  .wx:after { width:9px;height:8px;top:7px;left:9px;border:1px solid white; }
+  .privacy { display:flex;justify-content:center;gap:7px;align-items:center;color:#9a9aa0;font-size:10px;margin-top:13px; }
+  .shield { width:11px;height:13px;border:1px solid #9a9aa0;border-radius:7px 7px 8px 8px; }
+  .homebar { width:128px;height:4px;background:#171719;border-radius:9px;position:absolute;bottom:8px;left:calc(50% - 64px); }
+  .notes { width:260px; }
+  .notes h2 { font-size:20px;margin:0 0 12px; }
+  .notes p { font-size:13px;line-height:1.8;color:#55555b;margin:0 0 10px; }
+  .tag { display:inline-block;background:#fff;border-radius:99px;padding:7px 11px;color:#55555b;font-size:11px;margin:4px 4px 0 0; }
+  @media(max-width:760px) { body { display:block;background:var(--paper); } .stage { padding:0;display:block; } .phone { width:100vw;height:100dvh;border:0;border-radius:0;box-shadow:none; } .notes { display:none; } }
+</style>
+</head>
+<body>
+<main class="stage">
+  <section class="phone" aria-label="登录页概念稿">
+    <div class="screen">
+      <div class="status"><span>9:41</span><span class="sys">●●●　◖　▰</span></div>
+      <header class="top"><div class="back">‹</div><div class="brand-mini"><img src="../miniprogram/assets/station-badge.png" alt="" />菁悠广播站</div><div class="spacer"></div></header>
+      <section class="hero">
+        <div class="eyebrow">JINGYOU RADIO</div>
+        <h1>让每一个声音，<br>都被听见。</h1>
+        <div class="sub">登录后，点歌、投稿，和校园好声音相遇。</div>
+        <div class="tile">
+          <div class="tile-label">校园广播 · 正在等你</div>
+          <div class="tile-title">菁菁校园情，悠悠广播声</div>
+          <div class="tile-foot">用你的声音，记录校园日常</div>
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-head"><strong>学生登录</strong><span>学号账号</span></div>
+        <div class="field"><label>学号</label><div class="input"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.6-3.4 2.8-5 6.5-5s5.9 1.6 6.5 5"/></svg><span class="placeholder">输入学校分发的学号</span></div></div>
+        <div class="field"><label>密码</label><div class="input"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span class="placeholder">请输入密码</span><span class="eye">显示</span></div><div class="hint">首次登录？初始密码为 user + 学号</div></div>
+        <div class="button">登 录</div>
+        <div class="divider">其他方式</div>
+        <div class="wechat"><span class="wx"></span>微信一键登录</div>
+        <div class="privacy"><span class="shield"></span>不收集头像与手机号</div>
+      </section>
+    </div>
+    <div class="homebar"></div>
+  </section>
+  <aside class="notes"><h2>登录页 · 方案 A</h2><p>把品牌感放在上半屏，表单收进干净的白卡片。深色节目卡承接小程序的视觉主角，蓝色只用于主要操作。</p><p>首登改密沿用同一结构：标题区切换为“设置新密码”，下方展示姓名和密码规则。</p><span class="tag">浅色纸感底</span><span class="tag">单一强调蓝</span><span class="tag">深色品牌卡</span></aside>
+</main>
+</body>
+</html>

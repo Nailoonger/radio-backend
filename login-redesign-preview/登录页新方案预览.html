@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>菁悠广播站 · 登录页</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230066CC'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='white' stroke-width='3'/%3E%3Ccircle cx='32' cy='32' r='4' fill='white'/%3E%3C/svg%3E">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC",
+                 "MiSans", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    background: #DDE3EA;
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 32px 16px; gap: 20px;
+  }
+  .switcher {
+    display: flex; gap: 8px; background: #fff; padding: 6px;
+    border-radius: 999px; box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  .switcher button {
+    border: none; background: transparent;
+    padding: 8px 20px; border-radius: 999px;
+    font-size: 14px; color: #8E8E93; cursor: pointer;
+    font-family: inherit; transition: all .2s;
+  }
+  .switcher button.on { background: #0066CC; color: #fff; font-weight: 500; }
+
+  .phone {
+    width: 390px; height: 844px;
+    border-radius: 48px;
+    box-shadow: 0 30px 80px -20px rgba(20,40,80,0.35), 0 0 0 10px #1D1D1F, 0 0 0 12px #3a3a3c;
+    overflow: hidden; position: relative;
+  }
+  .statusbar {
+    height: 44px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 28px; font-size: 14px; font-weight: 600;
+    color: #1D1D1F; position: relative; z-index: 3;
+  }
+  .notch {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 28px; background: #1D1D1F; border-radius: 20px; z-index: 4;
+  }
+
+  .screen {
+    height: calc(100% - 44px);
+    display: flex; flex-direction: column;
+    /* 柔和淡蓝渐变 */
+    background: linear-gradient(180deg, #DCEBFF 0%, #EEF5FF 38%, #F7FAFF 55%);
+    position: relative;
+  }
+
+  .topbar {
+    height: 48px; display: flex; align-items: center;
+    padding: 0 22px; flex: none;
+  }
+  .back {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(255,255,255,0.7);
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .back svg { width: 13px; height: 13px; }
+
+  /* 品牌视觉区 */
+  .hero {
+    flex: none;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 18px 0 30px;
+  }
+  .mascot {
+    width: 218px; height: 218px;
+    border-radius: 44px;
+    border: 6px solid #fff;
+    box-shadow: 0 22px 44px -14px rgba(20,70,150,0.4);
+    margin-bottom: 20px;
+    object-fit: cover;
+  }
+  .hero-name {
+    font-size: 26px; font-weight: 700; color: #16335C;
+    letter-spacing: 3px;
+  }
+  .hero-slogan {
+    font-size: 13px; color: #6B84A8; margin-top: 8px; letter-spacing: 1px;
+  }
+
+  /* 白色操作面板：大圆角顶部，浮起 */
+  .sheet {
+    flex: 1;
+    background: #fff;
+    border-radius: 34px 34px 0 0;
+    padding: 34px 28px 30px;
+    display: flex; flex-direction: column;
+    box-shadow: 0 -10px 40px -12px rgba(20,50,100,0.12);
+  }
+
+  .field { margin-bottom: 20px; }
+  .field-label {
+    font-size: 12px; color: #8A94A6; margin-bottom: 9px; font-weight: 500;
+  }
+  .box-input {
+    background: #F4F7FB;
+    border-radius: 16px;
+    height: 52px; padding: 0 18px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .box-input input {
+    flex: 1; min-width: 0;
+    border: none; background: transparent; outline: none;
+    font-size: 15px; color: #1D1D1F; font-family: inherit;
+  }
+  .box-input input::placeholder { color: #AEB9C9; }
+  .eye { font-size: 12px; color: #AEB9C9; cursor: pointer; }
+
+  .error-bar {
+    background: #FDECEC; color: #D0342C;
+    font-size: 12px; padding: 11px 16px; border-radius: 12px;
+    margin-bottom: 18px; line-height: 1.5; display: none;
+  }
+  .error-bar.show { display: block; }
+
+  .btn-login {
+    width: 100%; height: 54px;
+    border: none; border-radius: 999px;
+    background: #0066CC; color: #fff;
+    font-size: 16px; font-weight: 600; letter-spacing: 6px;
+    cursor: pointer; font-family: inherit;
+    box-shadow: 0 10px 24px -8px rgba(0,102,204,0.55);
+  }
+
+  .divider-or {
+    display: flex; align-items: center; gap: 14px;
+    margin: 24px 0 18px;
+  }
+  .divider-or::before, .divider-or::after {
+    content: ''; flex: 1; height: 1px; background: #ECEFF3;
+  }
+  .divider-or span { font-size: 11px; color: #B5BECB; }
+
+  .btn-wx {
+    width: 100%; height: 48px;
+    border-radius: 999px;
+    background: #F4F7FB; color: #3D4654;
+    font-size: 14px; font-weight: 500;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    cursor: pointer; border: none; font-family: inherit;
+  }
+  .wx-ico {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #07C160; position: relative; flex: none;
+  }
+  .wx-ico::before, .wx-ico::after {
+    content: ''; position: absolute; background: #fff;
+    border-radius: 50%; width: 4px; height: 4px; top: 6px;
+  }
+  .wx-ico::before { left: 5px; }
+  .wx-ico::after { right: 5px; }
+
+  .privacy {
+    margin-top: auto; text-align: center;
+    font-size: 10px; color: #B5BECB; padding-top: 18px; line-height: 1.6;
+  }
+
+  /* 激活步 */
+  .hello-row {
+    display: flex; align-items: center; gap: 13px; margin-bottom: 24px;
+  }
+  .avatar {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: #0066CC; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 600; flex: none;
+  }
+  .hello-title { font-size: 16px; font-weight: 600; color: #1D1D1F; }
+  .hello-sub { font-size: 12px; color: #8A94A6; margin-top: 2px; }
+
+  .rules { display: flex; gap: 8px; margin-top: 10px; }
+  .rule {
+    font-size: 11px; padding: 4px 12px; border-radius: 999px;
+    background: #F0F2F6; color: #A5AEBC;
+  }
+  .rule.on { background: #E5F0FF; color: #0066CC; font-weight: 500; }
+
+  .skip {
+    text-align: center; margin-top: 16px;
+    font-size: 13px; color: #8A94A6; cursor: pointer;
+  }
+
+  .view { display: none; flex: 1; flex-direction: column; }
+  .view.on { display: flex; }
+  .note { font-size: 12px; color: #5A6472; max-width: 420px; text-align: center; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div class="switcher">
+  <button class="on" onclick="showView('login', this)">登录步</button>
+  <button onclick="showView('activate', this)">首登激活</button>
+</div>
+
+<div class="phone">
+  <div class="statusbar">
+    <span>9:41</span>
+    <div class="notch"></div>
+    <span style="font-size:12px;">●●● 100%</span>
+  </div>
+
+  <div class="screen">
+    <div class="topbar">
+      <div class="back">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="#1D1D1F" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+
+    <!-- 登录步 -->
+    <div class="view on" id="view-login" style="display:flex;flex:1;flex-direction:column;">
+      <div class="hero">
+        <img class="mascot" src="assets/mascot.png" alt="菁悠小收音机">
+        <div class="hero-name">菁悠广播站</div>
+        <div class="hero-slogan">菁菁校园情 · 悠悠广播声</div>
+      </div>
+
+      <div class="sheet">
+        <div class="field">
+          <div class="field-label">学号</div>
+          <div class="box-input">
+            <input type="text" placeholder="学校分发的学号，如 20240101">
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">密码</div>
+          <div class="box-input">
+            <input type="password" placeholder="初始密码为 user+学号">
+            <span class="eye">显示</span>
+          </div>
+        </div>
+
+        <div class="error-bar" id="errBar">学号或密码错误，请检查后重试</div>
+
+        <button class="btn-login" onclick="document.getElementById('errBar').classList.add('show')">登 录</button>
+
+        <div class="divider-or"><span>其他登录方式</span></div>
+
+        <button class="btn-wx"><span class="wx-ico"></span>微信一键登录</button>
+
+        <div class="privacy">不收集头像与手机号 · 头像由姓名生成</div>
+      </div>
+    </div>
+
+    <!-- 激活步 -->
+    <div class="view" id="view-activate" style="flex:1;flex-direction:column;">
+      <div class="hero" style="padding-bottom:20px;">
+        <img src="assets/mascot.png" alt="" style="width:84px;height:84px;border-radius:24px;border:4px solid #fff;box-shadow:0 12px 26px -10px rgba(20,70,150,0.4);margin-bottom:14px;object-fit:cover;">
+        <div class="hero-name" style="font-size:23px;">设置新密码</div>
+        <div class="hero-slogan">首次登录 · 激活你的账号</div>
+      </div>
+
+      <div class="sheet">
+        <div class="hello-row">
+          <div class="avatar">林</div>
+          <div>
+            <div class="hello-title">你好，林同学</div>
+            <div class="hello-sub">高二 3 班 · 请设置新密码</div>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">新密码</div>
+          <div class="box-input">
+            <input type="password" placeholder="至少 8 位，含字母和数字">
+            <span class="eye">隐藏</span>
+          </div>
+          <div class="rules">
+            <span class="rule on">至少 8 位</span>
+            <span class="rule on">含字母</span>
+            <span class="rule">含数字</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">再输一遍</div>
+          <div class="box-input">
+            <input type="password" placeholder="两次输入需一致">
+            <span class="eye">显示</span>
+          </div>
+        </div>
+
+        <button class="btn-login" style="letter-spacing:5px;">激活账号</button>
+        <div class="skip">暂时跳过，下次登录再改</div>
+
+        <div class="privacy">初始密码 = user + 学号 · 改完即激活</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  参考小红书案例布局：上半淡蓝渐变 + 站徽视觉中心，下半白色大圆角面板浮起，<br>
+  蓝色胶囊主按钮 + 微信次按钮。顶部切换看两个状态。
+</div>
+
+<script>
+  function showView(name, btn) {
+    document.querySelectorAll('.view').forEach(v => {
+      v.classList.remove('on');
+      v.style.display = 'none';
+    });
+    var t = document.getElementById('view-' + name);
+    t.classList.add('on');
+    t.style.display = 'flex';
+    document.querySelectorAll('.switcher button').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+  }
+</script>
+
+</body>
+</html>

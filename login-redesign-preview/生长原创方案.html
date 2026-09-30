@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>学生登录 · 「生长」原创方案</title>
+<style>
+  :root {
+    --ink:#1D1D1F; --ink-2:#333; --muted:#7A7A7A; --soft:#C7C7CC;
+    --hairline:#E0E0E0; --divider:#F0F0F0; --parchment:#F5F5F7;
+    --canvas:#fff; --accent:#0066CC; --live:#FF453A;
+    --red-bg:#FDE8E8; --red-fg:#B42318;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:-apple-system,"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei",sans-serif;
+    background:#E7E9ED; color:var(--ink); padding:32px 30px 60px;
+  }
+  .head { max-width:720px; margin:0 auto 20px; }
+  .head h1 { font-size:20px; font-weight:600; letter-spacing:-0.3px; }
+  .head h1 .ver { color:var(--accent); }
+  .head p { font-size:13px; color:var(--muted); margin-top:9px; line-height:1.9; }
+  .head b { color:var(--ink); }
+
+  .statebar { max-width:720px; margin:0 auto 26px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .statebar .lbl { font-size:12.5px; color:var(--muted); margin-right:4px; }
+  .st { font-size:12.5px; padding:7px 16px; border-radius:999px; border:1px solid var(--hairline);
+        background:#fff; color:var(--ink-2); cursor:pointer; transition:all .15s; font-family:inherit; }
+  .st.on { background:var(--ink); border-color:var(--ink); color:#fff; font-weight:500; }
+
+  .stage { display:flex; gap:30px; justify-content:center; flex-wrap:wrap; align-items:flex-start; }
+  .phone-wrap { display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .phone { width:340px; height:700px; border-radius:44px; background:#0b0b0f; padding:10px;
+           box-shadow:0 30px 60px -22px rgba(15,28,46,0.35); flex:none; }
+  .screen { width:100%; height:100%; border-radius:35px; overflow:hidden;
+            display:flex; flex-direction:column; font-size:14px; background:var(--parchment); }
+  .cap { font-size:12.5px; color:var(--muted); text-align:center; line-height:1.7; }
+  .cap b { color:var(--ink); font-size:13.5px; }
+  .cap .why { display:block; font-size:11.5px; margin-top:3px; }
+
+  .statusbar { height:34px; display:flex; align-items:center; justify-content:space-between;
+               padding:0 22px; font-size:11.5px; font-weight:600; flex:none; }
+  .topbar { height:40px; padding:0 18px; display:flex; align-items:center; flex:none; }
+  .back { width:34px; height:34px; border-radius:50%; background:#fff;
+          display:flex; align-items:center; justify-content:center; flex:none; cursor:pointer;
+          box-shadow:0 2px 6px rgba(0,0,0,0.08); }
+  .back .chev { width:9px; height:9px; border-left:2px solid var(--ink-2); border-bottom:2px solid var(--ink-2);
+                transform:rotate(45deg); margin-left:3px; }
+
+  .pane { display:none; flex:1; flex-direction:column; min-height:0; }
+  .pane.on { display:flex; }
+  .body { flex:1; min-height:0; display:flex; flex-direction:column; padding:2px 20px 14px; }
+
+  /* ══════════ 生长卡 ══════════ */
+  .grow-card {
+    background:#fff; border:1px solid var(--hairline); border-radius:17px;
+    padding:4px 8px 2px; flex:none;
+  }
+  .card-top { display:flex; align-items:center; justify-content:space-between; padding:4px 6px 0; }
+  .card-title { font-size:11.5px; font-weight:600; color:var(--ink-2); letter-spacing:0.5px; }
+  .air { display:flex; align-items:center; gap:5px; }
+  .air .lamp { width:7px; height:7px; border-radius:50%; background:#D6D6DB; flex:none; }
+  .air.live .lamp { background:var(--live); box-shadow:0 0 0 3px rgba(255,69,58,0.16); }
+  .air .t { font-size:8.5px; letter-spacing:1.3px; color:var(--soft); font-weight:600; }
+  .air.live .t { color:var(--live); }
+  .grow-card svg { width:100%; height:236px; display:block; }
+
+  .soil { fill:#EDE6D8; }
+  .stem { stroke:var(--accent); stroke-width:2.6; stroke-linecap:round;
+          transform-box:view-box; transform-origin:150px 230px; transform:scaleY(0);
+          transition:transform .5s cubic-bezier(.4,0,.3,1); }
+  .leafp { opacity:0; transform-box:view-box; transform:translateY(10px);
+           transition:opacity .4s, transform .4s; }
+  .leafp.on { opacity:1; transform:translateY(0); }
+  .leafp path { stroke:var(--accent); stroke-width:2.2; fill:none; stroke-linecap:round; }
+
+  .flower { transform-box:view-box; transform-origin:150px 48px; transform:scale(0);
+            transition:transform .55s cubic-bezier(.34,1.45,.5,1); }
+  .flower.bud { transform:scale(0.62); }
+  .flower.bloom { transform:scale(1); }
+  .fl-core { fill:var(--accent); }
+  .fl-pet { fill:#7FB0E8; }
+  .fl-wave { fill:none; stroke:var(--accent); stroke-width:1.5; opacity:0; }
+  .flower.bloom .fl-wave { opacity:.7; animation:wavePulse 2.4s ease-out infinite; }
+  .flower.bloom .fl-wave.d2 { animation-delay:1.2s; }
+  @keyframes wavePulse { 0%{opacity:.7;} 100%{opacity:0; r:26px;} }
+
+  .plant { transform-box:view-box; transform-origin:150px 230px; }
+  .plant.sway { animation:sway 4s ease-in-out infinite; }
+  @keyframes sway { 0%,100%{transform:rotate(-1.6deg);} 50%{transform:rotate(1.6deg);} }
+  .plant.droop { transform:rotate(-9deg); transition:transform .6s; }
+
+  .spores { opacity:0; }
+  .spores.show { opacity:1; }
+  .sp { fill:var(--accent); transform-box:view-box; }
+  .spores.show .sp { animation:sporeUp 3.2s ease-in infinite; }
+  .spores.show .sp.d2 { animation-delay:1s; }
+  .spores.show .sp.d3 { animation-delay:2s; }
+  @keyframes sporeUp { 0%{transform:translateY(10px);opacity:0;} 30%{opacity:.9;} 100%{transform:translateY(-46px);opacity:0;} }
+
+  /* ══════════ 表单 ══════════ */
+  .fld { margin-top:13px; }
+  .fld-hd { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
+  .fld-hd .lb { font-size:12px; font-weight:600; color:var(--ink-2); }
+  .fld-hd .hint { font-size:10.5px; color:var(--soft); }
+  .inp {
+    display:flex; align-items:center; height:43px;
+    background:var(--parchment); border-radius:11px; padding:0 14px; gap:10px;
+    box-shadow:inset 0 0 0 1px rgba(10,26,46,0.06); transition:box-shadow .18s;
+  }
+  .inp.focus { box-shadow:inset 0 0 0 1.5px var(--accent); }
+  .inp.err { box-shadow:inset 0 0 0 1.5px #D64541; background:#FDECEB; }
+  .inp input { flex:1; min-width:0; border:none; background:transparent; outline:none;
+               font-size:14px; color:var(--ink); font-family:inherit; letter-spacing:0.5px; }
+  .inp input::placeholder { color:var(--soft); }
+  .inp .eye { font-size:10.5px; color:var(--soft); cursor:pointer; flex:none; }
+
+  .error-bar { margin-top:11px; background:var(--red-bg); color:var(--red-fg);
+               font-size:11.5px; line-height:1.6; border-radius:10px; padding:9px 12px;
+               display:flex; gap:7px; align-items:flex-start; }
+  .error-bar .dot { width:5px; height:5px; border-radius:50%; background:var(--red-fg); margin-top:6px; flex:none; }
+
+  .submit {
+    width:100%; height:46px; border:none; border-radius:11px;
+    background:var(--accent); color:#fff; font-size:14.5px; font-weight:600; letter-spacing:2px;
+    display:flex; align-items:center; justify-content:center; line-height:1;
+    margin-top:15px; cursor:pointer; font-family:inherit;
+  }
+  .submit.dis { background:#B9CBE4; }
+  .wxline { margin-top:12px; text-align:center; font-size:12.5px; color:var(--accent); cursor:pointer; }
+  .foot { margin-top:auto; padding-top:10px; text-align:center; }
+  .foot .slogan { font-size:10.5px; color:var(--soft); letter-spacing:2px; }
+
+  .hello { display:flex; align-items:center; gap:11px; margin:13px 0 2px; }
+  .avatar { width:40px; height:40px; border-radius:50%; background:var(--accent); color:#fff;
+            display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:600; flex:none; }
+  .hello .t1 { font-size:15px; font-weight:600; }
+  .hello .t2 { font-size:11px; color:var(--muted); margin-top:2px; }
+  .pwd-rule { display:flex; gap:6px; margin-top:8px; }
+  .rule { font-size:10px; padding:3px 9px; border-radius:999px; background:var(--divider); color:var(--muted); }
+  .rule.on { background:rgba(0,102,204,0.08); color:var(--accent); font-weight:500; }
+  .skip { text-align:center; margin-top:12px; font-size:12px; color:var(--muted);
+          text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>学生登录 · <span class="ver">「生长」原创方案</span>（可交互原型，未写业务代码）</h1>
+  <p>
+    <b>概念：</b>站名里的「<b>菁</b>」是草木茂盛。广播站的声音在校园里像植物一样<b>拔节生长、开花结果</b>，陪伴每一位同学 ——
+    登录不是填表，是<b>让属于你的声音长出来</b>。输学号时声音植物从土里拔高、逐节长出声波叶；输满 8 位 → 顶端结出花苞，
+    输密码 → 绽放一朵声波花、在微风里轻轻摇曳，音符光点缓缓上浮，ON AIR。密码错 → 花闭合、植物低头。<br>
+    <b>为什么是原创：</b>不是收音机 / 信封 / 灯塔这类现成物件皮肤，而是从站名「菁」（草木）与"陪伴成长"情感里长出的抽象意象，
+    单蓝强调色、无渐变、无彩色投影。<b>填好学号密码点「让声音生长」看动画。</b>
+  </p>
+</div>
+
+<div class="statebar">
+  <span class="lbl">状态预览：</span>
+  <button class="st on" data-pane="login">① 生长（登录）</button>
+  <button class="st" data-pane="error">② 花闭合（密码错）</button>
+  <button class="st" data-pane="activate">③ 开花（首登激活）</button>
+</div>
+
+<div class="stage">
+  <div class="phone-wrap">
+    <div class="phone"><div class="screen">
+
+      <!-- ① 生长 -->
+      <div class="pane on" data-pane="login">
+        <div class="statusbar"><span>9:41</span><span>100%</span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div></div>
+        <div class="body">
+
+          <div class="grow-card">
+            <div class="card-top">
+              <span class="card-title">菁悠声音花园</span>
+              <div class="air" id="air1"><i class="lamp"></i><span class="t">OFF AIR</span></div>
+            </div>
+            <svg viewBox="0 0 300 256">
+              <g class="spores" id="spores1">
+                <circle class="sp" cx="142" cy="50" r="2.6"/>
+                <circle class="sp d2" cx="162" cy="58" r="2.1"/>
+                <circle class="sp d3" cx="152" cy="42" r="2.3"/>
+              </g>
+              <g class="plant" id="plant1">
+                <g class="flower" id="flower1">
+                  <circle class="fl-wave" cx="150" cy="48" r="18"/>
+                  <circle class="fl-wave d2" cx="150" cy="48" r="25"/>
+                  <circle class="fl-pet" cx="150" cy="36" r="4.4"/>
+                  <circle class="fl-pet" cx="160.4" cy="42" r="4.4"/>
+                  <circle class="fl-pet" cx="160.4" cy="54" r="4.4"/>
+                  <circle class="fl-pet" cx="150" cy="60" r="4.4"/>
+                  <circle class="fl-pet" cx="139.6" cy="54" r="4.4"/>
+                  <circle class="fl-pet" cx="139.6" cy="42" r="4.4"/>
+                  <circle class="fl-core" cx="150" cy="48" r="6.4"/>
+                </g>
+                <line class="stem" id="stem1" x1="150" y1="66" x2="150" y2="230"/>
+                <g class="leafp" id="lf4">
+                  <path d="M150 73 Q135 67 129 56"/><path d="M150 73 Q165 67 171 56"/>
+                </g>
+                <g class="leafp" id="lf3">
+                  <path d="M150 114 Q134 108 127 96"/><path d="M150 114 Q166 108 173 96"/>
+                </g>
+                <g class="leafp" id="lf2">
+                  <path d="M150 155 Q134 149 127 137"/><path d="M150 155 Q166 149 173 137"/>
+                </g>
+                <g class="leafp" id="lf1">
+                  <path d="M150 196 Q134 190 127 178"/><path d="M150 196 Q166 190 173 178"/>
+                </g>
+              </g>
+              <ellipse class="soil" cx="150" cy="231" rx="46" ry="6.5"/>
+            </svg>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">学号</span><span class="hint" id="uProg1">等待发芽</span></div>
+            <div class="inp" id="uBox1"><input id="u1" type="text" placeholder="输入学号" maxlength="12"/></div>
+          </div>
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">密码</span><span class="hint">初始密码 = user + 学号</span></div>
+            <div class="inp" id="pBox1"><input id="p1" type="password" placeholder="输入密码" maxlength="20"/><span class="eye" data-eye="p1">显示</span></div>
+          </div>
+
+          <div class="submit dis" id="btn1">让声音生长</div>
+          <div class="wxline">用微信一键登录</div>
+
+          <div class="foot"><div class="slogan">菁菁校园情 · 悠悠广播声</div></div>
+        </div>
+      </div>
+
+      <!-- ② 花闭合 -->
+      <div class="pane" data-pane="error">
+        <div class="statusbar"><span>9:41</span><span>100%</span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div></div>
+        <div class="body">
+
+          <div class="grow-card">
+            <div class="card-top">
+              <span class="card-title">菁悠声音花园</span>
+              <div class="air"><i class="lamp"></i><span class="t">OFF AIR</span></div>
+            </div>
+            <svg viewBox="0 0 300 256">
+              <g class="plant droop">
+                <g class="flower bud">
+                  <circle class="fl-pet" cx="150" cy="36" r="4.4"/>
+                  <circle class="fl-pet" cx="160.4" cy="42" r="4.4"/>
+                  <circle class="fl-pet" cx="160.4" cy="54" r="4.4"/>
+                  <circle class="fl-pet" cx="150" cy="60" r="4.4"/>
+                  <circle class="fl-pet" cx="139.6" cy="54" r="4.4"/>
+                  <circle class="fl-pet" cx="139.6" cy="42" r="4.4"/>
+                  <circle r="6.4" cx="150" cy="48" fill="#FF453A"/>
+                </g>
+                <line class="stem" x1="150" y1="66" x2="150" y2="230" style="transform:scaleY(1);"/>
+                <g class="leafp on"><path d="M150 73 Q135 67 129 56"/><path d="M150 73 Q165 67 171 56"/></g>
+                <g class="leafp on"><path d="M150 114 Q134 108 127 96"/><path d="M150 114 Q166 108 173 96"/></g>
+                <g class="leafp on"><path d="M150 155 Q134 149 127 137"/><path d="M150 155 Q166 149 173 137"/></g>
+                <g class="leafp on"><path d="M150 196 Q134 190 127 178"/><path d="M150 196 Q166 190 173 178"/></g>
+              </g>
+              <ellipse class="soil" cx="150" cy="231" rx="46" ry="6.5"/>
+            </svg>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">学号</span><span class="hint">已拔节</span></div>
+            <div class="inp"><input type="text" value="20240101"/></div>
+          </div>
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">密码</span><span class="hint">花没能开</span></div>
+            <div class="inp err"><input type="password" value="1234"/><span class="eye">显示</span></div>
+          </div>
+
+          <div class="error-bar"><i class="dot"></i>学号或密码不对，花没能开。初始密码为 user + 学号，例如 user20240101</div>
+
+          <div class="submit">重新生长</div>
+          <div class="wxline">用微信一键登录</div>
+
+          <div class="foot"><div class="slogan">连续输错不会锁号，慢慢来</div></div>
+        </div>
+      </div>
+
+      <!-- ③ 开花激活 -->
+      <div class="pane" data-pane="activate">
+        <div class="statusbar"><span>9:41</span><span>100%</span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div></div>
+        <div class="body">
+
+          <div class="grow-card">
+            <div class="card-top">
+              <span class="card-title">菁悠声音花园</span>
+              <div class="air live"><i class="lamp"></i><span class="t">ON AIR</span></div>
+            </div>
+            <svg viewBox="0 0 300 256" style="height:170px;">
+              <g class="spores show">
+                <circle class="sp" cx="142" cy="50" r="2.6"/>
+                <circle class="sp d2" cx="162" cy="58" r="2.1"/>
+                <circle class="sp d3" cx="152" cy="42" r="2.3"/>
+              </g>
+              <g class="plant sway">
+                <g class="flower bloom">
+                  <circle class="fl-wave" cx="150" cy="48" r="18"/>
+                  <circle class="fl-wave d2" cx="150" cy="48" r="25"/>
+                  <circle class="fl-pet" cx="150" cy="36" r="4.4"/>
+                  <circle class="fl-pet" cx="160.4" cy="42" r="4.4"/>
+                  <circle class="fl-pet" cx="160.4" cy="54" r="4.4"/>
+                  <circle class="fl-pet" cx="150" cy="60" r="4.4"/>
+                  <circle class="fl-pet" cx="139.6" cy="54" r="4.4"/>
+                  <circle class="fl-pet" cx="139.6" cy="42" r="4.4"/>
+                  <circle class="fl-core" cx="150" cy="48" r="6.4"/>
+                </g>
+                <line class="stem" x1="150" y1="66" x2="150" y2="170" style="transform:scaleY(1);"/>
+                <g class="leafp on"><path d="M150 90 Q135 84 129 73"/><path d="M150 90 Q165 84 171 73"/></g>
+                <g class="leafp on"><path d="M150 130 Q134 124 127 112"/><path d="M150 130 Q166 124 173 112"/></g>
+              </g>
+              <ellipse class="soil" cx="150" cy="171" rx="40" ry="6"/>
+            </svg>
+          </div>
+
+          <div class="hello">
+            <div class="avatar">张</div>
+            <div>
+              <div class="t1">你好，张同学</div>
+              <div class="t2">高二（3）班 · 种下你的专属声音</div>
+            </div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">新密码</span><span class="hint">至少 8 位</span></div>
+            <div class="inp"><input id="p3" type="password" value="abcd1234"/><span class="eye" data-eye="p3">显示</span></div>
+          </div>
+          <div class="pwd-rule">
+            <span class="rule on">至少 8 位</span><span class="rule on">含字母</span><span class="rule on">含数字</span>
+          </div>
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">再输一遍</span><span class="hint">两次需一致</span></div>
+            <div class="inp"><input type="password" placeholder="再输一遍新密码"/></div>
+          </div>
+
+          <div class="submit">种下专属声音</div>
+          <div class="skip">暂时跳过，下次登录再改</div>
+        </div>
+      </div>
+
+    </div></div>
+    <div class="cap"><b>「生长」</b>
+      <span class="why">学号让声音植物拔节长叶 → 密码让声波花绽放、光点上浮</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  var u1=document.getElementById('u1'), p1=document.getElementById('p1');
+  var stem1=document.getElementById('stem1'), plant1=document.getElementById('plant1');
+  var flower1=document.getElementById('flower1'), spores1=document.getElementById('spores1');
+  var air1=document.getElementById('air1'), btn1=document.getElementById('btn1'), uProg1=document.getElementById('uProg1');
+  var lf=[1,2,3,4].map(function(i){return document.getElementById('lf'+i);});
+
+  function reset(){
+    plant1.classList.remove('sway','droop');
+    flower1.classList.remove('bud','bloom');
+    spores1.classList.remove('show'); air1.classList.remove('live');
+    stem1.style.transform='scaleY(0)';
+    lf.forEach(function(e){e.classList.remove('on');});
+  }
+  function sync(){
+    reset();
+    var u=(u1.value||'').length, p=(p1.value||'').length;
+    var t=Math.min(u,8)/8;
+    stem1.style.transform='scaleY('+t+')';
+    for(var k=0;k<4;k++){ lf[k].classList.toggle('on', u>=2*(k+1)); }
+    if(u>=8) flower1.classList.add('bud');
+    var bloom=u>=8 && p>=6;
+    if(bloom){
+      flower1.classList.remove('bud'); flower1.classList.add('bloom');
+      plant1.classList.add('sway'); spores1.classList.add('show'); air1.classList.add('live');
+    }
+    btn1.classList.toggle('dis', !(u>=1&&p>=1));
+    uProg1.textContent=u===0?'等待发芽':(u<8?'拔节生长 '+u+'/8':'花苞已结');
+  }
+  u1.addEventListener('input',sync); p1.addEventListener('input',sync); sync();
+
+  btn1.addEventListener('click',function(){
+    if(btn1.classList.contains('dis'))return;
+    var u=(u1.value||'').length, p=(p1.value||'').length;
+    if(u>=8&&p>=6){
+      flower1.classList.remove('bud'); flower1.classList.add('bloom');
+      plant1.classList.add('sway'); spores1.classList.add('show'); air1.classList.add('live');
+    } else if(u>=8){
+      flower1.classList.add('bud');
+    }
+  });
+
+  ['uBox1','pBox1'].forEach(function(id){
+    var box=document.getElementById(id), ipt=box.querySelector('input');
+    ipt.addEventListener('focus',function(){box.classList.add('focus');});
+    ipt.addEventListener('blur',function(){box.classList.remove('focus');});
+  });
+
+  document.querySelectorAll('.eye').forEach(function(el){
+    el.addEventListener('click',function(){
+      var t=document.getElementById(el.getAttribute('data-eye')); if(!t)return;
+      var show=t.type==='text'; t.type=show?'password':'text';
+      el.textContent=show?'显示':'隐藏';
+    });
+  });
+
+  var bts=document.querySelectorAll('.st');
+  bts.forEach(function(b){
+    b.addEventListener('click',function(){
+      bts.forEach(function(x){x.classList.remove('on');}); b.classList.add('on');
+      var key=b.getAttribute('data-pane');
+      document.querySelectorAll('.pane').forEach(function(p){
+        p.classList.toggle('on',p.getAttribute('data-pane')===key);
+      });
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" color="#6E6E73" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="lock-title">
+  <title id="lock-title">密码</title>
+  <path d="M8 10V7a4 4 0 0 1 8 0v3"/>
+  <rect x="5" y="10" width="14" height="11" rx="2.75"/>
+  <path d="M12 14.5v2.5"/>
+</svg>

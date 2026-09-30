@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>菁悠广播站 · 管理端登录 · 方案 v3「v8 设计规范 · 播控台」</title>
+<style>
+  /* ====== 直接继承 admin-web 设计系统（theme.css v8） ======
+     单强调色 #0066cc · 无渐变无彩色投影 · 深色卡 #272729 主角 · Element Plus 控件语言 */
+  :root{
+    --ink:#1d1d1f; --ink-2:#333; --muted:#7a7a7a; --muted-2:#6e6e73;
+    --soft:#c7c7cc; --hairline:#e0e0e0; --divider:#f0f0f0; --parchment:#f5f5f7; --canvas:#fff;
+    --tile:#272729; --tile-2:#3a3a3c;
+    --accent:#0066cc; --accent-dark:#2997ff; --live:#ff453a;
+    --green-fg:#1e7a46; --red-fg:#b42318; --red-bg:#fde8e8; --amber-fg:#8a6100;
+    --r-card:18px; --r-input:12px; --r-tile:20px; --r-pill:9999px;
+    --s2:8px; --s3:13px; --s4:18px; --s5:26px; --s6:34px;
+    --fs-xs:11.5px; --fs-sm:12.5px; --fs-md:13.5px; --fs-lg:15px; --fs-xl:17px; --fs-2xl:19px; --fs-3xl:26px;
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --font:-apple-system,BlinkMacSystemFont,"HarmonyOS Sans SC","MiSans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    min-height:100vh; background:var(--parchment); color:var(--ink);
+    font-family:var(--font); -webkit-font-smoothing:antialiased;
+    display:flex; flex-direction:column; min-height:100vh;
+  }
+
+  /* 演示条（不进产品） */
+  .demo-bar{ position:fixed; top:14px; right:16px; z-index:99; display:flex; gap:6px; align-items:center;
+    padding:6px 8px; border-radius:10px; background:rgba(255,255,255,.7); border:1px solid var(--hairline); }
+  .demo-bar span{ font:600 10px/1 var(--mono); color:var(--muted); letter-spacing:.12em; padding:0 4px; }
+  .demo-bar button{ font:600 11px/1 inherit; color:var(--ink-2); cursor:pointer; padding:6px 10px; border-radius:7px;
+    background:#fff; border:1px solid var(--hairline); }
+  .demo-bar button:hover{ border-color:var(--soft); }
+  .demo-bar button.warn{ color:var(--red-fg); border-color:#e3b3af; }
+  .demo-bar button.warn:hover{ background:var(--red-bg); }
+
+  /* 顶栏（浅色、hairline 分隔，与后台一致） */
+  .topbar{ height:60px; flex:none; padding:0 44px; display:flex; align-items:center; justify-content:space-between;
+    border-bottom:1px solid var(--hairline); background:var(--canvas); }
+  .topbar-brand{ display:flex; align-items:center; gap:10px; }
+  .topbar-logo{ width:28px; height:28px; }
+  .topbar-name{ font-size:15px; font-weight:600; letter-spacing:-.1px; color:var(--ink); }
+  .topbar-nav{ display:flex; gap:24px; }
+  .topbar-nav a{ font-size:12.5px; color:var(--muted); text-decoration:none; }
+  .topbar-nav a:hover{ color:var(--ink); }
+
+  /* 主体 */
+  .main{ flex:1; display:flex; align-items:center; justify-content:center; gap:34px; padding:40px 24px; }
+  .col-info{ width:360px; flex:none; }
+  .card-light{ background:var(--canvas); border:1px solid var(--hairline); border-radius:var(--r-card);
+    padding:var(--s5); box-shadow:0 6px 18px rgba(0,0,0,.05); }
+
+  .slogan{ display:flex; align-items:center; gap:12px; margin-bottom:4px; }
+  .slogan .big{ width:42px; height:42px; }
+  .slogan h2{ margin:0; font-size:var(--fs-2xl); font-weight:600; letter-spacing:-.4px; color:var(--ink); }
+  .slogan p{ margin:2px 0 0; font-size:12.5px; color:var(--muted); letter-spacing:.04em; }
+
+  .liveboard{ margin-top:var(--s4); }
+  .lrow{ display:flex; align-items:center; justify-content:space-between; gap:14px; padding:13px 0;
+    border-bottom:1px solid var(--divider); }
+  .lrow:first-child{ padding-top:0; }
+  .lk{ display:flex; align-items:center; gap:9px; font-size:var(--fs-sm); color:var(--muted); }
+  .lk svg{ width:15px; height:15px; opacity:.8; }
+  .lv{ font-size:var(--fs-md); color:var(--ink-2); text-align:right; }
+  .lv b{ color:var(--ink); font-weight:600; }
+  .lv .led{ font:600 13px/1 var(--mono); color:var(--green-fg); letter-spacing:.08em; }
+
+  /* 状态点（规范语义色，不用金属灯） */
+  .dots{ display:flex; gap:20px; margin-top:var(--s4); padding-top:var(--s3); border-top:1px solid var(--divider); }
+  .dot{ display:flex; align-items:center; gap:8px; }
+  .dot i{ width:8px; height:8px; border-radius:50%; background:var(--soft); }
+  .dot.on.id i{ background:var(--green-fg); box-shadow:0 0 0 3px rgba(30,122,70,.16); }
+  .dot.on.air i{ background:var(--live); box-shadow:0 0 0 3px rgba(255,69,58,.16); }
+  .dot span{ font-size:10px; letter-spacing:.14em; color:var(--muted-2); text-transform:uppercase; }
+
+  /* 右：登录深色卡（v8 视觉主角 --tile） */
+  .login-tile{ width:380px; flex:none; background:var(--tile); color:#fff; border-radius:var(--r-tile);
+    padding:var(--s6) var(--s5) var(--s5); box-shadow:0 18px 40px -16px rgba(0,0,0,.4);
+    display:flex; flex-direction:column; }
+  .tile-head{ margin-bottom:var(--s5); }
+  .tile-head h1{ margin:0 0 6px; font-size:var(--fs-2xl); font-weight:600; letter-spacing:-.4px; color:#fff; }
+  .tile-head p{ margin:0; font-size:12.5px; color:rgba(255,255,255,.6); }
+  .field{ margin-bottom:var(--s3); }
+  .field-label{ display:block; font-size:var(--fs-xs); color:rgba(255,255,255,.6); margin-bottom:8px; letter-spacing:.02em; }
+  .slot{ display:flex; align-items:center; gap:10px; height:46px; padding:0 14px; border-radius:var(--r-input);
+    background:var(--canvas); box-shadow:0 0 0 1px var(--hairline) inset; transition:box-shadow .16s var(--ease); }
+  .slot:focus-within{ box-shadow:0 0 0 1px var(--accent) inset, 0 0 0 3px rgba(0,102,204,.22); }
+  .slot.err{ box-shadow:0 0 0 1px var(--live) inset, 0 0 0 3px rgba(255,69,58,.18); }
+  .slot .prefix{ font:600 10px/1 var(--mono); letter-spacing:.1em; color:var(--muted); padding-right:9px; border-right:1px solid var(--divider); }
+  .slot input{ flex:1; min-width:0; border:0; outline:0; background:transparent; color:var(--ink);
+    font:500 14px/1 var(--mono); letter-spacing:.08em; }
+  .slot input::placeholder{ color:var(--soft); letter-spacing:.02em; font-family:var(--font); }
+  .eye{ cursor:pointer; background:none; border:0; padding:2px; display:flex; }
+  .alert{ margin:4px 0 var(--s3); padding:9px 12px; border-radius:10px; font-size:12px; line-height:1.4;
+    background:rgba(253,232,232,.12); border:1px solid rgba(255,69,58,.4); color:#ff9a93; display:none; }
+  .alert.show{ display:block; }
+
+  /* 记住账号：规范 accent 拨钮（el-switch 语言） */
+  .switch-row{ display:flex; align-items:center; gap:11px; margin-bottom:var(--s5); cursor:pointer; user-select:none; }
+  .sw{ position:relative; width:40px; height:22px; border-radius:var(--r-pill); flex:none;
+    background:var(--tile-2); transition:background .18s; }
+  .sw i{ position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:#fff;
+    box-shadow:0 1px 2px rgba(0,0,0,.3); transition:left .18s var(--ease); }
+  .switch-row.on .sw{ background:var(--accent); }
+  .switch-row.on .sw i{ left:20px; }
+  .switch-label{ font-size:12.5px; color:rgba(255,255,255,.8); }
+  .switch-label small{ display:block; font-size:10.5px; color:rgba(255,255,255,.45); margin-top:2px; }
+
+  /* 主按钮：规范 #0066cc 实心、无投影；禁用浅蓝 #b9d2ee */
+  .push{ width:100%; height:48px; border:0; cursor:pointer; border-radius:var(--r-input);
+    font:600 15px/1 var(--font); letter-spacing:.14em; color:#fff; background:var(--accent);
+    display:flex; align-items:center; justify-content:center; gap:10px; transition:background .16s var(--ease); }
+  .push:disabled{ background:#b9d2ee; cursor:not-allowed; }
+  .push:not(:disabled):hover{ background:#0059b3; }
+  .push:not(:disabled):active{ background:#004d99; }
+  .push.ok{ background:var(--green-fg); }
+  .push.fail{ background:var(--red-fg); }
+  .push .sub{ font:600 9px/1 var(--mono); letter-spacing:.18em; opacity:.7; }
+
+  /* 页脚 */
+  .footer{ flex:none; padding:22px 24px 26px; border-top:1px solid var(--hairline); background:var(--canvas);
+    display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .footer-links{ display:flex; gap:22px; }
+  .footer-links a{ font-size:12px; color:var(--muted); text-decoration:none; }
+  .footer-links a:hover{ color:var(--ink); }
+  .footer-copy{ margin:0; font-size:11px; color:var(--muted-2); }
+
+  @media (max-width: 860px){
+    .topbar{ padding:0 24px; } .col-info{ display:none; }
+    .main{ gap:0; } .login-tile{ width:min(420px,92vw); }
+  }
+</style>
+</head>
+<body>
+
+<div class="demo-bar">
+  <span>DEMO</span>
+  <button data-act="fill">填入超管</button>
+  <button data-act="wrong">填入错误</button>
+  <button data-act="clear">清空</button>
+  <button class="warn" data-act="submit">点登录</button>
+</div>
+
+<header class="topbar">
+  <div class="topbar-brand">
+    <svg class="topbar-logo" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+      <circle cx="20" cy="20" r="18" stroke="#0066cc" stroke-width="2"/>
+      <circle cx="20" cy="20" r="11" stroke="#2997ff" stroke-width="1.4"/>
+      <circle cx="20" cy="20" r="3.4" fill="#0066cc"/>
+      <path d="M8.5 15.5 A14 14 0 0 1 31.5 15.5" stroke="#0066cc" stroke-width="1.6" stroke-linecap="round" opacity=".9"/>
+    </svg>
+    <span class="topbar-name">菁悠广播站</span>
+  </div>
+  <nav class="topbar-nav">
+    <a href="#">返回官网</a><a href="#">使用帮助</a><a href="#">小程序端</a><a href="#">关于我们</a>
+  </nav>
+</header>
+
+<main class="main">
+  <!-- 左：今日运营看板（浅卡） -->
+  <section class="col-info">
+    <div class="card-light">
+      <div class="slogan">
+        <svg class="big" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+          <circle cx="20" cy="20" r="18" stroke="#0066cc" stroke-width="2"/>
+          <circle cx="20" cy="20" r="3.6" fill="#0066cc"/>
+          <path d="M7 15 A15 15 0 0 1 33 15" stroke="#2997ff" stroke-width="1.6" stroke-linecap="round" opacity=".85"/>
+        </svg>
+        <div>
+          <h2>菁悠广播站</h2>
+          <p>菁菁校园情，悠悠广播声</p>
+        </div>
+      </div>
+      <div class="liveboard">
+        <div class="lrow">
+          <span class="lk"><svg viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.2" stroke="#7a7a7a" stroke-width="1.3"/><path d="M7 4.2V7l2 1.2" stroke="#7a7a7a" stroke-width="1.3" stroke-linecap="round"/></svg>北京时间</span>
+          <span class="lv"><span class="led" id="clock">--:--:--</span></span>
+        </div>
+        <div class="lrow">
+          <span class="lk"><svg viewBox="0 0 14 14" fill="none"><rect x="2.4" y="3" width="9.2" height="8" rx="1.2" stroke="#7a7a7a" stroke-width="1.3"/><path d="M4.6 6.4l1.5 1.5 3-3" stroke="#7a7a7a" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>今日播出</span>
+          <span class="lv"><b>午间 12:20</b> · 傍晚 18:10</span>
+        </div>
+        <div class="lrow">
+          <span class="lk"><svg viewBox="0 0 14 14" fill="none"><circle cx="7" cy="5" r="2.2" stroke="#7a7a7a" stroke-width="1.3"/><path d="M3.4 11.4a3.6 3.6 0 0 1 7.2 0" stroke="#7a7a7a" stroke-width="1.3" stroke-linecap="round"/></svg>当前轮值</span>
+          <span class="lv"><b>播音部</b> · 下午档</span>
+        </div>
+        <div class="lrow">
+          <span class="lk"><svg viewBox="0 0 14 14" fill="none"><path d="M2.6 7h8.8M2.6 7a1.6 1.6 0 1 0 0-3.2h8.8A1.6 1.6 0 1 1 11.4 7M2.6 7a1.6 1.6 0 1 1 0 3.2h8.8A1.6 1.6 0 1 0 11.4 7" stroke="#7a7a7a" stroke-width="1.1" stroke-linejoin="round"/></svg>系统状态</span>
+          <span class="lv"><b style="color:#1e7a46">在线</b> · 通道就绪</span>
+        </div>
+      </div>
+      <div class="dots">
+        <div class="dot" id="dotPower"><i></i><span>电源</span></div>
+        <div class="dot id" id="dotId"><i></i><span>账号</span></div>
+        <div class="dot air" id="dotAir"><i></i><span>ON AIR</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 右：登录深色卡 -->
+  <section class="login-tile" id="tile">
+    <div class="tile-head">
+      <h1>管理员登录</h1>
+      <p>请使用管理员账号进入播控台</p>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="inpId">账号</label>
+      <div class="slot" id="slotId"><span class="prefix">ID</span>
+        <input id="inpId" type="text" placeholder="如 teacher / 工号" autocomplete="username" maxlength="24" /></div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="inpKey">密码</label>
+      <div class="slot" id="slotKey"><span class="prefix">KEY</span>
+        <input id="inpKey" type="password" placeholder="输入登录密码" autocomplete="current-password" maxlength="24" />
+        <button class="eye" id="btnEye" type="button" aria-label="显示密码">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1.6 8S4 3.6 8 3.6 14.4 8 14.4 8 12 12.4 8 12.4 1.6 8 1.6 8Z" stroke="#7a7a7a" stroke-width="1.3"/><circle cx="8" cy="8" r="1.9" stroke="#7a7a7a" stroke-width="1.3"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="alert" id="alert">账号或密码错误，请核对后重试</div>
+
+    <div class="switch-row on" id="tgRemember">
+      <div class="sw"><i></i></div>
+      <div class="switch-label">记住本机账号<small>KEEP SIGNED ON THIS UNIT</small></div>
+    </div>
+
+    <button class="push" id="btnPush" disabled>
+      <span id="pushText">待机</span><span class="sub" id="pushSub">STANDBY</span>
+    </button>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="footer-links">
+    <a href="#">使用帮助</a><a href="#">关于我们</a><a href="#">校园广播中心</a>
+  </div>
+  <p class="footer-copy">菁悠广播站 · 版权所有 · 校园广播中心 技术支持</p>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id){ return document.getElementById(id); };
+  var inpId=$('inpId'), inpKey=$('inpKey'), slotId=$('slotId'), slotKey=$('slotKey'), alert=$('alert');
+  var dotId=$('dotId'), dotAir=$('dotAir'), tile=$('tile');
+  var btnPush=$('btnPush'), pushText=$('pushText'), pushSub=$('pushSub'), tg=$('tgRemember');
+  var phase='idle';
+
+  function pad(n){ return n<10?'0'+n:''+n; }
+  function tick(){ var d=new Date(); $('clock').textContent=pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); }
+  tick(); setInterval(tick,1000);
+
+  function armed(){ return inpId.value.trim().length>0 && inpKey.value.length>=6; }
+
+  function render(){
+    if (phase==='working'){ btnPush.disabled=true; btnPush.className='push'; pushText.textContent='正在登录'; pushSub.textContent='SIGNING IN'; return; }
+    if (phase==='ok'){ return; }
+    if (phase==='fail'){ return; }
+    dotId.className='dot id'+(inpId.value.trim().length>0?' on':'');
+    dotAir.className='dot air';
+    if (inpId.value.trim().length===0){ btnPush.disabled=true; btnPush.className='push'; pushText.textContent='待机'; pushSub.textContent='STANDBY'; }
+    else if (inpKey.value.length<6){ btnPush.disabled=true; btnPush.className='push'; pushText.textContent='等待密码'; pushSub.textContent='WAITING KEY'; }
+    else { btnPush.disabled=false; btnPush.className='push'; pushText.textContent='进入播控台'; pushSub.textContent='PUSH TO AIR'; }
+  }
+
+  function resetFail(){ phase='idle'; slotId.classList.remove('err'); slotKey.classList.remove('err'); alert.classList.remove('show'); }
+
+  inpId.addEventListener('input', function(){ if(phase==='fail') resetFail(); render(); });
+  inpKey.addEventListener('input', function(){ if(phase==='fail') resetFail(); render(); });
+  $('btnEye').addEventListener('click', function(){ inpKey.type = inpKey.type==='password'?'text':'password'; });
+  tg.addEventListener('click', function(){ tg.classList.toggle('on'); });
+
+  function submit(){
+    if (phase==='working'||phase==='ok') return;
+    if (!armed()) return;
+    phase='working'; render();
+    setTimeout(function(){
+      if (inpId.value.trim()==='teacher' && inpKey.value==='admin123456'){
+        phase='ok';
+        dotAir.className='dot air on';
+        btnPush.className='push ok'; btnPush.disabled=true; pushText.textContent='已进入播控台'; pushSub.textContent='ON AIR';
+        alert.classList.remove('show');
+      } else {
+        phase='fail';
+        slotId.classList.add('err'); slotKey.classList.add('err'); alert.classList.add('show');
+        tile.style.transform='translateX(0)'; void tile.offsetWidth;
+        tile.animate([{transform:'translateX(-2px)'},{transform:'translateX(4px)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}],{duration:380,easing:'cubic-bezier(.36,.07,.19,.97)'});
+        btnPush.className='push fail'; btnPush.disabled=false; pushText.textContent='认证失败 · 重试'; pushSub.textContent='RETRY';
+      }
+    }, 900);
+  }
+  btnPush.addEventListener('click', submit);
+
+  document.querySelector('.demo-bar').addEventListener('click', function(e){
+    var b=e.target.closest('button'); if(!b) return; var act=b.getAttribute('data-act');
+    alert.classList.remove('show'); slotId.classList.remove('err'); slotKey.classList.remove('err'); phase='idle';
+    if(act==='fill'){ inpId.value='teacher'; inpKey.value='admin123456'; }
+    else if(act==='wrong'){ inpId.value='teacher'; inpKey.value='wrongpwd'; }
+    else if(act==='clear'){ inpId.value=''; inpKey.value=''; }
+    else if(act==='submit'){ submit(); return; }
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

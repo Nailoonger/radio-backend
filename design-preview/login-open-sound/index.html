@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <title>开声 · 菁悠广播站登录体验</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main class="studio">
+    <aside class="editorial" aria-label="交互稿说明与演示控制">
+      <div class="project-label"><span class="project-mark" aria-hidden="true"><i></i><i></i><i></i></span> 菁悠广播站 <span class="project-index">DESIGN STUDY / 02</span></div>
+      <div class="editorial-heading"><p class="kicker">一个从声音开始的登录体验</p><h1>开声<span>。</span></h1><p class="lede">让登录，也有<br>声音的回应。</p></div>
+      <p class="description">输入时，声线轻轻起伏。<br>验证通过，它收束成你的姓名。<br>从一段声音，成为一个熟悉的人。</p>
+      <div class="state-selector" aria-label="预览不同页面状态">
+        <button type="button" data-preview="login" aria-pressed="true"><span>01</span> 登录</button>
+        <button type="button" data-preview="error" aria-pressed="false"><span>02</span> 错误反馈</button>
+        <button type="button" data-preview="activate" aria-pressed="false"><span>03</span> 首次改密</button>
+        <button type="button" data-preview="success" aria-pressed="false"><span>04</span> 登录完成</button>
+      </div>
+      <section class="demo-card" aria-labelledby="demo-title">
+        <div class="demo-card-heading"><h2 id="demo-title">试着登录一次</h2><span>本地演示</span></div>
+        <dl><div><dt>学号</dt><dd>20240101</dd></div><div><dt>密码</dt><dd>user20240101</dd></div></dl>
+        <div class="demo-actions"><button id="fill-demo" class="demo-fill" type="button">填入演示账号 <span aria-hidden="true">↗</span></button><button id="reset-demo" class="demo-reset" type="button">重置</button></div>
+        <p class="demo-note">演示数据仅在当前页面内使用，刷新即重置。</p>
+      </section>
+      <div class="motion-setting"><label for="motion-toggle"><input type="checkbox" id="motion-toggle" checked><span class="toggle-track" aria-hidden="true"></span><span>声线动效</span></label><span>跟随系统减弱动态效果</span></div>
+      <p id="demo-log" class="demo-status" role="status" aria-live="polite">可以直接输入，也可以切换状态预览。</p>
+      <p class="studio-footer">独立交互提案 <span>·</span> 原创 SVG <span>·</span> 无外部依赖</p>
+    </aside>
+
+    <div class="preview-column">
+      <section class="device" id="device" data-stage="login" data-wave="idle" aria-label="菁悠广播站手机交互预览">
+        <div class="statusbar" aria-hidden="true"><span>9:41</span><div class="system-icons"><svg viewBox="0 0 48 16" width="48" height="16"><path d="M2 12v2M6 9v5M10 6v8M14 3v11" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M23 6q8-7 16 0M26 9q5-4 10 0M29 12q2-1.8 4 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="31" cy="14" r="1"/></svg><svg viewBox="0 0 28 14" width="28" height="14"><rect x="1" y="2" width="22" height="10" rx="3" fill="none" stroke="currentColor" stroke-opacity=".45"/><rect x="3" y="4" width="18" height="6" rx="1.2"/><path d="M25 5v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div></div>
+        <nav class="phone-nav" aria-label="页面导航"><button type="button" id="back-button" class="icon-button" aria-label="返回登录预览"><img src="icons/chevron-left.svg" alt="" width="22" height="22"></button><span>菁悠广播站</span><div class="wechat-capsule" aria-hidden="true"><svg viewBox="0 0 22 10" width="22" height="10"><circle cx="3" cy="5" r="1.6"/><circle cx="11" cy="5" r="2"/><circle cx="19" cy="5" r="1.6"/></svg><i></i><svg viewBox="0 0 20 20" width="19" height="19"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="3"/></svg></div></nav>
+        <div class="phone-scroll">
+          <header class="hero"><p class="hero-eyebrow" id="hero-eyebrow">JINGYOU CAMPUS RADIO</p><h2 id="hero-title" tabindex="-1">让校园<br>听见你。</h2><p id="hero-subtitle">用学号登录菁悠广播站</p></header>
+          <div class="signal" aria-hidden="true"><svg id="signal-svg" viewBox="0 0 360 88" preserveAspectRatio="none"><path id="signal-baseline" d="M0 44H360"/><path id="signal-path" d="M0 44H360"/><circle id="signal-avatar" cx="180" cy="44" r="25"/><text id="signal-initial" x="180" y="44" text-anchor="middle" dominant-baseline="central">李</text></svg></div>
+          <div class="form-area">
+            <form id="login-form" novalidate>
+              <div class="field"><label for="student-id">学号</label><div class="input-shell"><input id="student-id" name="demo-student-id" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="24" placeholder="请输入学号" aria-describedby="login-hint login-error"></div></div>
+              <div class="field"><label for="login-password">密码</label><div class="input-shell"><input id="login-password" name="demo-login-password" type="password" autocomplete="off" maxlength="64" placeholder="请输入密码" aria-describedby="login-hint login-error"><button class="visibility" type="button" data-toggle-password="login-password" aria-label="显示密码" aria-pressed="false"><img src="icons/eye.svg" alt="" width="21" height="21"></button></div></div>
+              <p class="field-hint" id="login-hint">初始密码：<span>user + 学号</span></p>
+              <p id="login-error" class="form-error" role="alert" hidden></p>
+              <button type="submit" id="login-submit" class="primary"><span class="button-loader" aria-hidden="true"></span><span data-button-label>登录</span><svg class="submit-arrow" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 12h15m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              <button id="help-button" type="button" class="text-action">登录遇到问题？</button>
+              <div class="alternative"><span></span><p>其他登录方式</p><span></span></div>
+              <button id="wechat-button" class="wechat-login" type="button"><img src="icons/wechat.svg" alt="" width="24" height="24"><span>微信登录</span></button>
+            </form>
+            <form id="activate-form" novalidate hidden>
+              <div class="field"><label for="new-password">新密码</label><div class="input-shell"><input id="new-password" name="demo-new-password" type="password" autocomplete="off" maxlength="64" placeholder="设置一个新密码" aria-describedby="password-rules activate-error"><button class="visibility" type="button" data-toggle-password="new-password" aria-label="显示新密码" aria-pressed="false"><img src="icons/eye.svg" alt="" width="21" height="21"></button></div></div>
+              <div class="field"><label for="confirm-password">确认密码</label><div class="input-shell"><input id="confirm-password" name="demo-confirm-password" type="password" autocomplete="off" maxlength="64" placeholder="再次输入新密码" aria-describedby="password-rules activate-error"><button class="visibility" type="button" data-toggle-password="confirm-password" aria-label="显示确认密码" aria-pressed="false"><img src="icons/eye.svg" alt="" width="21" height="21"></button></div></div>
+              <div class="password-rules" id="password-rules" aria-label="新密码要求"><span id="rule-length" data-met="false">至少 8 位</span><span id="rule-letter" data-met="false">含字母</span><span id="rule-number" data-met="false">含数字</span></div>
+              <p id="activate-error" class="form-error" role="alert" hidden></p>
+              <button type="submit" id="activate-submit" class="primary"><span class="button-loader" aria-hidden="true"></span><span data-button-label>保存并进入</span><svg class="submit-arrow" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 12h15m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              <p class="activation-note">为你的校园账号，设置一份专属保护。</p>
+            </form>
+            <section id="success-panel" class="success-panel" aria-label="登录完成" hidden><p class="success-overline">READY TO CONNECT</p><h3 id="success-name">李同学的校园电台</h3><p id="success-copy">账号已准备好。<br>点一首歌，或写下想说的话。</p><div class="success-features"><span><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M9 17V6l10-2v11M9 9l10-2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><ellipse cx="6" cy="18" rx="3" ry="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><ellipse cx="16" cy="16" rx="3" ry="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>点一首歌</span><span><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M14 5H5v15h14v-9M11 13l8-10 3 3-9 9-3 1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>写下心声</span></div><button id="finish-button" class="primary" type="button">重新体验 <span aria-hidden="true">↗</span></button><p class="success-small">已完成本次交互预览</p></section>
+          </div>
+          <footer class="phone-footer"><div class="privacy"><img src="icons/shield-check.svg" alt="" width="16" height="16"><span>不收集头像与手机号</span></div><p class="closing-line">让每一个声音，都被听见。</p></footer>
+        </div>
+        <div class="home-indicator" aria-hidden="true"></div>
+      </section>
+      <p class="preview-caption"><span class="caption-dot"></span> 实际输入，感受声线的回应</p>
+    </div>
+  </main>
+  <dialog id="help-dialog" aria-labelledby="dialog-title" aria-describedby="dialog-copy"><div class="dialog-inner"><img src="icons/shield-check.svg" alt="" width="30" height="30"><h2 id="dialog-title">登录帮助</h2><p id="dialog-copy"></p><button class="primary" id="dialog-close" type="button">知道了</button></div></dialog>
+</body>
+</html>

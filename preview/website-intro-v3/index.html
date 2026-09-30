@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>菁悠广播站 · 关于我们</title>
+<style>
+/* ============================================================
+   菁悠广播站 · 官网介绍页 v3
+   设计 token 全部来自 admin-web/src/styles/theme.css（= miniprogram/app.wxss），
+   三条硬规则：① 只有一个强调色 #0066cc ② 无装饰性渐变 ③ 无彩色投影
+   内容只取 src/utils/seed.js 的真实系统设置值，不编业务事实。
+   母题：播出时刻刻度（从真实的两档播出时间生长）
+   ============================================================ */
+:root{
+  --ink:#1d1d1f; --ink-2:#333333; --muted:#7a7a7a; --muted-2:#6e6e73;
+  --soft:#c7c7cc; --hairline:#e0e0e0; --divider:#f0f0f0;
+  --parchment:#f5f5f7; --canvas:#ffffff;
+  --tile:#272729; --tile-2:#3a3a3c;
+  --accent:#0066cc; --accent-dark:#2997ff; --acc-bg:#e6f0fa;
+  --r-card:18px; --r-input:12px; --r-tile:20px; --r-pill:9999px;
+  --s1:4px; --s2:8px; --s3:13px; --s4:18px; --s5:26px; --s6:34px;
+  --fs-2xs:10.5px; --fs-xs:11.5px; --fs-sm:12.5px; --fs-md:13.5px; --fs-lg:15px;
+  --fs-xl:17px; --fs-2xl:19px; --fs-3xl:26px; --fs-num:30px;
+  --lh-xl:1.35; --lh-2xl:1.3; --lh-3xl:1.15;
+  --ls-tight:-0.6px; --ls-wide:0.3px;
+  --ease:cubic-bezier(0.22,0.61,0.36,1);
+  --font:-apple-system,BlinkMacSystemFont,"HarmonyOS Sans SC","MiSans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --maxw:960px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--parchment);color:var(--ink);font-family:var(--font);line-height:1.7;-webkit-font-smoothing:antialiased}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 var(--s5)}
+a{color:inherit;text-decoration:none}
+
+/* 骑缝孔分隔：整页像一张从播出台本上撕下来的单据。
+   ⚠️ 用 inline SVG 而不是 radial-gradient —— 「守设计系统」的硬判据是全表 gradient 数为 0。 */
+.perf{height:16px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23e0e0e0'/%3E%3Ccircle cx='8' cy='8' r='4' fill='%23f5f5f7'/%3E%3C/svg%3E");background-repeat:repeat-x;background-size:16px 16px}
+
+/* ── 顶栏 ── */
+header{position:sticky;top:0;z-index:50;background:rgba(245,245,247,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--hairline)}
+.nav-in{display:flex;align-items:center;justify-content:space-between;height:60px}
+.brand{display:flex;align-items:center;gap:var(--s2);font-weight:600;font-size:var(--fs-xl);letter-spacing:var(--ls-tight)}
+.brand img{width:28px;height:28px;display:block}
+.nav-links{display:flex;gap:var(--s5);font-size:var(--fs-md);color:var(--muted)}
+.nav-links a:hover{color:var(--accent)}
+.nav-cta{background:var(--accent);color:#fff;padding:var(--s2) var(--s4);border-radius:var(--r-pill);font-size:var(--fs-md);font-weight:600}
+
+/* ── 品牌区（沿用小程序 about 页：徽 + 名 + 英文副标 + 口号）── */
+.hero{padding:var(--s6) 0 var(--s5);text-align:center}
+.hero img{width:96px;height:96px;display:block;margin:0 auto var(--s4)}
+.hero .name{font-size:var(--fs-3xl);font-weight:700;letter-spacing:var(--ls-tight);line-height:var(--lh-3xl)}
+.hero .en{font-size:var(--fs-xs);color:var(--muted-2);letter-spacing:2.4px;margin-top:var(--s1)}
+.hero .slogan{display:inline-block;margin-top:var(--s4);font-size:var(--fs-lg);color:var(--ink-2);
+  background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-pill);padding:var(--s2) var(--s5)}
+
+/* ── 通用区块 ── */
+section{padding:var(--s6) 0}
+.sec-kick{font-size:var(--fs-xs);color:var(--accent);font-weight:600;letter-spacing:2px}
+.sec-title{font-size:var(--fs-2xl);font-weight:700;letter-spacing:var(--ls-tight-sm);margin:var(--s1) 0 var(--s4)}
+
+.card{background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-card);padding:var(--s5) var(--s5);box-shadow:0 1px 2px rgba(15,28,46,.04)}
+.info-row+.info-row{border-top:1px solid var(--divider);margin-top:var(--s4);padding-top:var(--s4)}
+.info-lb{font-size:var(--fs-sm);color:var(--muted);font-weight:600;letter-spacing:var(--ls-wide)}
+.info-vl{font-size:var(--fs-lg);color:var(--ink);margin-top:var(--s1);white-space:pre-line}
+
+/* ── 播出时刻刻度：整页的母题，数据来自真实两档 ── */
+.axis-card{background:var(--tile);border-radius:var(--r-tile);padding:var(--s5) var(--s5) var(--s6);color:#fff}
+.axis-card .sec-kick{color:var(--accent-dark)}
+.axis-card .sec-title{color:#fff}
+.axis{position:relative;height:52px;margin:var(--s5) 0 0;border-bottom:1px solid var(--tile-2)}
+.tick{position:absolute;bottom:0;width:1px;height:8px;background:var(--tile-2)}
+.tick.h{height:16px;background:var(--soft)}
+.tick-lb{position:absolute;bottom:-26px;transform:translateX(-50%);font-size:var(--fs-2xs);color:var(--muted)}
+.band{position:absolute;bottom:-1px;height:6px;background:var(--accent);border-radius:3px;min-width:52px}
+.band-mk{position:absolute;bottom:10px;width:1px;height:12px;background:var(--accent)}
+.band-lb{position:absolute;bottom:26px;font-size:var(--fs-sm);color:#fff;font-weight:600;white-space:nowrap}
+.band-sub{position:absolute;bottom:44px;font-size:var(--fs-2xs);color:var(--soft);white-space:nowrap}
+
+/* ── 投稿入口 ── */
+.cta{background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-card);padding:var(--s5);
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s5);flex-wrap:wrap}
+.cta h2{font-size:var(--fs-2xl);font-weight:700;letter-spacing:var(--ls-tight-sm)}
+.cta p{color:var(--muted);font-size:var(--fs-md);margin-top:var(--s1);max-width:460px}
+.btn{display:inline-flex;align-items:center;gap:var(--s2);background:var(--accent);color:#fff;
+  padding:var(--s3) var(--s5);border-radius:var(--r-pill);font-size:var(--fs-md);font-weight:600;flex:none}
+.btn:hover{background:var(--accent-dark)}
+.btn:disabled{background:var(--soft);cursor:default}
+
+footer{background:var(--tile);color:var(--muted);padding:var(--s5) 0;font-size:var(--fs-sm)}
+footer .wrap{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--s3)}
+footer a:hover{color:#fff}
+
+.reveal{opacity:0;transform:translateY(16px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
+.reveal.in{opacity:1;transform:none}
+
+@media(max-width:680px){
+  .nav-links{display:none}
+  .wrap{padding:0 var(--s4)}
+  .cta{flex-direction:column;align-items:flex-start}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav-in">
+    <div class="brand">
+      <img src="../assets/station-badge.png" alt="菁悠广播站站徽" />
+      菁悠广播站
+    </div>
+    <nav class="nav-links">
+      <a href="#about">关于我们</a>
+      <a href="#schedule">开播时间</a>
+      <a href="#contact">联系方式</a>
+    </nav>
+    <a class="nav-cta" href="#join">进入小程序</a>
+  </div>
+</header>
+
+<!-- 品牌区：站徽 + 站名 + 英文副标 + 口号（全部取自真实设定） -->
+<section class="hero">
+  <div class="wrap">
+    <img src="../assets/station-badge.png" alt="菁悠广播站站徽" />
+    <div class="name">菁悠广播站</div>
+    <div class="en">JING YOU GUANG BO ZHAN</div>
+    <div class="slogan">菁菁校园情，悠悠广播声</div>
+  </div>
+</section>
+
+<div class="perf"></div>
+
+<!-- 关于我们：介绍原文取自 systemSetting.station_intro -->
+<section id="about">
+  <div class="wrap">
+    <div class="card reveal">
+      <div class="info-row">
+        <div class="info-lb">关于我们</div>
+        <div class="info-vl">菁菁校园情，悠悠广播声。
+
+菁悠广播站成立于2005年，由一群热爱声音、热爱校园的同学们组成。我们用声音传递资讯，用音乐温暖日常。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 开播时间：真实两档，渲染成播出时刻刻度 -->
+<section id="schedule">
+  <div class="wrap">
+    <div class="axis-card reveal">
+      <div class="sec-kick">SCHEDULE</div>
+      <div class="sec-title">开播时间</div>
+      <div class="axis" id="axis"></div>
+    </div>
+  </div>
+</section>
+
+<div class="perf"></div>
+
+<!-- 联系方式：取自 systemSetting.contact -->
+<section id="contact">
+  <div class="wrap">
+    <div class="card reveal">
+      <div class="info-row">
+        <div class="info-lb">联系方式</div>
+        <div class="info-vl">广播站社长 13800138000</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 投稿入口 -->
+<section id="join">
+  <div class="wrap">
+    <div class="cta reveal">
+      <div>
+        <h2>想点歌、想投稿？</h2>
+        <p>打开微信小程序搜索「菁悠广播站」，即可点歌、投递文稿、给节目留言。</p>
+      </div>
+      <a class="btn" href="#">在小程序中打开</a>
+    </div>
+  </div>
+</section>
+
+<div class="perf"></div>
+
+<footer>
+  <div class="wrap">
+    <div>© 菁悠广播站</div>
+    <div>
+      <a href="#about">关于我们</a> ·
+      <a href="#schedule">开播时间</a> ·
+      <a href="#contact">联系方式</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* 播出时刻刻度：把「午间档 12:30-13:00 ｜ 下午档 17:00-17:30」画成刻度条。
+   时间值来自 src/utils/seed.js 的 systemSetting.broadcast_schedule。
+   这里只是把那串值结构化成 [开始小时, 结束小时] 的形式用于绘制刻度。 */
+(function(){
+  var DAY_START = 6, DAY_END = 22, SPAN = DAY_END - DAY_START;
+  // ✱ 真实值，改动请同步 seed.js / 管理端系统设置
+  var SLOTS = [
+    { name:'午间档', time:'12:30-13:00', from:12.5, to:13.0 },
+    { name:'下午档', time:'17:00-17:30', from:17.0, to:17.5 }
+  ];
+  var axis = document.getElementById('axis');
+  if(!axis) return;
+
+  // 每小时一根刻度，整点加高；每 2 小时一个时间标签
+  for(var h=DAY_START; h<=DAY_END; h++){
+    var pct = (h - DAY_START) / SPAN * 100;
+    var t = document.createElement('div');
+    t.className = 'tick' + (h % 2 === 0 ? ' h' : '');
+    t.style.left = pct + '%';
+    axis.appendChild(t);
+    if(h % 2 === 0){
+      var lb = document.createElement('div');
+      lb.className = 'tick-lb';
+      lb.style.left = pct + '%';
+      lb.textContent = h + ':00';
+      axis.appendChild(lb);
+    }
+  }
+
+  SLOTS.forEach(function(s, i){
+    var startPct = (s.from - DAY_START) / SPAN * 100;
+    var widthPct = (s.to - s.from) / SPAN * 100;
+    // 相邻标签错开方向，避免文字撞车
+    var alignRight = i % 2 === 1;
+
+    var band = document.createElement('div');
+    band.className = 'band';
+    band.style.left = startPct + '%';
+    band.style.width = widthPct + '%';
+    axis.appendChild(band);
+
+    var mk = document.createElement('div');
+    mk.className = 'band-mk';
+    mk.style.left = startPct + '%';
+    axis.appendChild(mk);
+
+    var lb = document.createElement('div');
+    lb.className = 'band-lb';
+    if(alignRight){ lb.style.left='auto'; lb.style.right=(100-startPct)+'%'; }
+    else { lb.style.right='auto'; lb.style.left=startPct+'%'; }
+    lb.textContent = s.name;
+    axis.appendChild(lb);
+
+    var sub = document.createElement('div');
+    sub.className = 'band-sub';
+    if(alignRight){ sub.style.left='auto'; sub.style.right=(100-startPct)+'%'; }
+    else { sub.style.right='auto'; sub.style.left=startPct+'%'; }
+    sub.textContent = s.time;
+    axis.appendChild(sub);
+  });
+})();
+
+/* 滚动揭示 */
+(function(){
+  var els = document.querySelectorAll('.reveal');
+  if(!('IntersectionObserver' in window)){ els.forEach(function(e){e.classList.add('in');}); return; }
+  var io = new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  },{threshold:.15});
+  els.forEach(function(e){ io.observe(e); });
+})();
+</script>
+</body>
+</html>

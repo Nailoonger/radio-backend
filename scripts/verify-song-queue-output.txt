@@ -1,4 +1,0 @@
-
-⛔ scripts/verify-song-queue.js 已作废：它断言的 v2 口径已被 docs/song-protocol.md 取代。
-   本文件保留为历史记录，下面的断言不再执行。
-   现行验证请跑：node scripts/verify-song-protocol.js

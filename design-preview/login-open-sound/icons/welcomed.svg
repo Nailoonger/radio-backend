@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="96" viewBox="0 0 320 96" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="welcomed-title">
+  <title id="welcomed-title">开声：登录成功</title>
+  <path stroke="#C7CCD3" d="M16 48h96M208 48h96"/>
+  <circle stroke="#0066CC" cx="160" cy="48" r="29"/>
+</svg>

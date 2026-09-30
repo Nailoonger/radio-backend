@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>菁悠广播站 · 登录方案 02</title>
+  <style>
+    :root{font:16px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei",sans-serif;color:#1d1d1f;background:#eeeff1;--blue:#0066cc;--paper:#f5f5f7;--ink:#1d1d1f;--muted:#747479;--ease:cubic-bezier(.22,.61,.36,1)}
+    *{box-sizing:border-box}body{margin:0}button,input{font:inherit}button,a,input{-webkit-tap-highlight-color:transparent}button{cursor:pointer;border:0;color:var(--blue);background:none;touch-action:manipulation}button:focus-visible,a:focus-visible{outline:3px solid #0066cc;outline-offset:4px}button:active{opacity:.72;transform:scale(.98)}a{color:var(--blue);text-decoration:none}svg{display:block;flex:none}button svg{pointer-events:none}[hidden]{display:none!important}
+    .sheet{max-width:1160px;margin:auto;padding:30px 56px 34px}.masthead{display:flex;align-items:center;justify-content:space-between;padding-bottom:19px;border-bottom:1px solid #d8d9dd;font-size:12px;color:#737479}.masthead-brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:.04em;color:#333338}.masthead-brand img{width:26px;height:26px}.masthead-meta{font-size:10px;letter-spacing:.12em}.workspace{display:grid;grid-template-columns:1fr 390px;gap:76px;align-items:center;padding:34px 26px 0}.direction{max-width:340px}.eyebrow{font-size:11px;letter-spacing:.19em;color:#737479}.direction h1{font-size:42px;line-height:1.25;letter-spacing:-.045em;font-weight:600;margin:17px 0 21px}.intro{font-size:14px;color:#707075;line-height:1.95;max-width:285px;margin:0}.state-control{display:flex;background:#dedfe3;border-radius:12px;padding:4px;margin-top:28px;gap:3px}.state-control button{flex:1;min-height:40px;font-size:12px;border-radius:9px;color:#66666c;white-space:nowrap}.state-control button[aria-pressed="true"]{background:#fff;color:var(--blue);box-shadow:0 1px 3px #0000000a;font-weight:600}.notes{margin:28px 0 0;padding:0;list-style:none}.notes li{display:grid;grid-template-columns:24px 1fr;gap:12px;padding:16px 0;border-top:1px solid #d8d9dd}.note-num{font-size:10px;letter-spacing:.1em;padding-top:3px;color:#909096}.notes strong{display:block;font-size:13px;font-weight:600}.notes p{font-size:12px;color:#79797f;margin:4px 0 0;line-height:1.75}.preview-tip{font-size:11px;line-height:1.8;color:#7a7a80;margin:23px 0 10px}.old-version{font-size:12px;display:inline-flex;gap:8px;min-height:40px;align-items:center}.device{width:390px;padding:7px;border-radius:49px;background:#28282b;box-shadow:0 0 0 1px #161619,0 1px 0 3px #b9babe,0 24px 65px -24px #1d1d1f55;position:relative}.screen{height:824px;background:var(--paper);border-radius:42px;overflow:hidden;position:relative;display:flex;flex-direction:column;isolation:isolate}.statusbar{height:49px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:4px 27px 0;font-size:14px;font-weight:600;letter-spacing:-.03em}.status-icons{display:flex;align-items:center;gap:5px}.navbar{flex:none;height:46px;margin:0 15px;display:flex;align-items:center;justify-content:space-between}.back{height:44px;min-width:72px;display:flex;align-items:center;gap:2px;padding:0 1px;font-size:14px}.wechat-capsule{height:30px;width:86px;border:1px solid #dbdbdf;border-radius:20px;background:#ffffff85;display:flex;align-items:center;justify-content:space-evenly;color:#1d1d1f}.capsule-divider{width:1px;height:15px;background:#d8d8dc}.content{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:14px 24px 18px;scrollbar-width:none}.content::-webkit-scrollbar{display:none}.station-card{height:166px;background:#272729;border-radius:25px;color:white;padding:23px 23px 19px;display:flex;flex-direction:column;justify-content:space-between}.station-top{display:flex;align-items:center;gap:13px}.station-top img{width:47px;height:47px;object-fit:contain}.station-name{font-size:21px;font-weight:600;letter-spacing:-.025em;line-height:1.3}.station-en{font-size:9px;letter-spacing:.19em;color:#aaaab0;margin-top:5px}.station-slogan{font-size:12px;color:#ccc;letter-spacing:1px;margin-top:13px}.station-footer{display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid #ffffff16}.station-footer span{font-size:9px;letter-spacing:.11em;color:#97979f}.waveform{height:18px;display:flex;gap:3px;align-items:center}.waveform i{width:2px;height:var(--h);border-radius:2px;background:#d4d4da}.view{padding-top:27px}.view h2{font-size:28px;font-weight:600;line-height:1.3;letter-spacing:-.035em;margin:0 0 7px}.subtitle{font-size:12px;letter-spacing:.1px;line-height:1.75;color:var(--muted);margin:0}.form{margin-top:23px}.field-group{background:white;border:1px solid #e8e8ec;border-radius:18px;overflow:hidden}.field-row{min-height:59px;display:flex;align-items:center;padding:0 16px;position:relative;gap:10px}.field-row+.field-row::before{content:"";position:absolute;left:16px;right:0;top:0;height:1px;background:#ededf0}.field-row:focus-within{box-shadow:inset 0 0 0 2px #0066cc;border-radius:13px}.field-row label{font-size:14px;flex:none;width:39px}.field-row input{width:0;flex:1;min-width:0;font-size:16px;height:58px;line-height:58px;border:0;outline:0;background:transparent;color:var(--ink);padding:0;caret-color:var(--blue)}input::placeholder{color:#97979e;font-size:14px}.visibility{width:40px;min-height:44px;margin-right:-9px;display:grid;place-items:center;flex:none}.form-meta{display:flex;align-items:center;justify-content:space-between;gap:4px;min-height:43px}.password-hint{font-size:10px;line-height:1.7;color:#77777e;margin:0}.password-hint b{font-weight:500;color:#45454c}.help{min-height:44px;padding:0 0 0 4px;font-size:11px;white-space:nowrap}.primary{display:flex;align-items:center;justify-content:center;width:100%;min-height:52px;padding:13px 15px;border-radius:17px;background:var(--blue);color:white;font-size:15px;font-weight:600;letter-spacing:.02em;margin-top:5px}.primary:disabled{background:#d0dce9;color:#647c94;cursor:default;transform:none;opacity:1}.secondary{width:100%;min-height:49px;display:flex;gap:8px;align-items:center;justify-content:center;font-size:12px;margin-top:7px}.error{font-size:12px;color:#b42318;background:#fde8e8;padding:10px 12px;border-radius:12px;margin:8px 0;line-height:1.6}.privacy{display:flex;align-items:center;justify-content:center;gap:5px;font-size:10px;letter-spacing:.1px;color:#7b7b82;margin-top:21px}.privacy svg{color:#77777e}.privacy-detail{font-size:10px;text-align:center;color:#929299;margin:4px 0 0}.bottom-caption{flex:none;text-align:center;font-size:9px;letter-spacing:.14em;color:#a0a0a6;padding:7px 0 29px}.home-indicator{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:127px;height:4px;border-radius:5px;background:#1d1d1f;pointer-events:none}.step-label{font-size:10px;letter-spacing:.1em;color:#77777e;margin-bottom:8px}.activation.view{padding-top:22px}.person{display:flex;align-items:center;gap:10px;background:#eaeaec;border-radius:13px;padding:11px 13px;margin-top:16px}.avatar{height:33px;width:33px;display:grid;place-items:center;border-radius:50%;background:#272729;color:#fff;font-size:14px}.person strong{font-size:12px;font-weight:500}.person small{font-size:10px;color:#77777e;display:block;margin-top:1px}.activation .form{margin-top:14px}.activation .field-row label{width:55px;font-size:12px}.rules{display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:#75757c;line-height:1.7;margin:12px 1px 15px}.rule{display:flex;align-items:center;gap:4px}.rule::before{content:"";width:5px;height:5px;border:1px solid #8d8d94;border-radius:50%}.rule.met{color:var(--blue)}.rule.met::before{border-color:var(--blue);background:var(--blue)}.activation .secondary{font-size:11px}.success{text-align:center;padding-top:38px}.success-symbol{margin:0 auto 21px;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:#e6eef8;color:var(--blue)}.success .primary{margin-top:28px}.success .subtitle{font-size:13px}.dialog-layer{position:absolute;inset:0;background:#00000038;z-index:4;display:flex;align-items:flex-end}.help-sheet{width:100%;padding:11px 25px 32px;border-radius:26px 26px 0 0;background:#fff;box-shadow:0 -12px 40px #0000000a}.handle{width:31px;height:4px;border-radius:4px;background:#d4d4d9;margin:0 auto 19px}.help-sheet h3{font-size:21px;letter-spacing:-.025em;line-height:1.4;margin:0 0 16px}.help-sheet p{font-size:13px;color:#707077;line-height:1.8;margin:0 0 13px}.help-sheet strong{color:var(--ink);font-weight:500}.help-sheet .primary{margin-top:21px}.toast{position:absolute;top:103px;left:24px;right:24px;z-index:5;font-size:12px;text-align:center;line-height:1.8;color:#fff;background:#272729f5;border-radius:15px;padding:14px;box-shadow:0 8px 24px #00000018}.view.enter{animation:appear 380ms var(--ease) both}@keyframes appear{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+    @media(min-width:900px) and (max-height:950px){.sheet{padding-top:20px}.workspace{padding-top:24px}.device{zoom:.86}}
+    @media(max-width:850px){.sheet{padding:24px}.workspace{gap:32px;grid-template-columns:1fr 390px;padding:28px 0 0}.direction h1{font-size:32px}.notes{margin-top:20px}.masthead-meta{font-size:9px}.direction{min-width:0}}
+    @media(max-width:700px){.sheet{padding:18px}.masthead{max-width:440px;margin:auto}.masthead-meta{display:none}.workspace{display:flex;flex-direction:column;gap:24px;padding-top:22px}.direction{max-width:390px;width:100%}.direction h1{font-size:26px;margin:8px 0}.intro{max-width:none;font-size:12px}.notes,.preview-tip,.old-version{display:none}.state-control{margin-top:15px}.device{max-width:100%;border-radius:40px}.screen{border-radius:33px}.bottom-caption{padding-bottom:29px}}
+    @media(max-width:390px){.sheet{padding:12px}.content{padding-left:18px;padding-right:18px}.station-card{padding-left:18px;padding-right:18px}.station-name{font-size:19px}.station-slogan{font-size:11px}.form-meta{gap:0}.password-hint{font-size:9px}.help{font-size:10px}.station-en{font-size:8px}.field-row{padding:0 12px;gap:6px}.activation .field-row label{width:51px}.statusbar{padding-left:23px;padding-right:23px}}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+    @media(max-width:700px){.preview-tip{display:block;font-size:10px;margin:12px 0 0}.preview-tip br{display:none}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;scroll-behavior:auto!important}button:active{transform:none}}
+    @media(prefers-contrast:more){.subtitle,.password-hint,.privacy,.privacy-detail,.bottom-caption{color:#48484c}.field-group{border-color:#76767d}input::placeholder{color:#68686f}}
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <symbol id="back-icon" viewBox="0 0 24 24"><path d="m14 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="eye-icon" viewBox="0 0 24 24"><path d="M2.5 12s3.3-6 9.5-6 9.5 6 9.5 6-3.3 6-9.5 6-9.5-6-9.5-6Z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="2.8" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="shield-icon" viewBox="0 0 24 24"><path d="m12 3 7 3v6c0 4-7 8-7 8s-7-4-7-8V6Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="m8.5 11.5 2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="wechat-icon" viewBox="0 0 24 24"><path d="M13.5 13.8a6.5 6.5 0 0 1-4.4 1.6 8 8 0 0 1-2.6-.4L3.8 16l.7-2.4A5.5 5.5 0 0 1 2 9.2C2 5.9 5.2 3.5 9.1 3.5c3.6 0 6.6 2 7 4.9" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M22 14.5c0 1.4-.7 2.6-1.9 3.5l.5 2-2.2-.8a7 7 0 0 1-2.2.3c-3.2 0-5.8-2.2-5.8-5s2.6-5 5.8-5 5.8 2.2 5.8 5Z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="6.7" cy="8" r=".9" fill="currentColor"/><circle cx="11.7" cy="8" r=".9" fill="currentColor"/><circle cx="14" cy="13.5" r=".8" fill="currentColor"/><circle cx="18.3" cy="13.5" r=".8" fill="currentColor"/></symbol>
+  </defs></svg>
+  <main class="sheet">
+    <header class="masthead"><div class="masthead-brand"><img src="../miniprogram/assets/station-badge.png" alt="">菁悠广播站</div><span class="masthead-meta">MINI PROGRAM / LOGIN STUDY — 02</span></header>
+    <div class="workspace">
+      <aside class="direction">
+        <div class="eyebrow">方案 02 · 静谧电台</div>
+        <h1>留一点安静，<br>给你的声音。</h1>
+        <p class="intro">深色站牌，清晰表单。<br>从熟悉的学号开始，走进自己的校园电台。</p>
+        <nav class="state-control" aria-label="切换预览状态"><button type="button" data-view="login" aria-pressed="true">账号登录</button><button type="button" data-view="activate" aria-pressed="false">首次改密</button><button type="button" data-view="success" aria-pressed="false">完成状态</button></nav>
+        <ol class="notes">
+          <li><span class="note-num">01</span><div><strong>一张站牌，保留熟悉感</strong><p>单色站徽、原有口号与声波，让品牌集中在一处。</p></div></li>
+          <li><span class="note-num">02</span><div><strong>把注意力留给登录</strong><p>合并两行输入，初始密码提示随手可见，主要操作只用广播蓝。</p></div></li>
+          <li><span class="note-num">03</span><div><strong>每次操作，都有回应</strong><p>可以输入、显示密码、查看帮助，体验首登改密与即时校验。</p></div></li>
+        </ol>
+        <p class="preview-tip">交互演示使用虚拟数据，不会提交账号。<br>点击上方按钮可直接切换三种状态。</p>
+        <a class="old-version" href="login-concept.html">回看方案 01 <span aria-hidden="true">↗</span></a>
+      </aside>
+      <section class="device" aria-label="手机中的登录方案预览">
+        <div class="screen">
+          <div class="statusbar" aria-hidden="true"><span>9:41</span><div class="status-icons"><svg width="17" height="13" viewBox="0 0 17 13" fill="currentColor"><rect y="9" width="3" height="4" rx=".7"/><rect x="4.5" y="6" width="3" height="7" rx=".7"/><rect x="9" y="3" width="3" height="10" rx=".7"/><rect x="13.5" width="3" height="13" rx=".7"/></svg><svg width="17" height="13" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 4q8-7 16 0M5 7q5-4.5 10 0M8 10q2-2 4 0"/><circle cx="10" cy="13" r="1" fill="currentColor" stroke="none"/></svg><svg width="25" height="13" viewBox="0 0 28 14"><rect x=".6" y=".6" width="23" height="12.8" rx="3" stroke="currentColor" fill="none" opacity=".5"/><rect x="2.5" y="2.5" width="19" height="9" rx="1.6" fill="currentColor"/><path d="M25 4v6q3 0 3-3t-3-3" fill="currentColor" opacity=".5"/></svg></div></div>
+          <header class="navbar"><button type="button" class="back" id="back"><svg width="21" height="21"><use href="#back-icon"/></svg><span id="back-label">返回</span></button><div class="wechat-capsule" aria-hidden="true"><svg width="24" height="16" viewBox="0 0 24 16" fill="currentColor"><circle cx="5" cy="8" r="1.8"/><circle cx="12" cy="8" r="2.2"/><circle cx="19" cy="8" r="1.8"/></svg><i class="capsule-divider"></i><svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.3" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="10" cy="10" r="2.8" fill="currentColor"/></svg></div></header>
+          <div class="content" id="content">
+            <div class="station-card">
+              <div><div class="station-top"><img src="../miniprogram/assets/station-badge-mono.png" alt="菁悠广播站站徽"><div><div class="station-name">菁悠广播站</div><div class="station-en">JINGYOU CAMPUS RADIO</div></div></div><div class="station-slogan">菁菁校园情，悠悠广播声</div></div>
+              <div class="station-footer"><span>校园里的每一种声音</span><div class="waveform" aria-hidden="true"><i style="--h:4px"></i><i style="--h:8px"></i><i style="--h:5px"></i><i style="--h:13px"></i><i style="--h:18px"></i><i style="--h:10px"></i><i style="--h:6px"></i><i style="--h:13px"></i><i style="--h:9px"></i><i style="--h:4px"></i><i style="--h:7px"></i><i style="--h:3px"></i></div></div>
+            </div>
+            <section class="view" data-panel="login">
+              <h2>欢迎回来</h2><p class="subtitle">用学号登录，开启你的校园电台。</p>
+              <form class="form" id="login-form" novalidate>
+                <div class="field-group"><div class="field-row"><label for="username">学号</label><input id="username" name="username" inputmode="numeric" autocomplete="off" placeholder="请输入学号" aria-describedby="login-error"></div><div class="field-row"><label for="password">密码</label><input id="password" name="password" type="password" autocomplete="off" placeholder="请输入密码" aria-describedby="initial-hint login-error"><button class="visibility" type="button" data-password="password" aria-label="显示密码" aria-pressed="false"><svg width="20" height="20"><use href="#eye-icon"/></svg></button></div></div>
+                <div class="form-meta"><p class="password-hint" id="initial-hint">初始密码：<b>user + 学号</b></p><button class="help" type="button" data-help="account">登录帮助</button></div>
+                <p id="login-error" class="error" role="alert" hidden></p>
+                <button class="primary" type="submit">登录</button>
+                <button class="secondary" type="button" id="wechat"><svg width="19" height="19"><use href="#wechat-icon"/></svg>微信登录</button>
+              </form>
+              <div class="privacy"><svg width="13" height="13"><use href="#shield-icon"/></svg>不收集头像与手机号</div><p class="privacy-detail">头像由姓名首字生成</p>
+            </section>
+            <section class="view activation" data-panel="activate" hidden>
+              <div class="step-label">首次登录</div><h2>设置你的新密码</h2><p class="subtitle">换一个专属密码，下次用它登录。</p>
+              <div class="person"><div class="avatar">林</div><div><strong>林同学</strong><small id="student-meta">演示账号 · 20240101</small></div></div>
+              <form class="form" id="activate-form" novalidate>
+                <div class="field-group"><div class="field-row"><label for="new-password">新密码</label><input id="new-password" type="password" autocomplete="off" placeholder="至少 8 位字母和数字" aria-describedby="rules activation-error"><button class="visibility" type="button" data-password="new-password" aria-label="显示新密码" aria-pressed="false"><svg width="19" height="19"><use href="#eye-icon"/></svg></button></div><div class="field-row"><label for="confirm-password">确认密码</label><input id="confirm-password" type="password" autocomplete="off" placeholder="请再次输入" aria-describedby="activation-error"><button class="visibility" type="button" data-password="confirm-password" aria-label="显示确认密码" aria-pressed="false"><svg width="19" height="19"><use href="#eye-icon"/></svg></button></div></div>
+                <div class="rules" id="rules"><span class="rule" id="rule-length">至少 8 位</span><span class="rule" id="rule-letter">包含字母</span><span class="rule" id="rule-digit">包含数字</span></div><p class="sr-only" id="rules-status" role="status" aria-live="polite"></p>
+                <p class="error" id="activation-error" role="alert" hidden></p><button type="submit" class="primary">保存并进入</button><button class="secondary" id="skip" type="button">稍后修改</button>
+              </form>
+            </section>
+            <section class="view success" data-panel="success" hidden><div class="success-symbol"><svg width="32" height="32" viewBox="0 0 32 32"><path d="m8 16 5 5L25 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><h2>准备好了</h2><p class="subtitle" id="success-copy">新密码已设置，欢迎来到菁悠广播站。</p><button class="primary" id="enter" type="button">进入广播站</button><div class="privacy"><svg width="13" height="13"><use href="#shield-icon"/></svg>演示完成，未提交或保存账号信息</div></section>
+          </div>
+          <div class="bottom-caption" aria-hidden="true">JINGYOU RADIO · 听见校园</div><div class="home-indicator" aria-hidden="true"></div>
+          <div class="dialog-layer" id="dialog-layer" hidden><section class="help-sheet" role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabindex="-1"><div class="handle" aria-hidden="true"></div><h3 id="dialog-title">登录帮助</h3><div id="dialog-body"></div><button type="button" class="primary" id="close-dialog">知道了</button></section></div>
+          <div class="toast" id="toast" role="status" hidden></div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script>
+    // Standalone interaction study. No requests, credentials, persistence, or app integration.
+    const $ = (selector) => document.querySelector(selector);
+    const panels = [...document.querySelectorAll('[data-panel]')];
+    const stateButtons = [...document.querySelectorAll('[data-view]')];
+    const content = $('#content');
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+    let activeView = 'login';
+    let lastFocused = null;
+    let toastTimer;
+    function hideErrors() { document.querySelectorAll('.error').forEach((node) => { node.hidden = true; }); document.querySelectorAll('[aria-invalid]').forEach((node) => node.removeAttribute('aria-invalid')); }
+    function changeView(view, moveFocus = false) {
+      if (!panels.some((panel) => panel.dataset.panel === view)) return;
+      hideErrors(); activeView = view;
+      panels.forEach((panel) => { panel.hidden = panel.dataset.panel !== view; panel.classList.remove('enter'); });
+      const nextPanel = panels.find((panel) => !panel.hidden);
+      void nextPanel.offsetWidth; nextPanel.classList.add('enter');
+      stateButtons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.view === view)));
+      $('#back-label').textContent = view === 'login' ? '返回' : '登录';
+      content.scrollTop = 0;
+      if (moveFocus) { const heading = nextPanel.querySelector('h2'); heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
+    }
+    function error(id, message, fieldId) { const node = $(id); node.textContent = message; node.hidden = false; if (fieldId) { const field = $(fieldId); field.setAttribute('aria-invalid', 'true'); field.focus(); } }
+    function showToast(message) { clearTimeout(toastTimer); const toast = $('#toast'); toast.textContent = message; toast.hidden = false; toastTimer = setTimeout(() => { toast.hidden = true; }, 3300); }
+    function updateRules() {
+      const value = $('#new-password').value;
+      const requirements = [['#rule-length', value.length >= 8], ['#rule-letter', /[a-z]/i.test(value)], ['#rule-digit', /\d/.test(value)]];
+      const status = requirements.map(([selector, met]) => { const node = $(selector); node.classList.toggle('met', met); return node.textContent + (met ? '：已满足' : '：未满足'); }).join('；');
+      $('#rules-status').textContent = value ? status : '';
+    }
+    function openHelp(kind) {
+      lastFocused = document.activeElement;
+      $('#dialog-title').textContent = kind === 'wechat' ? '使用学号登录' : '登录帮助';
+      $('#dialog-body').innerHTML = kind === 'wechat'
+        ? '<p>当前使用学校分发的学生账号。请填写学号和密码后登录。</p><p>如果这是第一次登录，初始密码为 <strong>user + 学号</strong>。</p>'
+        : '<p><strong>第一次登录</strong><br>初始密码是 user + 你的学号。<br>例如：学号 20240101，密码 user20240101。</p><p><strong>忘记密码或账号无法使用</strong><br>请联系学校管理员核对学号或重置密码。</p>';
+      $('#dialog-layer').hidden = false;
+      content.inert = true; $('.navbar').inert = true; $('.direction').inert = true;
+      if (!reducedMotion.matches) $('.help-sheet').animate([{transform:'translateY(24px)',opacity:.4},{transform:'translateY(0)',opacity:1}],{duration:380,easing:'cubic-bezier(.22,.61,.36,1)'});
+      $('#close-dialog').focus();
+    }
+    function closeHelp() { $('#dialog-layer').hidden = true; content.inert = false; $('.navbar').inert = false; $('.direction').inert = false; if (lastFocused) lastFocused.focus(); }
+    stateButtons.forEach((button) => button.addEventListener('click', () => { changeView(button.dataset.view); if (button.dataset.view === 'success') $('#success-copy').textContent = '新密码已设置，欢迎来到菁悠广播站。'; }));
+    document.querySelectorAll('[data-password]').forEach((button) => button.addEventListener('click', () => { const input = document.getElementById(button.dataset.password); const visible = input.type === 'password'; input.type = visible ? 'text' : 'password'; button.setAttribute('aria-pressed', String(visible)); button.setAttribute('aria-label', visible ? '隐藏密码' : '显示密码'); }));
+    document.querySelectorAll('input').forEach((input) => input.addEventListener('input', hideErrors));
+    document.querySelectorAll('[data-help]').forEach((button) => button.addEventListener('click', () => openHelp('account')));
+    $('#wechat').addEventListener('click', () => openHelp('wechat'));
+    $('#close-dialog').addEventListener('click', closeHelp);
+    $('#dialog-layer').addEventListener('click', (event) => { if (event.target === $('#dialog-layer')) closeHelp(); });
+    document.addEventListener('keydown', (event) => { if (!$('#dialog-layer').hidden) { if (event.key === 'Escape') closeHelp(); if (event.key === 'Tab') { event.preventDefault(); $('#close-dialog').focus(); } } });
+    $('#login-form').addEventListener('submit', (event) => { event.preventDefault(); hideErrors(); const username = $('#username').value.trim(); const password = $('#password').value; if (!username) return error('#login-error', '请先填写学号。', '#username'); if (!password) return error('#login-error', '请填写密码后继续。', '#password'); $('#student-meta').textContent = '演示账号 · ' + username; $('#password').value = ''; changeView('activate', true); });
+    $('#new-password').addEventListener('input', updateRules);
+    $('#activate-form').addEventListener('submit', (event) => { event.preventDefault(); hideErrors(); const value = $('#new-password').value; if (value.length < 8 || !/[a-z]/i.test(value) || !/\d/.test(value)) return error('#activation-error', '新密码需至少 8 位，包含字母和数字。', '#new-password'); if (value !== $('#confirm-password').value) return error('#activation-error', '两次输入的密码不一致，请再确认一下。', '#confirm-password'); $('#new-password').value = ''; $('#confirm-password').value = ''; updateRules(); $('#success-copy').textContent = '新密码已设置，欢迎来到菁悠广播站。'; changeView('success', true); });
+    $('#skip').addEventListener('click', () => { $('#success-copy').textContent = '欢迎来到菁悠广播站，记得稍后修改初始密码。'; changeView('success', true); });
+    $('#back').addEventListener('click', () => { if (activeView === 'login') showToast('当前为登录页预览；正式版将返回上一页。'); else changeView('login', true); });
+    $('#enter').addEventListener('click', () => showToast('登录流程预览结束，可切换状态继续查看。'));
+  </script>
+</body>
+</html>

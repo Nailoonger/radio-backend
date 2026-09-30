@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>菁悠广播站 · 登录方案 06</title>
+  <style>
+    :root {
+      --ink: #1d1d1f;
+      --muted: #6e7780;
+      --paper: #f5f5f7;
+      --tile: #272729;
+      --accent: #0066cc;
+      --accent-dark: #2997ff;
+      --ease: cubic-bezier(.22,.61,.36,1);
+      font: 16px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background: #e8e9eb;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    button, input { font: inherit; }
+    button { border: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+    button:active { transform: scale(.98); }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    input:focus-visible { outline: 0; }
+    [hidden] { display: none !important; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+    /* Preview frame: outside the mini program, never part of the intended page. */
+    .board { max-width: 1100px; margin: auto; padding: 28px 40px 44px; }
+    .board-head { color: #707880; font-size: 11px; letter-spacing: .15em; border-bottom: 1px solid #cdd2d7; padding-bottom: 15px; }
+    .layout { display: grid; grid-template-columns: minmax(300px, 1fr) 390px; gap: 72px; align-items: center; padding: 30px 12px 0; }
+    .description { max-width: 400px; }
+    .edition { color: var(--accent); font-size: 11px; font-weight: 650; letter-spacing: .14em; }
+    .description h1 { margin: 16px 0 20px; font-size: 44px; font-weight: 650; line-height: 1.18; letter-spacing: -.05em; }
+    .lead { color: #626d77; font-size: 14px; line-height: 1.95; margin: 0 0 25px; }
+    .switch { width: max-content; max-width: 100%; display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #dce1e6; }
+    .switch button { min-width: 102px; height: 40px; padding: 0 12px; border-radius: 11px; background: transparent; color: #66717b; font-size: 12px; }
+    .switch button[aria-pressed="true"] { background: #fff; color: var(--accent); font-weight: 650; box-shadow: 0 1px 5px #1d1d1f12; }
+    .note { border-top: 1px solid #cdd2d7; padding-top: 20px; margin-top: 33px; color: #6b747d; font-size: 12px; line-height: 1.85; }
+    .note strong { display: block; color: var(--ink); font-size: 13px; margin-bottom: 6px; }
+    .compare { display: inline-block; color: var(--accent); font-size: 12px; margin-top: 20px; text-decoration: none; }
+
+    /* The proposed 390 × 830 mini program screen. */
+    .phone { width: 390px; max-width: 100%; padding: 7px; border-radius: 48px; background: #272729; position: relative; box-shadow: 0 0 0 1px #111, 0 1px 0 3px #bec3c7, 0 25px 65px -28px #1d1d1f66; }
+    .screen { height: 830px; border-radius: 41px; overflow: hidden; position: relative; display: flex; flex-direction: column; background: var(--paper); }
+    .status { height: 48px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 4px 27px 0; font-size: 14px; font-weight: 650; letter-spacing: -.03em; }
+    .system-icons { display: flex; gap: 4px; align-items: center; }
+    .nav { height: 52px; padding: 0 20px; display: flex; align-items: center; flex: none; }
+    .back { width: 39px; height: 39px; display: grid; place-items: center; border-radius: 50%; color: #283139; background: #ffffffb8; border: 1px solid #fff; box-shadow: 0 2px 8px #1d1d1f0b; }
+    .viewport { flex: 1; min-height: 0; overflow: auto; scrollbar-width: none; overscroll-behavior: contain; padding: 17px 18px 27px; }
+    .viewport::-webkit-scrollbar { display: none; }
+    .broadcast { height: 228px; border-radius: 29px; background: var(--tile); color: #fff; position: relative; overflow: hidden; }
+    .broadcast-copy { position: relative; z-index: 1; padding: 28px 0 0 26px; }
+    .broadcast-kicker { color: #a9b3bd; font-size: 10px; font-weight: 600; letter-spacing: .18em; }
+    .broadcast h2 { font-size: 31px; font-weight: 600; letter-spacing: -.045em; line-height: 1.25; margin: 19px 0 0; }
+    .broadcast-caption { position: absolute; left: 27px; bottom: 27px; z-index: 1; color: #aeb9c3; font-size: 11px; line-height: 1.65; letter-spacing: .02em; }
+    .radio { position: absolute; width: 210px; height: 180px; right: -6px; top: 29px; color: var(--accent-dark); }
+    .glass { position: relative; z-index: 2; margin: -26px 10px 0; padding: 25px 20px 21px; border-radius: 27px; border: 1px solid #ffffffeb; border-bottom-color: #dfe4e8; background: #ffffffba; box-shadow: inset 0 1px 0 #fff, 0 15px 35px #1d1d1f12; backdrop-filter: blur(28px) saturate(145%); -webkit-backdrop-filter: blur(28px) saturate(145%); }
+    .glass::before { content: ""; position: absolute; top: 5px; left: 30px; width: 116px; height: 20px; border-top: 1px solid #fff; border-radius: 50%; pointer-events: none; }
+    .form-heading { margin-bottom: 21px; }
+    .eyebrow { color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+    .form-heading h3 { margin: 5px 0 2px; font-size: 23px; line-height: 1.3; letter-spacing: -.03em; font-weight: 650; }
+    .form-heading p { margin: 0; color: #69737d; font-size: 11px; }
+    .fields { display: grid; gap: 10px; }
+    .input-shell { height: 56px; display: flex; align-items: center; gap: 8px; padding: 0 13px; border: 1px solid #e1e5e9; border-radius: 17px; background: #ffffffd9; box-shadow: inset 0 1px 0 #fff; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); overflow: hidden; transition: border-color 180ms var(--ease), box-shadow 180ms var(--ease); }
+    .input-shell:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 0 4px #0066cc19, inset 0 1px 0 #fff; }
+    .input-shell label { flex: none; width: 40px; color: #303941; font-size: 12px; font-weight: 600; }
+    .input-shell input { flex: 1; width: 100%; min-width: 0; height: 100%; padding: 0; border: 0; background: transparent; color: var(--ink); font-size: 14px; caret-color: var(--accent); outline: 0; }
+    .input-shell input::placeholder { color: #9ca6af; font-size: 12px; }
+    .eye { min-width: 38px; height: 42px; margin-right: -6px; padding: 0 4px; color: #6c7780; background: transparent; font-size: 11px; }
+    .eye[aria-pressed="true"] { color: var(--accent); }
+    .eye:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; border-radius: 8px; }
+    .meta { min-height: 43px; display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #77818b; font-size: 10px; white-space: nowrap; }
+    .meta strong { color: #47525c; font-weight: 550; }
+    .meta button { color: var(--accent); background: transparent; font-size: 10px; white-space: nowrap; padding: 8px 0 8px 6px; }
+    .primary { width: 100%; height: 52px; border-radius: 16px; background: var(--accent); color: #fff; font-size: 15px; font-weight: 650; letter-spacing: .03em; }
+    .secondary { width: 100%; height: 43px; display: flex; gap: 7px; align-items: center; justify-content: center; color: #485662; background: transparent; font-size: 12px; margin-top: 6px; }
+    .secondary svg { color: var(--accent); }
+    .privacy { display: flex; align-items: center; justify-content: center; gap: 6px; color: #7b8792; font-size: 10px; margin-top: 9px; }
+    .privacy svg { color: #687b8b; }
+    .activation .input-shell label { width: 57px; }
+    .rules { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 15px; }
+    .rule { padding: 4px 7px; border-radius: 20px; background: #edf0f2; color: #717c86; font-size: 10px; white-space: nowrap; }
+    .rule.met { background: #e8f2fc; color: var(--accent); }
+    .activation .secondary { margin-top: 8px; }
+    .activation .privacy { margin-top: 8px; }
+    .error { margin: 0 0 10px; padding: 8px 10px; background: #fde8e8; border-radius: 10px; color: #b42318; font-size: 11px; line-height: 1.5; }
+    .home { position: absolute; z-index: 3; bottom: 7px; left: 50%; width: 127px; height: 4px; border-radius: 4px; background: var(--ink); transform: translateX(-50%); pointer-events: none; }
+    .notice { position: absolute; z-index: 5; top: 107px; left: 20px; right: 20px; padding: 12px; border-radius: 12px; background: #272729f2; color: #fff; text-align: center; font-size: 11px; }
+    .overlay { position: absolute; z-index: 6; inset: 0; display: flex; align-items: flex-end; background: #1d1d1f60; }
+    .sheet { width: 100%; padding: 12px 24px 31px; border-radius: 25px 25px 0 0; background: #fff; box-shadow: 0 -10px 38px #1d1d1f14; }
+    .sheet-handle { width: 32px; height: 4px; margin: 0 auto 21px; border-radius: 4px; background: #d4dce2; }
+    .sheet h4 { margin: 0 0 12px; font-size: 20px; }
+    .sheet p { margin: 0 0 12px; color: #606a73; font-size: 12px; line-height: 1.8; }
+    .sheet strong { color: var(--ink); }
+    .sheet .primary { margin-top: 17px; }
+
+    @media (max-height: 960px) and (min-width: 900px) { .board { padding-top: 19px; } .layout { padding-top: 20px; } .phone { zoom: .86; } }
+    @media (max-width: 810px) { .board { padding: 16px; } .board-head { max-width: 390px; margin: auto; } .layout { display: flex; flex-direction: column; gap: 19px; padding: 22px 0 0; } .description { width: 390px; max-width: 100%; } .description h1 { font-size: 25px; line-height: 1.25; margin: 8px 0; } .lead { font-size: 12px; margin-bottom: 14px; } .note, .compare { display: none; } }
+    @media (max-width: 390px) { .board { padding: 10px; } .viewport { padding-left: 13px; padding-right: 13px; } .broadcast { height: 216px; } .radio { width: 194px; right: -12px; top: 31px; } .glass { margin-left: 6px; margin-right: 6px; padding-left: 16px; padding-right: 16px; } .activation .input-shell label { width: 54px; } }
+    @media (max-width: 350px) { .broadcast h2 { font-size: 28px; } .radio { width: 155px; right: 6px; top: 29px; } .broadcast-kicker { font-size: 9px; letter-spacing: .12em; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } button:active { transform: none; } }
+    @media (prefers-reduced-transparency: reduce) { .glass, .back, .input-shell { background: #fff; backdrop-filter: none; -webkit-backdrop-filter: none; } }
+    @media (prefers-contrast: more) { .glass { background: #fff; border-color: #59636d; } .input-shell { background: #fff; border-color: #59636d; } .form-heading p, .privacy, .meta { color: #3d4852; } }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <div class="board-head">MINI PROGRAM / LOGIN STUDY 06</div>
+    <div class="layout">
+      <aside class="description">
+        <div class="edition">方案 06 · 简洁收音机 × 液态玻璃</div>
+        <h1>让收音机成为<br>唯一的画面主角。</h1>
+        <p class="lead">去掉顶部站徽和站名。深色卡片承载原版收音机线稿，玻璃表单轻轻压在卡片边缘；两个独立输入框各自拥有完整的圆角聚焦描边。</p>
+        <div class="switch" aria-label="预览状态"><button type="button" data-view="login" aria-pressed="true">学号登录</button><button type="button" data-view="activate" aria-pressed="false">首次改密</button></div>
+        <div class="note"><strong>可直接点进输入框查看聚焦状态</strong>账号与密码只在当前预览中使用；页面不会发送请求或保存输入内容。按钮可演示首次改密、密码显隐与帮助弹层。</div>
+        <a class="compare" href="login-concept-v5.html">回看方案 05 →</a>
+      </aside>
+      <section class="phone" aria-label="小程序登录页手机预览">
+        <div class="screen">
+          <div class="status" aria-hidden="true"><span>9:41</span><span class="system-icons"><svg width="17" height="13" viewBox="0 0 17 13" fill="currentColor"><rect y="9" width="3" height="4" rx=".7"/><rect x="4.5" y="6" width="3" height="7" rx=".7"/><rect x="9" y="3" width="3" height="10" rx=".7"/><rect x="13.5" width="3" height="13" rx=".7"/></svg><svg width="17" height="13" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 4q8-7 16 0M5 7q5-4.5 10 0M8 10q2-2 4 0"/><circle cx="10" cy="13" r="1" fill="currentColor" stroke="none"/></svg><svg width="25" height="13" viewBox="0 0 28 14"><rect x=".6" y=".6" width="23" height="12.8" rx="3" stroke="currentColor" fill="none" opacity=".5"/><rect x="2.5" y="2.5" width="19" height="9" rx="1.6" fill="currentColor"/><path d="M25 4v6q3 0 3-3t-3-3" fill="currentColor" opacity=".5"/></svg></span></div>
+          <nav class="nav"><button type="button" class="back" id="back" aria-label="返回"><svg width="18" height="18" viewBox="0 0 24 24"><path d="m14 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button></nav>
+          <div class="viewport" id="viewport">
+            <section class="broadcast" aria-label="广播站插画">
+              <div class="broadcast-copy"><div class="broadcast-kicker">JINGYOU RADIO</div><h2>听见<br>校园。</h2></div>
+              <div class="broadcast-caption">菁菁校园情<br>悠悠广播声</div>
+              <svg class="radio" viewBox="60 40 210 180" fill="none" aria-label="原版线条收音机插画" role="img"><path d="M150.6 90.5 A42 42 0 0 1 179.4 90.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-opacity=".9"/><path d="M138 72 A64 64 0 0 1 192.1 72" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-opacity=".55"/><path d="M124.6 54.1 A86 86 0 0 1 205.4 54.1" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-opacity=".3"/><rect x="75" y="130" width="180" height="76" rx="10" stroke="currentColor" stroke-width="2.6"/><circle cx="122" cy="168" r="26" stroke="currentColor" stroke-width="2.6"/><circle cx="122" cy="168" r="15" stroke="currentColor" stroke-width="2.4" stroke-opacity=".55"/><circle cx="122" cy="168" r="4.5" fill="currentColor"/><circle cx="200" cy="168" r="9" stroke="currentColor" stroke-width="2.4"/><path d="M200 161v4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="232" cy="168" r="9" stroke="currentColor" stroke-width="2.4"/><path d="M232 161v4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+            </section>
+            <section class="glass" aria-label="学生账号表单">
+              <div data-panel="login">
+                <div class="form-heading"><div class="eyebrow">学生账号</div><h3 tabindex="-1">学号登录</h3><p>使用学校发放的账号进入广播站</p></div>
+                <form id="login-form" novalidate>
+                  <div class="fields"><div class="input-shell"><label for="username">学号</label><input id="username" inputmode="numeric" autocomplete="off" placeholder="请输入学号" aria-describedby="login-error"></div><div class="input-shell"><label for="password">密码</label><input id="password" type="password" autocomplete="off" placeholder="请输入密码" aria-describedby="login-error"><button type="button" class="eye" data-eye="password" aria-pressed="false" aria-label="显示密码">显示</button></div></div>
+                  <div class="meta"><span>初始密码：<strong>user + 学号</strong></span><button type="button" id="help">登录帮助</button></div>
+                  <p class="error" id="login-error" role="alert" hidden></p>
+                  <button type="submit" class="primary">登录</button>
+                  <button type="button" class="secondary" id="wechat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 14a7 7 0 0 1-4 1.2l-2.7-.5-2.8 1 .7-2.2A5.4 5.4 0 0 1 2 9C2 5.8 5.2 3.5 9.1 3.5c3.4 0 6.1 1.8 6.9 4.5"/><path d="M22 14.5c0 2.9-2.6 5-5.8 5l-2.2-.4-2.1.8.5-1.9a4.6 4.6 0 0 1-2-3.5c0-2.8 2.6-5 5.8-5s5.8 2.2 5.8 5Z"/><circle cx="6.7" cy="8" r=".7" fill="currentColor"/><circle cx="11.5" cy="8" r=".7" fill="currentColor"/><circle cx="14" cy="13.5" r=".7" fill="currentColor"/><circle cx="18" cy="13.5" r=".7" fill="currentColor"/></svg>微信一键登录</button>
+                </form>
+                <div class="privacy"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="m12 3 7 3v6c0 4-7 8-7 8s-7-4-7-8V6Z" stroke="currentColor" stroke-width="1.6"/><path d="m8.5 11.5 2.5 2.5 4.5-5" stroke="currentColor" stroke-width="1.6"/></svg>不收集头像与手机号</div>
+              </div>
+              <div class="activation" data-panel="activate" hidden>
+                <div class="form-heading"><div class="eyebrow">首次登录</div><h3 tabindex="-1">设置新密码</h3><p>换一个只有你知道的密码</p></div>
+                <form id="activate-form" novalidate>
+                  <div class="fields"><div class="input-shell"><label for="new-password">新密码</label><input id="new-password" type="password" autocomplete="off" placeholder="至少 8 位" aria-describedby="rules-status activation-error"><button type="button" class="eye" data-eye="new-password" aria-pressed="false" aria-label="显示新密码">显示</button></div><div class="input-shell"><label for="confirm-password">再输一遍</label><input id="confirm-password" type="password" autocomplete="off" placeholder="再次输入" aria-describedby="activation-error"><button type="button" class="eye" data-eye="confirm-password" aria-pressed="false" aria-label="显示确认密码">显示</button></div></div>
+                  <div class="rules"><span class="rule" id="rule-length">至少 8 位</span><span class="rule" id="rule-letter">含字母</span><span class="rule" id="rule-digit">含数字</span></div>
+                  <p class="sr-only" id="rules-status" role="status" aria-live="polite"></p>
+                  <p class="error" id="activation-error" role="alert" hidden></p>
+                  <button type="submit" class="primary">激活账号</button>
+                  <button type="button" class="secondary" id="skip">暂时跳过，下次登录再改</button>
+                </form>
+                <div class="privacy">初始密码 = user + 学号</div>
+              </div>
+            </section>
+          </div>
+          <div class="home" aria-hidden="true"></div>
+          <div class="notice" id="notice" role="status" hidden></div>
+          <div class="overlay" id="overlay" hidden><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" tabindex="-1"><div class="sheet-handle" aria-hidden="true"></div><h4 id="sheet-title">登录帮助</h4><div id="sheet-body"></div><button type="button" class="primary" id="close-sheet">知道了</button></section></div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script>
+    // Standalone visual prototype. No network requests or persisted input.
+    const $ = selector => document.querySelector(selector);
+    let view = 'login';
+    let lastFocus;
+    let noticeTimer;
+    function clearError() {
+      document.querySelectorAll('.error').forEach(node => node.hidden = true);
+      document.querySelectorAll('[aria-invalid]').forEach(node => node.removeAttribute('aria-invalid'));
+    }
+    function switchView(next, focus = false) {
+      if (!['login', 'activate'].includes(next)) return;
+      view = next;
+      clearError();
+      document.querySelectorAll('[data-panel]').forEach(panel => panel.hidden = panel.dataset.panel !== next);
+      document.querySelectorAll('[data-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.view === next)));
+      $('#viewport').scrollTop = 0;
+      if (focus) $(`[data-panel="${next}"] h3`).focus({preventScroll: true});
+    }
+    function showError(target, message, field) {
+      $(target).textContent = message;
+      $(target).hidden = false;
+      if (field) { $(field).setAttribute('aria-invalid', 'true'); $(field).focus(); }
+    }
+    function showNotice(message) {
+      clearTimeout(noticeTimer);
+      $('#notice').textContent = message;
+      $('#notice').hidden = false;
+      noticeTimer = setTimeout(() => $('#notice').hidden = true, 3100);
+    }
+    function updateRules() {
+      const value = $('#new-password').value;
+      const checks = [['#rule-length', value.length >= 8], ['#rule-letter', /[A-Za-z]/.test(value)], ['#rule-digit', /\d/.test(value)]];
+      $('#rules-status').textContent = value ? checks.map(([selector, met]) => { const node = $(selector); node.classList.toggle('met', met); return node.textContent + (met ? '：已满足' : '：未满足'); }).join('；') : (checks.forEach(([selector]) => $(selector).classList.remove('met')), '');
+    }
+    function openSheet(kind) {
+      lastFocus = document.activeElement;
+      $('#sheet-title').textContent = kind === 'wechat' ? '使用学号登录' : '登录帮助';
+      $('#sheet-body').innerHTML = kind === 'wechat'
+        ? '<p>当前请使用学校发放的学号和密码登录。</p><p>微信登录通道是否开放由学校管理员设置。</p>'
+        : '<p><strong>首次登录</strong><br>初始密码是 user + 学号。例如学号 20240101，密码为 user20240101。</p><p><strong>忘记密码</strong><br>请联系学校管理员核对账号或重置密码。</p>';
+      $('#overlay').hidden = false;
+      $('#viewport').inert = true;
+      $('.nav').inert = true;
+      $('.description').inert = true;
+      $('#close-sheet').focus();
+    }
+    function closeSheet() {
+      $('#overlay').hidden = true;
+      $('#viewport').inert = false;
+      $('.nav').inert = false;
+      $('.description').inert = false;
+      lastFocus?.focus();
+    }
+    document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => switchView(button.dataset.view)));
+    document.querySelectorAll('[data-eye]').forEach(button => button.addEventListener('click', () => {
+      const field = document.getElementById(button.dataset.eye);
+      const show = field.type === 'password';
+      field.type = show ? 'text' : 'password';
+      button.textContent = show ? '隐藏' : '显示';
+      button.setAttribute('aria-pressed', String(show));
+      button.setAttribute('aria-label', show ? '隐藏密码' : '显示密码');
+    }));
+    document.querySelectorAll('input').forEach(input => input.addEventListener('input', clearError));
+    $('#login-form').addEventListener('submit', event => {
+      event.preventDefault();
+      clearError();
+      const username = $('#username').value.trim();
+      const password = $('#password').value;
+      if (!username) return showError('#login-error', '请先输入学号。', '#username');
+      if (!password) return showError('#login-error', '请输入密码后继续。', '#password');
+      $('#password').value = '';
+      switchView('activate', true);
+    });
+    $('#new-password').addEventListener('input', updateRules);
+    $('#activate-form').addEventListener('submit', event => {
+      event.preventDefault();
+      clearError();
+      const password = $('#new-password').value;
+      if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) return showError('#activation-error', '密码至少 8 位，并包含字母和数字。', '#new-password');
+      if (password !== $('#confirm-password').value) return showError('#activation-error', '两次输入的密码不一致。', '#confirm-password');
+      $('#new-password').value = '';
+      $('#confirm-password').value = '';
+      updateRules();
+      showNotice('演示完成 · 账号已激活');
+    });
+    $('#skip').addEventListener('click', () => showNotice('演示完成 · 已暂时跳过改密'));
+    $('#help').addEventListener('click', () => openSheet('help'));
+    $('#wechat').addEventListener('click', () => openSheet('wechat'));
+    $('#close-sheet').addEventListener('click', closeSheet);
+    $('#overlay').addEventListener('click', event => { if (event.target === $('#overlay')) closeSheet(); });
+    document.addEventListener('keydown', event => { if (!$('#overlay').hidden) { if (event.key === 'Escape') closeSheet(); else if (event.key === 'Tab') { event.preventDefault(); $('#close-sheet').focus(); } } });
+    $('#back').addEventListener('click', () => view === 'login' ? showNotice('当前为预览；正式版返回上一页。') : switchView('login', true));
+  </script>
+</body>
+</html>

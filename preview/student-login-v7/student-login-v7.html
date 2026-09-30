@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>学生登录 v7 · 「点唱机」黑胶版（回归设计系统）</title>
+<style>
+  :root {
+    /* ══════ 小程序设计系统 v2 token（app.wxss 同源，rpx÷2=px）══════
+       硬规则：唯一强调色 #0066CC / 无装饰性渐变 / 无彩色投影 / 深色是视觉主角 */
+    --ink: #1D1D1F;
+    --ink-2: #333333;
+    --muted: #7A7A7A;
+    --soft: #C7C7CC;
+    --hairline: #E0E0E0;
+    --divider: #F0F0F0;
+    --parchment: #F5F5F7;
+    --canvas: #FFFFFF;
+    --tile: #272729;
+    --tile-2: #3A3A3C;
+    --accent: #0066CC;
+    --accent-on-dark: #2997FF;
+    --accent-tint: #EAF3FD;
+    --red-bg: #FDE8E8;
+    --red-fg: #B42318;
+    --r-card: 17px;
+    --r-input: 12px;
+    --r-pill: 999px;
+    /* 黑胶：比 --tile 再深一档，是胶木的颜色，不是卡片色 */
+    --vinyl: #1C1C1E;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei", sans-serif;
+    background: var(--parchment); color: var(--ink); padding: 32px 30px 60px;
+    font-size: 14px; line-height: 1.5;
+  }
+
+  /* ══════════ 页头 ══════════ */
+  .head { max-width: 760px; margin: 0 auto 18px; }
+  .head h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+  .head h1 .ver { color: var(--accent); }
+  .head p { font-size: 13px; color: var(--muted); margin-top: 9px; line-height: 1.9; }
+  .head b { color: var(--ink); }
+
+  .bars { max-width: 760px; margin: 0 auto 24px; display: flex; gap: 22px; flex-wrap: wrap; align-items: center; }
+  .bars .grp { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .bars .lbl { font-size: 12.5px; color: var(--muted); }
+  .st { font-size: 12.5px; padding: 7px 16px; border-radius: var(--r-pill); border: 1px solid var(--hairline);
+        background: #fff; color: var(--ink-2); cursor: pointer; transition: all .15s; }
+  .st:hover { border-color: var(--soft); }
+  .st.on { background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 500; }
+
+  .stage { display: flex; gap: 30px; justify-content: center; flex-wrap: wrap; align-items: flex-start; }
+
+  /* ══════════ 手机框 ══════════ */
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .phone { width: 340px; height: 700px; border-radius: 44px; background: #0b0b0f; padding: 10px;
+           box-shadow: 0 30px 60px -22px rgba(15,28,46,0.35); flex: none; }
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 35px; overflow: hidden;
+            display: flex; flex-direction: column; background: var(--canvas); }
+  .cap { font-size: 12.5px; color: var(--muted); text-align: center; line-height: 1.7; }
+  .cap b { color: var(--ink); font-size: 13.5px; }
+  .cap .why { display: block; font-size: 11.5px; margin-top: 3px; }
+
+  .statusbar { height: 34px; display: flex; align-items: center; justify-content: space-between;
+               padding: 0 22px; font-size: 11.5px; font-weight: 600; color: var(--ink); flex: none; }
+  .statusbar .sig { display: flex; gap: 4px; align-items: center; }
+  .sig i { display: block; background: currentColor; border-radius: 1px; }
+  .topbar { height: 44px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; flex: none; }
+  .back { width: 36px; height: 36px; border-radius: var(--r-pill); background: var(--parchment);
+          display: flex; align-items: center; justify-content: center; flex: none; }
+  .back .chev { width: 9px; height: 9px; border-left: 2px solid var(--ink-2); border-bottom: 2px solid var(--ink-2);
+                transform: rotate(45deg); margin-left: 3px; }
+  .topbar .ttl { font-size: 15px; font-weight: 600; letter-spacing: -0.2px; color: var(--ink); }
+  .topbar .sp { width: 36px; flex: none; }
+
+  .pane { display: none; flex: 1; flex-direction: column; min-height: 0; }
+  .pane.on { display: flex; }
+  .body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 20px 16px; }
+
+  /* ══════════════════════════════════════════
+     主角：黑胶唱盘（深色是主角，符合设计系统）
+     唱片纹理全部用 border 环，不用任何渐变
+     ══════════════════════════════════════════ */
+  .player { position: relative; height: 208px; flex: none; margin-top: 6px; }
+  .platter {
+    position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
+    width: 184px; height: 184px; border-radius: 50%;
+    background: var(--vinyl);
+    /* 中性阴影（不用彩色投影） */
+    box-shadow: 0 12px 26px -14px rgba(15,28,46,0.45);
+  }
+  /* 唱纹层：同心描边环 + 一道随盘扫过的反光刻痕 */
+  .grooves {
+    position: absolute; inset: 0; border-radius: 50%;
+    animation: spin 3.6s linear infinite;
+    animation-play-state: paused;
+  }
+  .spinning .grooves { animation-play-state: running; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .grooves i {
+    position: absolute; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.075);
+  }
+  /* 反光刻痕：让「同心圆在转」这件事看得出来 */
+  .grooves .flash {
+    position: absolute; left: 50%; top: 30px; margin-left: -1px;
+    width: 2px; height: 44px; border-radius: 1px; border: none;
+    background: rgba(255,255,255,0.13);
+  }
+  /* 盘沿 */
+  .rim { position: absolute; inset: 3px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.10); }
+
+  /* 中心标签：黑胶的米色标签（--parchment），不随盘转，保证可读 */
+  .label {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 64px; height: 64px; border-radius: 50%;
+    background: var(--parchment);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.14);
+  }
+  .lp-top { font-size: 8.5px; font-weight: 700; color: var(--ink); letter-spacing: 0.2px; line-height: 1.2; }
+  .lp-bot { font-size: 7px; color: var(--muted); letter-spacing: 0.5px; line-height: 1.2; }
+  /* 转轴孔：黑胶中心镂空，露出唱机的金属轴 */
+  .hole {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--soft);
+    box-shadow: inset 0 0 0 1px rgba(15,28,46,0.25);
+  }
+
+  /* 唱针臂：转轴在盘的右上外侧，臂长 72。
+     抬起 +12° → 唱头在盘外（距盘心 107 > R92）；落下 -14° → 压到盘外圈（距盘心 83）。 */
+  .arm {
+    position: absolute; right: 8px; top: 26px;
+    width: 72px; height: 7px; border-radius: 4px;
+    background: var(--soft);
+    transform-origin: right center; transform: rotate(12deg);
+    transition: transform .55s cubic-bezier(0.34, 1.2, 0.5, 1);
+    /* 浅灰细杆在白底上容易发虚，加一道中性内描边把轮廓压出来（不是彩色投影） */
+    box-shadow: inset 0 0 0 1px rgba(15,28,46,0.10), 0 2px 6px -3px rgba(15,28,46,0.32);
+  }
+  .arm::before {  /* 转轴底座 */
+    content: ''; position: absolute; right: -5px; top: -5px;
+    width: 17px; height: 17px; border-radius: 50%;
+    background: var(--soft);
+    box-shadow: 0 0 0 1px rgba(15,28,46,0.10);
+  }
+  .arm::after {   /* 唱头 */
+    content: ''; position: absolute; left: -3px; top: -2px;
+    width: 14px; height: 11px; border-radius: 3px;
+    background: var(--ink-2);
+  }
+  .arm.down { transform: rotate(-14deg); }
+
+  .rpm { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%);
+         font-size: 9px; letter-spacing: 2px; color: var(--soft); }
+
+  /* ON AIR 胶囊：浅色底 + 强调色字（亮起才用强调色实心），不是深色块 */
+  .onair {
+    position: absolute; left: 16px; top: 14px;
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: var(--r-pill);
+    background: var(--divider); color: var(--muted);
+    font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+    transition: background .25s, color .25s;
+  }
+  .onair i { width: 6px; height: 6px; border-radius: 50%; background: var(--soft); }
+  .onair.live { background: var(--accent); color: #fff; }
+  .onair.live i { background: #fff; }
+
+  .stat-line { text-align: center; font-size: 12.5px; color: var(--muted); letter-spacing: 0.5px; margin-top: 4px; }
+  .stat-line b { color: var(--accent); font-weight: 600; }
+
+  /* ══════════ 表单 ══════════ */
+  .fld { margin-top: 16px; }
+  .fld-hd { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; }
+  .fld-hd .lb { font-size: 11.5px; font-weight: 600; color: var(--ink-2); letter-spacing: 0.5px; }
+  .fld-hd .hint { font-size: 10.5px; color: var(--soft); letter-spacing: 0.3px; }
+  .inp { display: flex; align-items: center; height: 46px; background: var(--parchment);
+         border-radius: var(--r-input); padding: 0 14px; gap: 10px;
+         box-shadow: inset 0 0 0 1px rgba(10,26,46,0.06); transition: box-shadow .18s; }
+  .inp.focus { box-shadow: inset 0 0 0 2px var(--accent); }
+  .inp.err { box-shadow: inset 0 0 0 2px var(--red-fg); background: var(--red-bg); }
+  .inp input { flex: 1; min-width: 0; border: none; background: transparent; outline: none;
+               font-size: 14px; color: var(--ink); font-family: inherit; letter-spacing: 0.5px;
+               font-variant-numeric: tabular-nums; }
+  .inp input::placeholder { color: var(--soft); letter-spacing: 0; }
+  .inp .eye { font-size: 10.5px; color: var(--muted); cursor: pointer; flex: none; }
+
+  .error-bar { margin-top: 14px; background: var(--red-bg); color: var(--red-fg); font-size: 11.5px;
+               line-height: 1.6; border-radius: var(--r-input); padding: 10px 13px;
+               display: flex; gap: 7px; align-items: flex-start; }
+  .error-bar .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--red-fg); margin-top: 6px; flex: none; }
+
+  .submit { width: 100%; height: 48px; border: none; border-radius: var(--r-input);
+            background: var(--accent); color: #fff; font-size: 15px; font-weight: 600; letter-spacing: 2px;
+            display: flex; align-items: center; justify-content: center; line-height: 1;
+            margin-top: 20px; cursor: pointer; transition: background .2s; }
+  .submit.dis { background: #B9D2EE; }
+  .wxline { margin-top: 14px; text-align: center; font-size: 12.5px; color: var(--accent); }
+  .foot { margin-top: auto; padding-top: 14px; text-align: center; }
+  .foot .slogan { font-size: 10.5px; color: var(--soft); letter-spacing: 2px; }
+  .foot .tip { font-size: 10.5px; color: var(--soft); margin-top: 5px; letter-spacing: 0.3px; }
+
+  .pwd-rule { display: flex; gap: 6px; margin-top: 10px; }
+  .rule { font-size: 10.5px; padding: 3px 10px; border-radius: var(--r-pill);
+          background: var(--divider); color: var(--muted); }
+  .rule.on { background: var(--accent-tint); color: var(--accent); font-weight: 500; }
+  .skip { text-align: center; margin-top: 14px; font-size: 12px; color: var(--muted);
+          text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>学生登录 <span class="ver">v7</span> · 「点唱机」黑胶版（回归设计系统）</h1>
+  <p>
+    <b>改回守规矩：</b>强调色回到唯一 <b>#0066CC</b>，底色羊皮纸 <b>#F5F5F7</b> / 白，文字 <b>#1D1D1F</b>，
+    <b>无装饰性渐变、无彩色投影</b>（唱片纹理用 border 描边环堆出来，不用任何 gradient；按钮不带彩色投影），
+    圆角与字号走设计系统 token。<b>唱片改成黑胶</b>（#1C1C1E 胶木色），深色圆盘正好是设计系统要的「深色主角」。<br>
+    <b>两个实现细节：</b>① 黑胶是同心圆纹，光转同心圆<b>看不出在转</b>，所以盘上加了一道<b>随盘扫过的反光刻痕</b>来体现旋转；
+    ② 中心标签用米色 <b>--parchment</b>，不随盘转，保证站名可读；中心是<b>镂空转轴孔</b>（露出金属轴）。<br>
+    <b>可以真输入试试：</b>学号框打字看盘转，密码框打字看唱针落下。
+  </p>
+</div>
+
+<div class="bars">
+  <div class="grp">
+    <span class="lbl">状态：</span>
+    <button class="st on" data-pane="login">① 待机（登录）</button>
+    <button class="st" data-pane="error">② 跳针（密码错）</button>
+    <button class="st" data-pane="activate">③ 播放中（激活）</button>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="phone-wrap">
+    <div class="phone"><div class="screen">
+
+      <!-- ══════ ① 待机 ══════ -->
+      <div class="pane on" data-pane="login">
+        <div class="statusbar"><span>9:41</span><span class="sig"><i style="width:14px;height:8px"></i><i style="width:6px;height:8px"></i></span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div><span class="ttl">点唱机 · 登录</span><span class="sp"></span></div>
+        <div class="body">
+
+          <div class="player" id="player1">
+            <div class="platter">
+              <div class="grooves" id="grooves1"><span class="flash"></span></div>
+              <div class="rim"></div>
+              <div class="label">
+                <span class="lp-top">菁悠广播站</span>
+                <span class="hole"></span>
+                <span class="lp-bot">SIDE A · 33⅓</span>
+              </div>
+            </div>
+            <div class="arm" id="arm1"></div>
+            <div class="onair" id="onair1"><i></i>OFF AIR</div>
+            <div class="rpm">33⅓ RPM</div>
+          </div>
+          <div class="stat-line" id="stat1">放上唱片 · <b>先报学号</b></div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">学号</span><span class="hint">学校分发，如 20240101</span></div>
+            <div class="inp" id="uBox1"><input id="u1" type="text" placeholder="输入学号，唱盘开始对轨" maxlength="12" /></div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">密码</span><span class="hint">初始密码 = user + 学号</span></div>
+            <div class="inp" id="pBox1"><input id="p1" type="password" placeholder="输入密码，唱针落下" maxlength="20" /><span class="eye" data-eye="p1">显示</span></div>
+          </div>
+
+          <div class="submit dis" id="btn1">开始播放 · 进入广播站</div>
+          <div class="wxline">用微信一键登录</div>
+
+          <div class="foot">
+            <div class="slogan">菁菁校园情 · 悠悠广播声</div>
+            <div class="tip">不收集头像与手机号，头像由姓名生成</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════ ② 跳针 ══════ -->
+      <div class="pane" data-pane="error">
+        <div class="statusbar"><span>9:41</span><span class="sig"><i style="width:14px;height:8px"></i><i style="width:6px;height:8px"></i></span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div><span class="ttl">点唱机 · 登录</span><span class="sp"></span></div>
+        <div class="body">
+
+          <div class="player">
+            <div class="platter">
+              <div class="grooves"><span class="flash"></span></div>
+              <div class="rim"></div>
+              <div class="label">
+                <span class="lp-top">菁悠广播站</span>
+                <span class="hole"></span>
+                <span class="lp-bot">SIDE A · 33⅓</span>
+              </div>
+            </div>
+            <div class="arm"></div>
+            <div class="onair"><i></i>OFF AIR</div>
+            <div class="rpm">33⅓ RPM</div>
+          </div>
+          <div class="stat-line"><b>跳针了</b> · 唱针已抬起，请重新对轨</div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">学号</span><span class="hint">学校分发，如 20240101</span></div>
+            <div class="inp"><input type="text" value="20240101" /></div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">密码</span><span class="hint">初始密码 = user + 学号</span></div>
+            <div class="inp err"><input type="password" value="1234" /><span class="eye" data-eye="x2">显示</span></div>
+          </div>
+
+          <div class="error-bar"><i class="dot"></i>学号或密码不对。初始密码为 user + 学号，例如 user20240101</div>
+
+          <div class="submit">重新对轨</div>
+          <div class="wxline">用微信一键登录</div>
+
+          <div class="foot">
+            <div class="slogan">菁菁校园情 · 悠悠广播声</div>
+            <div class="tip">连续输错不会锁号，慢慢来</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════ ③ 播放中 ══════ -->
+      <div class="pane" data-pane="activate">
+        <div class="statusbar"><span>9:41</span><span class="sig"><i style="width:14px;height:8px"></i><i style="width:6px;height:8px"></i></span></div>
+        <div class="topbar"><div class="back"><i class="chev"></i></div><span class="ttl">点唱机 · 激活</span><span class="sp"></span></div>
+        <div class="body">
+
+          <div class="player">
+            <div class="platter">
+              <div class="grooves" style="animation-play-state: running"><span class="flash"></span></div>
+              <div class="rim"></div>
+              <div class="label">
+                <span class="lp-top">张同学</span>
+                <span class="hole"></span>
+                <span class="lp-bot">高二（3）班</span>
+              </div>
+            </div>
+            <div class="arm down"></div>
+            <div class="onair live"><i></i>ON AIR</div>
+            <div class="rpm">33⅓ RPM</div>
+          </div>
+          <div class="stat-line">你好，张同学 · <b>唱片已就位，设个新密码</b></div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">新密码</span><span class="hint">至少 8 位</span></div>
+            <div class="inp"><input id="p3" type="password" value="abcd1234" /><span class="eye" data-eye="p3">显示</span></div>
+            <div class="pwd-rule"><span class="rule on">至少 8 位</span><span class="rule on">含字母</span><span class="rule on">含数字</span></div>
+          </div>
+
+          <div class="fld">
+            <div class="fld-hd"><span class="lb">再输一遍</span><span class="hint">两次需一致</span></div>
+            <div class="inp"><input type="password" placeholder="再输一遍新密码" /></div>
+          </div>
+
+          <div class="submit">激活并播放</div>
+          <div class="skip">暂时跳过，下次登录再改</div>
+
+          <div class="foot">
+            <div class="slogan">菁菁校园情 · 悠悠广播声</div>
+            <div class="tip">改完即激活，旧密码立即失效</div>
+          </div>
+        </div>
+      </div>
+
+    </div></div>
+    <div class="cap"><b>v7 · 点唱机（黑胶 · 守设计系统）</b>
+      <span class="why">学号 → 唱盘对轨旋转；密码 → 唱针落下；错 = 跳针</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* 唱纹环：全部用 border 描边，不用任何渐变 */
+  var INSETS = [10, 20, 30, 40, 50, 60, 70];
+  document.querySelectorAll('.grooves').forEach(function (g) {
+    INSETS.forEach(function (n) {
+      var i = document.createElement('i');
+      i.style.inset = n + 'px';
+      g.appendChild(i);
+    });
+  });
+
+  /* ══════ 唱机交互 ══════ */
+  var u1 = document.getElementById('u1');
+  var p1 = document.getElementById('p1');
+  var player1 = document.getElementById('player1');
+  var arm1 = document.getElementById('arm1');
+  var onair1 = document.getElementById('onair1');
+  var stat1 = document.getElementById('stat1');
+  var btn1 = document.getElementById('btn1');
+
+  function sync() {
+    var u = u1.value || '';
+    var p = p1.value || '';
+
+    player1.classList.toggle('spinning', u.length > 0);   // 学号 → 唱盘转
+    arm1.classList.toggle('down', p.length > 0);          // 密码 → 唱针落
+
+    var txt;
+    if (u.length === 0) txt = '放上唱片 · <b>先报学号</b>';
+    else if (u.length < 8) txt = '唱盘对轨中 · <b>' + u.length + '/8</b>';
+    else if (p.length === 0) txt = '轨道已对准 · <b>落针请输密码</b>';
+    else txt = '唱针已落 · <b>准备好播放</b>';
+    stat1.innerHTML = txt;
+
+    var ready = u.length > 0 && p.length > 0;
+    onair1.classList.toggle('live', ready);
+    onair1.innerHTML = '<i></i>' + (ready ? 'ON AIR' : 'OFF AIR');
+    btn1.className = 'submit' + (ready ? '' : ' dis');
+  }
+  u1.addEventListener('input', sync);
+  p1.addEventListener('input', sync);
+  sync();
+
+  ['uBox1', 'pBox1'].forEach(function (id) {
+    var box = document.getElementById(id);
+    var ipt = box.querySelector('input');
+    ipt.addEventListener('focus', function () { box.classList.add('focus'); });
+    ipt.addEventListener('blur', function () { box.classList.remove('focus'); });
+  });
+
+  document.querySelectorAll('.eye').forEach(function (el) {
+    el.addEventListener('click', function () {
+      var t = document.getElementById(el.getAttribute('data-eye'));
+      if (!t) return;
+      var show = t.type === 'text';
+      t.type = show ? 'password' : 'text';
+      el.textContent = show ? '显示' : '隐藏';
+    });
+  });
+
+  var btns = document.querySelectorAll('.st');
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      btns.forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      var key = b.getAttribute('data-pane');
+      document.querySelectorAll('.pane').forEach(function (p) {
+        p.classList.toggle('on', p.getAttribute('data-pane') === key);
+      });
+    });
+  });
+</script>
+</body>
+</html>
