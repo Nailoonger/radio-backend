@@ -23,14 +23,12 @@
   口径：配了 `INIT_ADMIN_PASSWORD` 就用它，**留空则启动时随机生成、只在首次日志打印一次**
   （`src/utils/seed.js`，`crypto.randomBytes(12)`）；SQL 初始化**不插固定账号**；文档一律写「见 `INIT_ADMIN_PASSWORD`」。
   ⚠️ **写死 bcrypt hash 等同写死密码**（README 那条"忘记密码"重置 SQL 就是现成后门，已改成自己生成 hash 的两步法）。
-- ⚠️⚠️ **公开的默认密钥 = 没有鉴权**。`JWT_SECRET` 曾有**三串**公开默认值（代码兜底 / compose 兜底 /
-  `.env.example` 示例）⇒ **2026-09-30 实测：线上就是拿 `.env.example` 那串在跑** —— 自签一个 token 打
-  `/api/admin/profile` 直接 `code:0`（`adminAuth` **只验签名、从不查库** ⇒ 绕过密码即超管）。
-  已在 `src/config/index.js` 加护栏：命中已知公开串 + `NODE_ENV=production` ⇒ **拒绝启动**（本机开发只警告）。
-  复验：`node scripts/verify-backend-jwt.js`（退出码 1 = 没过）。⚠️ 判据只看响应体 `code`（HTTP 恒 200）。
-  ✅ **2026-09-30 已修复**（陛下改服务器 `.env` + 重建容器；三条公开串**全部未命中**，退出码 0）。
-  ⚠️ 改时踩过：`${X:-兜底值}` 把**空串当未设置** ⇒ 写空值会**静默回落到另一串公开兜底值**，探测显示"还是旧值"。
-  ⇒ **判据必须是"全部未命中"，不是"命中的串变了"**；排查先读容器实际值 `docker compose exec <svc> printenv X`。
+- ⚠️⚠️ **公开的默认密钥 = 没有鉴权**。`JWT_SECRET` 曾有三串公开默认值 ⇒ **2026-09-30 实测线上就是拿
+  `.env.example` 那串在跑**（自签 token 打 `/api/admin/profile` 直接 `code:0`；`adminAuth` **只验签名不查库**
+  ⇒ 绕过密码即超管）。✅ **已修复**（换 `.env` + 重建容器，三条全未命中）。护栏在 `src/config/index.js`
+  （命中公开串 + production ⇒ 拒绝启动）；复验 `node scripts/verify-backend-jwt.js`（只看响应体 `code`）。
+  ⚠️ 坑：`${X:-兜底值}` 把**空串当未设置** ⇒ 写空值会静默回落到下一串公开值，看着像"文件没改"。
+  ⇒ **判据是"全部未命中"，不是"命中的串变了"**；排查先读容器实际值，再回头查文件。
 - ✅ **MySQL `root123` 确认不改**（陛下 2026-09-30 拍板「无所谓」）：已查实 `docker-compose.yml` **没有端口映射**，
   MySQL 只在 `radionet` 内网、外网不可达 ⇒ 风险确实低。**别再去清它。**
 - 提交身份用全局 `Nailoonger <1493586497@qq.com>`，不写仓库级 user.*。
