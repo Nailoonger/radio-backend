@@ -73,9 +73,19 @@
    部员 `staff` = 播音部/主持部/编辑部。
 4. 信息架构从 `pages/about` 长出来（品牌区 + 一卡三块 + 分隔线）；真站徽 `preview/assets/station-badge.png`（+ `-mono.png`）。
 
-**自检配方**（参考 `preview/_check-website-v3.cjs`）：gradient 数=0（**必须先剥 `/* */` 注释**，
-否则注释里提到 gradient 会误报）、无彩色投影、禁词扫描（FM/假人名/假栏目）、真内容必须在、
-JS 过 `new Function`、id/锚点可解析、图片存在、无乱码字符。
+**自检配方** = `node preview/_check-website.cjs <v4|v5> [--allow-gradient]`：
+gradient 数=0（**必须先剥 `/* */` 注释**，否则注释里提到 gradient 会误报）、无彩色投影、
+禁词扫描（FM/假人名/假栏目）、真内容必须在、JS 过 `new Function`、id/锚点可解析、图片存在、无乱码字符。
+破例版（如近黑 v5）用 `--allow-gradient` 放行渐变，其余判据照跑。
+
+⚠️⚠️ **三个坑（2026-09-30 v4/v5 踩出）**
+① **「彩色投影」的判据是「有没有色相」**，不是 RGB 数值白名单 —— 三通道极差 ≤12 算中性。
+   初版按数值白名单把 `rgba(242,244,247,.55)` 近白误判成彩色投影。
+② **语法通过 ≠ 能跑 ≠ 算对。** 静态脚本之上必须再加一层**逻辑冒烟**：
+   `preview/_smoke-axis.cjs` —— 把页面 `<script>` **原样抠出来**喂 `new Function`，跑在假 DOM 上，
+   再用假 `Date` 把北京时间**钉**到三个时刻（12:45 / 16:15 / 23:30）验 ON AIR 判定、倒计时文案、游标位置。
+   ⚠️ 必须抠真源码，另抄一份只能证明"我抄对了"。
+③ **JS 正则不能写 PCRE 的 `\x{0400}`**，要写 `\u0400`，否则直接 `SyntaxError: Invalid escape`。
 
 ## 已废弃（别捡回来）
 - v2 点歌口径（提交即占位 / 全局候补队 / `song_queue_limit`）。
