@@ -685,7 +685,28 @@ node ./node_modules/vite/bin/vite.js build --outDir _hosting
 云开发控制台 → 目标环境 → 左侧「**静态网站托管**」→「**新建部署**」→「**上传文件夹**」/
 「**上传代码包**」，选 `admin-web/_hosting`（或刚打的 zip）。
 - 文档明确：「如果静态文件已经是构建产物（如 dist/ 下的文件），**直接上传该目录即可**」。
-- 纯静态项目 ⇒ **安装命令 / 构建命令留空**，产物目录 `.`，部署路径 `/`。
+
+**⚠️⚠️ 「新建部署」表单的逐字段填法（2026-09-30 踩过，官方 docs.cloudbase.net/hosting/web-hosting-static）**：
+
+| 字段 | 填 | 为什么 |
+|---|---|---|
+| 项目名称 | 随意（`admin-web`） | 只是标识 |
+| 项目根目录 | **留空** | 指代码仓库的根目录，我们不是仓库部署 |
+| 安装命令 | **清空** ⚠️ | zip 里**没有 `package.json`**（`_hosting` 是构建产物，根目录只有 `index.html`+图片+`assets/`）⇒ 填 `npm install` 必然失败 |
+| 构建命令 | **清空** ⚠️ | 同上，没有 `package.json` 就没有 `build` 脚本 ⇒ 必然失败 |
+| 构建产物目录 | `.` | 官方对纯静态项目的写法（当前目录） |
+| **部署路径** | **`/`** ⚠️⚠️ | 默认就是 `/`。**别改成 `/admin-web/`** —— 见下 |
+
+**为什么部署路径必须是 `/`**：`_hosting/index.html` 里引用的是**绝对路径**
+`/assets/index-*.js`、`/assets/index-*.css`（vite 默认 `base: '/'`）。
+若部署到 `/admin-web/`，浏览器会去请求 `https://<域名>/assets/...`，
+而文件实际在 `https://<域名>/admin-web/assets/...` ⇒ **404 ⇒ 打开一片白**。
+（官方文档说"部署路径 `/` 或 `/my-website` 都行"，那是对**用相对路径引用资源**的纯静态站而言，我们这个不行。）
+
+> ⚠️ 表单自己也提示了：部署路径设成 `/` 之后**不能再改回子目录**。我们要的就是 `/`，没影响。
+>
+> **更省事的备选**：不进这个表单，直接在静态托管首页用「**上传文件夹**」选本机 `admin-web/_hosting` ——
+> 不涉及任何构建字段，最不容易填错。
 - 备选（以后改前端更快）：`npm i -g @cloudbase/cli` → `tcb login` →
   `tcb hosting deploy _hosting -e jy-radio-d1gdwmptl816ee6a9`
   ⚠️ 命令名在文档里有 `tcb` / `cloudbase` 两种写法，以装完后的实际提示为准。
