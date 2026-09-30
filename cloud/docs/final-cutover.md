@@ -799,6 +799,60 @@ const form = reactive({ username: savedUsername, password: '<默认密码明文>
 
 ---
 
+**⑥-c 🔴🔴 线上后端的 JWT 密钥是公开默认值（2026-09-30 实测，**当时仍然有效**）**
+
+查 `root123` 那个问题时顺手看到 `docker-compose.yml` 里还有一行：
+
+```yaml
+JWT_SECRET: ${JWT_SECRET:-please-change-me-in-production}
+```
+
+而 `src/config/index.js` 的兜底值是 `radio-station-default-secret`、
+`.env.example` 里写的是 `please-change-me-to-a-long-random-string` —— **三串全在公开仓库里**。
+
+**这为什么比 `root123` 严重一个量级**：
+
+| | `root123`（MySQL） | 公开的 `JWT_SECRET` |
+|---|---|---|
+| 外网可达？ | ❌ 没映射端口，只在 `radionet` 内网 | ✅ nginx 把 80/443 对公网开着，`/api/admin/*` 就在那儿 |
+| 能干什么？ | 先进内网才能连库 | **直接伪造管理员身份** |
+| 要不要密码？ | 要（虽然公开） | **不要 —— `adminAuth` 只验签名不查库** |
+
+关键在 `src/middlewares/auth.js` 的 `adminAuth`：它只做 `verify(token)` + 检查
+`payload.id && payload.username`，**从不查数据库** ⇒ 只要密钥公开，
+任何人签一个 `{ id:1, username:'teacher', role:0 }` 就是超管。
+
+**实测（只发只读 GET，不写任何数据）**：用 `.env.example` 那串自签 token 打
+`GET /api/admin/profile` ⇒ 返回 `code:0` 和真实管理员资料
+（`{"id":1,"username":"teacher","nickname":"指导老师","role":0,...}`）。
+另外两串返回 `40101`。⇒ **服务器 `.env` 里 `JWT_SECRET` 没改过，沿用了 `.env.example` 的示例值。**
+
+**修法**（在服务器 `~/radio` 下）：
+
+```bash
+# 1) 生成一个真实随机值（或直接抄学生端云函数里那个真实 JWT_SECRET，让两边一致）
+openssl rand -hex 32
+
+# 2) 写进 .env（替换掉原来那行 JWT_SECRET=...）
+#    注意：不要写进任何会提交的文件
+
+# 3) 重建后端容器
+docker compose up -d --force-recreate radio-backend
+
+# 4) 复验（应三串全未命中）
+node scripts/verify-backend-jwt.js
+```
+
+⚠️ 配后**存量 token 全作废**（学生 + admin-web 各重登一次），预期行为。
+
+**代码侧已加护栏**（`src/config/index.js`）：命中这三串之一 + `NODE_ENV=production`
+⇒ **直接拒绝启动**并打印修法；本机开发只警告。`docker-compose.yml` 的兜底值也已清空。
+
+**复验工具**：`node scripts/verify-backend-jwt.js [baseUrl]`（默认打线上，退出码 1 = 没通过）。
+⚠️ 判据同样**只允许看响应体 `code`** —— 本项目 HTTP 恒 200，拿状态码判会把拒绝误报成通过。
+
+---
+
 ### 建议的顺序
 
 1. **先把 A 做出来跑通** —— 目标是让「服务器停不停」都不影响老师登录。

@@ -23,8 +23,14 @@
   口径：配了 `INIT_ADMIN_PASSWORD` 就用它，**留空则启动时随机生成、只在首次日志打印一次**
   （`src/utils/seed.js`，`crypto.randomBytes(12)`）；SQL 初始化**不插固定账号**；文档一律写「见 `INIT_ADMIN_PASSWORD`」。
   ⚠️ **写死 bcrypt hash 等同写死密码**（README 那条"忘记密码"重置 SQL 就是现成后门，已改成自己生成 hash 的两步法）。
-  ⏳ **MySQL `root123` 约 25 处仍未动**（`docker-compose.yml` 默认值 + README/AGENTS/CLAUDE/docs/scripts）——
-  它连着线上库，**没擅自扩大范围**，等陛下拍板。
+- ⚠️⚠️ **公开的默认密钥 = 没有鉴权**。`JWT_SECRET` 曾有**三串**公开默认值（代码兜底 / compose 兜底 /
+  `.env.example` 示例）⇒ **2026-09-30 实测：线上就是拿 `.env.example` 那串在跑** —— 自签一个 token 打
+  `/api/admin/profile` 直接 `code:0`（`adminAuth` **只验签名、从不查库** ⇒ 绕过密码即超管）。
+  已在 `src/config/index.js` 加护栏：命中已知公开串 + `NODE_ENV=production` ⇒ **拒绝启动**（本机开发只警告）。
+  复验：`node scripts/verify-backend-jwt.js`（退出码 1 = 没过）。⚠️ 判据只看响应体 `code`（HTTP 恒 200）。
+  ⏳ **待陛下在服务器改 `.env` 的 `JWT_SECRET` 再重建容器** —— 护栏不改线上，只拦下次部署。
+- ✅ **MySQL `root123` 确认不改**（陛下 2026-09-30 拍板「无所谓」）：已查实 `docker-compose.yml` **没有端口映射**，
+  MySQL 只在 `radionet` 内网、外网不可达 ⇒ 风险确实低。**别再去清它。**
 - 提交身份用全局 `Nailoonger <1493586497@qq.com>`，不写仓库级 user.*。
 
 ## 云开发迁移（`cloud/`）
@@ -65,28 +71,22 @@
   ⇒ 按 SNI 拦域名）⇒ 小程序 `url not in domain list` 的根因。⚠️ **证书 ≠ 备案**（我踩过一次）。
   **免备案只有两条**：① 服务器 + **纯 IP 访问**（现在就是这样）② 云开发静态托管 + 默认域名（官方严禁用于生产）。
   要用域名 ⇒ **必须备案**。
-- ⚠️ `deploy-cloud.js` 同时打印两种终端命令（`</dev/null` 部分终端报错），且**长期误报**。
-- ✅ `Dashboard.vue` 显示瑕疵已修（cloud 显示云地址；`.kv .mono` 加 `min-width:0; overflow-wrap:anywhere`）。
-  ⚠️ `http.js` 踩过 `body` 重名 —— **vite build 直接报 `The symbol "body" has already been declared`**，
-  构建即最便宜的语法检查。
+- ⚠️ `http.js` 踩过 `body` 重名 —— **vite build 直接报 `The symbol "body" has already been declared`**，
+  构建即最便宜的语法检查。（`deploy-cloud.js` 打印的两种终端命令长期误报，忽略即可。）
 
-## 服务器到期后怎么办（2026-09-30 查证；细则 `cloud/docs/final-cutover.md`）
-- **服务器现在实质只是「静态网页托管机」**（学生走 `callFunction` 不碰它、admin-web 接口直连云端不打 `/api`）
+## 服务器到期后怎么办（2026-09-30 查证；**细则全在 `cloud/docs/final-cutover.md`**）
+- **服务器现在实质只是「静态网页托管机」**（学生走 `callFunction`、admin-web 接口直连云端不打 `/api`）
   —— 这就是「改个前端还要上服务器更新」的原因。
   ⚠️ 停后端容器前先看 `docker compose logs --tail=200 radio-backend` 有无近期请求（旧版 direct 可能还在打）。
-- **三个去向**：A 静态网站托管 + 默认域名（免费、几十分钟）／B 静态托管 + 备案自定义域名（最正规）／C 续服务器。
+- **三个去向**：A 静态托管 + 默认域名（免费）／B 静态托管 + 备案自定义域名／C 续服务器。
   ✅ 方案 A 已开工：产物 `admin-web/_hosting`（+ `_hosting.zip`）。
-- ⚠️⚠️ **静态托管必配 SPA fallback**：控制台「设置」→ **错误页面 = `index.html`**。不配则首页能开、任何子路由
-  刷新/直连都 404（云端物理上只有 index.html 一个文件）；配后返回 **200**（不是 404 改响应体）。
-- ⚠️ **默认域名现口径**：首次访问弹「访问提示中间页」，点过**同域名 Cookie 有效期内不再弹**；政策已放宽为
-  「**只有软性提醒，不再硬性禁止访问**」，但仍写「严禁用于正式生产环境或分发给大规模用户」+ 保留「访问量异常 → 风控关停」。
-  ⇒ **几个老师内部用够；对外分发别用**。
-- ⚠️⚠️ **云开发里备案的 3 个准入条件（须同时满足）**：① 套餐个人版及以上 —— **免费体验环境不支持备案**
-  ② 环境剩余有效期 **> 6 个月** ③ 已开启「**云托管固定 IP**」（本项目没开云托管）。管局审核 **1–20 个工作日**；
-  一环境最多备 **2 个**站；别家备过案的域名要办「新增接入备案（转入）」。
-- ⚠️ **静态域名后缀与 HTTP 网关不同**（`tcloudbaseapp.com` vs `app.tcloudbase.com`）⇒ 是**跨域** ⇒ 必须把静态托管域名
-  加进 **HTTP 网关 → 跨域设置**（同加 `129.28.26.180` 那里），否则页面打得开但接口全被拦。
-  另：默认域名会给非导航请求加 `Content-Disposition: attachment`（「点链接变下载」先怀疑它）。
+- ⚠️⚠️ **两个必配**：① 静态托管「设置 → 错误页面 = `index.html`」（不配则子路由刷新/直连全 404，
+  云端物理上只有 index.html）② 静态托管域名要加进 **HTTP 网关 → 跨域设置**（后缀与网关不同 ⇒ 跨域），
+  否则页面开、接口全被拦。另：默认域名给非导航请求加 `Content-Disposition: attachment`（「点链接变下载」先怀疑它）。
+- ⚠️ 默认域名：首次弹「访问提示中间页」，点过 Cookie 期内不再弹；官方已放宽为「只有软性提醒」，
+  但仍写「严禁用于正式生产/大范围分发」⇒ **内部几个老师够用，对外别用**。
+- ⚠️⚠️ **云开发备案 3 准入（须同时满足）**：① 套餐个人版及以上（免费体验环境**不支持**）
+  ② 环境剩余有效期 **> 6 个月** ③ 已开启「**云托管固定 IP**」（本项目没开）。审核 1–20 工作日；一环境最多 2 站。
 
 ## 部署（服务器 `~/radio`）
 - `build <svc>` + `up -d --force-recreate <svc>`（restart 不换镜像）。admin-web 只改 views：`build admin-web` →
