@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>唱片机 · 简笔画（动效交互）</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:-apple-system,"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei",sans-serif;
+    background:#F2EFE8; min-height:100vh; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:20px; padding:44px 24px;
+  }
+  .board { width:min(720px,94vw); background:#FBF9F4; border:1px solid #ECE7DB;
+           border-radius:18px; padding:26px 26px 18px;
+           box-shadow:0 18px 34px rgba(60,52,32,0.10); }
+  .board svg { width:100%; height:auto; display:block; }
+  .cap { text-align:center; }
+  .cap .t { font-size:16px; font-weight:600; letter-spacing:1px; color:#2B2B30; }
+  #statusLine { font-size:12.5px; color:#8a857a; margin-top:8px; letter-spacing:.6px; min-height:18px; }
+
+  /* 旋转/摆动组：相对 viewBox 坐标定位原点 */
+  #vinyl,#tonearm,#lever,#slider { transform-box:view-box; }
+  #vinyl { transform-origin:176px 170px; }
+  #tonearm { transform-origin:348px 96px; transition:transform .9s cubic-bezier(.22,.61,.36,1); }
+  #tonearm.rest { transform:rotate(-64deg); }
+  #lever { transform-origin:56px 262px; transition:transform .45s cubic-bezier(.34,1.35,.5,1); }
+  #lever.on { transform:rotate(23deg); }
+  #slider { transition:transform .35s ease; }
+  #slider.fast { transform:translateY(28px); }
+
+  /* LED */
+  .led-dot { fill:none; transition:fill .3s; }
+  .led-ray { opacity:0; transition:opacity .3s; }
+  .powered .led-dot { fill:#2B2B30; }
+  .powered .led-ray { animation:raypulse 1.3s ease-in-out infinite; }
+  @keyframes raypulse { 0%,100%{opacity:.35} 50%{opacity:1} }
+
+  /* 声波 */
+  .waves path { opacity:0; }
+  .playing .waves path { animation:wave 1.5s ease-in-out infinite; }
+  .playing .waves path:nth-child(2){ animation-delay:.25s; }
+  .playing .waves path:nth-child(3){ animation-delay:.5s; }
+  @keyframes wave { 0%,100%{opacity:.12} 50%{opacity:.9} }
+
+  .rpm-lab { fill:#B3B0A7; transition:fill .25s; }
+  .rpm-lab.active { fill:#2B2B30; }
+  .hit { cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div class="board">
+<svg id="deck" viewBox="0 0 420 340" xmlns="http://www.w3.org/2000/svg">
+<g fill="none" stroke="#2B2B30" stroke-linecap="round" stroke-linejoin="round">
+
+  <!-- 机身 -->
+  <rect class="drawme" x="30" y="30" width="360" height="280" rx="24" stroke-width="2.6"/>
+
+  <!-- 黑胶 -->
+  <g id="vinyl">
+    <circle class="drawme" cx="176" cy="170" r="118" stroke-width="2.6"/>
+    <circle class="drawme" cx="176" cy="170" r="104" stroke-width="1.4"/>
+    <circle class="drawme" cx="176" cy="170" r="90"  stroke-width="1.4"/>
+    <circle class="drawme" cx="176" cy="170" r="76"  stroke-width="1.4"/>
+    <circle class="drawme" cx="176" cy="170" r="62"  stroke-width="1.4"/>
+    <circle class="drawme" cx="176" cy="170" r="34"  stroke-width="2"/>
+    <circle class="dotin" cx="176" cy="148" r="2.6" fill="#2B2B30" stroke="none"/>
+    <circle class="dotin" cx="176" cy="170" r="3"   fill="#2B2B30" stroke="none"/>
+  </g>
+
+  <!-- 唱臂固定底座 -->
+  <circle class="drawme" cx="348" cy="96" r="22" stroke-width="2.4"/>
+
+  <!-- 唱臂活动部分（初始 rest 停放） -->
+  <g id="tonearm" class="rest">
+    <circle class="drawme" cx="368" cy="74" r="8" stroke-width="2"/>
+    <circle class="dotin"  cx="348" cy="96" r="5" fill="#2B2B30" stroke="none"/>
+    <line class="drawme" x1="340" y1="104" x2="232" y2="140" stroke-width="2.4"/>
+    <g transform="rotate(-18 228 140)">
+      <rect class="drawme" x="219" y="135" width="16" height="10" rx="2" stroke-width="2"/>
+    </g>
+  </g>
+
+  <!-- 左侧电源控制 -->
+  <g id="powerCtrl">
+    <circle class="led-dot drawme" cx="56" cy="228" r="5" stroke-width="2"/>
+    <g class="led-ray" stroke-width="1.6">
+      <line x1="56" y1="216" x2="56" y2="211"/>
+      <line x1="47" y1="221" x2="43" y2="217"/>
+      <line x1="65" y1="221" x2="69" y2="217"/>
+    </g>
+    <circle class="drawme" cx="56" cy="262" r="9" stroke-width="1.8"/>
+    <g id="lever">
+      <line class="drawme" x1="56" y1="260" x2="49" y2="228" stroke-width="2.6"/>
+      <circle class="drawme" cx="49" cy="228" r="3.4" stroke-width="1.8"/>
+    </g>
+    <text x="40" y="292" font-size="8.5" fill="#6B6B70">Off</text>
+    <text x="67" y="274" font-size="8.5" fill="#6B6B70">On</text>
+  </g>
+
+  <!-- 右侧转速 -->
+  <line class="drawme" x1="367" y1="238" x2="367" y2="290" stroke-width="2"/>
+  <g id="slider">
+    <rect class="drawme" x="359" y="244" width="16" height="12" rx="2" stroke-width="1.8"/>
+  </g>
+  <text id="lab33" class="rpm-lab active" x="351" y="250" text-anchor="end" font-size="9">33</text>
+  <text id="lab45" class="rpm-lab" x="351" y="284" text-anchor="end" font-size="9">45</text>
+
+  <!-- 声波（播放位唱头旁） -->
+  <g class="waves" stroke-width="1.5">
+    <path d="M208 130 Q201 140 208 150"/>
+    <path d="M200 127 Q191 140 200 153"/>
+    <path d="M192 124 Q181 140 192 156"/>
+  </g>
+
+  <!-- 命中区 -->
+  <rect id="hitPower" class="hit" x="28" y="202" width="60" height="104" fill="rgba(0,0,0,0)" stroke="none"/>
+  <rect id="hitSpeed" class="hit" x="332" y="224" width="64" height="80" fill="rgba(0,0,0,0)" stroke="none"/>
+
+</g>
+</svg>
+</div>
+
+<div class="cap">
+  <div class="t">唱片机 · 简笔画</div>
+  <div id="statusLine"></div>
+</div>
+
+<script>
+var svg=document.getElementById('deck');
+var vinyl=document.getElementById('vinyl');
+var tonearm=document.getElementById('tonearm');
+var lever=document.getElementById('lever');
+var slider=document.getElementById('slider');
+var powerCtrl=document.getElementById('powerCtrl');
+var board=document.querySelector('.board');
+var statusLine=document.getElementById('statusLine');
+
+var draw=[].slice.call(svg.querySelectorAll('.drawme'));
+var dots=[].slice.call(svg.querySelectorAll('.dotin'));
+
+if(location.search.indexOf('final')>=0){            // 自检：直接完整
+  draw.forEach(function(el){ el.style.strokeDasharray='1'; el.style.strokeDashoffset='0'; });
+  dots.forEach(function(el){ el.style.opacity='1'; });
+} else {
+  draw.forEach(function(el){
+    var L=el.getTotalLength();
+    el.style.strokeDasharray=L; el.style.strokeDashoffset=L;
+    el.style.transition='stroke-dashoffset .6s ease';
+  });
+  dots.forEach(function(el){ el.style.opacity='0'; el.style.transition='opacity .5s ease'; });
+  draw.forEach(function(el,i){ setTimeout(function(){ el.style.strokeDashoffset='0'; }, 90+i*52); });
+  dots.forEach(function(el,i){ setTimeout(function(){ el.style.opacity='1'; }, 950+i*70); });
+}
+
+/* 黑胶：rAF 驱动，开机平稳加速、关机惯性减速 */
+var state={power:false,rpm:33,vel:0,angle:0,last:0};
+function targetSpeed(){ if(!state.power) return 0; return state.rpm===33?200:272; }
+function tick(t){
+  if(!state.last) state.last=t;
+  var dt=Math.min((t-state.last)/1000,0.05); state.last=t;
+  var tg=targetSpeed();
+  var k=tg>state.vel?3.4:1.05;
+  state.vel+=(tg-state.vel)*Math.min(1,k*dt);
+  if(!state.power&&Math.abs(state.vel)<0.8) state.vel=0;
+  state.angle=(state.angle+state.vel*dt)%360;
+  vinyl.style.transform='rotate('+state.angle+'deg)';
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+function updateStatus(){
+  statusLine.textContent=state.power
+    ? 'ON AIR · '+(state.rpm===33?'33⅓':'45')+' RPM'
+    : '点一下左侧拨杆，让唱片转起来';
+}
+function setPower(on){
+  state.power=on;
+  tonearm.classList.toggle('rest',!on);
+  lever.classList.toggle('on',on);
+  powerCtrl.classList.toggle('powered',on);
+  board.classList.toggle('playing',on);
+  updateStatus();
+}
+function toggleRpm(){
+  state.rpm=state.rpm===33?45:33;
+  slider.classList.toggle('fast',state.rpm===45);
+  document.getElementById('lab33').classList.toggle('active',state.rpm===33);
+  document.getElementById('lab45').classList.toggle('active',state.rpm===45);
+  updateStatus();
+}
+document.getElementById('hitPower').addEventListener('click',function(){ setPower(!state.power); });
+document.getElementById('hitSpeed').addEventListener('click',toggleRpm);
+updateStatus();
+</script>
+
+</body>
+</html>

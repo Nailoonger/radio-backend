@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>唱片机 · 拟真质感</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:-apple-system,"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei",sans-serif;
+    background:linear-gradient(160deg,#EDEDEA,#DDDDD9);
+    min-height:100vh; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:24px; padding:44px 24px;
+  }
+  .board { width:min(440px,92vw); }
+  .board svg { width:100%; height:auto; display:block; }
+  .cap { text-align:center; }
+  .cap .t { font-size:16px; font-weight:600; letter-spacing:1px; color:#26262A; }
+  .cap .s { font-size:12px; color:#8b8b88; margin-top:7px; letter-spacing:1px; }
+</style>
+</head>
+<body>
+
+<div class="board">
+<svg viewBox="0 0 420 420" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+    <feGaussianBlur stdDeviation="15"/>
+  </filter>
+  <!-- 机身金属 -->
+  <linearGradient id="bodyG" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#DBDDE1"/>
+    <stop offset=".5" stop-color="#BCC0C7"/>
+    <stop offset="1" stop-color="#989CA4"/>
+  </linearGradient>
+  <!-- 拉丝颗粒 -->
+  <filter id="grain">
+    <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/>
+    <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.55 0"/>
+  </filter>
+  <!-- 转盘金属 -->
+  <radialGradient id="platterG" cx=".5" cy=".42" r=".62">
+    <stop offset="0" stop-color="#CDD0D6"/>
+    <stop offset=".72" stop-color="#A4A8B0"/>
+    <stop offset="1" stop-color="#868A92"/>
+  </radialGradient>
+  <!-- 黑胶 -->
+  <radialGradient id="vinylG" cx=".5" cy=".5" r=".5">
+    <stop offset="0" stop-color="#0B0B0F"/>
+    <stop offset=".78" stop-color="#16161B"/>
+    <stop offset="1" stop-color="#040406"/>
+  </radialGradient>
+  <!-- 金属旋钮 -->
+  <radialGradient id="knobG" cx=".38" cy=".33" r=".78">
+    <stop offset="0" stop-color="#E7E9ED"/>
+    <stop offset=".55" stop-color="#ACB0B8"/>
+    <stop offset="1" stop-color="#787C84"/>
+  </radialGradient>
+  <!-- 唱臂杆 -->
+  <linearGradient id="armG" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#7E828A"/>
+    <stop offset=".42" stop-color="#D8DADD"/>
+    <stop offset=".58" stop-color="#B9BCC3"/>
+    <stop offset="1" stop-color="#74787F"/>
+  </linearGradient>
+  <!-- LED -->
+  <radialGradient id="ledG" cx=".5" cy=".38" r=".62">
+    <stop offset="0" stop-color="#C7F3AC"/>
+    <stop offset=".5" stop-color="#5FCB38"/>
+    <stop offset="1" stop-color="#2A8616"/>
+  </radialGradient>
+  <!-- 封面圆裁剪 -->
+  <clipPath id="coverClip"><circle cx="208" cy="212" r="60"/></clipPath>
+  <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#fff" stop-opacity=".5"/>
+    <stop offset=".4" stop-color="#fff" stop-opacity="0"/>
+  </linearGradient>
+</defs>
+
+  <!-- 投影 -->
+  <rect x="28" y="36" width="372" height="372" rx="30" fill="rgba(20,22,28,0.30)" filter="url(#soft)"/>
+
+  <!-- 机身 -->
+  <rect x="24" y="24" width="372" height="372" rx="30" fill="url(#bodyG)"/>
+  <rect x="24" y="24" width="372" height="372" rx="30" filter="url(#grain)" opacity="0.07"/>
+  <rect x="24" y="24" width="372" height="372" rx="30" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.4"/>
+  <rect x="25.5" y="25.5" width="369" height="369" rx="29" fill="none" stroke="rgba(0,0,0,0.14)" stroke-width="1.4"/>
+
+  <!-- 转盘金属盘 -->
+  <circle cx="208" cy="212" r="154" fill="url(#platterG)"/>
+  <circle cx="208" cy="212" r="154" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="1.5"/>
+  <circle cx="208" cy="212" r="146" fill="none" stroke="rgba(255,255,255,0.30)" stroke-width="1"/>
+
+  <!-- 黑胶 -->
+  <circle cx="208" cy="212" r="140" fill="url(#vinylG)"/>
+  <g fill="none">
+    <circle cx="208" cy="212" r="132" stroke="rgba(255,255,255,0.035)"/>
+    <circle cx="208" cy="212" r="124" stroke="rgba(0,0,0,0.5)"/>
+    <circle cx="208" cy="212" r="116" stroke="rgba(255,255,255,0.03)"/>
+    <circle cx="208" cy="212" r="108" stroke="rgba(0,0,0,0.5)"/>
+    <circle cx="208" cy="212" r="100" stroke="rgba(255,255,255,0.03)"/>
+    <circle cx="208" cy="212" r="92" stroke="rgba(0,0,0,0.5)"/>
+    <circle cx="208" cy="212" r="84" stroke="rgba(255,255,255,0.03)"/>
+    <circle cx="208" cy="212" r="76" stroke="rgba(0,0,0,0.5)"/>
+  </g>
+  <!-- 黑胶反光 -->
+  <path d="M132 138 A108 108 0 0 1 188 112" fill="none" stroke="rgba(255,255,255,0.13)" stroke-width="9" stroke-linecap="round"/>
+  <path d="M150 150 A82 82 0 0 1 182 134" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="208" cy="212" r="139" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1.2"/>
+
+  <!-- 封面 -->
+  <circle cx="208" cy="212" r="60" fill="#F1F2F4"/>
+  <g clip-path="url(#coverClip)">
+    <image href="assets/station-badge.png" x="160" y="164" width="96" height="96"/>
+    <path d="M148 152 L268 152 L268 212 L148 262 Z" fill="url(#sheen)"/>
+  </g>
+  <circle cx="208" cy="212" r="60" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="1.4"/>
+  <circle cx="208" cy="212" r="5" fill="url(#knobG)"/>
+  <circle cx="208" cy="212" r="1.8" fill="#5A5E66"/>
+
+  <!-- 左侧：LED + 电源拨杆 -->
+  <circle cx="56" cy="232" r="11" fill="#5FCB38" opacity="0.22"/>
+  <circle cx="56" cy="232" r="8" fill="url(#ledG)"/>
+  <circle cx="53" cy="229" r="2.2" fill="rgba(255,255,255,0.7)"/>
+  <circle cx="56" cy="262" r="12" fill="url(#knobG)"/>
+  <g transform="rotate(-22 56 262)">
+    <rect x="49" y="222" width="14" height="42" rx="7" fill="#17171A"/>
+    <rect x="51" y="225" width="3.4" height="36" rx="1.7" fill="#3C3C42"/>
+  </g>
+  <text x="40" y="292" font-size="8" fill="#7E8088">Off</text>
+  <text x="70" y="272" font-size="8" fill="#5A5D64">On</text>
+
+  <!-- 右侧：转速滑块 -->
+  <rect x="366" y="238" width="7" height="54" rx="3.5" fill="#6B6E76"/>
+  <rect x="361" y="252" width="17" height="15" rx="3.5" fill="url(#knobG)"/>
+  <rect x="363" y="254" width="4" height="11" rx="2" fill="rgba(255,255,255,0.5)"/>
+
+  <!-- 唱臂（最后，置于最上层） -->
+  <circle cx="364" cy="50" r="11" fill="url(#knobG)"/>
+  <circle cx="364" cy="50" r="11" fill="none" stroke="rgba(0,0,0,0.2)"/>
+  <circle cx="344" cy="74" r="26" fill="url(#knobG)"/>
+  <circle cx="344" cy="74" r="26" fill="none" stroke="rgba(0,0,0,0.22)" stroke-width="1.4"/>
+  <circle cx="344" cy="74" r="16" fill="rgba(0,0,0,0.16)"/>
+  <circle cx="344" cy="74" r="13" fill="url(#knobG)"/>
+  <circle cx="344" cy="74" r="4.6" fill="#585C64"/>
+  <!-- 臂杆 -->
+  <line x1="336" y1="88" x2="282" y2="256" stroke="url(#armG)" stroke-width="8.5" stroke-linecap="round"/>
+  <line x1="333" y1="92" x2="279" y2="252" stroke="rgba(255,255,255,0.45)" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- 唱头 -->
+  <g transform="rotate(108 280 258)">
+    <rect x="274" y="246" width="12" height="24" rx="2.6" fill="#232328"/>
+    <rect x="276" y="248" width="3" height="20" rx="1.5" fill="#45454C"/>
+    <rect x="276" y="268" width="8" height="4" rx="1.5" fill="#9A9DA4"/>
+  </g>
+
+</svg>
+</div>
+
+<div class="cap">
+  <div class="t">唱片机 · 拟真质感</div>
+  <div class="s">金属拉丝机身 · 反光黑胶 · 写实唱臂与拨杆</div>
+</div>
+
+</body>
+</html>

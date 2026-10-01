@@ -1,0 +1,119 @@
+/* pages-admin/message/message.wxss
+   留言审核 —— 与审核列表同一套骨架（白底页面 + 羊皮纸灰条目卡）。 */
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+}
+
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(45deg);
+  margin-left: 6rpx;
+}
+
+.body {
+  flex: 1;
+  padding: 0 36rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+/* ══════════ 筛选胶囊行 ══════════ */
+.filters { display: flex; gap: 16rpx; flex: none; overflow: hidden; }
+.fl {
+  font-size: 25rpx;
+  padding: 12rpx 26rpx;
+  border-radius: 9999rpx;
+  background: var(--parchment);
+  color: var(--ink-2);
+  white-space: nowrap;
+  flex: none;
+}
+.fl.on { background: var(--ink); color: #fff; font-weight: 500; }
+.fl .n { opacity: 0.6; margin-left: 6rpx; }
+
+/* ══════════ 留言条目 ══════════ */
+.list { display: flex; flex-direction: column; gap: 20rpx; }
+
+.item {
+  border-radius: 34rpx;
+  background: var(--parchment);
+  padding: 26rpx 28rpx;
+  flex: none;
+}
+
+.m-head { display: flex; align-items: center; gap: 18rpx; }
+.av {
+  width: 60rpx; height: 60rpx;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  flex: none;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+.grow { flex: 1; min-width: 0; }
+.m-who { font-size: 27rpx; font-weight: 600; color: var(--ink); }
+.m-src { font-size: 23rpx; color: var(--muted); margin-top: 2rpx; }
+.m-body {
+  font-size: 26rpx;
+  line-height: 1.6;
+  margin-top: 16rpx;
+  color: var(--ink-2);
+}
+.m-foot { display: flex; align-items: center; gap: 16rpx; margin-top: 22rpx; }
+.m-foot .tag { margin-right: auto; }
+
+/* ══════════ 按钮 ══════════ */
+button.btn-sm {
+  font-size: 25rpx;
+  padding: 0;
+  height: 64rpx;
+  line-height: 1;
+  border-radius: 18rpx;
+  border: none;
+  flex: none;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+button.btn-sm::after { border: none; }
+button.btn-pass { background: var(--accent); color: #fff; padding: 0 32rpx; }
+button.btn-quiet {
+  background: var(--canvas);
+  color: var(--ink-2);
+  box-shadow: inset 0 0 0 2rpx var(--hairline);
+  padding: 0 28rpx;
+}
+
+/* ══════════ 状态胶囊 ══════════ */
+.tag {
+  font-size: 23rpx;
+  padding: 6rpx 18rpx;
+  border-radius: 9999rpx;
+  flex: none;
+  white-space: nowrap;
+}
+.tag-pending { background: var(--amber-bg); color: var(--amber-fg); }
+.tag-pass { background: var(--green-bg); color: var(--green-fg); }
+.tag-reject { background: var(--red-bg); color: var(--red-fg); }
+
+/* ══════════ 提示行 ══════════ */
+.hint-note {
+  text-align: center;
+  font-size: 23rpx;
+  color: var(--muted);
+  padding: 28rpx 0;
+  flex: none;
+}
+
+.pressed { opacity: 0.72; }

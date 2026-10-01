@@ -24,6 +24,41 @@
 - 记死两条底线：**别自起私有配色**（守 `theme.css` 的三硬规则）；**别再编任何业务事实**
   （站里没有 FM 频率——"87.6MHz"是编的，被点过）。
 
+## 启动动画素材（v4 拆好的零件，等点头）
+- 站徽底稿 1410×1410，**圆心 = 图心 (704.5, 704.5)**；深蓝 `#093592` / 浅蓝 `#2497D5`。
+  环形文字：中文 5 字顺时针走**顶**、英文 18 字母逆时针走**底**，**两行都是西起东收**。
+- 零件在 `preview/launch-v4/assets/`（80 张 PNG + `parts.json`/`arcs.json`/`sprite.png`+坐标表）。
+  ⚠️ 切图统一 **`alpha > 0`**（用 `alpha>100` 会丢抗锯齿边 → 外环少 6.6%）；
+  ⚠️ 校验零件要按清单 `(x,y)` **平移回绝对坐标**，否则「缺失==多出」是假错。
+  细则见 skill `bitmap-logo-split-animate`。
+- ✅ 线上 `miniprogram/components/launch-mask/` **仍是 v1，一个字没动**。
+  等陛下在 `preview/launch-v4/index.html` 上点头（时长档 2.6s/1.7s、环 A 逐段点亮 / B 整环扫频）。
+
+## 管理端小程序（分包 `pages-admin/`，2026-10-01 落地）
+> 细则见 `PROJECT-NOTES.md`「管理端小程序」一节。
+- 一期＝登录 / 待办台 / 投稿&点歌审核 / 审核处理台 / 留言审核；**排期、批量、学生账号、系统设置仍在电脑端**。
+- ⚠️⚠️ **管理端 token 分键**（`admin_token` + `globalData.adminToken`），请求**只能用 `adminRequest()`**；
+  与学生端共用一个 `token` key 会互相顶掉登录态。
+- ⚠️ **驳回理由服务端必填** ⇒ 列表页「驳回」跳处理台；留言「屏蔽」用 editable modal 收原因。
+- 处理台 = L1 白卡大投影（`--sh-lift` 纯黑透明）；⚠️ 页面底转灰后 `--soft` 提示会糊底 → 提到 `--muted`。
+  ❌ 处理台四段（投稿人/内容/驳回/记录）**不合并** —— 陛下看过 v10/v11 后说"算了，先维持现状"，
+  **别自己合**（设计稿留在 `preview/admin-mp-v10` 与 `-v11`）。
+- 待办台 = L1 + **C 案「主浮次平」**（待办卡浮 / 入口卡贴平）；**顶栏右侧一律留空**（微信胶囊地盘）。
+  ✅ 2026-10-01 定版：标题「**导播台**」+ 「指导老师」在**标题下面**（两行文字块，v12-C）；
+  待办卡右上角空着。⚠️ 顶栏**不能写死 `height`**（112rpx vs 单行 88rpx）→ 用 `min-height`；徽章 64rpx。
+  ⚠️ 这屏**没有深色卡**了，别在别的屏扩散。
+- ⚠️⚠️ **站徽 PNG 是透明底**（环形文字镂空，四角 alpha=0）⇒ 当图标用**必须自己给 `background`**，
+  否则镂空处透出页面底色（灰底上环字像"缺字"）。顶栏 `.badge` 已加白底。
+  ⚠️ 白底 ≠ 卡片：徽章卡片形态（v13 方块 / v14 正圆）**另行讨论，还没定**。
+- 改管理端 wxss 必跑 `node preview/_check-admin-mp.cjs`（`未定义 CSS 变量: 0`）。
+- ⚠️⚠️ **`<text>` 保留换行** ⇒ 内容拆行写会多一个空行把胶囊撑高（真机报过「红绿胶囊错位」）。
+  文案一律在 js `decorate()` 里拼好（`tagClass`/`tagText`），**wxml 一行写完**；
+  判据 `check-wxml-classes.js` 的 `<text> 跨行: 无 OK`。细则见 skill `wxml-render-traps`。
+- ⚠️⚠️ **投影档位名 ≠ 可见度**（2026-10-01 实测）：`--sh-card`（4% 黑）叠在 `#F5F5F7` 上**归零**
+  （卡左侧灰底 min=245，与"完全无影"逐像素一致）⇒ 表达不了"浮起来"；要浮必须 `--sh-lift`(237)
+  或中间档 `0 4px 12px -4px rgba(0,0,0,.10)`(241)。**别照档位名写交付说明 —— 采样像素**（差<6 灰阶＝没差别）。
+- ⚠️ **顶栏/导航区要变白底 → 先想微信胶囊**：胶囊本身是白色圆角条，会和白卡糊死（只剩 1px 描边）。
+
 ## 云开发迁移（`cloud/`）— 阶段 0–9 完成，回归 3115 项 / 0 失败
 > 细则（三约束三陷阱 / httpBridge / 回归速查）见 `PROJECT-NOTES.md` 与 skill `express-to-cloudfunction-migration`。
 - 源 `cloud/cloudfunctions/api/`，运行目录 `miniprogram/cloudfunctions/api/`。
@@ -88,6 +123,8 @@
 - ⚠️⚠️ **部署云函数本机做不了**（沙箱拦 `reg.exe`）⇒ **陛下自己跑**。CLI = `D:\dev\wx-devtools\cli.bat`；服务端口已开。
 - ⚠️ PowerShell `Add-Type` 被拦 → 图像处理走 Python venv `~/.workbuddy/binaries/python/envs/default/Scripts/python.exe`。
 - 截图见 skill `web-ui-screenshot-verify`。⚠️ **会话跑久 / `location.href` 导航必出空白页**（截图恒 3680 字节）→ 换 **`--session <独立名>`**。
+  ⚠️ **agent-browser 可能 spawn EBUSY（起不来）→ 改用 Chrome 无头**（可用！旧"不可用"结论已作废）；
+  ⚠️⚠️ **`--virtual-time-budget` 不推进 CSS 动画** ⇒ 验动画中间帧要让**页面自己定格**（`#t=毫秒` + `getAnimations()` pause）。
 
 ## 后端约定
 - 容器 UTC、MySQL 北京时间；按天/周逻辑禁裸 `dayjs()`，统一 `src/utils/bjTime.js`。

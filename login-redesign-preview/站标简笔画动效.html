@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>菁悠广播站标 · 会动的站标</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:-apple-system,"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei",sans-serif;
+    background:#F2EFE8; min-height:100vh; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:16px; padding:42px 24px;
+  }
+  .card { width:min(560px,94vw); background:#FBF9F4; border:1px solid #ECE7DB;
+          border-radius:20px; padding:24px 24px 16px;
+          box-shadow:0 18px 34px rgba(60,52,32,0.10); }
+  #badge { width:100%; height:auto; display:block; cursor:pointer; }
+  .foot { text-align:center; }
+  #replay { border:1px solid #d8d2c4; background:#fff; color:#5a564c;
+            font-size:12.5px; letter-spacing:1px; padding:8px 18px; border-radius:999px;
+            cursor:pointer; font-family:inherit; transition:background .2s; }
+  #replay:hover { background:#f3efe6; }
+
+  /* 持续动效：涟漪 + 内环流光（alive 后运行） */
+  .ripple,.flow { opacity:0; }
+  .ripple { transform-box:view-box; transform-origin:500px 500px; }
+  .flow  { transform-box:view-box; transform-origin:500px 500px; }
+  #badge.alive .ripple { opacity:1; animation:ripple 2.8s linear infinite; }
+  #badge.alive .r2{ animation-delay:.93s; }
+  #badge.alive .r3{ animation-delay:1.86s; }
+  #badge.alive .flow { opacity:1; animation:spinFlow 4.2s linear infinite; }
+  @keyframes ripple {
+    0%  { transform:scale(.22); opacity:.5; }
+    70% { opacity:.16; }
+    100%{ transform:scale(1.02); opacity:0; }
+  }
+  @keyframes spinFlow { to { transform:rotate(360deg); } }
+
+  /* ON AIR */
+  .onair { display:flex; align-items:center; justify-content:center; gap:8px;
+           font-size:12.5px; letter-spacing:2px; color:#0F3D91;
+           opacity:0; transition:opacity .5s; margin-top:12px; }
+  .onair.show { opacity:1; }
+  .onair i { width:8px; height:8px; border-radius:50%; background:#0F3D91;
+             animation:blink 1.3s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:.3;transform:scale(.8)} 50%{opacity:1;transform:scale(1.15)} }
+</style>
+</head>
+<body>
+
+<div class="card">
+<svg id="badge" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <filter id="rough" x="-3%" y="-3%" width="106%" height="106%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="2" seed="6" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="1.4"/>
+  </filter>
+</defs>
+
+<g fill="none" stroke="#0F3D91" stroke-linecap="round" stroke-linejoin="round" filter="url(#rough)">
+
+  <!-- 双环 -->
+  <circle class="drawme" cx="500" cy="500" r="470" stroke-width="5" data-delay="0"   data-dur="1100"/>
+  <circle class="drawme" cx="500" cy="500" r="330" stroke-width="9" data-delay="450" data-dur="950"/>
+  <!-- 内环流光（一段亮蓝沿环跑） -->
+  <circle class="flow" cx="500" cy="500" r="330" stroke="#5AA9EC" stroke-width="9"
+          stroke-dasharray="55 2018"/>
+
+  <!-- 声波涟漪（由中心向外扩） -->
+  <circle class="ripple r1" cx="500" cy="500" r="300" stroke="#2B8FCF" stroke-width="2"/>
+  <circle class="ripple r2" cx="500" cy="500" r="300" stroke="#2B8FCF" stroke-width="2"/>
+  <circle class="ripple r3" cx="500" cy="500" r="300" stroke="#2B8FCF" stroke-width="2"/>
+
+  <!-- 中心声波柱（左浅右深） -->
+  <g id="bars">
+    <line class="bar drawme" x1="300" y1="435" x2="300" y2="565" stroke="#2B8FCF" stroke-width="9" data-delay="1150" data-dur="380"/>
+    <line class="bar drawme" x1="360" y1="400" x2="360" y2="600" stroke="#2B8FCF" stroke-width="9" data-delay="1240" data-dur="380"/>
+    <line class="bar drawme" x1="420" y1="375" x2="420" y2="625" stroke="#2B8FCF" stroke-width="9" data-delay="1330" data-dur="380"/>
+    <line class="bar drawme" x1="500" y1="315" x2="500" y2="685" stroke="#2B8FCF" stroke-width="9" data-delay="1420" data-dur="420"/>
+    <line class="bar drawme" x1="580" y1="375" x2="580" y2="625" stroke="#0F3D91" stroke-width="9" data-delay="1510" data-dur="380"/>
+    <line class="bar drawme" x1="640" y1="400" x2="640" y2="600" stroke="#0F3D91" stroke-width="9" data-delay="1600" data-dur="380"/>
+    <line class="bar drawme" x1="700" y1="435" x2="700" y2="565" stroke="#0F3D91" stroke-width="9" data-delay="1690" data-dur="380"/>
+  </g>
+
+  <!-- 上半中文站名 -->
+  <g class="word" fill="#0F3D91" stroke="none" font-size="64" font-weight="700"
+     text-anchor="middle" dominant-baseline="central"
+     font-family='Songti SC, SimSun, serif' data-delay="2250" data-dur="420">
+    <text transform="rotate(-58 165 291)" x="165" y="291">菁</text>
+    <text transform="rotate(-29 308 154)" x="308" y="154">悠</text>
+    <text x="500" y="105">广</text>
+    <text transform="rotate(29 692 154)" x="692" y="154">播</text>
+    <text transform="rotate(58 835 291)" x="835" y="291">站</text>
+  </g>
+
+  <!-- 下半英文 -->
+  <text class="word" fill="#0F3D91" stroke="none" font-size="44" font-weight="700"
+        letter-spacing="7" data-delay="2750" data-dur="600">
+    <textPath href="#arcBot" startOffset="50%" text-anchor="middle">JINGYOU GUANGBO ZHAN</textPath>
+  </text>
+  <path id="arcBot" fill="none" d="M 124 622 A 395 395 0 0 1 876 622"/>
+
+</g>
+</svg>
+</div>
+
+<div class="foot">
+  <button id="replay">重新播放</button>
+  <div class="onair" id="onair"><i></i>ON AIR</div>
+</div>
+
+<script>
+var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var badge=document.getElementById('badge');
+var bars=document.getElementById('bars');
+var onair=document.getElementById('onair');
+
+/* —— 中心声波柱：均衡器式独立跳动（rAF） —— */
+var baseHalf=[65,100,125,170,125,100,65];
+var barData=[].map.call(bars.querySelectorAll('.bar'),function(el,i){
+  return { el:el, half:baseHalf[i], cur:baseHalf[i],
+           p1:Math.random()*6.28, p2:Math.random()*6.28,
+           s1:1.5+Math.random()*1.4, s2:2.4+Math.random()*1.8 };
+});
+var barsRunning=false;
+function energy(b,t){
+  var a=0.5+0.5*Math.sin(t*b.s1+b.p1);
+  var c=0.5+0.5*Math.sin(t*b.s2+b.p2);
+  return a*0.65+c*0.35;
+}
+function barsTick(ms){
+  if(barsRunning){
+    var t=ms/1000;
+    barData.forEach(function(b){
+      var target=b.half*(0.42+0.62*energy(b,t));
+      b.cur+=(target-b.cur)*0.22;
+      b.el.setAttribute('y1',(500-b.cur).toFixed(1));
+      b.el.setAttribute('y2',(500+b.cur).toFixed(1));
+    });
+  }
+  requestAnimationFrame(barsTick);
+}
+requestAnimationFrame(barsTick);
+
+function goAlive(){
+  badge.classList.add('alive');
+  onair.classList.add('show');
+  /* 描绘完成，移除 dash 让柱连续，再开始跳动 */
+  barData.forEach(function(b){
+    b.el.style.transition='none';
+    b.el.style.strokeDasharray='none';
+    b.el.style.strokeDashoffset='0';
+  });
+  barsRunning=true;
+}
+
+/* —— 入场一笔画 —— */
+function showAll(){
+  badge.querySelectorAll('.drawme').forEach(function(el){
+    el.style.strokeDasharray='1'; el.style.strokeDashoffset='0';
+  });
+  badge.querySelectorAll('.word').forEach(function(el){ el.style.opacity='1'; });
+  onair.classList.add('show');
+}
+function play(){
+  badge.classList.remove('alive'); onair.classList.remove('show'); barsRunning=false;
+  badge.querySelectorAll('.drawme').forEach(function(el){
+    var L=el.getTotalLength();
+    el.style.transition='none';
+    el.style.strokeDasharray=L; el.style.strokeDashoffset=L;
+  });
+  badge.querySelectorAll('.word').forEach(function(el){
+    el.style.transition='none'; el.style.opacity='0';
+  });
+  void badge.getBoundingClientRect();
+  badge.querySelectorAll('.drawme').forEach(function(el){
+    var dur=+(el.dataset.dur||700);
+    setTimeout(function(){
+      el.style.transition='stroke-dashoffset '+dur+'ms ease-out';
+      el.style.strokeDashoffset='0';
+    }, +(el.dataset.delay||0));
+  });
+  badge.querySelectorAll('.word').forEach(function(el){
+    var dur=+(el.dataset.dur||500);
+    setTimeout(function(){
+      el.style.transition='opacity '+dur+'ms ease-out';
+      el.style.opacity='1';
+    }, +(el.dataset.delay||0));
+  });
+  setTimeout(goAlive, 2450);
+}
+
+if(reduced){ showAll(); } else { play(); }
+
+document.getElementById('replay').addEventListener('click',function(){ location.reload(); });
+badge.addEventListener('click',function(){ if(!reduced) location.reload(); });
+</script>
+
+</body>
+</html>

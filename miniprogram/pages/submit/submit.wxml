@@ -9,7 +9,11 @@
   <block wx:if="{{receipt}}">
     <view class="body">
       <view class="receipt">
-        <view class="rc-mark">✓</view>
+        <view class="rc-mark">
+          <!-- 内嵌源：assets/receipt-check.svg；使用 SVG Base64 图片保持小程序兼容。 -->
+          <image class="rc-check" mode="aspectFit" aria-label="已提交"
+                 src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIj48cGF0aCBkPSJNNS41IDEyLjI1IDkuNzUgMTYuNSAxOC41IDcuNzUiIHN0cm9rZT0iIzAwNjZDQyIgc3Ryb2tlLXdpZHRoPSIyLjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==" />
+        </view>
         <view class="stack" style="gap: 12rpx;">
           <view class="rc-title">已提交，进入审核</view>
           <view class="rc-song">{{receipt.song}}</view>
@@ -44,7 +48,9 @@
       <view class="t-cap receipt-foot">{{receipt.lockText}}</view>
     </view>
 
-    <view class="bottom-cta">
+    <view class="bottom-cta receipt-cta">
+      <button class="btn btn-ghost btn-block rc-replay" wx:if="{{receipt.canReplay}}"
+              hover-class="pressed" bindtap="replaySong">再点一首</button>
       <button class="btn btn-primary btn-block" hover-class="pressed" bindtap="goMySubmit">查看我的投稿</button>
     </view>
   </block>

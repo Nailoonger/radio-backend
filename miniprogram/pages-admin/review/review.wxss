@@ -1,0 +1,137 @@
+/* pages-admin/review/review.wxss
+   投稿 & 点歌审核列表 —— 白色页面底 + 羊皮纸灰条目卡（未走 L1，L1 只在处理台两屏）。
+   顶栏骨架复用 app.wxss 的 .navbar 系列，这里只补返回箭头。 */
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+}
+
+/* 返回箭头（app.wxss 的 .navbar-back 只给了圆底，箭头要自己画） */
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(45deg);
+  margin-left: 6rpx;
+}
+
+.body {
+  flex: 1;
+  padding: 0 36rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+/* ══════════ 筛选胶囊行 ══════════ */
+.filters {
+  display: flex;
+  gap: 16rpx;
+  flex: none;
+  overflow: hidden;
+}
+.fl {
+  font-size: 25rpx;
+  padding: 12rpx 26rpx;
+  border-radius: 9999rpx;
+  background: var(--parchment);
+  color: var(--ink-2);
+  white-space: nowrap;
+  flex: none;
+}
+.fl.on { background: var(--ink); color: #fff; font-weight: 500; }
+.fl .n { opacity: 0.6; margin-left: 6rpx; }
+
+/* ══════════ 条目卡 ══════════ */
+.list { display: flex; flex-direction: column; gap: 20rpx; }
+
+.item {
+  border-radius: 34rpx;
+  background: var(--parchment);
+  padding: 26rpx 28rpx;
+  flex: none;
+}
+.item-hover { opacity: 0.82; }
+
+.i-top { display: flex; align-items: center; gap: 14rpx; }
+.i-kind {
+  font-size: 21rpx;
+  padding: 3rpx 14rpx;
+  border-radius: 10rpx;
+  border: 2rpx solid var(--soft);
+  color: var(--muted);
+  flex: none;
+  line-height: 1.5;
+}
+/* 文稿用蓝灰描边区分（v2/v3 起就是这个语义色，不是新起的配色） */
+.i-kind.art { border-color: #c8d9ee; color: #3d6ea8; }
+.i-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.i-note {
+  font-size: 25rpx;
+  color: var(--muted);
+  margin-top: 10rpx;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.i-meta { font-size: 23rpx; color: var(--soft); margin-top: 14rpx; }
+.i-act { display: flex; gap: 16rpx; margin-top: 22rpx; align-items: center; }
+
+/* ══════════ 条目按钮 ══════════ */
+button.btn-sm {
+  font-size: 25rpx;
+  padding: 0;
+  height: 64rpx;
+  line-height: 1;
+  border-radius: 18rpx;
+  border: none;
+  flex: 1;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+button.btn-sm::after { border: none; }
+button.btn-pass { background: var(--accent); color: #fff; }
+button.btn-quiet {
+  background: var(--canvas);
+  color: var(--ink-2);
+  box-shadow: inset 0 0 0 2rpx var(--hairline);
+}
+
+/* ══════════ 状态胶囊 ══════════ */
+.tag {
+  font-size: 23rpx;
+  padding: 6rpx 18rpx;
+  border-radius: 9999rpx;
+  flex: none;
+  white-space: nowrap;
+}
+.tag-pass { background: var(--green-bg); color: var(--green-fg); }
+.tag-reject { background: var(--red-bg); color: var(--red-fg); }
+
+/* ══════════ 提示行 ══════════ */
+.hint-note {
+  text-align: center;
+  font-size: 23rpx;
+  color: var(--muted);
+  padding: 28rpx 0;
+  flex: none;
+}
+
+.pressed { opacity: 0.72; }

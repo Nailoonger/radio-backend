@@ -65,6 +65,7 @@ Page({
     // ── 次数提示 ──
     quotaText: '',          // 「本周还能点 2 次（上限 2 次）」
     quotaBlocked: false,
+    quotaWeekly: null,      // 服务端个人周额度；null = 尚未获取或数据无效
 
     // ── 协议版新增（docs/song-protocol.md）──
     // 提交不再「即占住时段」：首选排满时能不能被调到别的时段，由学生自己勾这一项决定
@@ -84,6 +85,13 @@ Page({
   },
 
   onShow() {
+    this._visible = true;
+    // 回执只保留到本次提交结束；重新进入投稿页就回到干净表单。
+    // 没有成功回执的草稿不清，文稿草稿也不受影响。
+    if (this.data.receipt) {
+      this.resetSongForm();
+      if (wx.pageScrollTo) wx.pageScrollTo({ scrollTop: 0, duration: 0 });
+    }
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setSelected(1);
     }
@@ -92,8 +100,16 @@ Page({
     this.prepareSong();
   },
 
-  onHide() { if (this.wb) this.wb.stopTimer(); },
-  onUnload() { if (this.wb) this.wb.stopTimer(); },
+  onHide() {
+    this._visible = false;
+    this._pageVersion = (this._pageVersion || 0) + 1;
+    this._quotaRequestId = (this._quotaRequestId || 0) + 1;
+    if (this.wb) this.wb.stopTimer();
+  },
+  onUnload() {
+    this.onHide();
+    clearTimeout(this._skTimer);
+  },
 
   /** 点歌侧的前置数据：次数提示 + 可选时段 + 时间窗口（不阻塞表单，静默失败） */
   prepareSong() {
@@ -118,11 +134,26 @@ Page({
   },
 
   loadQuota() {
+    const requestId = this._quotaRequestId = (this._quotaRequestId || 0) + 1;
+    const pageVersion = this._pageVersion || 0;
+    const token = app.globalData.token;
     return request('/user/submit/quota').then((d) => {
+      // 提交前或上一场回执的请求晚到时，不能覆盖当前额度。
+      if (requestId !== this._quotaRequestId || pageVersion !== (this._pageVersion || 0)
+          || token !== app.globalData.token) return null;
       // v2：没有日/周名额了，只剩「每人每周 N 次」这一条个人限制
-      const uw = d.userWeekly || {};
-      const limit = Number(uw.limit) || 0;
-      const remaining = Number(uw.remaining) || 0;
+      const uw = d && d.userWeekly;
+      if (!uw || !Number.isInteger(uw.limit) || uw.limit < 0
+          || !Number.isInteger(uw.used) || uw.used < 0
+          || (uw.limit > 0 && (!Number.isInteger(uw.remaining)
+            || uw.remaining < 0 || uw.remaining > uw.limit))) {
+        this.setData({ quotaWeekly: null, quotaText: '', quotaBlocked: false });
+        if (this.data.receipt) this.setData({ 'receipt.canReplay': false, 'receipt.leftText': '' });
+        return null;
+      }
+      const { limit, used } = uw;
+      const remaining = limit === 0 ? null : uw.remaining;
+      const quotaWeekly = { limit, used, remaining };
       let text = '';
       let blocked = false;
       if (limit > 0) {
@@ -132,11 +163,24 @@ Page({
           text = '本周 ' + limit + ' 次已用完，下周再来';
           blocked = true;
         }
-      } else if (uw.used > 0) {
-        text = '本周已点 ' + uw.used + ' 次（不限次数）';
+      } else if (used > 0) {
+        text = '本周已点 ' + used + ' 次（不限次数）';
       }
-      this.setData({ quotaText: text, quotaBlocked: blocked });
-    }).catch(() => {});
+      const patch = { quotaWeekly, quotaText: text, quotaBlocked: blocked };
+      if (this.data.receipt) {
+        patch['receipt.canReplay'] = limit === 0 || remaining > 0;
+        patch['receipt.leftText'] = limit > 0 && remaining > 0 ? '本周还剩 ' + remaining + ' 次点歌机会' : '';
+      }
+      this.setData(patch);
+      return quotaWeekly;
+    }).catch(() => {
+      if (requestId === this._quotaRequestId && pageVersion === (this._pageVersion || 0)
+          && token === app.globalData.token) {
+        this.setData({ quotaWeekly: null, quotaText: '', quotaBlocked: false });
+        if (this.data.receipt) this.setData({ 'receipt.canReplay': false, 'receipt.leftText': '' });
+      }
+      return null;
+    });
   },
 
   loadSlots() {
@@ -409,7 +453,8 @@ Page({
   },
 
   async doSubmit() {
-    const { type, songName, singer, wishContent, articleTitle, articleContent, wantBroadcastTime } = this.data;
+    if (this.data.submitting) return;
+    const { type, songName, singer, wishContent, articleTitle, articleContent, wantBroadcastTime, allowReschedule } = this.data;
 
     if (type === 1) {
       if (this.data.ctaClosed) {
@@ -426,6 +471,7 @@ Page({
     }
 
     if (!(await this.ensureLogin())) return;
+    if (this.data.submitting) return;
 
     const payload = {
       type,
@@ -436,9 +482,10 @@ Page({
       articleContent: type === 2 ? articleContent : undefined,
       wantBroadcastTime,
       // 协议版：点歌才带这一项（服务端 allow_reschedule，缺省视为 1）
-      ...(type === 1 ? { allowReschedule: this.data.allowReschedule ? 1 : 0 } : {}),
+      ...(type === 1 ? { allowReschedule: allowReschedule ? 1 : 0 } : {}),
     };
 
+    const pageVersion = this._pageVersion || 0;
     this.setData({ submitting: true });
     try {
       const r = await request('/user/submit', 'POST', payload);
@@ -450,8 +497,17 @@ Page({
           wx.switchTab({ url: '/pages/mySubmit/mySubmit' });
         }, 800);
       } else if (type === 1) {
+        // 请求发出后离开过本页：成功结果仍在「我的投稿」，旧回执不应在返回时冒出来。
+        if (pageVersion !== (this._pageVersion || 0)) {
+          // 返回后重新编辑过的草稿属于下一次点歌，不能被上一条慢请求清掉。
+          if (this.data.songName === songName && this.data.singer === singer
+              && this.data.wishContent === wishContent && this.data.wantBroadcastTime === wantBroadcastTime
+              && this.data.allowReschedule === allowReschedule) this.resetSongForm();
+          if (this._visible) this.prepareSong();
+          return;
+        }
         // 协议版：提交只进审核队列，不给回执的话学生会反复刷新等「已排期」
-        this.showReceipt(r);
+        this.showReceipt(r, { songName, singer, allowReschedule });
       } else {
         wx.showToast({ title: '提交成功，等待审核' });
         setTimeout(() => {
@@ -496,24 +552,52 @@ Page({
    *    不再拿点播截止顶替；锁定时刻取这条投稿的 card.lockAt（= 审核截止），
    *    取不到就退回相对说法，不编一个假时刻给学生。
    */
-  showReceipt(r) {
+  showReceipt(r, submittedSong = this.data) {
     const card = (r && r.card) || {};
-    // 提交前的 quotaText 形如「本周还能点 2 次（上限 2 次）」，本地 -1 即提交后的剩余
-    const m = String(this.data.quotaText || '').match(/还能点\s*(\d+)/);
-    const left = m ? Number(m[1]) - 1 : null;
     const lockAt = card.lockAt ? fmtIso(card.lockAt) : '';
     this.setData({
+      quotaWeekly: null,
+      quotaText: '',
+      quotaBlocked: false,
       receipt: {
-        song: [this.data.songName, this.data.singer].filter(Boolean).join(' — '),
+        song: [submittedSong.songName, submittedSong.singer].filter(Boolean).join(' — '),
         at: fmtDate(Date.now()).slice(5, 16), // MM-DD HH:mm
-        leftText: left !== null && left >= 0 ? '本周还剩 ' + left + ' 次点歌机会' : '',
+        leftText: '',
+        canReplay: false, // 等提交成功后的新额度返回，不能拿提交前数据猜。
         auditAt: this.data.winReviewAt || this.data.winClosesAt || '',
         lockText: (lockAt ? '排期结果最晚在 ' + lockAt + '（审核截止）' : '排期结果最晚在审核截止')
           + '确定，届时可在「我的投稿」看到。',
-        allowReschedule: this.data.allowReschedule,
+        allowReschedule: submittedSong.allowReschedule,
       },
     });
-    this.loadQuota(); // 顺手把剩余次数刷到最新，回「表单」时看到的也是准的
+    this.loadQuota();
+    if (wx.pageScrollTo) wx.pageScrollTo({ scrollTop: 0, duration: 0 });
+  },
+
+  /** 只清已提交的点歌字段，保留文稿草稿。 */
+  resetSongForm() {
+    this.setData({
+      receipt: null,
+      songName: '',
+      singer: '',
+      wishContent: '',
+      wantBroadcastTime: '',
+      slotLabel: '',
+      slotShow: false,
+      allowReschedule: true,
+      slotDays: this.data.slotDays.map((day) => ({
+        ...day,
+        items: day.items.map((item) => ({ ...item, selected: false })),
+      })),
+    });
+  },
+
+  /** 有剩余机会才显示入口；重新加载前置数据，服务端仍是最终提交闸门。 */
+  replaySong() {
+    if (!this.data.receipt || !this.data.receipt.canReplay) return;
+    this.resetSongForm();
+    this.setData({ type: 1 });
+    this.prepareSong();
     if (wx.pageScrollTo) wx.pageScrollTo({ scrollTop: 0, duration: 0 });
   },
 

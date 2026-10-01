@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>学生登录 · 「开场白」新方向</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2316161A'/%3E%3Ctext x='32' y='45' font-size='36' text-anchor='middle' fill='white' font-family='serif'%3E%E8%8F%81%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Serif+SC:wght@500;700;900&display=swap">
 <style>
   :root {
@@ -54,7 +55,7 @@
   .step.on { display:flex; }
 
   .kick { font-size:11px; letter-spacing:4px; color:var(--muted); font-weight:500; }
-  .q { font-size:29px; font-weight:700; line-height:1.45; letter-spacing:1px; margin-top:16px; color:var(--ink); }
+  .q { font-size:30px; font-weight:700; line-height:1.5; letter-spacing:1.5px; margin-top:18px; color:var(--ink); }
   .q .hl { color:var(--accent); }
   .sub { font-size:13px; color:var(--muted); margin-top:14px; line-height:1.9; }
 
@@ -62,9 +63,10 @@
   .fill-wrap.tight { margin-top:26px; }
   .flabel { font-size:12px; color:var(--muted); margin-bottom:4px; letter-spacing:1px; }
   .fill { width:100%; background:transparent; border:none; outline:none;
-          border-bottom:2px solid var(--ink); padding:7px 2px;
-          font-size:25px; font-weight:600; color:var(--ink); letter-spacing:3px;
-          font-variant-numeric:tabular-nums; font-family:inherit; transition:border-color .2s; }
+          border-bottom:2px solid var(--ink); padding:8px 2px;
+          font-size:26px; font-weight:700; color:var(--ink); letter-spacing:3px;
+          font-variant-numeric:tabular-nums; font-family:"Noto Serif SC","Songti SC",serif;
+          transition:border-color .25s; }
   .fill::placeholder { color:var(--soft); font-weight:400; letter-spacing:1px; }
   .fill:focus { border-bottom-color:var(--accent); }
   .fill.err { border-bottom-color:var(--live); color:var(--live); }
@@ -78,8 +80,10 @@
   .footbar { flex:none; padding:16px 26px 28px; }
   .next { width:100%; height:52px; border:none; border-radius:13px; background:var(--ink); color:#fff;
           font-size:15px; font-weight:600; letter-spacing:3px; cursor:pointer; font-family:inherit;
-          display:flex; align-items:center; justify-content:center; transition:opacity .2s, background .2s; }
-  .next.dis { background:#D8D6D1; color:#fff; cursor:default; }
+          display:flex; align-items:center; justify-content:center;
+          transition:opacity .2s, background .25s, transform .12s; }
+  .next:not(.dis):active { transform:scale(0.98); opacity:.92; }
+  .next.dis { background:#D8D6D1; color:#fff; cursor:default; transform:none; }
   .ghost { text-align:center; margin-top:14px; font-size:12px; color:var(--muted); cursor:pointer;
            text-decoration:underline; text-underline-offset:3px; }
   .wx { text-align:center; margin-top:14px; font-size:12.5px; color:var(--accent); cursor:pointer; }
@@ -107,7 +111,7 @@
     <b>这次换的是范式，不是皮肤：</b>不再有"顶部装饰动画卡片 + 下方表单 + 蓝按钮"。广播站的人靠<b>念开场白</b>开始一天 ——
     登录就是你和广播站<b>你一句、我一句，把今天的开场白补完整</b>。全屏大字排版、一次只问一句，你的学号和暗号直接填进句子的空行里，
     没有卡片、没有输入框。底部按钮随句子推进。<br>
-    <b>操作：</b>点底部按钮一句句往下走；也可用下方按钮直接跳到某句。衬线大字 + 暖白纸感，无渐变、无插画、无彩色投影。
+    <b>呈现：</b>每一句逐行柔和淡入（小标签 → 问句 → 空行），学号用衬线数字书写；按钮有按压反馈。暖白纸感，无渐变、无插画、无彩色投影。
   </p>
 </div>
 
@@ -135,18 +139,18 @@
         <!-- s0 开场 -->
         <div class="step on center" data-step="s0">
           <div class="brand">
-            <div class="tag">校园广播 · 学生端</div>
-            <div class="station serif">菁悠广播站</div>
-            <div class="rule-line"></div>
-            <div class="slogan">菁菁校园情 · 悠悠广播声</div>
+            <div class="tag ain">校园广播 · 学生端</div>
+            <div class="station serif ain">菁悠广播站</div>
+            <div class="rule-line ain"></div>
+            <div class="slogan ain">菁菁校园情 · 悠悠广播声</div>
           </div>
         </div>
 
         <!-- s1 学号 -->
         <div class="step" data-step="s1">
-          <div class="kick">开场白 · 第一句</div>
-          <div class="q serif">我是菁悠广播站。<br>你呢，学号是——</div>
-          <div class="fill-wrap">
+          <div class="kick ain">开场白 · 第一句</div>
+          <div class="q serif ain">我是菁悠广播站。<br>你呢，学号是——</div>
+          <div class="fill-wrap ain">
             <input class="fill" id="fSid" type="text" inputmode="numeric" placeholder="在这里写下学号" maxlength="12"/>
             <div class="fhint" id="sidHint">写下学号，找到你的位置</div>
           </div>
@@ -154,9 +158,9 @@
 
         <!-- s2 密码 -->
         <div class="step" data-step="s2">
-          <div class="kick">开场白 · 第二句</div>
-          <div class="q serif">嗨，<span class="hl" id="echoSid">同学</span>。<br>对上暗号——</div>
-          <div class="fill-wrap">
+          <div class="kick ain">开场白 · 第二句</div>
+          <div class="q serif ain">嗨，<span class="hl" id="echoSid">同学</span>。<br>对上暗号——</div>
+          <div class="fill-wrap ain">
             <input class="fill" id="fPwd" type="password" placeholder="暗号" maxlength="20"/>
             <div class="fhint">初始暗号是 user + 学号，例如 user20240101</div>
           </div>
@@ -164,9 +168,9 @@
 
         <!-- s2err 密码错 -->
         <div class="step" data-step="s2err">
-          <div class="kick">开场白 · 第二句</div>
-          <div class="q serif">嗨，<span class="hl">20240101</span>。<br>对上暗号——</div>
-          <div class="fill-wrap">
+          <div class="kick ain">开场白 · 第二句</div>
+          <div class="q serif ain">嗨，<span class="hl">20240101</span>。<br>对上暗号——</div>
+          <div class="fill-wrap ain">
             <input class="fill err" id="fPwdErr" type="text" value="1234"/>
             <div class="fhint bad">暗号不对，这句没对上。初始暗号是 user + 学号，例如 user20240101；连续输错不会锁号。</div>
           </div>
@@ -174,16 +178,16 @@
 
         <!-- s3 激活设新暗号 -->
         <div class="step" data-step="s3">
-          <div class="kick">开场白 · 第三句</div>
-          <div class="q serif">第一次见面呀。<br>给自己定个<span class="hl">新暗号</span>——</div>
-          <div class="fill-wrap tight">
+          <div class="kick ain">开场白 · 第三句</div>
+          <div class="q serif ain">第一次见面呀。<br>给自己定个<span class="hl">新暗号</span>——</div>
+          <div class="fill-wrap tight ain">
             <div class="flabel">新暗号</div>
             <input class="fill" id="fNew" type="password" value="abcd1234"/>
             <div class="rules">
               <span class="rule on">至少 8 位</span><span class="rule on">含字母</span><span class="rule on">含数字</span>
             </div>
           </div>
-          <div class="fill-wrap tight">
+          <div class="fill-wrap tight ain">
             <div class="flabel">再写一遍</div>
             <input class="fill" id="fNew2" type="password" placeholder="两次要一样"/>
           </div>
@@ -192,8 +196,8 @@
         <!-- sw 欢迎 -->
         <div class="step center" data-step="sw">
           <div class="brand welcome">
-            <div class="station serif">欢迎你，<br>张同学</div>
-            <div class="onair"><i class="lamp"></i>ON AIR · 开播了</div>
+            <div class="station serif ain">欢迎你，<br>张同学</div>
+            <div class="onair ain"><i class="lamp"></i>ON AIR · 开播了</div>
           </div>
         </div>
 
@@ -221,6 +225,23 @@
   var fSid=document.getElementById('fSid'), fPwd=document.getElementById('fPwd');
   var fNew=document.getElementById('fNew'), fNew2=document.getElementById('fNew2');
 
+  var activeAnims=[];
+  function cancelAnims(){ activeAnims.forEach(function(a){ try{a.cancel();}catch(e){} }); activeAnims=[]; }
+  function playEnter(c){
+    cancelAnims();
+    if(!c||!c.animate) return;
+    if(document.visibilityState!=='visible') return;   // 后台：保持全部可见，不播淡入
+    var els=c.querySelectorAll('.ain');
+    Array.prototype.forEach.call(els,function(el,i){
+      var a=el.animate(
+        [{opacity:0,transform:'translateY(18px)'},{opacity:1,transform:'translateY(0)'}],
+        {duration:540, delay:40+i*95, easing:'cubic-bezier(.22,.61,.36,1)', fill:'both'}
+      );
+      activeAnims.push(a);
+    });
+  }
+  document.addEventListener('visibilitychange',function(){ if(document.hidden) cancelAnims(); });
+
   var META={
     s0:{p:18, n:'开场白', btn:'开始收听'},
     s1:{p:38, n:'01', btn:'下一句'},
@@ -238,14 +259,7 @@
       s.classList.toggle('on',on);
       if(on)target=s;
     });
-    if(target&&target.animate){
-      var a=target.animate(
-        [{opacity:0,transform:'translateY(16px)'},{opacity:1,transform:'translateY(0)'}],
-        {duration:420,easing:'cubic-bezier(.22,.61,.36,1)',fill:'none'}
-      );
-      // 页面在后台（动画时钟冻结）时直接取消，保持内容可见；前台才播放淡入
-      if(document.visibilityState!=='visible'){ a.cancel(); }
-    }
+    playEnter(target);
     var m=META[key];
     pbar.style.width=m.p+'%'; pnum.textContent=m.n;
     next.textContent=m.btn;

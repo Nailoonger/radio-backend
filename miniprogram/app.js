@@ -14,12 +14,22 @@ const STATUS_BAR_HEIGHT = windowInfo.statusBarHeight || 20;
 /* 导航带高度按真实胶囊算：留白 = 胶囊上边距 × 2 + 胶囊高。
    写死的 88rpx 在华为等胶囊偏低的机型上会差好几个像素，内容会顶到胶囊。 */
 let NAV_BAR_HEIGHT = 44;
+
+/* 右上角微信胶囊**占掉的那一段宽度**（自定义导航栏右侧必须让出来）。
+   ⚠️ 2026-10-01 管理端落地踩过：待办台顶栏右边的「指导老师」被胶囊盖住，只剩「指导老」。
+      自定义导航（navigationStyle: custom）下工具和真机都有这颗胶囊，而预览稿的模拟器没有，
+      所以做设计时看不见这个问题 —— 必须用真实 rect 让位，别拍脑袋写死。 */
+let NAV_RIGHT_SPACE = 0;
 try {
   const rect = wx.getMenuButtonBoundingClientRect ? wx.getMenuButtonBoundingClientRect() : null;
   if (rect && rect.height > 0) {
     NAV_BAR_HEIGHT = Math.max((rect.top - STATUS_BAR_HEIGHT) * 2 + rect.height, 44);
   }
-} catch (e) { /* 拿不到就用默认 44 */ }
+  if (rect && rect.left > 0) {
+    const winW = windowInfo.windowWidth || 0;
+    if (winW > 0) NAV_RIGHT_SPACE = Math.max(0, Math.round(winW - rect.left));
+  }
+} catch (e) { /* 拿不到就用默认 44 / 不让位 */ }
 
 App({
   globalData: {
@@ -49,11 +59,20 @@ App({
 
     token: '',
     userInfo: null,
+
+    // ── 管理端登录态（2026-10-01 管理端小程序进入分包）──────────────────
+    // ⚠️ 必须与学生端分键：老师可能在同一台手机既登学生端、又登管理端，
+    //    共用一个 key 会互相顶掉登录态（request.js 的 scope 也是按这个分的）。
+    adminToken: '',
+    adminInfo: null,
+
     switches: {},
 
     // 布局常量（自定义导航用）
     statusBarHeight: STATUS_BAR_HEIGHT,
     navBarHeight: NAV_BAR_HEIGHT,
+    // 右上角胶囊要让出的宽度（px）：右侧有内容的顶栏必须带上它，否则被胶囊盖住
+    navRightSpace: NAV_RIGHT_SPACE,
   },
 
   onLaunch() {
@@ -88,6 +107,12 @@ App({
     const userInfo = wx.getStorageSync('userInfo');
     if (token) this.globalData.token = token;
     if (userInfo) this.globalData.userInfo = userInfo;
+
+    // 管理端登录态（独立 key，与学生端互不影响）
+    const adminToken = wx.getStorageSync('admin_token');
+    const adminInfo = wx.getStorageSync('adminInfo');
+    if (adminToken) this.globalData.adminToken = adminToken;
+    if (adminInfo) this.globalData.adminInfo = adminInfo;
 
     // 拉取模块开关（不阻塞首屏）
     this.fetchSwitches();
@@ -215,6 +240,43 @@ App({
     this.globalData.userInfo = null;
     wx.removeStorageSync('token');
     wx.removeStorageSync('userInfo');
+  },
+
+  /**
+   * 管理员登录（2026-10-01 管理端小程序）
+   * POST /api/admin/login  body: { username, password }
+   *
+   * ⚠️ 管理员账号是独立体系，不走微信绑定，也不能复用学生 token：
+   *    这里写的是 admin_token / globalData.adminToken，request.js 的
+   *    adminRequest() 也只会读这一份，同机双登互不干扰。
+   */
+  adminLogin(username, password) {
+    const { adminRequest } = require('./utils/request.js');
+    return adminRequest('/admin/login', 'POST', { username, password })
+      .then((data) => {
+        this.globalData.adminToken = data.token;
+        this.globalData.adminInfo = data.admin;
+        wx.setStorageSync('admin_token', data.token);
+        wx.setStorageSync('adminInfo', data.admin);
+        return data;
+      });
+  },
+
+  /**
+   * 退出管理端登录（只清管理端那份凭据，不动学生端）
+   */
+  adminLogout() {
+    this.globalData.adminToken = '';
+    this.globalData.adminInfo = null;
+    wx.removeStorageSync('admin_token');
+    wx.removeStorageSync('adminInfo');
+  },
+
+  /**
+   * 是否已登录管理端
+   */
+  isAdminLoggedIn() {
+    return !!this.globalData.adminToken;
   },
 
   /**

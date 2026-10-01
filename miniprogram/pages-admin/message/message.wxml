@@ -1,0 +1,59 @@
+<!-- pages-admin/message/message.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">留言审核</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <view class="filters">
+      <view class="fl {{tabIndex === index ? 'on' : ''}}"
+            wx:for="{{tabs}}" wx:key="*this"
+            data-idx="{{index}}" bindtap="switchTab">
+        <text>{{item}}</text>
+        <text class="n">{{counts[index]}}</text>
+      </view>
+    </view>
+
+    <view class="hint-note" wx:if="{{loading && list.length === 0}}">正在加载……</view>
+
+    <view class="hint-note" wx:elif="{{list.length === 0}}">
+      {{tabIndex === 0 ? '暂时没有待审核的留言' : (tabIndex === 1 ? '还没有已展示的留言' : '还没有已屏蔽的留言')}}
+    </view>
+
+    <block wx:else>
+      <view class="list">
+        <view class="item" wx:for="{{list}}" wx:key="id">
+          <view class="m-head">
+            <view class="av">{{item.initial}}</view>
+            <view class="grow">
+              <view class="m-who">{{item.who}}</view>
+              <view class="m-src">{{item.src}}</view>
+            </view>
+          </view>
+
+          <view class="m-body">{{item.body}}</view>
+
+          <view class="m-foot">
+            <!-- ⚠️ 内容必须写在同一行：<text> 会保留换行，拆行写会多出一个空行把胶囊撑高 -->
+            <text class="tag {{item.tagClass}}">{{item.tagText}}</text>
+            <block wx:if="{{item.status === 0}}">
+              <button class="btn-sm btn-pass" hover-class="pressed"
+                      catchtap="onApprove" data-id="{{item.id}}">通过</button>
+              <button class="btn-sm btn-quiet" hover-class="pressed"
+                      catchtap="onReject" data-id="{{item.id}}">屏蔽</button>
+            </block>
+          </view>
+        </view>
+      </view>
+
+      <view class="hint-note" wx:if="{{hasMore}}">上滑加载更多</view>
+      <view class="hint-note" wx:elif="{{list.length >= 6}}">没有更多了</view>
+    </block>
+  </view>
+</view>

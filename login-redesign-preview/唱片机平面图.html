@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>唱片机 · 平面图</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:-apple-system,"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei",sans-serif;
+    background:#E7E7E3; min-height:100vh; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:22px; padding:40px 24px;
+  }
+  .board { width:min(760px,94vw); }
+  .board svg { width:100%; height:auto; display:block;
+               filter:drop-shadow(0 26px 40px rgba(40,36,24,0.18)); }
+  .cap { text-align:center; }
+  .cap .t { font-size:17px; font-weight:600; letter-spacing:1px; color:#26262A; }
+  .cap .s { font-size:12.5px; color:#8b8b85; margin-top:7px; letter-spacing:1px; }
+</style>
+</head>
+<body>
+
+<div class="board">
+  <svg viewBox="0 0 420 340" xmlns="http://www.w3.org/2000/svg">
+
+    <!-- 机身投影 -->
+    <rect x="30" y="36" width="368" height="276" rx="22" fill="rgba(40,36,24,0.10)"/>
+
+    <!-- 机身 -->
+    <rect x="24" y="28" width="368" height="276" rx="22" fill="#ECE6D9"/>
+    <rect x="24" y="28" width="368" height="276" rx="22" fill="none" stroke="#E0D9C6" stroke-width="1.5"/>
+    <text x="48" y="60" font-size="9" letter-spacing="2.5" fill="#B6AF9E">JINGYOU · TURNTABLE</text>
+
+    <!-- ═══ 黑胶唱片 ═══ -->
+    <circle cx="176" cy="170" r="122" fill="#151519"/>
+    <circle cx="176" cy="170" r="121" fill="none" stroke="#000" stroke-width="1"/>
+    <!-- 沟槽 -->
+    <g fill="none" stroke="#232329" stroke-width="1">
+      <circle cx="176" cy="170" r="112"/>
+      <circle cx="176" cy="170" r="102"/>
+      <circle cx="176" cy="170" r="92"/>
+      <circle cx="176" cy="170" r="82"/>
+      <circle cx="176" cy="170" r="72"/>
+      <circle cx="176" cy="170" r="62"/>
+      <circle cx="176" cy="170" r="52"/>
+    </g>
+    <!-- 一道平面高光弧 -->
+    <path d="M110 118 A96 96 0 0 1 150 92" fill="none" stroke="#2E2E36" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+
+    <!-- 中心标签 -->
+    <circle cx="176" cy="170" r="40" fill="#0A5FCC"/>
+    <circle cx="176" cy="170" r="33" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1"/>
+    <text x="176" y="158" text-anchor="middle" font-size="12" font-weight="700" fill="#fff"
+          font-family="Songti SC,serif" letter-spacing="2">菁悠</text>
+    <circle cx="176" cy="170" r="3.4" fill="#ECE6D9"/>
+    <text x="176" y="190" text-anchor="middle" font-size="6.5" fill="rgba(255,255,255,0.85)" letter-spacing="1.2">33⅓ RPM</text>
+
+    <!-- ═══ 唱臂 ═══ -->
+    <!-- 配重 -->
+    <circle cx="368" cy="74" r="9" fill="#C6C1B5"/>
+    <circle cx="368" cy="74" r="9" fill="none" stroke="#B3AEA2" stroke-width="1"/>
+    <!-- 底座 -->
+    <circle cx="348" cy="96" r="24" fill="#D9D4C8"/>
+    <circle cx="348" cy="96" r="24" fill="none" stroke="#CBC6B9" stroke-width="1"/>
+    <circle cx="348" cy="96" r="15" fill="#C6C1B5"/>
+    <circle cx="348" cy="96" r="5" fill="#8E897D"/>
+    <!-- 臂杆 -->
+    <line x1="340" y1="104" x2="232" y2="140" stroke="#CBC6BB" stroke-width="8" stroke-linecap="round"/>
+    <line x1="340" y1="104" x2="232" y2="140" stroke="#DDD8CE" stroke-width="2.4" stroke-linecap="round"/>
+    <!-- 唱头 -->
+    <g transform="rotate(-18 228 142)">
+      <rect x="216" y="137" width="22" height="10" rx="2.5" fill="#2A2A2E"/>
+      <rect x="216" y="137" width="22" height="3.4" rx="1.7" fill="#45454C"/>
+    </g>
+
+    <!-- ═══ 控制区（右下） ═══ -->
+    <rect x="324" y="210" width="42" height="20" rx="10" fill="#D5D0C3"/>
+    <rect x="324" y="210" width="21" height="20" rx="10" fill="#C4BFB2"/>
+    <text x="331" y="223.5" text-anchor="middle" font-size="6.5" fill="#7E796C">33</text>
+    <text x="356" y="223.5" text-anchor="middle" font-size="6.5" fill="#7E796C">45</text>
+    <!-- 指示灯 -->
+    <circle cx="345" cy="250" r="4.5" fill="#0A5FCC"/>
+    <circle cx="343.4" cy="248.4" r="1.4" fill="rgba(255,255,255,0.7)"/>
+    <text x="356" y="253" font-size="7.5" fill="#A39E90" letter-spacing="0.5">POWER</text>
+
+  </svg>
+</div>
+
+<div class="cap">
+  <div class="t">唱片机 · 平面图</div>
+  <div class="s">俯视 · 扁平风格 ／ 黑胶唱片 · 唱臂 · 转速切换</div>
+</div>
+
+</body>
+</html>

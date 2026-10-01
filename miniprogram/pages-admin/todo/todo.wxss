@@ -1,0 +1,196 @@
+/* pages-admin/todo/todo.wxss
+   待办台 —— L1「白卡大投影」+ C 案「主浮次平」（2026-10-01 陛下定版 v7-C / v8-②）
+
+      页面底 = 羊皮纸灰（--parchment）
+      待办卡 = 白卡 + 第 3 档投影（--sh-lift）—— 整屏唯一浮起来的一张，靠海拔当主角
+      入口卡 = 白卡但**贴平**（不带投影）—— 主次靠"浮/平"区分
+      卡内次级块（图标底）= 退回羊皮纸灰 —— 白卡里嵌灰块
+
+   ⚠️ 原来这里是深色卡（--tile）当主角，改成白卡后这屏没有深色卡了
+      —— 与审核处理台（L1）同一套，别在别的屏顺手扩散。
+   ⚠️ 页面底由白转灰后，原本靠白底衬托的 --soft 提示会糊进灰底（对比度 ~1.5:1），
+      所以 .divider-note 提到 --muted（对羊皮纸灰 ≈4.3:1）。
+
+   尺寸换算：预览稿 rpx÷2 = px，所以这里一律 px×2。 */
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+}
+/* L1 标记：页面底退成羊皮纸灰，卡片才浮得起来 */
+.page.lift { background: var(--parchment); }
+
+/* ══════════ 顶栏 ══════════
+   2026-10-01 定版：徽章跨两行 + 「导播台 / 指导老师」两行文字（预览 v12 的 C 案）。
+   ⚠️⚠️ **这里不能再写死 `height`** —— 两行文字比一行高（实测 112rpx vs 单行 88rpx），
+       写死高度会把文字压扁。改用 `min-height` + 上下内科距，让它自己长。
+   ⚠️ 右上角是微信胶囊的地盘，顶栏右侧不放任何东西。
+   ⚠️ 「指导老师」原先贴在待办卡右上角，已挪到标题下面（见 wxml 注释）。 */
+.topbar {
+  min-height: 88rpx;
+  padding: 16rpx 36rpx 20rpx;
+  display: flex;
+  align-items: center;
+  /* 16rpx = 预览稿的 column-gap: 8px，别随手改成 20 */
+  gap: 16rpx;
+  flex: none;
+}
+/* C 案：徽章跟着两行文字块一起长（26px → 32px = 64rpx），否则两行文字变高后徽章显小。
+   ⚠️ 这层 `background` 是**必须的**，不是装饰：站徽 PNG 是**透明底**（环形文字中间是镂空的），
+      不给白底的话，镂空处会直接透出下方的羊皮纸灰 —— 环形文字就成了"缺字"的样子。
+      预览稿（v12）里就有这层白底，所以陛下点头的 C 案 = 白底圆徽章。
+   ⚠️ 这是"背景色"不是"卡片"（没有外扩尺寸、没有投影）—— 徽章卡片的形态另行讨论。 */
+.badge {
+  width: 64rpx; height: 64rpx;
+  border-radius: 50%;
+  background: var(--canvas);
+  flex: none;
+}
+/* 两行文字块：**必须是 flex column** —— WXML 里两个相邻 <text> 之间的换行
+   在 flex 容器中不生成匿名行盒；若用普通 block 容器，那个换行会实占一行。 */
+.topbar-txt { display: flex; flex-direction: column; min-width: 0; }
+.topbar-name { font-size: 30rpx; font-weight: 600; color: var(--ink); line-height: 1.25; }
+.topbar-role { font-size: 24rpx; color: var(--muted); line-height: 1.4; margin-top: 4rpx; }
+
+/* ══════════ 内容区 ══════════ */
+.body {
+  flex: 1;
+  padding: 0 36rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+/* ══════════ 待办卡：白卡 + 大投影（整屏唯一浮起的） ══════════ */
+.tile {
+  background: var(--canvas);
+  border-radius: 40rpx;
+  padding: 34rpx 36rpx;
+  box-shadow: var(--sh-lift);
+  flex: none;
+}
+/* eyebrow 行（原先右端还有当前登录人，2026-10-01 已挪进顶栏） */
+.tl-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  flex: none;
+}
+.tl-eyebrow {
+  font-size: 23rpx;
+  color: var(--muted);
+  letter-spacing: 1.2rpx;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex: none;
+}
+.tl-dot { width: 12rpx; height: 12rpx; border-radius: 50%; background: var(--accent); flex: none; }
+.tl-num {
+  font-size: 88rpx;
+  font-weight: 600;
+  letter-spacing: -3rpx;
+  line-height: 1.1;
+  margin-top: 12rpx;
+  color: var(--ink);
+  flex: none;
+}
+.tl-unit { font-size: 26rpx; color: var(--muted); margin-left: 14rpx; font-weight: 400; }
+.tl-split {
+  margin-top: 26rpx;
+  padding-top: 24rpx;
+  border-top: 2rpx solid var(--divider);
+  display: flex;
+  gap: 36rpx;
+  font-size: 24rpx;
+  color: var(--muted);
+  flex: none;
+}
+.tl-split .b { font-weight: 600; color: var(--ink); }
+
+/* ══════════ 入口卡：白卡但贴平（不带投影 —— 主次靠"浮/平"分） ══════════ */
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 30rpx 32rpx;
+  border-radius: 34rpx;
+  background: var(--canvas);
+  flex: none;
+}
+.e-ico {
+  width: 72rpx; height: 72rpx;
+  border-radius: 22rpx;
+  /* 白卡里嵌灰块（原来是白底 + 一档投影，翻过来了） */
+  background: var(--parchment);
+  flex: none;
+  display: flex; align-items: center; justify-content: center;
+}
+.e-txt { flex: 1; min-width: 0; }
+.e-name { font-size: 29rpx; font-weight: 500; color: var(--ink); }
+.e-sub { font-size: 23rpx; color: var(--muted); margin-top: 4rpx; }
+.e-n { font-size: 30rpx; font-weight: 600; color: var(--accent); flex: none; }
+.e-arrow {
+  width: 14rpx; height: 14rpx;
+  border-right: 3rpx solid var(--soft);
+  border-top: 3rpx solid var(--soft);
+  transform: rotate(45deg);
+  flex: none;
+}
+
+/* ══════════ 纯 CSS 图标（不用 emoji、不引图） ══════════ */
+.ic-doc {
+  width: 30rpx; height: 38rpx;
+  border: 3rpx solid var(--ink-2);
+  border-radius: 4rpx;
+  position: relative;
+}
+.ic-doc::before {
+  content: '';
+  position: absolute; left: 6rpx; top: 10rpx;
+  width: 18rpx; height: 3rpx;
+  background: var(--ink-2);
+  box-shadow: 0 8rpx 0 var(--ink-2), 0 16rpx 0 var(--ink-2);
+}
+.ic-chat {
+  width: 38rpx; height: 30rpx;
+  border: 3rpx solid var(--ink-2);
+  border-radius: 8rpx;
+  position: relative;
+}
+.ic-chat::after {
+  content: '';
+  position: absolute; left: 8rpx; bottom: -10rpx;
+  width: 0; height: 0;
+  border-left: 8rpx solid transparent;
+  border-right: 8rpx solid transparent;
+  border-top: 10rpx solid var(--ink-2);
+}
+
+/* ══════════ 底部说明 + 退出 ══════════ */
+.divider-note {
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--muted);
+  padding: 4rpx 0;
+  flex: none;
+}
+
+.footbar {
+  margin-top: auto;
+  padding-top: 24rpx;
+  display: flex;
+  justify-content: center;
+  flex: none;
+}
+.foot-link {
+  font-size: 25rpx;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 6rpx;
+}
+
+.pressed { opacity: 0.72; }

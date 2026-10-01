@@ -1,0 +1,124 @@
+<!-- pages-admin/review-detail/detail.wxml
+     审核处理台 —— L1「白卡大投影」：页面底是羊皮纸灰，卡片浮起来（第 3 档投影），
+     描边全去；卡内的名额条 / 文本域退回灰底（白卡里嵌灰块）。 -->
+<view class="page lift">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">审核处理台</view>
+    <!-- ⚠️ 顶栏右侧一律留空（微信胶囊的地盘，见 app.js 的 navRightSpace 说明）。
+         原来这里放「点歌 / 文稿」，会被胶囊盖掉；而且卡里「投稿内容（点歌）」已经写了类型，
+         信息完全重复 —— 所以直接空着，和其余 8 个页面保持一致。 -->
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body" wx:if="{{loading}}">
+    <view class="hint-note">正在加载……</view>
+  </view>
+
+  <view class="body" wx:elif="{{notFound}}">
+    <view class="hint-note">这条投稿不存在，或已被删除</view>
+  </view>
+
+  <block wx:else>
+    <view class="body">
+      <!-- 上一条 / 位置 / 下一条 -->
+      <view class="cs-nav">
+        <text class="cs-nav-b {{pos <= 1 ? 'off' : ''}}" bindtap="prevOne">‹ 上一条</text>
+        <!-- ⚠️ 内容必须写在同一行：<text> 会保留换行，拆行写会多出一个空行把这一行撑高 -->
+        <text class="cs-nav-c">{{pos > 0 ? '第 ' + pos + ' / ' + queueTotal + ' 条待处理' : '不在待处理队列'}}</text>
+        <text class="cs-nav-b {{pos >= queueTotal ? 'off' : ''}}" bindtap="nextOne">下一条 ›</text>
+      </view>
+
+      <!-- 投稿人卡（白卡 + 大投影） -->
+      <view class="pod">
+        <view class="pod-person">
+          <view class="pod-av">{{person.initial}}</view>
+          <view class="grow">
+            <view class="pod-name">{{person.name}}</view>
+            <view class="pod-sub">{{person.sub}}</view>
+          </view>
+          <text class="pod-chip">{{person.chip}}</text>
+        </view>
+        <view class="pod-stats">
+          <view class="pod-stat">
+            <view class="pod-stat-l">历史通过</view>
+            <view class="pod-stat-n">{{person.approved}}</view>
+          </view>
+          <view class="pod-stat">
+            <view class="pod-stat-l">历史驳回</view>
+            <view class="pod-stat-n">{{person.rejected}}</view>
+          </view>
+          <view class="pod-stat">
+            <view class="pod-stat-l">首次投稿</view>
+            <view class="pod-stat-d">{{person.firstAt}}</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 投稿内容（白卡 + 大投影） -->
+      <view class="card-sec">
+        <view class="sec-head">
+          <text class="sh-t">投稿内容（{{kindText}}）</text>
+          <text class="sh-m">完整内容，不做截断</text>
+        </view>
+        <view class="kv" wx:for="{{rows}}" wx:key="k">
+          <text class="k">{{item.k}}</text>
+          <text class="v {{item.strong ? 'strong' : ''}}">{{item.v}}</text>
+        </view>
+      </view>
+
+      <!-- 处理结果：本周名额（仅点歌） -->
+      <view class="card-sec" wx:if="{{quota}}">
+        <view class="sec-head"><text class="sh-t">处理结果</text></view>
+        <view class="quota">
+          <view class="quota-row">
+            <text>本周名额</text>
+            <text><text class="qb">{{quota.used}}</text> / {{quota.limit}} · 还剩 {{quota.remain}}</text>
+          </view>
+          <view class="qbar"><view class="qbar-fill" style="width: {{quota.pct}}%"></view></view>
+          <view class="q-hint">通过会占用一个名额（日 + 周各一个）。</view>
+        </view>
+      </view>
+
+      <!-- 驳回原因（白卡 + 大投影；预设胶囊保持羊皮纸灰） -->
+      <view class="reject-box" id="rejectBox">
+        <view class="rb-head">
+          <text class="rb-t">驳回原因</text>
+          <text class="rb-req">必填</text>
+        </view>
+        <view class="presets">
+          <view class="preset {{presetIndex === index ? 'on' : ''}}"
+                wx:for="{{presets}}" wx:key="*this"
+                data-idx="{{index}}" bindtap="tapPreset">{{item}}</view>
+        </view>
+        <textarea class="ta" value="{{reason}}" bindinput="inputReason"
+                  placeholder="或直接写明原因，会原样展示给投稿人"
+                  placeholder-class="ta-ph" maxlength="200" auto-height />
+        <view class="warnline">
+          <view class="warn-dot"></view>
+          <text>原因会原样展示给投稿人（小程序「我的投稿」里可见），写清理由再驳回。未填原因时「驳回」不可点。</text>
+        </view>
+      </view>
+
+      <!-- 审核记录 -->
+      <view class="card-sec">
+        <view class="sec-head"><text class="sh-t">审核记录</text></view>
+        <view class="record">
+          <view class="rec-line" wx:for="{{recordLines}}" wx:key="*this">{{item}}</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 底部固定操作条（白底 + 上边框，页面变灰后自然成为「操作区」） -->
+    <view class="actionbar2">
+      <button class="btn-lg2 rej" hover-class="pressed"
+              bindtap="doReject" disabled="{{!canReject || submitting}}">驳 回</button>
+      <button class="btn-lg2 pass" hover-class="pressed"
+              bindtap="doApprove" disabled="{{submitting}}">通过并取下一条</button>
+    </view>
+  </block>
+</view>

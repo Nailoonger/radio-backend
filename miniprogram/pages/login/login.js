@@ -138,4 +138,9 @@ Page({
     if (pages.length > 1) wx.navigateBack();
     else wx.switchTab({ url: '/pages/index/index' });
   },
+
+  /** 管理员入口（2026-10-01）：进管理端分包，与学生登录完全两条链路 */
+  goAdminLogin() {
+    wx.navigateTo({ url: '/pages-admin/login/login' });
+  },
 });

@@ -1,0 +1,67 @@
+<!-- pages-admin/todo/todo.wxml -->
+<view class="page lift">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <!-- 顶栏：徽章跨两行 + 「导播台 / 指导老师」两行文字（2026-10-01 定版，预览 v12 的 C 案）
+       ⚠️ 右上角是微信胶囊的地盘，**顶栏右侧不放任何东西**。
+       ⚠️ 「指导老师」原先贴在待办卡右上角，已挪到标题下面 —— 它是"谁在看这屏"的身份信息，跟标题在一起更顺。
+       ⚠️ 这个顶栏现在是**两行文字**，比原来一行高：高度不能再写死（见 wxss 的 min-height 说明）。 -->
+  <view class="topbar">
+    <image class="badge" src="/assets/station-badge.png" mode="aspectFit" />
+    <!-- ⚠️ 两个 <text> 的内容都必须写在同一行：WXML 的 <text> 会保留换行（不做 HTML 那种空白折叠），
+         拆行写会多渲染一个空行盒，把这一行撑高。本行文案是写死的，不需要拆行。 -->
+    <view class="topbar-txt">
+      <text class="topbar-name">导播台</text>
+      <text class="topbar-role">指导老师</text>
+    </view>
+  </view>
+
+  <view class="body">
+    <!-- 待办卡：L1 白卡 + 大投影（整屏唯一浮起来的一张，靠海拔当主角） -->
+    <view class="tile">
+      <view class="tl-top">
+        <view class="tl-eyebrow">
+          <view class="tl-dot"></view>
+          <text>今日待办</text>
+        </view>
+        <!-- ⚠️ 这里原先是「{{adminName}}」（指导老师）—— 已挪到顶栏标题下面。
+             空着就好，**别为了填空再添别的东西**（陛下 2026-10-01 明确说过）。 -->
+      </view>
+      <view class="tl-num">
+        <text>{{total}}</text><text class="tl-unit">条待你处理</text>
+      </view>
+      <view class="tl-split">
+        <text>投稿 & 点歌 <text class="b">{{submitPending}}</text></text>
+        <text>留言 <text class="b">{{messagePending}}</text></text>
+      </view>
+    </view>
+
+    <!-- 入口一：投稿 & 点歌审核 -->
+    <view class="entry" hover-class="pressed" bindtap="goReview">
+      <view class="e-ico"><view class="ic-doc"></view></view>
+      <view class="e-txt">
+        <view class="e-name">投稿 & 点歌审核</view>
+        <view class="e-sub">通过 / 驳回，驳回带预设理由</view>
+      </view>
+      <text class="e-n">{{submitPending}}</text>
+      <view class="e-arrow"></view>
+    </view>
+
+    <!-- 入口二：留言审核 -->
+    <view class="entry" hover-class="pressed" bindtap="goMessage">
+      <view class="e-ico"><view class="ic-chat"></view></view>
+      <view class="e-txt">
+        <view class="e-name">留言审核</view>
+        <view class="e-sub">通过展示 / 屏蔽</view>
+      </view>
+      <text class="e-n">{{messagePending}}</text>
+      <view class="e-arrow"></view>
+    </view>
+
+    <view class="divider-note">排期、批量、学生账号、系统设置仍在电脑端</view>
+
+    <view class="footbar">
+      <text class="foot-link" hover-class="pressed" bindtap="doLogout">退出登录</text>
+    </view>
+  </view>
+</view>

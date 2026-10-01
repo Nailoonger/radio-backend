@@ -84,6 +84,14 @@
       </view>
     </block>
 
+    <!-- 管理端入口：一行灰字，**不做按钮** —— 按钮会被学生误点，
+         灰字老师找得到、学生不会留意（2026-10-01，与学生登录完全两条链路） -->
+    <view class="admin-entry" wx:if="{{step === 'login'}}"
+          hover-class="pressed" bindtap="goAdminLogin">
+      <text>管理员登录</text>
+      <text class="arw">→</text>
+    </view>
+
     <!-- ══════════ 第二步：首登激活（初始密码改新密码） ══════════ -->
     <block wx:if="{{step === 'activate'}}">
       <view class="glass">

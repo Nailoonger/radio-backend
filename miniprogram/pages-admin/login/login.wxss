@@ -1,15 +1,20 @@
-/* pages/login/login.wxss
-   v2：沿用管理端登录视觉 —— 淡蓝对角渐变底 + 收音机线条插画 + 玻璃卡 + 整宽实心蓝按钮 */
+/* pages-admin/login/login.wxss
+   管理端登录 —— 与学生登录页同一套「登录家族」视觉：
+   对角淡渐变底 + 收音机线条插画 + 玻璃卡 + 整宽实心蓝按钮。
+   （登录页是唯一获批突破配色的页面，管理端登录沿用同一破例尺度。）
+
+   ⚠️ 这些类必须在本页 wxss 里定义：小程序页面样式不继承别的页面，
+      app.wxss 只提供设计系统 token 与骨架类。
+*/
 
 .page {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  /* 管理端同款对角淡渐变，为玻璃卡提供可透的底色 */
   background: linear-gradient(135deg, #e1ecf8 0%, #fbfdfe 100%);
 }
 
-/* ══════════ 顶栏（管理端同款：徽章 + 站名） ══════════ */
+/* ══════════ 顶栏 ══════════ */
 .topbar {
   height: 96rpx;
   padding: 0 36rpx;
@@ -34,7 +39,7 @@
 .topbar-name { font-size: 26rpx; font-weight: 600; color: #1d1d1f; letter-spacing: -0.2rpx; }
 .topbar-spacer { width: 60rpx; }
 
-/* ══════════ 内容区（方案：padding 6px → 12rpx，顶对齐不居中） ══════════ */
+/* ══════════ 内容区 ══════════ */
 .body {
   flex: 1;
   padding: 12rpx 44rpx 0;
@@ -42,9 +47,7 @@
   flex-direction: column;
 }
 
-/* ══════════ 品牌区：收音机线条插画 ══════════
-   方案里的 SVG viewBox 是 330×240，1 单位 = 1rpx 直接映射（整机 336×244rpx，和预览稿 168×122px 一致）。
-   喇叭/旋钮/信号弧全部按 SVG 坐标绝对定位，不再用 flex 拼装。 */
+/* ══════════ 品牌区：收音机线条插画（SVG 1 单位 = 1rpx 原样映射） ══════════ */
 .brand { display: flex; flex-direction: column; align-items: center; gap: 16rpx; margin: 8rpx 0 28rpx; flex: none; }
 .radio-art { position: relative; width: 336rpx; height: 244rpx; flex: none; }
 
@@ -73,7 +76,7 @@
   width: 9rpx; height: 9rpx;
   background: #0066cc; border-radius: 50%;
 }
-/* 旋钮：cx200 / cx232，cy168，r9；刻度是 y161→165 的 4 单位小竖线 */
+/* 旋钮：cx200 / cx232，cy168，r9 */
 .knob { position: absolute; width: 18rpx; height: 18rpx; border: 4rpx solid #0066cc; border-radius: 50%; box-sizing: border-box; }
 .knob.k1 { left: 191rpx; top: 159rpx; }
 .knob.k2 { left: 223rpx; top: 159rpx; }
@@ -81,9 +84,7 @@
 .k1 .tick { left: 7rpx; top: 2rpx; }
 .k2 .tick { left: 7rpx; top: 2rpx; }
 
-/* 三道信号弧：SVG 里是圆心同在 (165,130)、半径 42/64/86 的上弧。
-   用「圆环只描 border-top」近似（约 90° 弧，比 SVG 的 ~80° 略饱满，视觉一致）：
-   圆心对齐 → 盒子 left = 165 - r，top = 130 - r。 */
+/* 三道信号弧：圆心同在 (165,130)，半径 42/64/86 的上弧 */
 .wave {
   position: absolute;
   border: 5rpx solid transparent;
@@ -97,7 +98,7 @@
 
 .tagline { font-size: 24rpx; color: #6b7280; letter-spacing: 0.4rpx; }
 
-/* ══════════ 玻璃卡（管理端同款配方） ══════════ */
+/* ══════════ 玻璃卡 ══════════ */
 .glass {
   position: relative;
   border-radius: 44rpx;
@@ -111,7 +112,6 @@
     0 24rpx 56rpx -16rpx rgba(15, 28, 46, 0.04),
     0 48rpx 112rpx -24rpx rgba(15, 28, 46, 0.03);
 }
-/* 渐变描边：上沿受光发白、下沿收暗（微信不支持 mask-composite，用边框近似） */
 .glass::before {
   content: '';
   position: absolute; inset: 0;
@@ -147,7 +147,7 @@
   border-radius: 20rpx; padding: 16rpx 22rpx;
 }
 
-/* ══════════ 登录按钮：整宽实心蓝（管理端同款） ══════════ */
+/* ══════════ 登录按钮：整宽实心蓝 ══════════ */
 button.submit {
   width: 100%; height: 88rpx; margin-top: 40rpx;
   padding: 0; box-sizing: border-box;
@@ -155,63 +155,13 @@ button.submit {
   font-size: 29rpx; font-weight: 600; letter-spacing: 10rpx;
   color: #fff; background: #2f6be8; border: none;
   box-shadow: 0 16rpx 36rpx -12rpx rgba(47, 107, 232, 0.45);
-  /* 微信 button 自带 padding/line-height，必须显式清掉再用 flex 居中，否则文字会挤出盒子 */
   display: flex; align-items: center; justify-content: center;
   line-height: 1;
 }
 button.submit::after { border: none; }
 button.submit[disabled] { color: rgba(255, 255, 255, 0.75); background: #2f6be8; opacity: 0.7; }
 
-/* ══════════ 「或」分隔 + 微信一键登录 ══════════ */
-.or-row { display: flex; align-items: center; gap: 20rpx; margin: 30rpx 0 22rpx; }
-.or-line { flex: 1; height: 2rpx; background: rgba(10, 26, 46, 0.09); }
-.or-txt { font-size: 22rpx; color: #9aa3ae; }
-
-button.ghost-btn {
-  width: 100%; height: 84rpx;
-  padding: 0; box-sizing: border-box;
-  border-radius: 24rpx;
-  background: transparent; border: 2rpx solid rgba(10, 26, 46, 0.16);
-  color: #141519; font-size: 27rpx; font-weight: 500;
-  display: flex; align-items: center; justify-content: center; gap: 14rpx;
-  line-height: 1;
-}
-button.ghost-btn::after { border: none; }
-.wx {
-  width: 34rpx; height: 34rpx; border-radius: 50%;
-  background: #2aae67; position: relative; flex: none;
-}
-.wx::before, .wx::after {
-  content: ''; position: absolute; background: #fff;
-  border-radius: 50%; width: 8rpx; height: 8rpx; top: 10rpx;
-}
-.wx::before { left: 8rpx; }
-.wx::after { right: 8rpx; }
-
-/* ══════════ 卡底注（管理端「记住账号/帮助」一栏 → 隐私口径） ══════════ */
-.card-divider { height: 2rpx; margin: 30rpx 0 22rpx; background: rgba(10, 26, 46, 0.09); }
-.card-foot { display: flex; align-items: center; justify-content: space-between; }
-.foot-txt { font-size: 22rpx; color: #8a9199; }
-
-/* ══════════ 激活屏 ══════════ */
-.hello-row { display: flex; align-items: center; gap: 20rpx; }
-.avatar {
-  width: 80rpx; height: 80rpx; border-radius: 50%; flex: none;
-  background: #1d1d1f; color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 32rpx; font-weight: 600;
-}
-.hello-meta { min-width: 0; }
-.pwd-rule { display: flex; gap: 12rpx; margin-top: 14rpx; flex-wrap: wrap; }
-.rule {
-  font-size: 21rpx; padding: 6rpx 18rpx; border-radius: 999rpx;
-  background: rgba(10, 26, 46, 0.05); color: #9aa3ae;
-}
-.rule.on { background: rgba(0, 102, 204, 0.08); color: #0066cc; }
-
-.skip { text-align: center; margin-top: 26rpx; font-size: 24rpx; color: #9aa3ae; text-decoration: underline; text-underline-offset: 6rpx; }
-
-/* ══════════ 管理端入口（卡片下方一行灰字，不用按钮） ══════════ */
+/* ══════════ 回学生登录：一行灰字（不做按钮，避免老师之外的人误触） ══════════ */
 .admin-entry {
   margin: 24rpx auto 0;
   font-size: 25rpx;
@@ -222,5 +172,14 @@ button.ghost-btn::after { border: none; }
   flex: none;
 }
 .admin-entry .arw { color: #9aa3ae; }
+
+/* ══════════ 页脚 ══════════ */
+.lg-foot {
+  padding: 16rpx 0 24rpx;
+  text-align: center;
+  font-size: 23rpx;
+  color: #9aa3ae;
+  flex: none;
+}
 
 .pressed { opacity: 0.72; }

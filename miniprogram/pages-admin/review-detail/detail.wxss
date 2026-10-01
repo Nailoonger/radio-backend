@@ -1,0 +1,236 @@
+/* pages-admin/review-detail/detail.wxss
+   ══ L1「白卡大投影」══════════════════════════════════════════════
+   不引入任何新颜色，纯靠海拔差当焦点：
+     · 页面底退成羊皮纸灰（--parchment）
+     · 主卡（投稿人卡 / 投稿内容 / 驳回原因箱）白底 + 第 3 档投影 --sh-lift
+     · 原来的 1px 描边一律去掉（描边叠影子会显脏）
+     · 卡内次级块（名额条、文本域）翻过来 —— 白卡里嵌灰块
+   ⚠️ --sh-lift 全是纯黑透明（三通道极差 0），是中性投影，不是彩色投影。 */
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+}
+/* L1 标记：本页恒为 lift —— 页面底由白退成羊皮纸灰，卡片才浮得起来 */
+.page.lift { background: var(--parchment); }
+
+/* 返回箭头 */
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(45deg);
+  margin-left: 6rpx;
+}
+/* ⚠️ 这里原有一个 .navbar-quiet（顶栏右侧显示「点歌 / 文稿」）—— 已删：
+   自定义导航右上角是微信胶囊的地盘，放那儿会被盖掉；类型在卡里已经写了。 */
+
+/* 底部固定操作条要占位，否则最后一张卡会被压住 */
+.body {
+  flex: 1;
+  padding: 0 36rpx 220rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+/* ══════════ 上一条 / 位置 / 下一条 ══════════ */
+.cs-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 25rpx;
+  padding: 2rpx 4rpx 0;
+  flex: none;
+}
+.cs-nav-b { color: var(--accent); }
+.cs-nav-b.off { color: var(--soft); }
+.cs-nav-c { font-size: 23rpx; color: var(--muted); }
+
+/* ══════════ 主卡：白底 + 第 3 档投影 ══════════ */
+.pod,
+.card-sec,
+.reject-box {
+  background: var(--canvas);
+  border-radius: 34rpx;
+  box-shadow: var(--sh-lift);
+  flex: none;
+}
+.pod { padding: 28rpx 30rpx; }
+.card-sec { padding: 26rpx 28rpx; }
+.reject-box { padding: 28rpx; }
+
+/* ── 投稿人卡 ── */
+.pod-person { display: flex; align-items: center; gap: 20rpx; }
+.pod-av {
+  width: 76rpx; height: 76rpx;
+  border-radius: 50%;
+  flex: none;
+  background: var(--ink);
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+}
+.grow { flex: 1; min-width: 0; }
+.pod-name { font-size: 30rpx; font-weight: 600; color: var(--ink); }
+.pod-sub {
+  font-size: 22rpx;
+  color: var(--muted);
+  margin-top: 4rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pod-chip {
+  font-size: 21rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 9999rpx;
+  flex: none;
+  background: var(--parchment);
+  color: var(--muted);
+}
+.pod-stats {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 24rpx;
+  padding-top: 22rpx;
+  border-top: 2rpx solid var(--divider);
+}
+.pod-stat { flex: 1; min-width: 0; }
+.pod-stat-l { font-size: 22rpx; color: var(--muted); }
+.pod-stat-n { font-size: 40rpx; font-weight: 600; color: var(--ink); margin-top: 4rpx; line-height: 1.15; }
+.pod-stat-d { font-size: 30rpx; font-weight: 600; color: var(--ink); margin-top: 10rpx; }
+
+/* ── 小节卡 ── */
+.sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18rpx;
+}
+.sh-t { font-size: 27rpx; font-weight: 600; color: var(--ink); }
+.sh-m { font-size: 22rpx; color: var(--muted); }
+
+.kv { display: flex; gap: 20rpx; padding: 14rpx 0; align-items: flex-start; }
+.kv + .kv { border-top: 2rpx solid var(--divider); }
+.kv .k { width: 160rpx; flex: none; font-size: 25rpx; color: var(--muted); line-height: 1.55; }
+.kv .v { flex: 1; min-width: 0; font-size: 26rpx; line-height: 1.6; color: var(--ink-2); }
+.kv .v.strong { font-weight: 600; color: var(--ink); }
+
+/* ── 名额条：白卡里嵌灰块 ── */
+.quota { border-radius: 22rpx; background: var(--parchment); padding: 22rpx 26rpx; }
+.quota-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 25rpx;
+  color: var(--muted);
+}
+.quota-row .qb { font-size: 30rpx; color: var(--ink); font-weight: 600; }
+.qbar {
+  height: 10rpx;
+  border-radius: 9999rpx;
+  background: var(--hairline);
+  margin-top: 18rpx;
+  overflow: hidden;
+}
+.qbar-fill { height: 100%; background: var(--accent); border-radius: 9999rpx; }
+.q-hint { font-size: 22rpx; color: var(--muted); margin-top: 16rpx; line-height: 1.55; }
+
+/* ── 驳回原因箱 ── */
+.rb-head { display: flex; align-items: center; justify-content: space-between; }
+.rb-t { font-size: 27rpx; font-weight: 500; color: var(--ink); }
+.rb-req {
+  font-size: 21rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 9999rpx;
+  background: var(--red-bg);
+  color: var(--red-fg);
+}
+.presets { display: flex; flex-wrap: wrap; gap: 14rpx; margin-top: 22rpx; }
+.preset {
+  font-size: 24rpx;
+  padding: 10rpx 20rpx;
+  border-radius: 9999rpx;
+  background: var(--parchment);
+  color: var(--ink-2);
+  border: 2rpx solid transparent;
+}
+.preset.on { background: var(--accent-tint); color: var(--accent); border-color: var(--accent); }
+
+/* 文本域：灰底嵌在白卡里 */
+.ta {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 20rpx;
+  border-radius: 22rpx;
+  background: var(--parchment);
+  padding: 20rpx 24rpx;
+  font-size: 25rpx;
+  line-height: 1.6;
+  color: var(--ink-2);
+  min-height: 108rpx;
+}
+.ta-ph { color: var(--soft); }
+
+.warnline { display: flex; gap: 14rpx; margin-top: 20rpx; }
+.warn-dot {
+  width: 10rpx; height: 10rpx;
+  border-radius: 50%;
+  background: var(--red-fg);
+  flex: none;
+  margin-top: 12rpx;
+}
+.warnline > text { flex: 1; font-size: 22rpx; color: var(--muted); line-height: 1.6; }
+
+/* ── 审核记录 ── */
+.record { font-size: 24rpx; color: var(--muted); line-height: 1.75; }
+.rec-line { word-break: break-all; }
+
+/* ══════════ 底部固定操作条 ══════════ */
+.actionbar2 {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  padding: 22rpx 36rpx calc(32rpx + env(safe-area-inset-bottom));
+  border-top: 2rpx solid var(--divider);
+  display: flex;
+  gap: 18rpx;
+  background: var(--canvas);
+  z-index: 20;
+}
+button.btn-lg2 {
+  flex: 1;
+  height: 92rpx;
+  border-radius: 26rpx;
+  border: none;
+  font-size: 30rpx;
+  font-weight: 600;
+  padding: 0;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+button.btn-lg2::after { border: none; }
+button.btn-lg2.pass { background: var(--accent); color: #fff; }
+button.btn-lg2.rej {
+  background: var(--canvas);
+  color: var(--ink-2);
+  box-shadow: inset 0 0 0 2rpx var(--hairline);
+}
+button.btn-lg2[disabled] { opacity: 0.45; }
+
+/* ══════════ 提示行 ══════════ */
+.hint-note {
+  text-align: center;
+  font-size: 23rpx;
+  color: var(--muted);
+  padding: 60rpx 0;
+  flex: none;
+}
+
+.pressed { opacity: 0.72; }

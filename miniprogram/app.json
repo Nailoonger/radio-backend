@@ -54,6 +54,19 @@
       }
     ]
   },
+  "subPackages": [
+    {
+      "root": "pages-admin",
+      "name": "admin",
+      "pages": [
+        "login/login",
+        "todo/todo",
+        "review/review",
+        "review-detail/detail",
+        "message/message"
+      ]
+    }
+  ],
   "style": "v2",
   "sitemapLocation": "sitemap.json"
 }

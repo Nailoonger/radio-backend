@@ -1,0 +1,76 @@
+<!-- pages-admin/login/login.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <!-- 顶栏：与学生登录页同款「徽章 + 站名」，这里站名写「导播台」
+       （2026-10-01 与待办台标题同步改名：管理台 → 导播台） -->
+  <view class="topbar">
+    <view class="back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
+    </view>
+    <view class="topbar-brand">
+      <image class="badge" src="/assets/station-badge.png" mode="aspectFit" />
+      <text class="topbar-name">导播台</text>
+    </view>
+    <view class="topbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <!-- 品牌区：收音机线条插画（与学生登录页同一套 SVG 坐标，1 单位 = 1rpx） -->
+    <view class="brand">
+      <view class="radio-art">
+        <view class="wave w1"></view>
+        <view class="wave w2"></view>
+        <view class="wave w3"></view>
+        <view class="radio-body"></view>
+        <view class="sp-outer"></view>
+        <view class="sp-inner"></view>
+        <view class="sp-dot"></view>
+        <view class="knob k1"><view class="tick"></view></view>
+        <view class="knob k2"><view class="tick"></view></view>
+      </view>
+      <text class="tagline">广播站导播台</text>
+    </view>
+
+    <view class="glass">
+      <view class="card-title">管理员登录</view>
+      <view class="card-sub">使用广播站的管理账号</view>
+
+      <view class="field">
+        <view class="field-label">账号</view>
+        <view class="input {{loginError ? 'err' : ''}}">
+          <input class="ipt" type="text" placeholder="管理员账号"
+                 placeholder-class="ph" value="{{username}}"
+                 bindinput="inputUsername" confirm-type="next" />
+        </view>
+      </view>
+
+      <view class="field">
+        <view class="field-label">密码</view>
+        <view class="input {{loginError ? 'err' : ''}}">
+          <input class="ipt" password="{{!showPwd}}" placeholder="登录密码"
+                 placeholder-class="ph" value="{{password}}"
+                 bindinput="inputPassword" confirm-type="done"
+                 bindconfirm="doLogin" />
+          <text class="eye" hover-class="pressed" bindtap="togglePwd">{{showPwd ? '隐藏' : '显示'}}</text>
+        </view>
+      </view>
+
+      <!-- 错误条：贴在按钮上方（文案直接取后端 message） -->
+      <view class="error-bar" wx:if="{{loginError}}">{{loginError}}</view>
+
+      <button class="submit" hover-class="pressed"
+              bindtap="doLogin" disabled="{{loading}}">
+        {{loading ? '登录中……' : '登 录'}}
+      </button>
+    </view>
+
+    <!-- 回学生登录：一行灰字，不做按钮 -->
+    <view class="admin-entry" hover-class="pressed" bindtap="goStudentLogin">
+      <text class="arw">←</text>
+      <text>返回学生登录</text>
+    </view>
+  </view>
+
+  <view class="lg-foot">登录状态长期保持，不必每次输入</view>
+</view>

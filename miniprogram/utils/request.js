@@ -35,8 +35,19 @@ function getAppSafe() {
   try { return getApp(); } catch (e) { return null; }
 }
 
-function currentToken() {
+/**
+ * 取当前 token。
+ * ⚠️ 分身份存放（2026-10-01 管理端落地）：老师和管理员可能在同一台手机上
+ *    既登学生端又登管理端，共用一个 key 会互相顶掉登录态。
+ *      scope='user'（默认）→ globalData.token      / storage 'token'       ← 原逻辑，一字未改
+ *      scope='admin'       → globalData.adminToken / storage 'admin_token'
+ */
+function currentToken(scope) {
   const app = getAppSafe();
+  if (scope === 'admin') {
+    if (app && app.globalData && app.globalData.adminToken) return app.globalData.adminToken;
+    try { return wx.getStorageSync('admin_token') || ''; } catch (e) { return ''; }
+  }
   if (app && app.globalData && app.globalData.token) return app.globalData.token;
   try { return wx.getStorageSync('token') || ''; } catch (e) { return ''; }
 }
@@ -47,22 +58,26 @@ function currentBaseURL() {
   return (app && app.globalData && app.globalData.baseURL) || 'http://localhost:3000/api';
 }
 
-/** 401 统一处理：清 token */
-function handleUnauthorized(app) {
-  if (app) {
-    app.globalData.token = '';
-    try { wx.removeStorageSync('token'); } catch (e) {}
+/** 401 统一处理：按身份清 token */
+function handleUnauthorized(app, scope) {
+  if (!app) return;
+  if (scope === 'admin') {
+    app.globalData.adminToken = '';
+    try { wx.removeStorageSync('admin_token'); } catch (e) {}
+    return;
   }
+  app.globalData.token = '';
+  try { wx.removeStorageSync('token'); } catch (e) {}
 }
 
 // ---------------- direct 模式：wx.request（原逻辑） ----------------
-function directRequest(path, method, data) {
+function directRequest(path, method, data, scope) {
   return new Promise((resolve, reject) => {
     const app = getAppSafe();
     const baseURL = currentBaseURL();
     const fullURL = path.startsWith('http') ? path : baseURL + path;
     const header = { 'Content-Type': 'application/json' };
-    const token = currentToken();
+    const token = currentToken(scope);
     if (token) header.Authorization = `Bearer ${token}`;
 
     console.log(`[request:direct] ${method} ${fullURL}`);
@@ -76,7 +91,7 @@ function directRequest(path, method, data) {
         console.log(`[request:direct] ${method} ${fullURL} → ${res.statusCode}`, res.data);
         const body = res.data || {};
         if (res.statusCode === 401) {
-          handleUnauthorized(app);
+          handleUnauthorized(app, scope);
           return reject({ code: 40101, message: '请先登录' });
         }
         if (body.code === 0) return resolve(body.data);
@@ -91,7 +106,7 @@ function directRequest(path, method, data) {
 }
 
 // ---------------- cloud 模式：wx.cloud.callFunction ----------------
-function cloudRequest(path, method, data) {
+function cloudRequest(path, method, data, scope) {
   return new Promise((resolve, reject) => {
     const app = getAppSafe();
     console.log(`[request:cloud] ${method} ${path}`);
@@ -102,12 +117,12 @@ function cloudRequest(path, method, data) {
 
     wx.cloud.callFunction({
       name: CONFIG.cloudFunctionName,
-      data: { path, method, body: data || {}, token: currentToken() },
+      data: { path, method, body: data || {}, token: currentToken(scope) },
       success: (res) => {
         const body = (res && res.result) || {};
         console.log(`[request:cloud] ${method} ${path} → ${body.code}`, body.data);
         if (body.code === 40101) {
-          handleUnauthorized(app);
+          handleUnauthorized(app, scope);
           return reject({ code: 40101, message: body.message || '请先登录' });
         }
         if (body.code === 0) return resolve(body.data);
@@ -123,9 +138,17 @@ function cloudRequest(path, method, data) {
 }
 
 // ---------------- 对外主函数（签名与原版一致，页面代码不用改） ----------------
-function request(url, method = 'GET', data = {}) {
-  if (CONFIG.mode === 'cloud') return cloudRequest(url, method, data);
-  return directRequest(url, method, data);
+function request(url, method = 'GET', data = {}, scope = 'user') {
+  if (CONFIG.mode === 'cloud') return cloudRequest(url, method, data, scope);
+  return directRequest(url, method, data, scope);
 }
 
-module.exports = { request, configure, getMode: () => CONFIG.mode };
+/**
+ * 管理端专用请求 —— 与学生端共用同一套通道，只是**读写 admin_token**。
+ * 用法与 request 完全一致：adminRequest('/admin/submit/list', 'GET', {...})
+ */
+function adminRequest(url, method = 'GET', data = {}) {
+  return request(url, method, data, 'admin');
+}
+
+module.exports = { request, adminRequest, configure, getMode: () => CONFIG.mode };
