@@ -202,8 +202,12 @@
                · 下一行用灰色箭头引出红色实排时段
              ⚠️⚠️ 红色严格只落在**时间串本身** —— 箭头、任何前缀字都不上色，
                  也没有红底红框（陛下原话：「切记仅仅是时间段用红色标记」）。
-             文稿不选时段 → 这一格恒为「—」。 -->
-        <el-table-column label="首选时段" width="150">
+             文稿不选时段 → 这一格恒为「—」。
+             ⚠️ 居中：2026-10-03 陛下裁定「首选时段 / 投稿人 / 提交时间 / 审核人 / 状态 这五栏统一居中」，
+                所以这一列也加了 align="center"；⚠️ 光加列居中不够 —— 内部 .slot-real 是横向 flex，
+                必须同时给它 justify-content:center（见样式区），否则实排那一行还是左贴。
+             ⚠️ 内容列仍左对齐、操作列仍右对齐，别一起改。 -->
+        <el-table-column label="首选时段" width="150" align="center">
           <template #default="{ row }">
             <div class="slot-cell" v-if="Number(row.type) !== 2">
               <span class="slot-want" :class="{ 'is-stale': slotMoved(row) }">
@@ -216,7 +220,10 @@
         </el-table-column>
         <!-- 投稿人 + 学号（协议版把「谁的投稿」压成两行，省一列宽度留给内容）
              ⚠️ 表头与单元格一起居中（2026-09-27 陛下要求）——「审核人 / 时间」列同款处理，
-             两列结构一致（头像 + 两行小字），必须一起改，否则左右不对称。 -->
+             两列结构一致（头像 + 两行小字），必须一起改，否则左右不对称。
+             ⚠️ 2026-10-03 起居中口径扩到**五栏**：首选时段 / 投稿人 / 提交时间 / 审核人 / 状态
+             （陛下原话「仅仅首选时段、投稿人、提交时间、审核人、状态这几栏居中就好」）。
+             内容列保持左对齐、操作列保持右对齐 —— 别顺手一起居中。 -->
         <el-table-column label="投稿人" width="150" align="center">
           <template #default="{ row }">
             <div class="user-cell">
@@ -228,7 +235,8 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="提交时间" width="118">
+        <!-- 提交时间：2026-10-03 起也居中（五栏统一居中之一） -->
+        <el-table-column label="提交时间" width="118" align="center">
           <template #default="{ row }"><span class="c-time">{{ fmt(row.createTime).slice(5) }}</span></template>
         </el-table-column>
         <!-- ⚠️ 审核人 ≠ 投稿人：投稿人在上一列，这里显示是谁审的、什么时候审的。
@@ -2220,8 +2228,10 @@ onBeforeUnmount(() => {
    soft 在浅色表格底上对比度只有 ≈1.9:1，实测截图里几乎读不出来 ——
    管理员还是得看清"他原本想播哪一格"，只是不该和红色实排抢眼。 */
 .slot-want.is-stale { color: var(--muted); text-decoration: line-through; }
+/* ⚠️ justify-content:center —— 列居中（align="center"）只管到单元格的 text-align，
+   管不到这个横向 flex 内部；不加这句，被调剂过的「→ 实排时段」仍会左贴（2026-10-03 实测）。 */
 .slot-real {
-  display: flex; align-items: center; gap: 3px;
+  display: flex; align-items: center; justify-content: center; gap: 3px;
   font-size: var(--fs-xs); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .slot-arw { color: var(--soft); }
