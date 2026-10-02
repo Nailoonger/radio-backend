@@ -120,7 +120,7 @@ import {
 import StatusTag from '@/components/StatusTag.vue';
 import EmptyState from '@/components/EmptyState.vue';
 
-const knownRoles = ['站长', '副站长', '纪检长', '站长助理'];
+const knownRoles = ['站长', '副站长', '秘书长', '纪检长', '站长助理'];
 const baseURL = import.meta.env.VITE_API_BASE || '/api';
 
 const query = reactive({ page: 1, pageSize: 20, keyword: '' });

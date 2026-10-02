@@ -57,7 +57,7 @@ src/
 │   ├── notice.js           # 公告
 │   ├── message.js          # 留言
 │   ├── systemSetting.js    # KV 设置（广播站介绍/开播时间/联系方式）
-│   ├── cadre.js            # 社干（站长/副站长/纪检长/站长助理，无部门字段）
+│   ├── cadre.js            # 社干（站长/副站长/秘书长/纪检长/站长助理，无部门字段）
 │   ├── staff.js            # 部门人员（播音部/主持部/编辑部，含 department + programs）
 │   ├── member.js           # ⚠️ 已废弃（被 cadre + staff 取代，接口仍挂载未删）
 │   └── systemSwitch.js     # 模块开关（submit_song/submit_article/message/member）

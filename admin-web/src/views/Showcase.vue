@@ -50,7 +50,7 @@
     <div class="card note">
       <div class="micro">
         <b>筛选器跟着类型走：</b>
-        选「社干」时显示<b>职务</b>筛选（站长 / 副站长 / 纪检长 / 站长助理）；
+        选「社干」时显示<b>职务</b>筛选（站长 / 副站长 / 秘书长 / 纪检长 / 站长助理）；
         选「部员」时显示<b>部门</b>筛选（播音部 / 主持部 / 编辑部）；
         选「全部」时两者都不显示，只留搜索 —— 避免出现选了部门却筛出社干的怪结果。
       </div>
@@ -252,7 +252,7 @@ import { setPageHeader, clearPageHeader, setRefreshHandler, clearRefreshHandler 
 
 const HEADER_TITLE = '风采展示';
 
-const CADRE_ROLES = ['站长', '副站长', '纪检长', '站长助理'];
+const CADRE_ROLES = ['站长', '副站长', '秘书长', '纪检长', '站长助理'];
 const DEPTS = ['播音部', '主持部', '编辑部'];
 
 const loading = ref(false);
