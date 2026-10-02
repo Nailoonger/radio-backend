@@ -95,4 +95,5 @@ async function cleanupRates(now = Date.now()) {
   return rows.length;
 }
 
-module.exports = { C, _, get: direct.get, transaction, list, count, rate, cleanupRates, _internals: { missing, conflict } };
+// set / remove 供「删除批次」这类非事务的幂等清理使用；单据删除不走事务（子记录逐条删）。
+module.exports = { C, _, get: direct.get, set: direct.set, remove: direct.remove, transaction, list, count, rate, cleanupRates, _internals: { missing, conflict } };

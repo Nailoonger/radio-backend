@@ -2,8 +2,34 @@
 const transport = require('./request.js');
 const PENDING_KEY = 'recruitment_pending_submission';
 const RETRY_TTL = 24 * 60 * 60 * 1000;
-const FORM_VERSION = 2;
+// v3：QQ 号可为选填（超管可关掉它的「必填」），年级/班级改成从选项里挑。
+const FORM_VERSION = 3;
 let nextContext = null;
+
+// —— 固定信息：默认四项都必填；年级只有高一/初一，班级 1~15 班。——
+// 与云端 recruitmentForm.DEFAULT_FIXED_FIELDS 保持一致；历史批次（没有 fixedFields）走这里的默认值。
+const FIXED_LIMITS = { name: 40, qqNumber: 12, grade: 40, className: 40 };
+const FIXED_LABELS = { name: '姓名', qqNumber: 'QQ 号', grade: '年级', className: '班级' };
+const DEFAULT_FIXED_FIELDS = {
+  name: { required: true, options: [] },
+  qqNumber: { required: true, options: [] },
+  grade: { required: true, options: ['高一', '初一'] },
+  className: { required: true, options: Array.from({ length: 15 }, (_, i) => (i + 1) + '班') },
+};
+function fixedOf(source) {
+  const out = {};
+  Object.keys(FIXED_LIMITS).forEach((key) => {
+    const item = source && source[key];
+    const fallback = DEFAULT_FIXED_FIELDS[key];
+    out[key] = {
+      required: item && typeof item.required === 'boolean' ? item.required : fallback.required,
+      options: item && Array.isArray(item.options) ? item.options.map(String) : fallback.options.slice(),
+    };
+  });
+  return out;
+}
+// 空串表示「选填且没填」；非空则必须是 5～12 位数字（重试凭证也用同一条判据）。
+function validQq(value) { return typeof value === 'string' && (value === '' || /^\d{5,12}$/.test(value)); }
 
 function api(path, method = 'GET', body = {}) {
   if (transport.getMode() !== 'cloud') {
@@ -29,8 +55,8 @@ function pendingSubmission() {
       return null;
     }
     const owns = (key) => Object.prototype.hasOwnProperty.call(saved.payload, key);
-    if (saved.formVersion === FORM_VERSION && owns('qqNumber') && !owns('studentNo')
-      && typeof saved.payload.qqNumber === 'string' && /^\d{5,12}$/.test(saved.payload.qqNumber)) return saved;
+    if ((saved.formVersion === FORM_VERSION || saved.formVersion === 2)
+      && owns('qqNumber') && !owns('studentNo') && validQq(saved.payload.qqNumber)) return saved;
     // 旧表单仅凭原 key 原 payload 向服务端恢复已存在的报名，不能将学号转换成 QQ 或另建记录。
     if (!owns('qqNumber') && owns('studentNo') && typeof saved.payload.studentNo === 'string'
       && (saved.formVersion === undefined || saved.formVersion === 1)) return { ...saved, legacyRetry: true };
@@ -40,9 +66,8 @@ function pendingSubmission() {
 }
 
 function savePending(submissionKey, payload, batch) {
-  if (!payload || typeof payload.qqNumber !== 'string' || !/^\d{5,12}$/.test(payload.qqNumber)
-    || Object.prototype.hasOwnProperty.call(payload, 'studentNo')) {
-    throw { code: 40001, message: '请填写 5～12 位数字的 QQ 号后提交' };
+  if (!payload || !validQq(payload.qqNumber) || Object.prototype.hasOwnProperty.call(payload, 'studentNo')) {
+    throw { code: 40001, message: 'QQ 号须为 5～12 位数字（选填的批次可以留空）' };
   }
   const saved = { formVersion: FORM_VERSION, submissionKey, payload, batch, expiresAt: Date.now() + RETRY_TTL };
   // 保存失败时禁止发送请求，否则首次响应丢失后无法安全重试。
@@ -71,18 +96,28 @@ function submissionKey() {
 }
 
 function charLength(value) { return Array.from(String(value || '')).length; }
-function normalizeForm(fields, questions, answers = {}) {
-  if (typeof fields.qqNumber !== 'string') throw { code: 40001, message: '请填写 5～12 位数字的 QQ 号' };
-  const limits = { name: 40, qqNumber: 12, grade: 40, className: 40 };
-  const labels = { name: '姓名', qqNumber: 'QQ 号', grade: '年级', className: '班级' };
+// fixedFields 来自批次 DTO；不传则按默认配置（四项必填、年级/班级走默认选项）校验。
+function normalizeForm(fields, questions, answers = {}, fixedFields) {
+  const fixed = fixedOf(fixedFields);
+  // QQ 号必须是字符串：数字会丢前导零（'0012345' → 12345），一律拒绝。
+  if (fields.qqNumber !== undefined && fields.qqNumber !== null && typeof fields.qqNumber !== 'string') {
+    throw { code: 40001, message: 'QQ 号须为 5～12 位数字' };
+  }
   const payload = {};
-  Object.keys(limits).forEach((key) => {
+  Object.keys(FIXED_LIMITS).forEach((key) => {
+    const rule = fixed[key];
+    const label = FIXED_LABELS[key];
     const value = String(fields[key] || '').trim();
-    if (!value) throw { code: 40001, message: '请填写' + labels[key] };
-    if (charLength(value) > limits[key]) throw { code: 40001, message: labels[key] + '最多 ' + limits[key] + ' 字' };
+    if (!value) {
+      if (rule.required) throw { code: 40001, message: '请填写' + label };
+      payload[key] = '';
+      return;
+    }
+    if (charLength(value) > FIXED_LIMITS[key]) throw { code: 40001, message: label + '最多 ' + FIXED_LIMITS[key] + ' 字' };
+    if (rule.options.length && rule.options.indexOf(value) === -1) throw { code: 40001, message: '请从给出的' + label + '选项中选择' };
     payload[key] = value;
   });
-  if (!/^\d{5,12}$/.test(payload.qqNumber)) throw { code: 40001, message: 'QQ 号应为 5～12 位数字' };
+  if (payload.qqNumber && !/^\d{5,12}$/.test(payload.qqNumber)) throw { code: 40001, message: 'QQ 号应为 5～12 位数字' };
   payload.answers = {};
   (questions || []).forEach((question) => {
     const raw = answers[question.id];
@@ -103,6 +138,21 @@ function normalizeForm(fields, questions, answers = {}) {
     if (value.length) payload.answers[question.id] = value;
   });
   return payload;
+}
+
+// 招新范围文案由批次的年级选项派生，别再写死「仅限高一、初一」。
+function gradeScopeText(fixedSource) {
+  const options = fixedOf(fixedSource).grade.options;
+  return options.length ? '限' + options.join('、') + '学生报名。' : '年级请如实填写。';
+}
+
+// 顶部说明随配置变化：必填项和「从选项里挑」的都是超管在后台定的，不能写死。
+function fixedHint(fixed) {
+  const required = Object.keys(FIXED_LIMITS).filter((key) => fixed[key].required).map((key) => FIXED_LABELS[key]);
+  const picked = ['grade', 'className'].filter((key) => fixed[key].options.length).map((key) => FIXED_LABELS[key]);
+  const parts = [required.length ? '带 * 的 ' + required.join('、') + ' 必填' : '以下信息均为选填'];
+  if (picked.length) parts.push(picked.join('、') + '请从给出的选项中选择');
+  return parts.join('；') + '。';
 }
 
 function decorateQuestions(questions, answers = {}) {
@@ -163,5 +213,5 @@ module.exports = {
   resubmit: (body) => api('resubmit', 'POST', body),
   setContext, takeContext, clearContext, navigate, goBack,
   pendingSubmission, savePending, clearPending, submissionKey,
-  normalizeForm, decorateQuestions, timeText, errorText, charLength,
+  normalizeForm, decorateQuestions, timeText, errorText, charLength, fixedOf, fixedHint, gradeScopeText, validQq,
 };

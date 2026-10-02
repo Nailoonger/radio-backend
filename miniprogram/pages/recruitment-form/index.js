@@ -3,7 +3,8 @@ const recruitment = require('../../utils/recruitment.js');
 Page({
   data: {
     statusBarHeight: 20, loading: true, error: '', submitting: false, mode: 'apply', batch: null,
-    fields: { name: '', qqNumber: '', grade: '', className: '' }, questions: [], locked: false, retrying: false, legacyRetry: false,
+    fields: { name: '', qqNumber: '', grade: '', className: '' }, fixed: {}, fixedHint: '', gradeText: '',
+    questions: [], locked: false, retrying: false, legacyRetry: false,
     canSubmit: false, closesText: '', fieldError: '',
   },
   onLoad() {
@@ -53,8 +54,12 @@ Page({
   },
   showForm(batch, fields) {
     if (!this._alive) return;
+    const fixed = recruitment.fixedOf(batch && batch.fixedFields);
     this.setData({
       batch,
+      fixed,
+      fixedHint: recruitment.fixedHint(fixed),
+      gradeText: recruitment.gradeScopeText(batch && batch.fixedFields),
       fields: { name: fields.name || '', qqNumber: fields.qqNumber || '', grade: fields.grade || '', className: fields.className || '' },
       questions: recruitment.decorateQuestions(batch && batch.questions, this.answers),
       closesText: recruitment.timeText(batch && (batch.closedAt || batch.closesAt)),
@@ -63,6 +68,12 @@ Page({
   inputField(event) {
     if (this.data.locked || this.data.submitting) return;
     this.setData({ ['fields.' + event.currentTarget.dataset.field]: event.detail.value, fieldError: '' });
+  },
+  // 年级/班级改成从选项里挑：再点一次已选中的选项即取消选择。
+  pickField(event) {
+    if (this.data.locked || this.data.submitting) return;
+    const { field, value } = event.currentTarget.dataset;
+    this.setData({ ['fields.' + field]: this.data.fields[field] === value ? '' : value, fieldError: '' });
   },
   inputAnswer(event) {
     if (this.data.locked || this.data.submitting) return;
@@ -91,7 +102,7 @@ Page({
       if (this.data.mode === 'apply') {
         let pending = this._pending;
         if (!pending) {
-          const payload = { batchId: this.data.batch.id, ...recruitment.normalizeForm(this.data.fields, this.data.batch.questions, this.answers) };
+          const payload = { batchId: this.data.batch.id, ...recruitment.normalizeForm(this.data.fields, this.data.batch.questions, this.answers, this.data.batch.fixedFields) };
           const key = await recruitment.submissionKey();
           pending = recruitment.savePending(key, payload, this.data.batch);
           this._pending = pending;
@@ -114,7 +125,7 @@ Page({
           },
         });
       } else {
-        const form = recruitment.normalizeForm(this.data.fields, this.data.batch.questions, this.answers);
+        const form = recruitment.normalizeForm(this.data.fields, this.data.batch.questions, this.answers, this.data.batch.fixedFields);
         const body = { queryCode: this._queryCode, version: this._version, ...form };
         const application = await (this.data.mode === 'resubmit' ? recruitment.resubmit(body) : recruitment.update(body));
         if (!this._alive) return;

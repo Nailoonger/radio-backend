@@ -1,7 +1,7 @@
 const recruitment = require('../../utils/recruitment.js');
 
 Page({
-  data: { statusBarHeight: 20, loading: true, error: '', batch: null, opensText: '', closesText: '', windowText: '', pending: false },
+  data: { statusBarHeight: 20, loading: true, error: '', batch: null, opensText: '', closesText: '', windowText: '', gradeText: '', pending: false },
   onLoad() {
     this.setData({ statusBarHeight: getApp().globalData.statusBarHeight || 20 });
     this.load();
@@ -18,6 +18,7 @@ Page({
         closesText: batch ? recruitment.timeText(batch.closedAt || batch.closesAt) : '',
         windowText: batch ? (batch.closedAt ? '报名已手动截止'
           : ({ upcoming: '报名尚未开始', open: '正在报名', closed: '报名已截止' }[batch.windowState] || '报名暂未开放')) : '',
+        gradeText: batch ? recruitment.gradeScopeText(batch.fixedFields) : '',
       });
     } catch (error) { this.setData({ error: recruitment.errorText(error) }); }
     finally { this.setData({ loading: false }); }

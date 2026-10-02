@@ -9,11 +9,14 @@ const crypto = require('crypto');
 const bj = require('../lib/bjTime');
 const { C, _ } = S;
 const FORM_FIELDS = ['name', 'qqNumber', 'grade', 'className', 'answers'];
-const BATCH_FIELDS = ['title', 'intro', 'opensAt', 'closesAt', 'questions'];
+const BATCH_FIELDS = ['title', 'intro', 'opensAt', 'closesAt', 'questions', 'fixedFields'];
 
 function fail(code, message) { throw new ApiError(code, message); }
 function state(message) { fail(R.INVALID_STATE, message); }
 function iso(n) { return n === null || n === undefined ? null : new Date(n).toISOString(); }
+// 面试安排：批次级「统一安排」与个人「单独配置」同构。
+function arrangement(row) { return row ? { at: iso(row.at), location: row.location, note: row.note } : null; }
+function fixedOf(row) { return (row && row.fixedFields) || F.DEFAULT_FIXED_FIELDS; }
 function manuallyClosed(row) { return row.closedAt !== null && row.closedAt !== undefined; }
 function windowState(batch, now = Date.now()) {
   if (batch.publishedAt === null) return 'draft';
@@ -25,25 +28,39 @@ function batchDTO(row, admin = false) {
   const out = {
     id: row._id, title: row.title, intro: row.intro, opensAt: iso(row.opensAt), closesAt: iso(row.closesAt),
     publishedAt: iso(row.publishedAt), closedAt: iso(row.closedAt), resultPublishedAt: iso(row.resultPublishedAt), archivedAt: iso(row.archivedAt),
-    questions: row.questions, version: row.version, windowState: windowState(row),
+    questions: row.questions, fixedFields: fixedOf(row), interview: arrangement(row.interview),
+    version: row.version, windowState: windowState(row),
   };
   if (admin) Object.assign(out, { unresolvedCount: row.unresolvedCount, orderGeneratedAt: iso(row.orderGeneratedAt),
     interviewOrderCount: Array.isArray(row.interviewOrderIds) ? row.interviewOrderIds.length : 0,
     createdAt: iso(row.createdAt), updatedAt: iso(row.updatedAt) });
   return out;
 }
-function status(row) { return row.progress === 'withdrawn' ? 'withdrawn' : (row.decision || row.progress); }
+// 是否有生效的面试安排：个人「单独配置」优先，否则跟随批次「统一安排」。
+function arranged(row, batch) { return !!(row.interview || (batch && batch.interview)); }
+// 面试改成批次级统一安排后，「待面试」由「有没有生效安排」派生，不再依赖逐条写 progress：
+// 批次有统一安排、或本人有单独配置、或本行本就处于待面试，三者之一即为待面试。
+function status(row, batch) {
+  if (row.progress === 'withdrawn') return 'withdrawn';
+  if (row.decision) return row.decision;
+  if (row.progress === 'interview' || arranged(row, batch)) return 'interview';
+  return 'submitted';
+}
 function applicationDTO(row, batch, admin = false) {
   const published = batch.resultPublishedAt !== null && row.progress !== 'withdrawn';
+  // 公开侧绝不泄露未发布的录取决定；但「已安排面试」对本人可见。
+  const publicProgress = row.progress === 'submitted' && arranged(row, batch) ? 'interview' : row.progress;
   const out = {
     id: row._id, batchId: row.batchId, batch: batchDTO(batch, admin),
     name: row.name, qqNumber: row.qqNumber || '', grade: row.grade, className: row.className,
-    answers: row.answers, progress: admin ? row.progress : (published ? row.decision : row.progress),
-    interview: row.interview ? { at: iso(row.interview.at), location: row.interview.location, note: row.interview.note } : null,
+    answers: row.answers, progress: admin ? status(row, batch) : (published ? row.decision : publicProgress),
+    // 生效的面试安排 = 个人单独配置优先，否则跟随批次统一安排。
+    interview: arrangement(row.interview || batch.interview),
     canEdit: windowState(batch) === 'open', version: row.version,
     createdAt: iso(row.createdAt), updatedAt: iso(row.updatedAt),
   };
-  if (admin) Object.assign(out, { decision: row.decision, internalNote: row.internalNote, publicNote: row.publicNote, status: status(row),
+  if (admin) Object.assign(out, { decision: row.decision, internalNote: row.internalNote, publicNote: row.publicNote, status: status(row, batch),
+    interviewCustom: !!row.interview,
     legacyStudentNo: row.studentNo || '',
     interviewSequence: Array.isArray(batch.interviewOrderIds) && batch.interviewOrderIds.includes(row._id) ? batch.interviewOrderIds.indexOf(row._id) + 1 : null });
   else if (published) Object.assign(out, { decision: row.decision, publicNote: row.publicNote });
@@ -123,7 +140,7 @@ async function apply(body) {
           const batch = await requireBatch(tx, row.batchId);
           const legacy = F.own(body, 'studentNo') && !F.own(body, 'qqNumber') && F.own(row, 'studentNo');
           F.keys(body, ['batchId', 'submissionKey', ...(legacy ? FORM_FIELDS.filter((k) => k !== 'qqNumber').concat('studentNo') : FORM_FIELDS)]);
-          const fields = F.application(body, batch.questions, legacy);
+          const fields = F.application(body, batch, legacy);
           if (row.payloadHash !== Code.payloadHash({ batchId, ...fields })) fail(R.VERSION_CONFLICT, '提交凭证与报名内容不一致');
           const originalCode = Code.decrypt(row.codeCipher, row._id);
           if (Code.digest(originalCode) !== row.codeHash) fail(Codes.SERVER_ERROR, '招新查询凭证暂不可用，请联系广播站');
@@ -132,9 +149,10 @@ async function apply(body) {
         const batch = await requireBatch(tx, batchId);
         assertOpen(batch);
         F.keys(body, ['batchId', 'submissionKey', ...FORM_FIELDS]);
-        const fields = F.application(body, batch.questions);
-        const studentKey = uniqueId(batchId, fields.qqNumber);
-        if (await tx.get(C.UNIQUE, studentKey)) fail(R.DUPLICATE_STUDENT, '该 QQ 号已报名，请使用原查询码查询');
+        const fields = F.application(body, batch);
+        // QQ 号可为选填：为空时不占用唯一键，也就不再做同批次去重。
+        const studentKey = fields.qqNumber ? uniqueId(batchId, fields.qqNumber) : null;
+        if (studentKey && await tx.get(C.UNIQUE, studentKey)) fail(R.DUPLICATE_STUDENT, '该 QQ 号已报名，请使用原查询码查询');
         const queryCode = Code.generate(); const codeHash = Code.digest(queryCode);
         if (await tx.get(C.CODE, codeHash)) { const error = new Error('Recruitment credential collision'); error.recruitmentCollision = true; throw error; }
         const applicationId = Code.randomId(); const now = Date.now();
@@ -145,7 +163,8 @@ async function apply(body) {
           payloadHash: Code.payloadHash({ batchId, ...fields }), version: 1, createdAt: now, updatedAt: now,
         };
         const nextBatch = touch(batch, { unresolvedCount: batch.unresolvedCount + 1 });
-        await tx.set(C.UNIQUE, studentKey, { applicationId });
+        // 未填 QQ 号时不占用唯一键（也就没有同批次去重可言）。
+        if (studentKey) await tx.set(C.UNIQUE, studentKey, { applicationId });
         await tx.set(C.UNIQUE, submitId(keyHash), { applicationId });
         await tx.set(C.CODE, codeHash, { applicationId });
         await tx.set(C.APPLICATION, applicationId, row);
@@ -175,14 +194,14 @@ async function mutate(body, action) {
       patch = { progress: 'withdrawn' }; countDelta = -1;
     } else {
       if (action === 'resubmit' ? row.progress !== 'withdrawn' : row.progress !== 'submitted') state('当前报名无法执行此操作');
-      const fields = F.application(body, batch.questions);
-      if (fields.qqNumber !== row.qqNumber) {
+      const fields = F.application(body, batch);
+      if (fields.qqNumber !== (row.qqNumber || '')) {
         // Legacy studentNo remains as historical data and keeps its old reservation.
         // It is never interpreted as a QQ number or silently migrated.
         oldStudentKey = row.qqNumber ? uniqueId(row.batchId, row.qqNumber) : null;
-        newStudentKey = uniqueId(row.batchId, fields.qqNumber);
+        newStudentKey = fields.qqNumber ? uniqueId(row.batchId, fields.qqNumber) : null;
         const owner = oldStudentKey ? await tx.get(C.UNIQUE, oldStudentKey) : null;
-        const target = await tx.get(C.UNIQUE, newStudentKey);
+        const target = newStudentKey ? await tx.get(C.UNIQUE, newStudentKey) : null;
         if (oldStudentKey && (!owner || owner.applicationId !== row._id)) state('报名数据异常，请联系广播站');
         if (target && target.applicationId !== row._id) fail(R.DUPLICATE_STUDENT, '该 QQ 号已报名，请使用原查询码查询');
       }
@@ -191,7 +210,10 @@ async function mutate(body, action) {
     }
     const next = { ...row, ...patch, version: row.version + 1, updatedAt: Date.now() };
     const nextBatch = touch(batch, { unresolvedCount: batch.unresolvedCount + countDelta });
-    if (newStudentKey) { await tx.set(C.UNIQUE, newStudentKey, { applicationId: row._id }); if (oldStudentKey) await tx.remove(C.UNIQUE, oldStudentKey); }
+    if (newStudentKey !== oldStudentKey) {
+      if (oldStudentKey) await tx.remove(C.UNIQUE, oldStudentKey);
+      if (newStudentKey) await tx.set(C.UNIQUE, newStudentKey, { applicationId: row._id });
+    }
     await tx.set(C.APPLICATION, row._id, next); await tx.set(C.BATCH, batch._id, nextBatch);
     return applicationDTO(next, nextBatch);
   });
@@ -317,11 +339,13 @@ async function generateInterviewOrder(id, body) {
     return batchDTO(next, true);
   });
 }
-function orderItem(row, sequence) {
+function orderItem(row, batch, sequence) {
   return {
     id: row._id, name: row.name, qqNumber: row.qqNumber || '', grade: row.grade, className: row.className,
-    interview: row.interview ? { at: iso(row.interview.at), location: row.interview.location, note: row.interview.note } : null,
-    status: status(row), interviewSequence: sequence,
+    // 名单里的面试信息同样按「个人单独配置优先，否则批次统一安排」取值。
+    interview: arrangement(row.interview || batch.interview),
+    interviewCustom: !!row.interview,
+    status: status(row, batch), interviewSequence: sequence,
   };
 }
 async function orderRows(batch, ids, start = 0) {
@@ -329,7 +353,7 @@ async function orderRows(batch, ids, start = 0) {
   const rows = await S.list(C.APPLICATION, { batchId: batch._id, _id: _.in(ids) }, { limit: ids.length });
   const byId = new Map(rows.map((row) => [row._id, row]));
   if (byId.size !== ids.length) state('面试名单存在缺失记录，请联系广播站');
-  return ids.map((id, i) => orderItem(byId.get(id), start + i + 1));
+  return ids.map((id, i) => orderItem(byId.get(id), batch, start + i + 1));
 }
 async function interviewOrder(id, query = {}) {
   F.keys(query, ['page', 'pageSize']);
@@ -409,7 +433,16 @@ async function applications(query) {
   if (query.status !== undefined && query.status !== '') {
     if (!['submitted', 'interview', 'accepted', 'rejected', 'withdrawn'].includes(query.status)) fail(Codes.PARAM_ERROR, '报名状态无效');
     if (['accepted', 'rejected'].includes(query.status)) { where.decision = query.status; where.progress = _.neq('withdrawn'); }
-    else { where.progress = query.status; if (query.status !== 'withdrawn') where.decision = null; }
+    else if (query.status === 'withdrawn') where.progress = 'withdrawn';
+    else if (query.status === 'interview') {
+      // 有了批次统一安排后，所有未定结果的报名都等价于「待面试」。
+      where.progress = batch.interview ? _.in(['submitted', 'interview']) : 'interview';
+      where.decision = null;
+    } else {
+      where.progress = 'submitted'; where.decision = null;
+      // 同理，此时不存在「仅已提交」的报名，直接给空页而不是把待面试混进来。
+      if (batch.interview) return { items: [], total: 0, page: p.page, pageSize: p.pageSize };
+    }
   }
   const [items, total] = await Promise.all([S.list(C.APPLICATION, where, { ...p, limit: p.pageSize, orderBy: [['createdAt', 'desc']] }), S.count(C.APPLICATION, where)]);
   return { items: items.map((r) => applicationDTO(r, batch, true)), total, page: p.page, pageSize: p.pageSize };
@@ -430,7 +463,8 @@ async function review(id, body) {
     const patch = {}; let delta = 0;
     if (F.own(body, 'decision')) {
       if (body.decision !== null && !['accepted', 'rejected'].includes(body.decision)) fail(Codes.PARAM_ERROR, '录取决定无效');
-      if (row.progress === 'submitted' && body.decision === 'accepted') state('已提交报名需先安排面试才可录取');
+      // 面试改成批次级统一安排后，判据是「有没有生效的面试安排」，而不是单条 progress。
+      if (body.decision === 'accepted' && !arranged(row, batch)) state('请先安排面试时间，再拟定录取');
       if (!['submitted', 'interview'].includes(row.progress)) state('当前报名不可审核');
       if (body.decision === null && row.decision !== null) delta = 1;
       else if (body.decision !== null && row.decision === null) delta = -1;
@@ -445,19 +479,68 @@ async function review(id, body) {
     return applicationDTO(next, nextBatch, true);
   });
 }
+// 批次级「统一安排」：一次设置/清除，覆盖批次内所有未单独配置的报名。
+// 传 at: null 或 '' 即清除统一安排。
+async function interviewPlan(id, body) {
+  F.keys(body, ['version', 'at', 'location', 'note']);
+  const cleared = body.at === null || body.at === '';
+  const plan = cleared ? null : { at: F.time(body.at, '面试时间'), location: F.text(body.location, '面试地点', 200), note: F.text(body.note, '面试说明', 2000, false) };
+  return S.transaction(async (tx) => {
+    const row = await requireBatch(tx, id); expectVersion(row, body.version); assertReview(row);
+    const next = touch(row, { interview: plan });
+    await tx.set(C.BATCH, row._id, next);
+    return batchDTO(next, true);
+  });
+}
+// 个人「单独配置」面试时间：传 at: null 即清除覆盖，重新跟随批次统一安排。
 async function interview(id, body) {
   F.keys(body, ['version', 'at', 'location', 'note']);
-  const arrangement = { at: F.time(body.at, '面试时间'), location: F.text(body.location, '面试地点', 200), note: F.text(body.note, '面试说明', 2000, false) };
+  const cleared = body.at === null || body.at === '';
+  const plan = cleared ? null : { at: F.time(body.at, '面试时间'), location: F.text(body.location, '面试地点', 200), note: F.text(body.note, '面试说明', 2000, false) };
   return S.transaction(async (tx) => {
     const { row, batch } = await adminRecord(tx, id); expectVersion(row, body.version); assertReview(batch);
-    if (!['submitted', 'interview'].includes(row.progress) || row.decision !== null) state('当前报名不可安排面试');
-    const next = { ...row, progress: 'interview', interview: arrangement, version: row.version + 1, updatedAt: Date.now() };
+    if (row.progress === 'withdrawn' || row.decision !== null) state('当前报名不可安排面试');
+    // 清除个人覆盖后进度交回「已提交」；批次有统一安排时由 status() 派生出「待面试」，
+    // 这样批次统一安排被清除后不会残留一个「待面试却没有时间」的脏进度。
+    const progress = plan ? 'interview' : 'submitted';
+    const next = { ...row, progress, interview: plan, version: row.version + 1, updatedAt: Date.now() };
     const nextBatch = touch(batch);
     await tx.set(C.APPLICATION, row._id, next); await tx.set(C.BATCH, batch._id, nextBatch);
     return applicationDTO(next, nextBatch, true);
   });
 }
+// 删除批次：连带清除该批次的报名、查询码与唯一键占位（不可恢复）。
+// 子记录逐条删除（天然幂等），批次本体最后删；中途失败时残留子记录可重跑清理。
+async function deleteBatch(id, body) {
+  F.keys(body, ['confirm']);
+  const row = await requireBatch(S, id);
+  const total = await S.count(C.APPLICATION, { batchId: row._id });
+  if (total > 0 || row.publishedAt !== null) {
+    if (typeof body.confirm !== 'string' || body.confirm.trim() !== row.title) state('请原样输入批次名称以确认删除');
+  }
+  let removed = 0;
+  for (let round = 0; round < 500; round += 1) {
+    const page = await S.list(C.APPLICATION, { batchId: row._id }, { limit: 100, orderBy: [['_id', 'asc']] });
+    if (!page.length) break;
+    for (const item of page) {
+      if (item.codeHash) await S.remove(C.CODE, item.codeHash);
+      if (item.submissionKeyHash) await S.remove(C.UNIQUE, submitId(item.submissionKeyHash));
+      if (item.qqNumber) await S.remove(C.UNIQUE, uniqueId(row._id, item.qqNumber));
+      // 历史学号占位沿用 student: 前缀，命名空间与 QQ 号隔离。
+      if (item.studentNo) await S.remove(C.UNIQUE, `student:${Code.digest(JSON.stringify([row._id, item.studentNo]))}`);
+      await S.remove(C.APPLICATION, item._id);
+    }
+    removed += page.length;
+  }
+  if (await S.count(C.APPLICATION, { batchId: row._id })) state('报名记录未能全部清除，请重试删除');
+  await S.remove(C.BATCH, row._id);
+  const control = await S.get(C.CONTROL, 'global');
+  if (control && Array.isArray(control.windows) && control.windows.some((item) => item.batchId === row._id)) {
+    await S.set(C.CONTROL, 'global', { windows: control.windows.filter((item) => item.batchId !== row._id), updatedAt: Date.now() });
+  }
+  return { id: row._id, title: row.title, deletedApplications: removed };
+}
 
 module.exports = { current, apply, query, mutate, batches, createBatch, batchDetail, updateBatch, publishBatch, closeBatch,
   generateInterviewOrder, interviewOrder, exportInterviewOrder, publishResults, archiveBatch, applications, applicationDetail,
-  review, interview, _internals: { batchDTO, applicationDTO, windowState, status, uniqueId, shuffle, assertOrderSize } };
+  review, interviewPlan, interview, deleteBatch, _internals: { batchDTO, applicationDTO, windowState, status, arranged, uniqueId, shuffle, assertOrderSize } };

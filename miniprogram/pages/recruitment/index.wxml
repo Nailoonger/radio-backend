@@ -9,7 +9,7 @@
     <view class="tile">
       <view class="tile-chips"><view class="chip">菁悠广播站·统一招录</view></view>
       <view class="tile-title"><view>让你的声音，</view><view>成为校园的回响。</view></view>
-      <view class="tile-meta">仅限高一、初一学生报名。</view>
+      <view class="tile-meta">{{gradeText || '公开报名，无需登录。'}}</view>
     </view>
     <view class="loading" wx:if="{{loading}}">加载中……</view>
     <view class="card stack recruitment-gap" wx:elif="{{error}}">

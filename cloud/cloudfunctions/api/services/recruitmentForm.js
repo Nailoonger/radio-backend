@@ -27,6 +27,54 @@ function id(value, label = '标识') {
     || ['__proto__', 'constructor', 'prototype'].includes(value)) bad(`${label}无效`);
   return value;
 }
+// 固定信息的默认配置：四项都必填；年级只有高一/初一，班级 1~15 班。
+// 超管可在批次配置里改「必填」并维护这两个选项列表（见 fixedFields）。
+const FIXED_KEYS = ['name', 'qqNumber', 'grade', 'className'];
+const DEFAULT_FIXED_FIELDS = Object.freeze({
+  name: { required: true, options: [] },
+  qqNumber: { required: true, options: [] },
+  grade: { required: true, options: ['高一', '初一'] },
+  className: { required: true, options: Array.from({ length: 15 }, (_, index) => `${index + 1}班`) },
+});
+const FIXED_LABEL = { name: '姓名', qqNumber: 'QQ 号', grade: '年级', className: '班级' };
+function optionList(value, label) {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.length > 50) bad(`${label}选项最多 50 个`);
+  const seen = new Set();
+  return value.map((raw) => {
+    const out = text(raw, label, 40);
+    if (seen.has(out)) bad(`${label}选项不可重复`);
+    seen.add(out);
+    return out;
+  });
+}
+// 只收白名单字段；缺项沿用默认值，避免历史批次（没有 fixedFields）行为突变。
+function fixedFields(value) {
+  const raw = value === undefined || value === null ? {} : object(value, '固定信息');
+  keys(raw, FIXED_KEYS);
+  const out = {};
+  FIXED_KEYS.forEach((key) => {
+    const item = raw[key];
+    if (item !== undefined && item !== null) keys(item, ['required', 'options']);
+    const fallback = DEFAULT_FIXED_FIELDS[key];
+    const required = item && item.required !== undefined ? item.required : fallback.required;
+    if (typeof required !== 'boolean') bad('必填设置无效');
+    const source = item && item.options !== undefined ? item.options : fallback.options;
+    out[key] = { required, options: optionList(source, FIXED_LABEL[key]) };
+  });
+  return out;
+}
+// 年级 / 班级：配置了选项就必须是选项之一；没配选项则退回自由文本。
+function pick(value, key, config) {
+  const label = FIXED_LABEL[key];
+  const list = (config && config.options) || [];
+  const required = !config || config.required !== false;
+  if (!list.length) return text(value, label, 40, required);
+  const out = text(value, label, 40, required);
+  if (!out) return '';
+  if (!list.includes(out)) bad(`${label}请从选项中选择`);
+  return out;
+}
 function time(value, label, optional = false) {
   if (optional && (value === undefined || value === null || value === '')) return null;
   // Require an explicit timezone for strings; local host timezone cannot affect storage.
@@ -71,18 +119,26 @@ function batch(value, complete = false) {
     opensAt: time(value.opensAt, '开始时间', !complete),
     closesAt: time(value.closesAt, '截止时间', !complete),
     questions: questions(value.questions === undefined ? [] : value.questions),
+    fixedFields: fixedFields(value.fixedFields),
   };
   if (out.opensAt !== null && out.closesAt !== null && out.opensAt >= out.closesAt) bad('开始时间必须早于截止时间');
   return out;
 }
-function application(value, qs, legacy = false) {
+function application(value, batchRow, legacy = false) {
+  const fixed = (batchRow && batchRow.fixedFields) || DEFAULT_FIXED_FIELDS;
+  const qs = (batchRow && batchRow.questions) || [];
+  const required = (key) => !fixed[key] || fixed[key].required !== false;
   const identity = legacy
     ? { studentNo: text(value.studentNo, '原学号', 32) }
-    : { qqNumber: text(value.qqNumber, 'QQ 号', 12) };
-  if (!legacy && !/^[0-9]{5,12}$/.test(identity.qqNumber)) bad('QQ 号须为 5～12 位数字');
+    : { qqNumber: text(value.qqNumber, 'QQ 号', 12, required('qqNumber')) };
+  if (!legacy && identity.qqNumber && !/^[0-9]{5,12}$/.test(identity.qqNumber)) bad('QQ 号须为 5～12 位数字');
+  // 历史补录（legacy）只用于把升级前的原请求原样重放以取回查询码，
+  // 因此不做新规则校验（选项列表是升级后才有的），否则老记录永远对不上 payloadHash。
   const out = {
-    name: text(value.name, '姓名', 40), ...identity,
-    grade: text(value.grade, '年级', 40), className: text(value.className, '班级', 40), answers: {},
+    name: text(value.name, '姓名', 40, required('name')), ...identity,
+    grade: legacy ? text(value.grade, '年级', 40) : pick(value.grade, 'grade', fixed.grade),
+    className: legacy ? text(value.className, '班级', 40) : pick(value.className, 'className', fixed.className),
+    answers: {},
   };
   const raw = value.answers === undefined ? {} : object(value.answers, '答案');
   if (Object.keys(raw).some((k) => !qs.some((q) => q.id === k))) bad('包含未知问题的答案');
@@ -110,4 +166,5 @@ function version(value) {
   if (!Number.isSafeInteger(value) || value < 1) bad('请提供有效的数据版本');
   return value;
 }
-module.exports = { own, object, keys, text, id, time, questions, batch, application, version };
+module.exports = { own, object, keys, text, id, time, questions, batch, application, version,
+  fixedFields, DEFAULT_FIXED_FIELDS, FIXED_KEYS };

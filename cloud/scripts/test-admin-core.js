@@ -75,6 +75,8 @@ const SUPER_ONLY = new Set([
   'admin.recruitment.createBatch', 'admin.recruitment.updateBatch',
   'admin.recruitment.publishBatch', 'admin.recruitment.publishResults', 'admin.recruitment.archiveBatch',
   'admin.recruitment.closeBatch', 'admin.recruitment.generateInterviewOrder',
+  // 批次级统一面试安排、删除批次：仅超管（普管只能对单条报名做「单独配置」）
+  'admin.recruitment.interviewPlan', 'admin.recruitment.deleteBatch',
   // 点歌：容量 / 窗口 / 时段 / 排期 / 规则 / 危险操作（V1 §2.1）
   'admin.submit.setQuota', 'admin.submit.sweepQueue', 'admin.submit.saveWindow',
   'admin.submit.saveSlots', 'admin.submit.previewSchedule', 'admin.submit.runSchedule',
@@ -128,7 +130,7 @@ const PLAIN_ONLY = new Set([
   section('A. 权限矩阵（全量管理端路由）');
   reset(baseSeed());
 
-  eq('管理端路由总数', ADMIN_ROUTES.length, 108);
+  eq('管理端路由总数', ADMIN_ROUTES.length, 110);
 
   const anonBad = [];
   const plainBad = [];
@@ -165,9 +167,9 @@ const PLAIN_ONLY = new Set([
   ok('匿名调全部路由（除登录）均为 40101', anonBad.length === 0, anonBad.slice(0, 8).join(' | '));
   ok('普管对超管专属路由全部 40301、对其它路由不被误拦', plainBad.length === 0, plainBad.slice(0, 8).join(' | '));
   ok('超管调全部路由均过鉴权', anonLeak.length === 0, anonLeak.slice(0, 8).join(' | '));
-  eq('超管专属 handlerKey 条数', SUPER_ONLY.size, 62);
-  // sweepQueue 一个 key 对应两条路由（/quota/sweep 与 /queue/sweep）→ 56 > 55
-  eq('落在超管专属 handlerKey 上的**路由**条数', ADMIN_ROUTES.filter(([, hk]) => SUPER_ONLY.has(hk)).length, 63);
+  eq('超管专属 handlerKey 条数', SUPER_ONLY.size, 64);
+  // sweepQueue 一个 key 对应两条路由（/quota/sweep 与 /queue/sweep）→ 65 > 64
+  eq('落在超管专属 handlerKey 上的**路由**条数', ADMIN_ROUTES.filter(([, hk]) => SUPER_ONLY.has(hk)).length, 65);
 
   // 权限规范必须**恰好覆盖**路由表。只声明「超管」是不够的 ——
   // 另一半（普管即可）如果只靠「不在 SUPER_ONLY 里」隐式推出，那么

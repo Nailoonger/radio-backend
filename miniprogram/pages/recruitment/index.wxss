@@ -2,3 +2,5 @@
 .recruitment-gap { gap: 18rpx; }
 .recruitment-intro { white-space: pre-wrap; word-break: break-word; }
 .recruitment-foot { text-align: center; padding: 0 16rpx; }
+/* wxml 里 hover-class="row-hover"（与 index / notices / programs 同一套反馈） */
+.row-hover { background: rgba(0, 0, 0, 0.035); }

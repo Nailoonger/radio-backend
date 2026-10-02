@@ -96,8 +96,8 @@ function page(name) {
     { id: 'm', title: '多选', type: 'multiple', required: true, options: [{ id: 'a', label: '甲' }, { id: 'b', label: '乙' }] },
     { id: 'o', title: '选填', type: 'textarea', required: false, options: [] },
   ];
-  const fields = { name: ' 同学 ', qqNumber: ' 0012345 ', grade: '初一', className: '一班' };
-  check('固定四项归一化且不校验年级', () => assert.strictEqual(client.normalizeForm(fields, questions, { t: '答', m: ['a'] }).name, '同学'));
+  const fields = { name: ' 同学 ', qqNumber: ' 0012345 ', grade: '初一', className: '1班' };
+  check('固定四项归一化（年级班级按选项取值）', () => assert.strictEqual(client.normalizeForm(fields, questions, { t: '答', m: ['a'] }).name, '同学'));
   check('QQ号去空白并保留字符串前导零', () => assert.strictEqual(client.normalizeForm(fields, questions, { t: '答', m: ['a'] }).qqNumber, '0012345'));
   check('QQ号严格5至12位ASCII数字', () => {
     for (const qqNumber of ['', '1234', '1234567890123', '123a5', '１２３４５', 12345]) {
@@ -105,8 +105,32 @@ function page(name) {
     }
     assert.strictEqual(client.normalizeForm({ ...fields, qqNumber: '123456789012' }, questions, { t: '答', m: ['a'] }).qqNumber, '123456789012');
   });
-  check('不接受仅学号的旧表单', () => assert.throws(() => client.normalizeForm({ name: '同学', studentNo: '12345', grade: '初一', className: '一班' }, questions, { t: '答', m: ['a'] })));
+  check('不接受仅学号的旧表单', () => assert.throws(() => client.normalizeForm({ name: '同学', studentNo: '12345', grade: '初一', className: '1班' }, questions, { t: '答', m: ['a'] })));
   check('固定四项空白拒绝', () => assert.throws(() => client.normalizeForm({ ...fields, grade: ' ' }, questions, { t: '答', m: ['a'] })));
+  // 年级/班级改成选项后：不在选项里的一律拒绝；超管把「必填」关掉后留空合法。
+  check('年级不在选项内被拒绝', () => assert.throws(() => client.normalizeForm({ ...fields, grade: '高二' }, questions, { t: '答', m: ['a'] })));
+  check('班级不在选项内被拒绝', () => assert.throws(() => client.normalizeForm({ ...fields, className: '16班' }, questions, { t: '答', m: ['a'] })));
+  const looseFixed = {
+    name: { required: true, options: [] }, qqNumber: { required: false, options: [] },
+    grade: { required: false, options: ['高一', '初一'] }, className: { required: false, options: [] },
+  };
+  check('关掉必填后QQ与班级可留空', () => {
+    const out = client.normalizeForm({ name: '同学', qqNumber: '', grade: '', className: '' }, questions, { t: '答', m: ['a'] }, looseFixed);
+    assert.strictEqual(out.qqNumber, '');
+    assert.strictEqual(out.className, '');
+  });
+  check('留空但给了值仍要落在选项内', () => assert.throws(() => client.normalizeForm({ name: '同学', qqNumber: '', grade: '高三', className: '' }, questions, { t: '答', m: ['a'] }, looseFixed)));
+  check('固定信息默认值与云端一致', () => {
+    const fixed = client.fixedOf(null);
+    assert.deepStrictEqual([fixed.grade.options, fixed.className.options.length, fixed.className.options[14]], [['高一', '初一'], 15, '15班']);
+  });
+  check('必填提示随配置变化', () => {
+    const allOptional = { name: { required: false, options: [] }, qqNumber: { required: false, options: [] }, grade: { required: false, options: ['高一', '初一'] }, className: { required: false, options: [] } };
+    assert.ok(client.fixedHint(client.fixedOf(null)).includes('带 * 的 姓名、QQ 号、年级、班级 必填'));
+    assert.ok(client.fixedHint(client.fixedOf(looseFixed)).includes('带 * 的 姓名 必填'));
+    assert.ok(client.fixedHint(client.fixedOf(allOptional)).includes('以下信息均为选填'));
+    assert.ok(client.fixedHint(client.fixedOf(allOptional)).includes('年级请从给出的选项中选择'));
+  });
   check('必填多选拒绝空', () => assert.throws(() => client.normalizeForm(fields, questions, { t: '答', m: [] })));
   check('多选拒绝重复或未知答案', () => {
     assert.throws(() => client.normalizeForm(fields, questions, { t: '答', m: ['a', 'a'] }));
@@ -132,12 +156,14 @@ function page(name) {
   editForm.answers = {};
   await editForm.initialize({ mode: 'edit', application: legacyApplication, queryCode: '23456789ABCDEFGH' });
   check('历史报名修改不把旧信息填作QQ', () => { assert.strictEqual(editForm.data.fields.qqNumber, ''); assert.ok(!('studentNo' in editForm.data.fields)); });
+  check('历史班级格式不匹配选项时不自动勾选', () => { assert.strictEqual(editForm.data.fixed.className.options.indexOf('1 班'), -1); assert.ok(editForm.data.fixed.className.options.indexOf('1班') >= 0); });
   const originalUpdate = client.update;
   let editBody;
   client.update = async body => { editBody = body; return legacyApplication; };
   await editForm.submit();
   check('历史报名修改必须先补QQ', () => { assert.ok(!editBody); assert.ok(editForm.data.fieldError.includes('QQ')); });
   editForm.data.fields.qqNumber = '567890';
+  editForm.data.fields.className = '1班';
   await editForm.submit();
   check('修改报名提交QQ及原查询凭证', () => { assert.strictEqual(editBody.qqNumber, '567890'); assert.strictEqual(editBody.queryCode, '23456789ABCDEFGH'); assert.strictEqual(editBody.version, 1); assert.ok(!('studentNo' in editBody)); });
   client.update = originalUpdate;

@@ -5,3 +5,22 @@
 .recruitment-option radio, .recruitment-option checkbox { flex: none; }
 .recruitment-error { color: var(--red-fg); font-size: 25rpx; line-height: 1.6; }
 .recruitment-code { color: #fff; font-size: 40rpx; font-weight: 600; letter-spacing: 3rpx; word-break: break-all; }
+/* 年级：一左一右两个胶囊；班级：等宽胶囊网格（1~15 班） */
+.pick-row { display: flex; gap: 20rpx; }
+.pick-pill {
+  flex: 1; height: 88rpx; display: flex; align-items: center; justify-content: center;
+  border: 2rpx solid var(--hairline); border-radius: var(--r-pill);
+  background: var(--canvas); color: var(--ink-2); font-size: 29rpx; line-height: 1;
+}
+.pick-pill.on {
+  border-color: var(--accent); background: var(--accent-tint); color: var(--accent); font-weight: 600;
+}
+.pick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16rpx; }
+.pick-cell {
+  height: 80rpx; display: flex; align-items: center; justify-content: center;
+  border: 2rpx solid var(--hairline); border-radius: var(--r-input);
+  background: var(--canvas); color: var(--ink-2); font-size: 28rpx; line-height: 1;
+}
+.pick-cell.on {
+  border-color: var(--accent); background: var(--accent-tint); color: var(--accent); font-weight: 600;
+}

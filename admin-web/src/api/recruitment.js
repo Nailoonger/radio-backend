@@ -23,6 +23,10 @@ export const publishBatch = (id, version) => call('post', `${base}/batches/${idP
 export const publishResults = (id, version) => call('post', `${base}/batches/${idPath(id)}/results`, { version });
 export const archiveBatch = (id, version) => call('post', `${base}/batches/${idPath(id)}/archive`, { version });
 export const closeBatch = (id, version) => call('post', `${base}/batches/${idPath(id)}/close`, { version });
+// 批次级「统一面试安排」：at 传 null 即清除统一安排（各报名回落到未安排）。
+export const arrangeBatchInterview = (id, body) => call('put', `${base}/batches/${idPath(id)}/interview`, body);
+// 删除批次（仅超管）：有报名或已发布的批次需 body.confirm 原样等于批次名，连带清除报名与查询码。
+export const deleteBatch = (id, body) => call('delete', `${base}/batches/${idPath(id)}`, body);
 export const generateInterviewOrder = (id, version, regenerate = false) => call('post', `${base}/batches/${idPath(id)}/interview-order`, { version, ...(regenerate ? { confirm: 'REGENERATE' } : {}) });
 export const getInterviewOrder = (id, params) => call('get', `${base}/batches/${idPath(id)}/interview-order`, params);
 export const exportInterviewOrder = (id) => call('get', `${base}/batches/${idPath(id)}/interview-order/export`, undefined, { responseType: 'blob' });

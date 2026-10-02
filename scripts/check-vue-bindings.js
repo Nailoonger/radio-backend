@@ -79,6 +79,7 @@ const files = targets.length
   : [
       path.join(ROOT, 'admin-web/src/views/SubmitList.vue'),
       path.join(ROOT, 'admin-web/src/views/SongSettings.vue'),
+      path.join(ROOT, 'admin-web/src/views/Recruitment.vue'),
       path.join(ROOT, 'admin-web/src/components/StatusTag.vue'),
     ];
 

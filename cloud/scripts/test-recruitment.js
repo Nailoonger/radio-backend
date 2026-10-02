@@ -45,7 +45,7 @@ async function success(method, url, body, token) {
 const admin = '/admin/recruitment';
 const user = '/user/recruitment';
 const form = (batchId, qqNumber, submissionKey) => ({ batchId, submissionKey,
-  name: ' 王同学 ', qqNumber, grade: '高二', className: '3 班',
+  name: ' 王同学 ', qqNumber, grade: '高一', className: '3班',
   answers: { intro: '介绍', skill: '爱播音', radio: 'a', days: ['mon', 'wed'] },
 });
 const config = () => ({ title: '秋季招新', intro: '仅限高一、初一学生报名。',
@@ -85,7 +85,7 @@ const config = () => ({ title: '秋季招新', intro: '仅限高一、初一学�
   const body = form(batch.id, ' 11001 ', '11'.repeat(16));
   const a = await success('POST', `${user}/apply`, body);
   equal('四项自行填写并去空白', a.application.name, '王同学');
-  equal('其他年级也可报名', a.application.grade, '高二');
+  equal('年级按配置选项取值', a.application.grade, '高一');
   yes('随机查询码16位', /^[A-Z2-9]{16}$/.test(a.queryCode));
   const retry = await success('POST', `${user}/apply`, body);
   equal('响应丢失安全重试返回相同码', retry.queryCode, a.queryCode);
@@ -103,7 +103,7 @@ const config = () => ({ title: '秋季招新', intro: '仅限高一、初一学�
   let viewA = await success('POST', `${user}/query`, { queryCode: ` ${a.queryCode.toLowerCase()} ` });
   equal('码忽略大小写空白', viewA.id, a.application.id);
   yes('查询不回显查询码和内部字段', !('queryCode' in viewA) && !('codeHash' in viewA) && !('internalNote' in viewA) && !('decision' in viewA));
-  const edit = { queryCode: a.queryCode, version: viewA.version, name: '修改姓名', qqNumber: '11002', grade: '初一', className: '1 班', answers: body.answers };
+  const edit = { queryCode: a.queryCode, version: viewA.version, name: '修改姓名', qqNumber: '11002', grade: '初一', className: '1班', answers: body.answers };
   equal('改 QQ 号不能占他人号码', (await request('PUT', `${user}/application`, edit)).code, 40911);
   viewA = await success('PUT', `${user}/application`, { ...edit, qqNumber: '11003' });
   equal('修改表单', viewA.name, '修改姓名');
@@ -111,7 +111,7 @@ const config = () => ({ title: '秋季招新', intro: '仅限高一、初一学�
   let viewB = await success('POST', `${user}/query`, { queryCode: b.queryCode });
   viewB = await success('POST', `${user}/withdraw`, { queryCode: b.queryCode, version: viewB.version });
   equal('撤回状态', viewB.progress, 'withdrawn');
-  viewB = await success('POST', `${user}/resubmit`, { queryCode: b.queryCode, version: viewB.version, name: '同学乙', qqNumber: '11002', grade: '高一', className: '2 班', answers: optional.answers });
+  viewB = await success('POST', `${user}/resubmit`, { queryCode: b.queryCode, version: viewB.version, name: '同学乙', qqNumber: '11002', grade: '高一', className: '2班', answers: optional.answers });
   equal('重新提交沿用记录', viewB.id, b.application.id);
   equal('截止前后台审核被拒绝', (await request('PUT', `${admin}/applications/${viewA.id}/review`, { version: viewA.version, decision: 'rejected' }, member)).code, 40304);
   const preArchive = await success('GET', `${admin}/batches/${batch.id}`, {}, root);
@@ -241,7 +241,7 @@ const config = () => ({ title: '秋季招新', intro: '仅限高一、初一学�
   now = base; H.reset(seed);
   const basic = () => ({ ...config(), questions: [] });
   const simpleForm = (batchId, qqNumber, key) => ({ batchId, submissionKey: key,
-    name: '新同学', qqNumber, grade: '初一', className: '1 班', answers: {} });
+    name: '新同学', qqNumber, grade: '初一', className: '1班', answers: {} });
   let early = await success('POST', `${admin}/batches`, basic(), root);
   equal('草稿不能手动截止', (await request('POST', `${admin}/batches/${early.id}/close`, { version: early.version }, root)).code, 40912);
   early = await success('POST', `${admin}/batches/${early.id}/publish`, { version: early.version }, root);
@@ -267,7 +267,7 @@ const config = () => ({ title: '秋季招新', intro: '仅限高一、初一学�
   const repeatClose = await success('POST', `${admin}/batches/${early.id}/close`, { version: 0 }, root);
   equal('重复截止保持首次时间和版本', [repeatClose.closedAt, repeatClose.version], [earlyLatest.closedAt, earlyLatest.version]);
   const closedEdit = { queryCode: earlyApplicant.queryCode, version: earlyApplicant.application.version,
-    name: '同学', qqNumber: '012345', grade: '初一', className: '1 班', answers: {} };
+    name: '同学', qqNumber: '012345', grade: '初一', className: '1班', answers: {} };
   equal('手动截止后禁止新增', (await request('POST', `${user}/apply`, simpleForm(early.id, '912345', '64'.repeat(16)))).code, 40304);
   equal('手动截止后禁止修改', (await request('PUT', `${user}/application`, closedEdit)).code, 40304);
   equal('手动截止后禁止撤回', (await request('POST', `${user}/withdraw`, { queryCode: earlyApplicant.queryCode, version: closedEdit.version })).code, 40304);
@@ -311,12 +311,65 @@ const config = () => ({ title: '秋季招新', intro: '仅限高一、初一学�
   equal('不同凭证不能沿旧学号新建', (await request('POST', `${user}/apply`, { ...legacyRetry, submissionKey: '66'.repeat(16) })).code, 40001);
   await success('POST', `${user}/apply`, simpleForm(legacyBatchId, '100001', '67'.repeat(16)));
   yes('新 QQ 占位隔离旧学号命名空间', H.dump().recruitment_unique.some(x => x._id.startsWith('qq:')) && H.dump().recruitment_unique.some(x => x._id.startsWith('student:')));
-  const legacyEdit = { queryCode: legacyCode, version: legacyView.version, name: '旧同学', qqNumber: '100001', grade: '高一', className: '2 班', answers: {} };
+  const legacyEdit = { queryCode: legacyCode, version: legacyView.version, name: '旧同学', qqNumber: '100001', grade: '高一', className: '2班', answers: {} };
   equal('历史补填 QQ 也不能占用他人号码', (await request('PUT', `${user}/application`, legacyEdit)).code, 40911);
   legacyView = await success('PUT', `${user}/application`, { ...legacyEdit, qqNumber: '100002' });
   equal('历史记录修改后 QQ 已补填', legacyView.qqNumber, '100002');
   equal('补填 QQ 后原学号仍保留', (await success('GET', `${admin}/applications/${legacyId}`, {}, member)).legacyStudentNo, '100001');
   equal('补填后原提交凭证仍恢复同查询码', (await success('POST', `${user}/apply`, legacyRetry)).queryCode, legacyCode);
+
+  // 固定信息配置（必填可改 + 年级/班级选项）+ 批次级统一面试安排 + 单人覆盖 + 删除批次。
+  H.reset(seed); now = base;
+  let flex = await success('POST', `${admin}/batches`, { ...basic(), fixedFields: {
+    name: { required: true, options: [] },
+    qqNumber: { required: false, options: [] },
+    grade: { required: true, options: ['高一', '初一'] },
+    className: { required: false, options: [] },
+  } }, root);
+  flex = await success('POST', `${admin}/batches/${flex.id}/publish`, { version: flex.version }, root);
+  equal('固定信息配置下发给公众', (await success('GET', `${user}/current`)).batch.fixedFields.grade.options, ['高一', '初一']);
+  const offForm = (qq, grade, className, key) => ({ batchId: flex.id, submissionKey: key, name: '配置同学', qqNumber: qq, grade, className, answers: {} });
+  equal('不在选项内的年级被拒绝', (await request('POST', `${user}/apply`, offForm('31001', '高二', '3班', '71'.repeat(16)))).code, 40001);
+  equal('选填的班级可以留空', (await success('POST', `${user}/apply`, offForm('31001', '初一', '', '72'.repeat(16)))).application.className, '');
+  const noQqOne = await success('POST', `${user}/apply`, offForm('', '初一', '', '73'.repeat(16)));
+  const noQqTwo = await success('POST', `${user}/apply`, offForm('', '高一', '', '74'.repeat(16)));
+  equal('选填的 QQ 号可以留空', noQqOne.application.qqNumber, '');
+  yes('两个空 QQ 号各自成单不互相占用唯一键', noQqOne.application.id !== noQqTwo.application.id);
+  equal('只有填了 QQ 号才产生 qq 占位', H.dump().recruitment_unique.filter(x => x._id.startsWith('qq:')).length, 1);
+  equal('固定信息配置随批次回读', (await success('GET', `${admin}/batches/${flex.id}`, {}, root)).fixedFields.className.required, false);
+  const flexBeforeClose = await success('GET', `${admin}/batches/${flex.id}`, {}, root);
+  flex = await success('POST', `${admin}/batches/${flex.id}/close`, { version: flexBeforeClose.version }, root);
+  equal('普管不能设置统一面试安排', (await request('PUT', `${admin}/batches/${flex.id}/interview`, { version: flex.version, at: new Date(now + 1000).toISOString(), location: '广播室' }, member)).code, 40301);
+  const clearedPlan = await success('PUT', `${admin}/batches/${flex.id}/interview`, { version: flex.version, at: null, location: '', note: '' }, root);
+  equal('统一面试可留空时间（即清除）', clearedPlan.interview, null);
+  flex = await success('PUT', `${admin}/batches/${flex.id}/interview`, { version: clearedPlan.version, at: new Date(now + 100000).toISOString(), location: '广播室', note: '统一安排' }, root);
+  equal('统一面试回读', flex.interview.location, '广播室');
+  const flexList = await success('GET', `${admin}/applications`, { batchId: flex.id, page: 1, pageSize: 20 }, member);
+  yes('统一安排后未定结果者一律待面试', flexList.items.length === 3 && flexList.items.every(x => x.status === 'interview' && x.interview.location === '广播室' && x.interviewCustom === false));
+  equal('此时「已提交」筛选为空', (await success('GET', `${admin}/applications`, { batchId: flex.id, status: 'submitted', page: 1, pageSize: 20 }, member)).total, 0);
+  equal('待面试筛选含全部报名', (await success('GET', `${admin}/applications`, { batchId: flex.id, status: 'interview', page: 1, pageSize: 20 }, member)).total, flexList.total);
+  const flexTarget = flexList.items[0];
+  equal('统一安排即可录取', (await success('PUT', `${admin}/applications/${flexTarget.id}/review`, { version: flexTarget.version, decision: 'accepted' }, member)).decision, 'accepted');
+  const solo = await success('PUT', `${admin}/applications/${flexList.items[1].id}/interview`, { version: flexList.items[1].version, at: new Date(now + 200000).toISOString(), location: '小会议室', note: '单独' }, member);
+  equal('单独配置生效并打标', [solo.interview.location, solo.interviewCustom], ['小会议室', true]);
+  equal('单独配置不改动批次统一安排', (await success('GET', `${admin}/batches/${flex.id}`, {}, root)).interview.location, '广播室');
+  equal('清除单独配置回到统一安排', (await success('PUT', `${admin}/applications/${flexList.items[1].id}/interview`, { version: solo.version, at: null, location: '', note: '' }, member)).interview.location, '广播室');
+  const clearedCustom = await success('GET', `${admin}/applications/${flexList.items[1].id}`, {}, member);
+  equal('清除后不再标记单独配置', [clearedCustom.interviewCustom, clearedCustom.status], [false, 'interview']);
+  const afterSoloClear = await success('GET', `${admin}/batches/${flex.id}`, {}, root);
+  flex = await success('PUT', `${admin}/batches/${flex.id}/interview`, { version: afterSoloClear.version, at: null, location: '', note: '' }, root);
+  equal('清除统一安排回读为空', flex.interview, null);
+  equal('清除统一安排后回到已提交', (await success('GET', `${admin}/applications/${flexList.items[1].id}`, {}, member)).status, 'submitted');
+  equal('已定结果者不受清除影响', (await success('GET', `${admin}/applications/${flexTarget.id}`, {}, member)).status, 'accepted');
+  equal('未面试不能录取的判据仍在', (await request('PUT', `${admin}/applications/${flexList.items[2].id}/review`, { version: flexList.items[2].version, decision: 'accepted' }, member)).code, 40912);
+  equal('普管不能删除批次', (await request('DELETE', `${admin}/batches/${flex.id}`, {}, member)).code, 40301);
+  equal('已发布批次删除需原文确认', (await request('DELETE', `${admin}/batches/${flex.id}`, {}, root)).code, 40912);
+  equal('批次名不符不能删除', (await request('DELETE', `${admin}/batches/${flex.id}`, { confirm: '别的批次' }, root)).code, 40912);
+  equal('删除批次连带清理报名', (await success('DELETE', `${admin}/batches/${flex.id}`, { confirm: flex.title }, root)).deletedApplications, flexList.total);
+  equal('删除后报名记录清空', (H.dump().recruitment_application || []).filter(x => x.batchId === flex.id).length, 0);
+  equal('删除后查询码占位清空', (H.dump().recruitment_code || []).length, 0);
+  equal('删除后唯一键占位清空', (H.dump().recruitment_unique || []).length, 0);
+  equal('删除后批次不再出现在列表', (await success('GET', `${admin}/batches`, { page: 1, pageSize: 20 }, root)).total, 0);
 
   // > 1000 candidates prove both cloud-page coverage and the absence of an old
   // findAllPaged default cap. Persisted order is tested independently of shuffle luck.

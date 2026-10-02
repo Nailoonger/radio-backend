@@ -7,6 +7,10 @@ const APP = path.join(ROOT, 'miniprogram/app.wxss');
 const PAGES = [
   { name: 'submit', dir: path.join(ROOT, 'miniprogram/pages/submit') },
   { name: 'mySubmit', dir: path.join(ROOT, 'miniprogram/pages/mySubmit') },
+  // ── 招新（2026-10-03 加）──────────────────────────────────────
+  { name: 'recruitment', dir: path.join(ROOT, 'miniprogram/pages/recruitment'), file: 'index' },
+  { name: 'recruitment-form', dir: path.join(ROOT, 'miniprogram/pages/recruitment-form'), file: 'index' },
+  { name: 'recruitment-result', dir: path.join(ROOT, 'miniprogram/pages/recruitment-result'), file: 'index' },
   // ── 管理端分包（2026-10-01 加）────────────────────────────────
   // ⚠️ 目录名与文件名不一致的用 file 显式给出（review-detail/detail）
   { name: 'login', dir: path.join(ROOT, 'miniprogram/pages-admin/login') },

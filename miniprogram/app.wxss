@@ -85,6 +85,8 @@ page {
 .t-link    { font-size: 25rpx; color: var(--accent); }
 .t-on-dark { color: var(--canvas); }
 .t-dim     { color: #CCCCCC; }
+/* 可点元素的按下反馈：此前只有 submit.wxss 定义了它，其它页写 hover-class="pressed" 等于没有反馈 */
+.pressed   { opacity: 0.72; }
 
 /* ============ 页面骨架 ============ */
 .page {

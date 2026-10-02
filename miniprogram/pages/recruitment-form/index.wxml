@@ -19,7 +19,7 @@
     <block wx:elif="{{batch}}">
       <view class="stack recruitment-gap">
         <view class="t-title">{{batch.title}}</view>
-        <view class="t-sub">仅限高一、初一学生报名。</view>
+        <view class="t-sub">{{gradeText}}</view>
         <view class="t-cap">截止：{{closesText}}（北京时间）</view>
       </view>
       <view class="card stack recruitment-gap" wx:if="{{retrying}}">
@@ -29,11 +29,11 @@
       </view>
       <view class="form">
         <view class="t-section">基本信息</view>
-        <view class="t-cap">以下四项均为必填，请如实填写。</view>
-        <view class="field"><view class="field-label">姓名 *</view><input class="input" placeholder-class="ph" placeholder="填写姓名，最多 40 字" value="{{fields.name}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="name" bindinput="inputField" /></view>
-        <view class="field"><view class="field-label">QQ 号 *</view><input class="input" type="number" placeholder-class="ph" placeholder="填写 5～12 位数字的 QQ 号" value="{{fields.qqNumber}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="qqNumber" bindinput="inputField" /></view>
-        <view class="field"><view class="field-label">年级 *</view><input class="input" placeholder-class="ph" placeholder="例如：高一或初一，最多 40 字" value="{{fields.grade}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="grade" bindinput="inputField" /></view>
-        <view class="field"><view class="field-label">班级 *</view><input class="input" placeholder-class="ph" placeholder="填写班级，最多 40 字" value="{{fields.className}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="className" bindinput="inputField" /></view>
+        <view class="t-cap">{{fixedHint}}</view>
+        <view class="field"><view class="field-label">姓名<text wx:if="{{fixed.name.required}}"> *</text><text class="t-cap" wx:else>（选填）</text></view><input class="input" placeholder-class="ph" placeholder="填写姓名，最多 40 字" value="{{fields.name}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="name" bindinput="inputField" /></view>
+        <view class="field"><view class="field-label">QQ 号<text wx:if="{{fixed.qqNumber.required}}"> *</text><text class="t-cap" wx:else>（选填）</text></view><input class="input" type="number" placeholder-class="ph" placeholder="填写 5～12 位数字的 QQ 号" value="{{fields.qqNumber}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="qqNumber" bindinput="inputField" /></view>
+        <view class="field"><view class="field-label">年级<text wx:if="{{fixed.grade.required}}"> *</text><text class="t-cap" wx:else>（选填）</text></view><view class="pick-row" wx:if="{{fixed.grade.options.length}}"><view class="pick-pill {{item === fields.grade ? 'on' : ''}}" wx:for="{{fixed.grade.options}}" wx:key="*this" data-field="grade" data-value="{{item}}" bindtap="pickField">{{item}}</view></view><input wx:else class="input" placeholder-class="ph" placeholder="填写年级，最多 40 字" value="{{fields.grade}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="grade" bindinput="inputField" /></view>
+        <view class="field"><view class="field-label">班级<text wx:if="{{fixed.className.required}}"> *</text><text class="t-cap" wx:else>（选填）</text></view><view class="pick-grid" wx:if="{{fixed.className.options.length}}"><view class="pick-cell {{item === fields.className ? 'on' : ''}}" wx:for="{{fixed.className.options}}" wx:key="*this" data-field="className" data-value="{{item}}" bindtap="pickField">{{item}}</view></view><input wx:else class="input" placeholder-class="ph" placeholder="填写班级，最多 40 字" value="{{fields.className}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="className" bindinput="inputField" /></view>
       </view>
       <view class="form" wx:if="{{questions.length}}">
         <view class="t-section">报名问题</view>

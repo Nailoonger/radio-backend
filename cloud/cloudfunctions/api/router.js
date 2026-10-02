@@ -70,6 +70,8 @@ const ADMIN_ROUTES = [
   ['PUT /admin/recruitment/batches/:id', 'admin.recruitment.updateBatch'],
   ['POST /admin/recruitment/batches/:id/publish', 'admin.recruitment.publishBatch'],
   ['POST /admin/recruitment/batches/:id/close', 'admin.recruitment.closeBatch'],
+  ['PUT /admin/recruitment/batches/:id/interview', 'admin.recruitment.interviewPlan'],
+  ['DELETE /admin/recruitment/batches/:id', 'admin.recruitment.deleteBatch'],
   ['POST /admin/recruitment/batches/:id/interview-order', 'admin.recruitment.generateInterviewOrder'],
   ['GET /admin/recruitment/batches/:id/interview-order/export', 'admin.recruitment.exportInterviewOrder'],
   ['GET /admin/recruitment/batches/:id/interview-order', 'admin.recruitment.interviewOrder'],
