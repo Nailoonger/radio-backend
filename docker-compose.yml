@@ -73,25 +73,16 @@ services:
     networks:
       - radionet
 
-  # ---------- 3. 管理后台（Vue 静态资源）----------
-  admin-web:
-    build:
-      context: ./admin-web
-      
-    container_name: radio-admin-web
-    restart: unless-stopped
-    depends_on:
-      - radio-backend
-    networks:
-      - radionet
-
-  # ---------- 4. 统一入口 nginx（暴露 80 + 443）----------
+  # ---------- 3. 统一入口 nginx（暴露 80 + 443）----------
+  # ⚠️ 2026-10-02：管理后台（原 admin-web 服务）已下线。
+  #    正式的管理后台由「云开发静态托管」提供，统一走 GitHub Actions 自动发布
+  #    （.github/workflows/cloud-release.yml）。原先 IP 上这份是服务器自行构建的旧代码，
+  #    曾被长期误当成"线上"，造成"改完看不到"的假象 ⇒ 不再构建、不再运行。
   nginx:
     image: nginx:1.27-alpine
     container_name: radio-nginx
     restart: unless-stopped
     depends_on:
-      - admin-web
       - radio-backend
     ports:
       - "80:80"

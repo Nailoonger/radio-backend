@@ -10,7 +10,9 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 - 后端：Node 20 + Express + Sequelize（MySQL 8 / SQLite 双支持）
 - 管理后台：Vue 3 + Vite + Element Plus + Pinia + ECharts
 - 小程序：原生 WXML/WXSS/JS（无第三方框架）
-- 部署：Docker Compose（4 容器：mysql / backend / admin-web / nginx）
+- 部署：Docker Compose（3 容器：mysql / backend / nginx）。
+  ⚠️ **管理后台不在容器里**（2026-10-02 起）：由云开发静态托管提供，`git push` 到 master 后
+  由 GitHub Actions 自动构建并发布（`.github/workflows/cloud-release.yml`）。
 
 ## 常用命令
 
@@ -31,8 +33,8 @@ npx jest --watch                    # watch 模式
 
 # 改代码后重新构建
 docker compose build radio-backend   # 后端
-cd admin-web && npm run build && cd ..   # ⚠️ admin-web 本地先 build
-docker compose build admin-web      # 然后 build 镜像
+# 管理后台**不需要任何本地命令**：改完 push 到 master，GitHub Actions 自动构建并发布到静态托管。
+# （`docker compose build admin-web` 已作废 —— 该服务已从 compose 下线）
 
 # 热加载 nginx（不用重启）
 docker exec radio-nginx nginx -s reload
@@ -145,7 +147,8 @@ admin-web/src/
 └── styles/theme.css        # 全局主题（青蓝渐变 + 玻璃拟态；⚠️ 与小程序设计语言相反，v8 预览是新方向的参照）
 ```
 
-**注意：** admin-web 镜像构建**需要本地先 `npm run build`**！容器内 npm build 会因 native 模块（rollup/win32）失败。Dockerfile 已改为只 COPY dist/。
+**注意（2026-10-02 更新）：** 管理后台**已不再由 Docker 提供** —— `admin-web` 服务已从 `docker-compose.yml` 移除，
+改由云开发静态托管 + GitHub Actions 自动发布。下面关于 admin-web 镜像 / Dockerfile 的说明**仅作历史参考**。
 
 ### 小程序 `miniprogram/`
 
@@ -253,22 +256,22 @@ textarea 的 wxml 必须写 `input input-area` 或 `input input-area input-area-
 ## Docker 部署
 
 ```
-docker-compose.yml        # 4 服务编排
+docker-compose.yml        # 3 服务编排（admin-web 已于 2026-10-02 下线）
 ├── radio-mysql           # mysql:8.0（持久化 data/mysql）
 ├── radio-backend         # 我们的 Node 后端（监听 3000 内部）
-├── radio-admin-web       # nginx + Vue dist
+├── (radio-admin-web)     # ⚠️ 已下线：原 nginx + Vue dist，改由云开发静态托管提供
 └── radio-nginx           # 80 + 443 反代入口
 
 deploy/
 ├── nginx.conf            # 统一入口：80 跳 443 + 自签证书 + 反代 4 路径
-├── nginx-admin.conf      # admin-web 容器内的 nginx
+├── nginx-admin.conf      # 历史遗留：原 admin-web 容器内的 nginx（已不再使用）
 ├── wait-for-mysql.sh     # 等 MySQL TCP 通后再启动 Node
 ├── gen-selfsigned.{sh,ps1}  # 生成 10 年自签证书
 └── start/stop/clean/logs.{sh,ps1}
 ```
 
 **URL 路由：**
-- `/` → admin-web（Vue SPA）
+- `/` → **301 跳转到云开发静态托管**（2026-10-02 起；IP 上不再提供管理后台）
 - `/api/*` → radio-backend:3000
 - `/uploads/*` → radio-backend:3000（头像）
 - `/api-docs/*` → radio-backend:3000
@@ -279,7 +282,7 @@ deploy/
 
 | 决策 | 原因 |
 |---|---|
-| admin-web Dockerfile 只 COPY dist/ | 容器内 npm build 因 rollup native 模块失败 |
+| ~~admin-web Dockerfile 只 COPY dist/~~ | **已作废**：该服务 2026-10-02 下线，管理后台改由静态托管发布 |
 | 启动后立即 `seedAll()` 自动建超管 | teacher；密码取自 `INIT_ADMIN_PASSWORD`，留空则随机生成并只在首次启动日志打印一次 |
 | `module_disabled` 错误码 40302 | 区别于普通 40301 禁止 |
 | 模块开关缓存 30 秒 + set 时立即预热 | 减少 DB 查询 |
@@ -326,7 +329,9 @@ chore(deps): 升级 echarts 到 6.1
 2. **Docker build 卡住** → 检查 `.vite` 缓存、`node_modules/.vite` 是否被锁
 3. **MySQL 启动后第一次慢** → `wait-for-mysql.sh` 已在用，但首次数据卷初始化要 30s+
 4. **schema.sql 改了不生效** → MySQL 数据卷已存在；删 `data/mysql/` 重建或只补字段
-5. **admin-web 看不到新代码** → 必须本地 build 后再 `docker compose build admin-web`
+5. **管理后台看不到新代码** → ⚠️ **先确认地址栏**：正式地址是静态托管域名（`…webapps.tcloudbase.com`）；
+   IP `129.28.26.180` 上那份已于 2026-10-02 下线（留着它会让你看到旧版本）。
+   代码改动 push 到 master 后由 GitHub Actions 自动发布，通常 3~4 分钟。
 6. **小程序接口 404 但后端是好的** → 逐条检查：request.js 会拼 baseURL（已含 /api），
    页面路径不能再以 `/api` 开头（会出现 `/api/api/...`）；
    模块开关真实路径是 `/api/user/switch/list`（不是 `/api/switch/list`）
