@@ -256,14 +256,16 @@
           </template>
         </el-table-column>
         <!-- 操作列按协议版七态分组：改数据一律实体描边按钮，只切视图用文字链接。
-             ⚠️ 列宽口径（2026-09-27 实测，别凭感觉改）：
-               实体按钮 通过/驳回 54、撤销 54、改时段 66、标记播放 78、指派时段 78、改驳回 66；
-               文字链接（.op-log / .op-del）≈46 / 40，gap 6。
-               最长组合「改时段 66 + 标记播放 78 + 查看日志 46 + 删除 40 + 3×6 = 248」，
-               减 td 左右 padding 20 → 列宽**至少 236** 才不裁切；
+             ⚠️ 列宽口径（2026-10-03 用真渲染重测，替掉 09-27 那组已过时的数）：
+               实测环境＝EP index.css + theme.css 原序，fs 13.5px（中文全角＝1em，与字体无关）。
+               实体按钮（padding 0 14px / height 30px）：2 字 57、3 字 70.5、4 字 84；
+               文字链接（.op-log / .op-del，padding 0 2px / height 26px）：2 字 31、4 字 58；gap 6。
+               最长组合＝已排期超管「撤销 57 + 改时段 70.5 + 标记播放 84 + 删除 31 + 3×6 = 260.5」，
+               td 左右 padding 20 → 列宽**至少 280.5**；283/284 只余 3.5 太险，**取 288（余量 7.5）**。
+               ⚠️ 别退回 280：实测余量 -0.5 ⇒ flex-wrap 真的换行（四个控件变两行，行高 60）。
                低于 200 时旧的「查看日志」会被截成「查…」（曾经就是 200，踩过）。
                兜底再加 flex-wrap：真放不下时换行，不裁切。 -->
-        <el-table-column label="操作" width="236" fixed="right" align="right">
+        <el-table-column label="操作" width="288" fixed="right" align="right">
           <template #default="{ row }">
             <div class="op-cell">
               <!-- 待审(0) / v2 遗留的补位待审(4)：通过 or 驳回 —— 审核员也有权限 -->
@@ -288,9 +290,14 @@
                 <el-button v-if="!canWrite" size="small" class="op-log" @click="openAssign(row, true)">查看日志</el-button>
               </template>
 
-              <!-- 已排期(1)：换格 / 补标播放 —— 均改数据，仅超管（同上：日志在改时段弹窗里） -->
+              <!-- 已排期(1)：撤销退回待审 / 换格 / 补标播放 —— 均改数据，仅超管（同上：日志在改时段弹窗里）
+                   ⚠️ 「撤销」是 v2 规则版就有的（当时已排期/已驳回共用一个模板），协议版拆七态时漏掉了，
+                   2026-10-03 补回（陛下点名）。后端 PUT /admin/submit/:id/revoke 本就支持
+                   「审核通过(1) → 回到待审(0)，排期维度重置、位子释放并触发调剂」，revoke() 的
+                   确认文案也一直写着"若是已排期的点歌，位子立刻释放…" —— 属回归漏删，别再删。 -->
               <template v-else-if="Number(row.status) === 1">
                 <template v-if="canWrite">
+                  <el-button size="small" :disabled="weekLocked" @click="revoke(row)">撤销</el-button>
                   <el-button size="small" :disabled="weekLocked" @click="openAssign(row)">改时段</el-button>
                   <el-button size="small" :disabled="weekLocked" @click="markPlayed(row)">标记播放</el-button>
                 </template>
