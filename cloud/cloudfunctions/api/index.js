@@ -85,6 +85,12 @@ exports.main = async (event = {}, context) => {
    *    所以这条分支对原有两条通道**零影响**。
    */
   let httpVia = null;
+  // Only platform-injected request context may supply an HTTP source address.
+  // Envelope fields and forwarding headers are user input, never a rate-limit identity.
+  const httpSourceIp = event && event.requestContext && (
+    (event.requestContext.http && event.requestContext.http.sourceIp) ||
+    (event.requestContext.identity && event.requestContext.identity.sourceIp)
+  );
   try {
     const info = require('./httpBridge').normalizeHttpEvent(event);
     if (info) {
@@ -115,6 +121,12 @@ exports.main = async (event = {}, context) => {
    */
   if (event && (event.Type === 'Timer' || event.TriggerName)) {
     try {
+      // Bound maintenance to 100 expired rate documents per tick; recruitment
+      // collections may not yet be initialized in existing deployments.
+      if (Math.floor(Date.now() / 60000) % 60 === 0) {
+        try { await require('./services/recruitmentStore').cleanupRates(); }
+        catch (_) { console.warn('[cron] 招新限流记录清理暂不可用'); }
+      }
       const sched = require('./services/scheduling');
       const out = await sched.sweepTick({ now: Date.now() });
       console.log('[cron]', event.TriggerName || 'timer', JSON.stringify({
@@ -171,6 +183,9 @@ exports.main = async (event = {}, context) => {
       body: body || {},
       token,
       openid: wxContext.OPENID || '',        // 云开发原生 openid（备用；业务仍以 JWT 内的 openid 为准）
+      // A native caller can forge HTTP-looking event fields. Platform OPENID
+      // always takes precedence, so changing fake sourceIp cannot reset quotas.
+      source: wxContext.OPENID ? `cloud:${wxContext.OPENID}` : (httpVia && httpSourceIp ? `http:${httpSourceIp}` : ''),
       unionid: wxContext.UNIONID || '',
       cloud,
     };
@@ -181,6 +196,12 @@ exports.main = async (event = {}, context) => {
     if (err instanceof ApiError) {
       // 业务错误：code 原样返回，data 可带附加信息（如 40907 的 opensAt / windowText）
       return { code: err.code, message: err.message, data: err.data || null };
+    }
+    // Recruitment carries bearer credentials and student data: never return or log
+    // SDK diagnostics that could embed a submitted document or query credential.
+    if (reqPath.includes('/recruitment')) {
+      console.error('[recruitment] 未捕获异常', { method, path: reqPath });
+      return { code: Codes.SERVER_ERROR, message: '服务器繁忙，请稍后再试', data: null };
     }
     console.error('[api] 未捕获异常', { method, path: reqPath, msg: err && err.message, stack: err && err.stack });
     // ⚠️ 迁移期刻意把错误详情放进 `data`（前端只读 message 做 toast，不受影响）：

@@ -1,0 +1,12 @@
+.recruitment-result-body { padding-bottom: calc(60rpx + env(safe-area-inset-bottom)); }
+.recruitment-gap { gap: 18rpx; }
+.recruitment-code { color: #fff; font-size: 40rpx; font-weight: 600; letter-spacing: 3rpx; word-break: break-all; }
+.recruitment-code-input { letter-spacing: 2rpx; }
+.recruitment-pre { white-space: pre-wrap; word-break: break-word; }
+.recruitment-detail { display: flex; gap: 28rpx; align-items: flex-start; }
+.recruitment-detail .t-sub { flex: none; width: 72rpx; }
+.recruitment-detail .t-body { word-break: break-word; min-width: 0; }
+.recruitment-answer + .recruitment-answer { border-top: 1rpx solid var(--hairline); padding-top: 22rpx; }
+button.recruitment-secondary { background: var(--parchment); color: var(--accent); }
+.recruitment-links { display: flex; justify-content: space-between; padding: 8rpx 4rpx; }
+.recruitment-error { color: var(--red-fg); font-size: 25rpx; line-height: 1.6; }

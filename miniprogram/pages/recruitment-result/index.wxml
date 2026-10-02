@@ -1,0 +1,63 @@
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" bindtap="goBack" hover-class="pressed" aria-label="返回"><view class="chev-l"></view></view>
+    <view class="navbar-title">我的报名</view><view class="navbar-spacer"></view>
+  </view>
+  <view class="body recruitment-result-body">
+    <view class="tile" wx:if="{{receiptCode}}">
+      <view class="tile-title">报名已提交</view>
+      <view class="tile-meta">请复制或截图保存查询码，查询和修改报名都需要它。</view>
+      <text class="recruitment-code" selectable>{{receiptCode}}</text>
+      <button class="btn btn-on-tile btn-block" bindtap="copyCode">复制查询码</button>
+      <view class="tile-meta">查询码持有人可以查看和修改报名，请勿分享。遗失请联系广播站。</view>
+    </view>
+    <block wx:if="{{!application}}">
+      <view class="stack recruitment-gap"><view class="t-page">查询报名</view><view class="t-sub">无需登录，输入查询码即可查看。</view></view>
+      <view class="form">
+        <view class="field"><view class="field-label">查询码</view><input class="input recruitment-code-input" placeholder-class="ph" placeholder="输入报名时保存的查询码" value="{{queryInput}}" maxlength="64" disabled="{{querying}}" bindinput="inputCode" bindconfirm="query" confirm-type="search" /></view>
+        <button class="btn btn-primary btn-block" bindtap="query" loading="{{querying}}" disabled="{{querying}}">查询报名</button>
+      </view>
+      <view class="t-cap">查询码不区分字母大小写。遗失查询码请联系广播站，姓名和学号不能用于查询。</view>
+    </block>
+    <block wx:else>
+      <view class="card stack recruitment-gap">
+        <view class="between"><view class="t-section grow">{{application.batch.title}}</view><view class="tag {{statusClass}}">{{statusText}}</view></view>
+        <view class="t-cap">报名时间：{{createdText}}（北京时间）</view>
+        <view class="t-sub" wx:if="{{application.progress === 'withdrawn'}}">报名已撤回，不参与本次招新审核。</view>
+        <view class="t-sub" wx:elif="{{!application.decision}}">录取结果尚未发布，请留意面试安排。</view>
+        <view class="t-body recruitment-pre" wx:elif="{{application.publicNote}}">{{application.publicNote}}</view>
+      </view>
+      <view class="card stack recruitment-gap" wx:if="{{application.interview && application.progress !== 'withdrawn'}}">
+        <view class="t-section">面试安排</view>
+        <view class="t-body">时间：{{interviewText}}（北京时间）</view>
+        <view class="t-body recruitment-pre">地点：{{application.interview.location}}</view>
+        <view class="t-sub recruitment-pre" wx:if="{{application.interview.note}}">{{application.interview.note}}</view>
+      </view>
+      <view class="card stack recruitment-gap">
+        <view class="t-section">报名信息</view>
+        <view class="recruitment-detail"><view class="t-sub">姓名</view><view class="t-body">{{application.name}}</view></view>
+        <view class="recruitment-detail"><view class="t-sub">学号</view><view class="t-body">{{application.studentNo}}</view></view>
+        <view class="recruitment-detail"><view class="t-sub">年级</view><view class="t-body">{{application.grade}}</view></view>
+        <view class="recruitment-detail"><view class="t-sub">班级</view><view class="t-body">{{application.className}}</view></view>
+      </view>
+      <view class="card stack recruitment-gap" wx:if="{{questions.length}}">
+        <view class="t-section">问题回答</view>
+        <view class="stack recruitment-gap recruitment-answer" wx:for="{{questions}}" wx:key="id">
+          <view class="t-sub">{{index + 1}}．{{item.title}}</view><view class="t-body recruitment-pre">{{item.answerText}}</view>
+        </view>
+      </view>
+      <view class="stack recruitment-gap" wx:if="{{application.canEdit}}">
+        <view class="t-cap">截止前可修改或撤回：{{closesText}}（北京时间）。</view>
+        <button class="btn btn-primary btn-block" bindtap="edit" disabled="{{busy || querying}}">{{application.progress === 'withdrawn' ? '重新提交报名' : '修改报名'}}</button>
+        <button wx:if="{{application.progress !== 'withdrawn'}}" class="btn recruitment-secondary btn-block" bindtap="withdraw" loading="{{busy}}" disabled="{{busy || querying}}">撤回报名</button>
+      </view>
+      <view class="t-cap" wx:else>报名已锁定，表单无法修改或撤回。</view>
+      <view class="recruitment-links">
+        <view class="t-link" bindtap="query" hover-class="pressed">{{querying ? '刷新中……' : '刷新进度'}}</view>
+        <view class="t-link" bindtap="another" hover-class="pressed">查询其他报名</view>
+      </view>
+    </block>
+    <view class="recruitment-error" wx:if="{{error}}">{{error}}</view>
+  </view>
+</view>

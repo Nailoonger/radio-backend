@@ -60,8 +60,8 @@ eq('健康检查', match('GET', '/health').handlerKey, 'system.health');
 
 const userCount = RAW_ROUTES.filter(([k]) => k.includes(' /user/')).length;
 const adminCount = RAW_ROUTES.filter(([k]) => k.includes(' /admin/')).length;
-eq('用户端路由数', userCount, 32);
-eq('管理端路由数', adminCount, 93);
+eq('用户端路由数', userCount, 38);
+eq('管理端路由数', adminCount, 104);
 
 // ============ 2. 纯逻辑移植一致性 ============
 const oldT = require(path.join(ROOT, 'src', 'utils', 'bjTime'));

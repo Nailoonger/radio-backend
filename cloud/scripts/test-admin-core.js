@@ -72,6 +72,8 @@ function baseSeed() {
  * 规范应当独立于被测实现，否则实现改错、测试跟着改错，等于没测。
  * ══════════════════════════════════════════════════════════════════ */
 const SUPER_ONLY = new Set([
+  'admin.recruitment.createBatch', 'admin.recruitment.updateBatch',
+  'admin.recruitment.publishBatch', 'admin.recruitment.publishResults', 'admin.recruitment.archiveBatch',
   // 点歌：容量 / 窗口 / 时段 / 排期 / 规则 / 危险操作（V1 §2.1）
   'admin.submit.setQuota', 'admin.submit.sweepQueue', 'admin.submit.saveWindow',
   'admin.submit.saveSlots', 'admin.submit.previewSchedule', 'admin.submit.runSchedule',
@@ -104,6 +106,9 @@ const ANON_OK = new Set(['POST /admin/login']);
  * 与 SUPER_ONLY 一起构成完整且互斥的分类（下面有并集/交集断言兜底）。
  */
 const PLAIN_ONLY = new Set([
+  'admin.recruitment.batches', 'admin.recruitment.batchDetail',
+  'admin.recruitment.applications', 'admin.recruitment.applicationDetail',
+  'admin.recruitment.review', 'admin.recruitment.interview',
   'admin.auth.login', 'admin.auth.profile', 'admin.auth.changePassword', 'admin.auth.logout',
   // 点歌：**读** 全放行 + 审核动作；排期 / 配置 / 危险操作在 SUPER_ONLY
   'admin.submit.list', 'admin.submit.capacity', 'admin.submit.window', 'admin.submit.notice',
@@ -121,7 +126,7 @@ const PLAIN_ONLY = new Set([
   section('A. 权限矩阵（全部 93 条管理端路由）');
   reset(baseSeed());
 
-  eq('管理端路由总数', ADMIN_ROUTES.length, 93);
+  eq('管理端路由总数', ADMIN_ROUTES.length, 104);
 
   const anonBad = [];
   const plainBad = [];
@@ -158,9 +163,9 @@ const PLAIN_ONLY = new Set([
   ok('匿名调 92 条路由（除登录）全部 40101', anonBad.length === 0, anonBad.slice(0, 8).join(' | '));
   ok('普管对超管专属路由全部 40301、对其它路由不被误拦', plainBad.length === 0, plainBad.slice(0, 8).join(' | '));
   ok('超管调全部路由均过鉴权', anonLeak.length === 0, anonLeak.slice(0, 8).join(' | '));
-  eq('超管专属 handlerKey 条数', SUPER_ONLY.size, 55);
+  eq('超管专属 handlerKey 条数', SUPER_ONLY.size, 60);
   // sweepQueue 一个 key 对应两条路由（/quota/sweep 与 /queue/sweep）→ 56 > 55
-  eq('落在超管专属 handlerKey 上的**路由**条数', ADMIN_ROUTES.filter(([, hk]) => SUPER_ONLY.has(hk)).length, 56);
+  eq('落在超管专属 handlerKey 上的**路由**条数', ADMIN_ROUTES.filter(([, hk]) => SUPER_ONLY.has(hk)).length, 61);
 
   // 权限规范必须**恰好覆盖**路由表。只声明「超管」是不够的 ——
   // 另一半（普管即可）如果只靠「不在 SUPER_ONLY 里」隐式推出，那么
@@ -172,8 +177,8 @@ const PLAIN_ONLY = new Set([
   ok('每个 handlerKey 都被显式分类（超管 ∪ 普管）', uncovered.length === 0, uncovered.join(' | '));
   ok('两类互不重叠', overlap.length === 0, overlap.join(' | '));
   eq('分类总数 = 路由表去重后的 key 数', SUPER_ONLY.size + PLAIN_ONLY.size, routeKeys.length);
-  eq('普管可调 handlerKey 条数', PLAIN_ONLY.size, 36);
-  eq('普管可调**路由**条数（capacity 一 key 两路由）', ADMIN_ROUTES.filter(([, hk]) => PLAIN_ONLY.has(hk)).length, 37);
+  eq('普管可调 handlerKey 条数', PLAIN_ONLY.size, 42);
+  eq('普管可调**路由**条数（capacity 一 key 两路由）', ADMIN_ROUTES.filter(([, hk]) => PLAIN_ONLY.has(hk)).length, 43);
 
   /* ══════════════════ B. auth ══════════════════ */
   section('B. 管理端登录 / 当前账号 / 改密 / 退出');

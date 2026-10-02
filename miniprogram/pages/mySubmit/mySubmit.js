@@ -311,4 +311,8 @@ Page({
   goAbout() {
     wx.navigateTo({ url: '/pages/about/about' });
   },
+
+  goRecruitment() {
+    wx.navigateTo({ url: '/pages/recruitment/index' });
+  },
 });

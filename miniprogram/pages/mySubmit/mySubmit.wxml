@@ -153,6 +153,17 @@
       </view>
     </block>
 
+    <!-- 公开招新入口，独立于学生登录状态 -->
+    <view class="card-flush">
+      <view class="card-row" hover-class="row-hover" bindtap="goRecruitment">
+        <view class="grow stack">
+          <text class="t-strong t-link">加入我们</text>
+          <text class="t-cap">招新报名、面试安排与录取结果</text>
+        </view>
+        <view class="chev-r"></view>
+      </view>
+    </view>
+
   </view>
 
   <view class="pb-tabbar"></view>

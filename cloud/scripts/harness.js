@@ -245,7 +245,27 @@ class Collection {
   async count() { return { total: bucket(this.name).size }; }
 }
 
+// Serial transactions with rollback exercise atomicity, not real cloud contention.
+// Transaction collection deliberately permits document operations only.
+let transactionTail = Promise.resolve();
 const fakeDb = {
+  runTransaction: async (work) => {
+    const previous = transactionTail;
+    let release;
+    transactionTail = new Promise((resolve) => { release = resolve; });
+    await previous;
+    const snapshot = new Map(Array.from(store, ([name, docs]) => [name, new Map(Array.from(docs, ([id, doc]) => [id, clone(doc)]))]));
+    try {
+      return await work({ collection: (name) => ({
+        doc: (id) => new Doc(name, id),
+        add: (options) => new Collection(name).add(options),
+      }) });
+    } catch (error) {
+      store.clear();
+      snapshot.forEach((docs, name) => store.set(name, docs));
+      throw error;
+    } finally { release(); }
+  },
   collection: (n) => new Collection(n),
   // 模拟服务端建集合：已存在时抛错（对齐真实 SDK 行为）
   createCollection: async (name) => {

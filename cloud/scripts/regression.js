@@ -37,6 +37,9 @@ const BUNDLE_DIR = path.join(ROOT, 'miniprogram', 'cloudfunctions', 'api');
  * `test-bundle` / `selfcheck` 自己就会去看产物，再指一遍没意义，故只在源码那一轮跑。
  */
 const SUITE = [
+  ['test-recruitment.js', true],
+  ['test-recruitment-client.js', false],
+  ['test-recruitment-init.js', false],
   ['test-system.js', true],
   ['test-user-auth.js', true],
   ['test-user-readonly.js', true],

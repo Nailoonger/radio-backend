@@ -95,7 +95,7 @@ const modKeyToFile = (key) => key.replace(/\./g, '/') + '.js';
   ok('REGISTRY 里每个 key 都能落到磁盘上的文件', notOnDisk.length === 0, notOnDisk.join(', '));
 
   eq('★ 双向刚好一一对应（数量相等）', REG.length, fileKeys.length);
-  eq('REGISTRY 条数（阶段 7 收尾口径：1 system + 10 user + 13 admin）', REG.length, 24);
+  eq('REGISTRY 条数（含招新：1 system + 11 user + 14 admin）', REG.length, 26);
 
   // 辅助件必须真的是辅助件（没有被路由引用）
   const routeModKeys = [...new Set(RAW_ROUTES.map(([, hk]) => {
@@ -139,8 +139,8 @@ const modKeyToFile = (key) => key.replace(/\./g, '/') + '.js';
   const adminRoutes = RAW_ROUTES.filter(([k]) => pathOf(k).startsWith('/admin/'));
   const userRoutes = RAW_ROUTES.filter(([k]) => pathOf(k).startsWith('/user/'));
   const systemRoutes = RAW_ROUTES.filter(([, hk]) => hk.startsWith('system.'));
-  eq('★ admin 路由 93 条（阶段 7 目标）', adminRoutes.length, 93);
-  eq('user 路由 32 条', userRoutes.length, 32);
+  eq('★ admin 路由 104 条（含招新）', adminRoutes.length, 104);
+  eq('user 路由 38 条（含招新）', userRoutes.length, 38);
   eq('system 路由 2 条（/health + /system/init-collections）',
     systemRoutes.map(([k]) => k), ['GET /health', 'POST /system/init-collections']);
   eq('路由总数 = admin + user + system（没有第四种前缀）',

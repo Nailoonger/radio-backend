@@ -1,0 +1,4 @@
+.recruitment-body { padding-bottom: calc(60rpx + env(safe-area-inset-bottom)); }
+.recruitment-gap { gap: 18rpx; }
+.recruitment-intro { white-space: pre-wrap; word-break: break-word; }
+.recruitment-foot { text-align: center; padding: 0 16rpx; }

@@ -1,0 +1,7 @@
+.recruitment-form-body { padding-bottom: calc(60rpx + env(safe-area-inset-bottom)); }
+.recruitment-gap { gap: 18rpx; }
+.recruitment-label { color: var(--ink-2); word-break: break-word; }
+.recruitment-option { display: flex; align-items: flex-start; gap: 18rpx; padding: 20rpx 8rpx; color: var(--ink-2); }
+.recruitment-option radio, .recruitment-option checkbox { flex: none; }
+.recruitment-error { color: var(--red-fg); font-size: 25rpx; line-height: 1.6; }
+.recruitment-code { color: #fff; font-size: 40rpx; font-weight: 600; letter-spacing: 3rpx; word-break: break-all; }

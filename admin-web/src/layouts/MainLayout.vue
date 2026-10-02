@@ -141,6 +141,7 @@ const NAV_GROUPS = [
       { path: '/program', title: '栏目管理', icon: IconCalendar },
       { path: '/notice', title: '公告管理', icon: IconMegaphone },
       { path: '/message', title: '留言审核', icon: IconChat, badgeKey: 'messagePending' },
+      { path: '/recruitment', title: '招新管理', icon: IconUserPlus },
     ],
   },
   {

@@ -14,6 +14,12 @@
 
 // ---- 用户端 /user ----
 const USER_ROUTES = [
+  ['GET /user/recruitment/current', 'user.recruitment.current'],
+  ['POST /user/recruitment/apply', 'user.recruitment.apply'],
+  ['POST /user/recruitment/query', 'user.recruitment.query'],
+  ['PUT /user/recruitment/application', 'user.recruitment.update'],
+  ['POST /user/recruitment/withdraw', 'user.recruitment.withdraw'],
+  ['POST /user/recruitment/resubmit', 'user.recruitment.resubmit'],
   ['POST /user/login', 'user.auth.login'],
   ['POST /user/login/account', 'user.auth.loginByAccount'],
   ['PUT /user/change-password', 'user.auth.changePassword'],
@@ -58,6 +64,17 @@ const USER_ROUTES = [
 
 // ---- 管理端 /admin ----
 const ADMIN_ROUTES = [
+  ['GET /admin/recruitment/batches', 'admin.recruitment.batches'],
+  ['POST /admin/recruitment/batches', 'admin.recruitment.createBatch'],
+  ['GET /admin/recruitment/batches/:id', 'admin.recruitment.batchDetail'],
+  ['PUT /admin/recruitment/batches/:id', 'admin.recruitment.updateBatch'],
+  ['POST /admin/recruitment/batches/:id/publish', 'admin.recruitment.publishBatch'],
+  ['POST /admin/recruitment/batches/:id/results', 'admin.recruitment.publishResults'],
+  ['POST /admin/recruitment/batches/:id/archive', 'admin.recruitment.archiveBatch'],
+  ['GET /admin/recruitment/applications', 'admin.recruitment.applications'],
+  ['GET /admin/recruitment/applications/:id', 'admin.recruitment.applicationDetail'],
+  ['PUT /admin/recruitment/applications/:id/review', 'admin.recruitment.review'],
+  ['PUT /admin/recruitment/applications/:id/interview', 'admin.recruitment.interview'],
   ['POST /admin/login', 'admin.auth.login'],
   ['GET /admin/profile', 'admin.auth.profile'],
   ['PUT /admin/change-password', 'admin.auth.changePassword'],

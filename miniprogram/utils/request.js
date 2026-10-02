@@ -43,6 +43,7 @@ function getAppSafe() {
  *      scope='admin'       → globalData.adminToken / storage 'admin_token'
  */
 function currentToken(scope) {
+  if (scope === 'public') return '';
   const app = getAppSafe();
   if (scope === 'admin') {
     if (app && app.globalData && app.globalData.adminToken) return app.globalData.adminToken;
@@ -71,7 +72,7 @@ function handleUnauthorized(app, scope) {
 }
 
 // ---------------- direct 模式：wx.request（原逻辑） ----------------
-function directRequest(path, method, data, scope) {
+function directRequest(path, method, data, scope, options) {
   return new Promise((resolve, reject) => {
     const app = getAppSafe();
     const baseURL = currentBaseURL();
@@ -88,7 +89,8 @@ function directRequest(path, method, data, scope) {
       data,
       header,
       success: (res) => {
-        console.log(`[request:direct] ${method} ${fullURL} → ${res.statusCode}`, res.data);
+        if (options.sensitive) console.log(`[request:direct] ${method} ${fullURL} → ${res.statusCode}`);
+        else console.log(`[request:direct] ${method} ${fullURL} → ${res.statusCode}`, res.data);
         const body = res.data || {};
         if (res.statusCode === 401) {
           handleUnauthorized(app, scope);
@@ -98,7 +100,8 @@ function directRequest(path, method, data, scope) {
         reject(body);
       },
       fail: (err) => {
-        console.error(`[request:direct FAIL] ${method} ${fullURL}`, err);
+        if (options.sensitive) console.error(`[request:direct FAIL] ${method} ${fullURL}`);
+        else console.error(`[request:direct FAIL] ${method} ${fullURL}`, err);
         reject({ code: -1, message: err.errMsg || '网络异常' });
       },
     });
@@ -106,7 +109,7 @@ function directRequest(path, method, data, scope) {
 }
 
 // ---------------- cloud 模式：wx.cloud.callFunction ----------------
-function cloudRequest(path, method, data, scope) {
+function cloudRequest(path, method, data, scope, options) {
   return new Promise((resolve, reject) => {
     const app = getAppSafe();
     console.log(`[request:cloud] ${method} ${path}`);
@@ -120,7 +123,8 @@ function cloudRequest(path, method, data, scope) {
       data: { path, method, body: data || {}, token: currentToken(scope) },
       success: (res) => {
         const body = (res && res.result) || {};
-        console.log(`[request:cloud] ${method} ${path} → ${body.code}`, body.data);
+        if (options.sensitive) console.log(`[request:cloud] ${method} ${path} → ${body.code}`);
+        else console.log(`[request:cloud] ${method} ${path} → ${body.code}`, body.data);
         if (body.code === 40101) {
           handleUnauthorized(app, scope);
           return reject({ code: 40101, message: body.message || '请先登录' });
@@ -130,7 +134,8 @@ function cloudRequest(path, method, data, scope) {
       },
       fail: (err) => {
         // 云函数执行失败 / 环境未开通 / 冷启动超时都走这里
-        console.error(`[request:cloud FAIL] ${method} ${path}`, err);
+        if (options.sensitive) console.error(`[request:cloud FAIL] ${method} ${path}`);
+        else console.error(`[request:cloud FAIL] ${method} ${path}`, err);
         reject({ code: -1, message: (err && err.errMsg) || '云函数调用失败' });
       },
     });
@@ -138,9 +143,9 @@ function cloudRequest(path, method, data, scope) {
 }
 
 // ---------------- 对外主函数（签名与原版一致，页面代码不用改） ----------------
-function request(url, method = 'GET', data = {}, scope = 'user') {
-  if (CONFIG.mode === 'cloud') return cloudRequest(url, method, data, scope);
-  return directRequest(url, method, data, scope);
+function request(url, method = 'GET', data = {}, scope = 'user', options = {}) {
+  if (CONFIG.mode === 'cloud') return cloudRequest(url, method, data, scope, options);
+  return directRequest(url, method, data, scope, options);
 }
 
 /**

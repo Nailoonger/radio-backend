@@ -40,6 +40,7 @@ const REGISTRY = {
   'user.staff': () => require('./user/staff'),
   'user.submit': () => require('./user/submit'),
   'user.switch': () => require('./user/switch'),
+  'user.recruitment': () => require('./user/recruitment'),
 
   // ---- 管理端（阶段 7）----
   'admin.auth': () => require('./admin/auth'),
@@ -55,6 +56,7 @@ const REGISTRY = {
   'admin.adminMgr': () => require('./admin/adminMgr'),
   'admin.student': () => require('./admin/student'),
   'admin.submit': () => require('./admin/submit'),
+  'admin.recruitment': () => require('./admin/recruitment'),
 };
 
 const cache = new Map();

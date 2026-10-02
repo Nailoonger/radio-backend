@@ -10,7 +10,10 @@
     "pages/programDetail/programDetail",
     "pages/memberDetail/memberDetail",
     "pages/programs/programs",
-    "pages/notices/notices"
+    "pages/notices/notices",
+    "pages/recruitment/index",
+    "pages/recruitment-form/index",
+    "pages/recruitment-result/index"
   ],
   "window": {
     "navigationStyle": "custom",

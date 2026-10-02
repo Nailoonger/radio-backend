@@ -20,6 +20,7 @@ const routes = [
       { path: 'program', name: 'Program', component: () => import('@/views/Program.vue'), meta: { title: '节目排期' } },
       { path: 'notice', name: 'Notice', component: () => import('@/views/Notice.vue'), meta: { title: '公告管理' } },
       { path: 'message', name: 'Message', component: () => import('@/views/Message.vue'), meta: { title: '留言审核' } },
+      { path: 'recruitment', name: 'Recruitment', component: () => import('@/views/Recruitment.vue'), meta: { title: '招新管理' } },
       { path: 'student', name: 'Student', component: () => import('@/views/StudentAccounts.vue'), meta: { title: '学生账号', superAdmin: true } },
       { path: 'showcase', name: 'Showcase', component: () => import('@/views/Showcase.vue'), meta: { title: '风采展示', superAdmin: true } },
       { path: 'cadre', name: 'Cadre', component: () => import('@/views/Cadre.vue'), meta: { title: '风采展示 - 社干', superAdmin: true } },

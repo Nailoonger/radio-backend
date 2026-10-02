@@ -1,0 +1,51 @@
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" bindtap="goBack" hover-class="pressed" aria-label="返回"><view class="chev-l"></view></view>
+    <view class="navbar-title">加入我们</view>
+    <view class="navbar-spacer"></view>
+  </view>
+  <view class="body recruitment-body">
+    <view class="tile">
+      <view class="tile-chips"><view class="chip">菁悠广播站·统一招录</view></view>
+      <view class="tile-title"><view>让你的声音，</view><view>成为校园的回响。</view></view>
+      <view class="tile-meta">仅限高一、初一学生报名。</view>
+    </view>
+    <view class="loading" wx:if="{{loading}}">加载中……</view>
+    <view class="card stack recruitment-gap" wx:elif="{{error}}">
+      <view class="t-sub">{{error}}</view>
+      <button class="btn btn-primary" bindtap="load">重新加载</button>
+    </view>
+    <block wx:elif="{{batch}}">
+      <view class="stack recruitment-gap">
+        <view class="t-title">{{batch.title}}</view>
+        <view class="t-body recruitment-intro">{{batch.intro}}</view>
+      </view>
+      <view class="win-bar {{batch.windowState === 'open' ? 'open' : ''}}">
+        <view class="win-dot"></view>
+        <view class="win-main">
+          <view class="win-txt">{{windowText}}</view>
+          <view class="win-sub">开始：{{opensText}}</view>
+          <view class="win-sub">截止：{{closesText}}（北京时间）</view>
+        </view>
+      </view>
+      <button class="btn btn-primary btn-block" disabled="{{batch.windowState !== 'open'}}" bindtap="apply">{{batch.windowState === 'open' ? '填写报名表' : windowText}}</button>
+    </block>
+    <view class="card stack recruitment-gap" wx:else>
+      <view class="t-section">暂无招新计划</view>
+      <view class="t-sub">招新开放后，可以在这里填写报名表。</view>
+    </view>
+    <view class="card stack recruitment-gap" wx:if="{{pending}}">
+      <view class="t-strong">上次提交尚未确认</view>
+      <view class="t-cap">继续原提交以确认结果，请勿重复填写报名。</view>
+      <button class="btn btn-primary" bindtap="resume">继续上次提交</button>
+    </view>
+    <view class="card-flush">
+      <view class="card-row" hover-class="row-hover" bindtap="query">
+        <view class="grow stack"><view class="t-strong t-link">查询我的报名</view><view class="t-cap">凭查询码查看面试安排和录取结果</view></view>
+        <view class="chev-r"></view>
+      </view>
+    </view>
+    <view class="t-cap recruitment-foot">公开报名，无需登录。提交后请保存查询码，后续修改和查询都需要它。</view>
+  </view>
+</view>

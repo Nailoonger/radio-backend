@@ -1,0 +1,58 @@
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" bindtap="goBack" hover-class="pressed" aria-label="返回"><view class="chev-l"></view></view>
+    <view class="navbar-title">{{mode === 'edit' ? '修改报名' : '招新报名'}}</view><view class="navbar-spacer"></view>
+  </view>
+  <view class="body recruitment-form-body">
+    <view class="loading" wx:if="{{loading}}">加载中……</view>
+    <view class="card stack recruitment-gap" wx:elif="{{error}}">
+      <view class="t-sub">{{error}}</view><button class="btn btn-primary" bindtap="goBack">返回</button>
+    </view>
+    <view class="tile" wx:elif="{{receiptCode}}">
+      <view class="tile-title">报名已提交</view>
+      <view class="tile-meta">请复制或截图保存查询码，查询和修改报名都需要它。</view>
+      <text class="recruitment-code" selectable>{{receiptCode}}</text>
+      <button class="btn btn-on-tile btn-block" bindtap="copyCode">复制查询码</button>
+      <view class="tile-meta">查询码持有人可以查看和修改报名，请勿分享。遗失请联系广播站。</view>
+    </view>
+    <block wx:elif="{{batch}}">
+      <view class="stack recruitment-gap">
+        <view class="t-title">{{batch.title}}</view>
+        <view class="t-sub">仅限高一、初一学生报名。</view>
+        <view class="t-cap">截止：{{closesText}}（北京时间）</view>
+      </view>
+      <view class="card stack recruitment-gap" wx:if="{{retrying}}">
+        <view class="t-strong">确认上次提交</view>
+        <view class="t-cap">提交结果尚未确认，已保留原内容。请重试以获取同一查询码；暂存凭证保留 24 小时，请及时确认。</view>
+      </view>
+      <view class="form">
+        <view class="t-section">基本信息</view>
+        <view class="t-cap">以下四项均为必填，请如实填写。</view>
+        <view class="field"><view class="field-label">姓名 *</view><input class="input" placeholder-class="ph" placeholder="填写姓名，最多 40 字" value="{{fields.name}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="name" bindinput="inputField" /></view>
+        <view class="field"><view class="field-label">学号 *</view><input class="input" placeholder-class="ph" placeholder="填写学号，最多 32 字" value="{{fields.studentNo}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="studentNo" bindinput="inputField" /></view>
+        <view class="field"><view class="field-label">年级 *</view><input class="input" placeholder-class="ph" placeholder="例如：高一或初一，最多 40 字" value="{{fields.grade}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="grade" bindinput="inputField" /></view>
+        <view class="field"><view class="field-label">班级 *</view><input class="input" placeholder-class="ph" placeholder="填写班级，最多 40 字" value="{{fields.className}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="className" bindinput="inputField" /></view>
+      </view>
+      <view class="form" wx:if="{{questions.length}}">
+        <view class="t-section">报名问题</view>
+        <view class="field" wx:for="{{questions}}" wx:key="id" wx:for-item="question" wx:for-index="questionIndex">
+          <view class="field-label recruitment-label">{{questionIndex + 1}}．{{question.title}}<text wx:if="{{question.required}}"> *</text><text class="t-cap" wx:else>（选填）</text></view>
+          <input wx:if="{{question.type === 'text'}}" class="input" placeholder-class="ph" placeholder="请输入，最多 200 字" value="{{question.value}}" maxlength="-1" disabled="{{locked || submitting}}" data-index="{{questionIndex}}" bindinput="inputAnswer" />
+          <textarea wx:elif="{{question.type === 'textarea'}}" class="input input-area input-area-lg" placeholder-class="ph" placeholder="请输入，最多 2000 字" value="{{question.value}}" maxlength="-1" disabled="{{locked || submitting}}" data-index="{{questionIndex}}" bindinput="inputAnswer" />
+          <radio-group wx:elif="{{question.type === 'single'}}" data-index="{{questionIndex}}" bindchange="selectAnswer">
+            <label class="recruitment-option" wx:for="{{question.options}}" wx:key="id" wx:for-item="option"><radio value="{{option.id}}" checked="{{option.checked}}" color="#0066CC" disabled="{{locked || submitting}}" /><text class="grow">{{option.label}}</text></label>
+          </radio-group>
+          <checkbox-group wx:elif="{{question.type === 'multiple'}}" data-index="{{questionIndex}}" bindchange="selectAnswer">
+            <label class="recruitment-option" wx:for="{{question.options}}" wx:key="id" wx:for-item="option"><checkbox value="{{option.id}}" checked="{{option.checked}}" color="#0066CC" disabled="{{locked || submitting}}" /><text class="grow">{{option.label}}</text></label>
+          </checkbox-group>
+          <view class="t-link" wx:if="{{question.type === 'single' && question.value && !question.required && !locked && !submitting}}" data-index="{{questionIndex}}" bindtap="clearAnswer">清除选择</view>
+        </view>
+      </view>
+      <view class="recruitment-error" wx:if="{{fieldError}}">{{fieldError}}</view>
+      <view class="t-sub" wx:if="{{!canSubmit}}">当前报名已锁定，无法提交或修改。</view>
+      <view class="t-cap" wx:elif="{{mode === 'apply'}}">提交成功后会生成查询码，请复制或截图保存。</view>
+      <button class="btn btn-primary btn-block" bindtap="submit" loading="{{submitting}}" disabled="{{submitting || !canSubmit}}">{{retrying ? '重试原提交' : (mode === 'edit' ? '保存修改' : (mode === 'resubmit' ? '重新提交报名' : '提交报名'))}}</button>
+    </block>
+  </view>
+</view>
