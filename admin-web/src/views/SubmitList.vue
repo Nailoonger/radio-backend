@@ -206,8 +206,10 @@
              ⚠️ 居中：2026-10-03 陛下裁定「首选时段 / 投稿人 / 提交时间 / 审核人 / 状态 这五栏统一居中」，
                 所以这一列也加了 align="center"；⚠️ 光加列居中不够 —— 内部 .slot-real 是横向 flex，
                 必须同时给它 justify-content:center（见样式区），否则实排那一行还是左贴。
-             ⚠️ 内容列仍左对齐、操作列仍右对齐，别一起改。 -->
-        <el-table-column label="首选时段" width="150" align="center">
+             ⚠️ 2026-10-03 第二版（A 方案）：**全部列改 min-width**，余量按各列权重等比摊给所有列
+                （原先只有「内容」一个弹性列，独吃 900+ 余量 ⇒ 状态与操作之间一个大洞，陛下点名）。
+                现在**只有「内容」列左对齐**，其余六列（含操作）一律居中。 -->
+        <el-table-column label="首选时段" min-width="150" align="center">
           <template #default="{ row }">
             <div class="slot-cell" v-if="Number(row.type) !== 2">
               <span class="slot-want" :class="{ 'is-stale': slotMoved(row) }">
@@ -223,8 +225,8 @@
              两列结构一致（头像 + 两行小字），必须一起改，否则左右不对称。
              ⚠️ 2026-10-03 起居中口径扩到**五栏**：首选时段 / 投稿人 / 提交时间 / 审核人 / 状态
              （陛下原话「仅仅首选时段、投稿人、提交时间、审核人、状态这几栏居中就好」）。
-             内容列保持左对齐、操作列保持右对齐 —— 别顺手一起居中。 -->
-        <el-table-column label="投稿人" width="150" align="center">
+             内容列保持左对齐；操作列在 A 方案里也一并居中了（陛下追加「操作那里也要居中」）。 -->
+        <el-table-column label="投稿人" min-width="150" align="center">
           <template #default="{ row }">
             <div class="user-cell">
               <span class="avatar-fallback">{{ (row.nickname || '?').charAt(0) }}</span>
@@ -236,12 +238,12 @@
           </template>
         </el-table-column>
         <!-- 提交时间：2026-10-03 起也居中（五栏统一居中之一） -->
-        <el-table-column label="提交时间" width="118" align="center">
+        <el-table-column label="提交时间" min-width="118" align="center">
           <template #default="{ row }"><span class="c-time">{{ fmt(row.createTime).slice(5) }}</span></template>
         </el-table-column>
         <!-- ⚠️ 审核人 ≠ 投稿人：投稿人在上一列，这里显示是谁审的、什么时候审的。
              居中口径与「投稿人」列一致（2026-09-27 一起改）。 -->
-        <el-table-column label="审核人 / 时间" width="142" align="center">
+        <el-table-column label="审核人 / 时间" min-width="142" align="center">
           <template #default="{ row }">
             <span class="micro" v-if="row.status === 0">—</span>
             <div class="user-cell" v-else>
@@ -255,10 +257,11 @@
         </el-table-column>
         <!-- ⚠️ 列宽 148 是量出来的，别改小：
              协议版最长胶囊是「已通过 · 待排期」（8 字），实测 ≈116px
-             （fs-xs 11.5px × 8 + 「 · 」间隔 + padding 0 10px + letter-spacing）；
-             减去 td 左右各 10px padding，列宽低于 140 就会把胶囊裁掉一截。
+             （fs-xs 11.5px × 8 + 「 · 」间隔 + 胶囊自身 padding + letter-spacing）；
+             减去格内左右各 12px（td 横向 padding 0 + .cell `padding: 0 12px`，共 24），
+             列宽低于 140 就会把胶囊裁掉一截 —— 故取 148。
              其余胶囊最长 6 字（已补位 · 待审）/ 4 字，都放得下。 -->
-        <el-table-column label="状态" width="148" align="center">
+        <el-table-column label="状态" min-width="148" align="center">
           <template #default="{ row }">
             <StatusTag :status="row.status" :label="statusLabel(row)" />
           </template>
@@ -274,8 +277,14 @@
                ⇒ 列宽**至少 284.5**；**取 288（余量 3.5）**。
                ⚠️⚠️ 别退回 280 / 236：280 可用仅 256（缺 4.5）、236 缺 44.5，实测 flex-wrap 真换行
                   （四个控件折成两行、行高 30→60）。低于 200 时「查看日志」会被截成「查…」（踩过）。
-               兜底再加 flex-wrap：真放不下时换行，不裁切。 -->
-        <el-table-column label="操作" width="288" fixed="right" align="right">
+               兜底再加 flex-wrap：真放不下时换行，不裁切。
+             ⚠️ 2026-10-03 A 方案（陛下选定）：本列由 `width="288"` 改 **`min-width="288"`**、`align`
+                由 right 改 **center**；同时其余五列也全改 min-width —— 余量按各列 min-width 权重等比
+                摊给**所有**列，不再让「内容」列独吃。2280 屏实测：内容 569 / 首选 257 / 投稿人 257 /
+                提交 202 / 审核人 243 / 状态 253 / 操作 493（操作列按钮组 261，左右各留 116 ⇒ 正好居中）。
+                ⚠️ `fixed="right"` **不影响**余量分配（已用真 el-table 在 `fixed` 下复测过，数据一致）。
+                ⚠️ 窄屏只是回到各自的 min-width，不比原方案差（最小宽度一个都没变小）。 -->
+        <el-table-column label="操作" min-width="288" fixed="right" align="center">
           <template #default="{ row }">
             <div class="op-cell">
               <!-- 待审(0) / v2 遗留的补位待审(4)：通过 or 驳回 —— 审核员也有权限 -->
@@ -2251,7 +2260,10 @@ onBeforeUnmount(() => {
 .micro.is-sys { color: var(--amber-fg); }
 /* 操作列：只切视图的（查看日志）/ 危险操作（删除）用**文字链接**，省宽度也降调性。
    实体按钮留给「改数据」的动作，视觉层次才分得开。 */
-.op-cell { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; row-gap: 4px; }
+/* ⚠️ justify-content：2026-10-03 A 方案后操作列改 align="center"，这里同步从 flex-end 改 center。
+   本元素是 inline-flex（宽度收缩到内容），所以真正把它挪到格子中间的是 td 的 text-align:center；
+   这句只是保持一致（也覆盖内容超宽 / 换行时最后一行的对齐），别改回 flex-end。 */
+.op-cell { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; row-gap: 4px; }
 .op-cell :deep(.el-button) {
   margin-left: 0; border-radius: var(--r-pill) !important;
   height: 30px; padding: 0 14px;
