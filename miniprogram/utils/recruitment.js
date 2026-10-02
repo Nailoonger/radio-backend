@@ -2,6 +2,7 @@
 const transport = require('./request.js');
 const PENDING_KEY = 'recruitment_pending_submission';
 const RETRY_TTL = 24 * 60 * 60 * 1000;
+const FORM_VERSION = 2;
 let nextContext = null;
 
 function api(path, method = 'GET', body = {}) {
@@ -27,12 +28,23 @@ function pendingSubmission() {
       wx.removeStorageSync(PENDING_KEY);
       return null;
     }
-    return saved;
+    const owns = (key) => Object.prototype.hasOwnProperty.call(saved.payload, key);
+    if (saved.formVersion === FORM_VERSION && owns('qqNumber') && !owns('studentNo')
+      && typeof saved.payload.qqNumber === 'string' && /^\d{5,12}$/.test(saved.payload.qqNumber)) return saved;
+    // 旧表单仅凭原 key 原 payload 向服务端恢复已存在的报名，不能将学号转换成 QQ 或另建记录。
+    if (!owns('qqNumber') && owns('studentNo') && typeof saved.payload.studentNo === 'string'
+      && (saved.formVersion === undefined || saved.formVersion === 1)) return { ...saved, legacyRetry: true };
+    wx.removeStorageSync(PENDING_KEY);
+    return null;
   } catch (e) { return null; }
 }
 
 function savePending(submissionKey, payload, batch) {
-  const saved = { submissionKey, payload, batch, expiresAt: Date.now() + RETRY_TTL };
+  if (!payload || typeof payload.qqNumber !== 'string' || !/^\d{5,12}$/.test(payload.qqNumber)
+    || Object.prototype.hasOwnProperty.call(payload, 'studentNo')) {
+    throw { code: 40001, message: '请填写 5～12 位数字的 QQ 号后提交' };
+  }
+  const saved = { formVersion: FORM_VERSION, submissionKey, payload, batch, expiresAt: Date.now() + RETRY_TTL };
   // 保存失败时禁止发送请求，否则首次响应丢失后无法安全重试。
   try { wx.setStorageSync(PENDING_KEY, saved); }
   catch (e) { throw { code: -1, message: '无法保存本次提交凭证，请检查设备存储后重试' }; }
@@ -60,8 +72,9 @@ function submissionKey() {
 
 function charLength(value) { return Array.from(String(value || '')).length; }
 function normalizeForm(fields, questions, answers = {}) {
-  const limits = { name: 40, studentNo: 32, grade: 40, className: 40 };
-  const labels = { name: '姓名', studentNo: '学号', grade: '年级', className: '班级' };
+  if (typeof fields.qqNumber !== 'string') throw { code: 40001, message: '请填写 5～12 位数字的 QQ 号' };
+  const limits = { name: 40, qqNumber: 12, grade: 40, className: 40 };
+  const labels = { name: '姓名', qqNumber: 'QQ 号', grade: '年级', className: '班级' };
   const payload = {};
   Object.keys(limits).forEach((key) => {
     const value = String(fields[key] || '').trim();
@@ -69,6 +82,7 @@ function normalizeForm(fields, questions, answers = {}) {
     if (charLength(value) > limits[key]) throw { code: 40001, message: labels[key] + '最多 ' + limits[key] + ' 字' };
     payload[key] = value;
   });
+  if (!/^\d{5,12}$/.test(payload.qqNumber)) throw { code: 40001, message: 'QQ 号应为 5～12 位数字' };
   payload.answers = {};
   (questions || []).forEach((question) => {
     const raw = answers[question.id];
@@ -123,7 +137,7 @@ function errorText(error) {
     40404: '查询码无效，请检查后重试',
     40304: '当前不在报名时间内，无法提交、修改或撤回',
     40910: '报名信息已更新，请重新查询后操作；提交重试请保留原内容',
-    40911: '该学号已报名，请使用原查询码查询；遗失查询码请联系广播站',
+    40911: '该 QQ 号已报名，请使用原查询码查询；遗失查询码请联系广播站',
     40912: '当前报名状态不允许此操作，请重新查询',
     42901: '操作过于频繁，请稍后重试',
   };

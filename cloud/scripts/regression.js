@@ -39,6 +39,7 @@ const BUNDLE_DIR = path.join(ROOT, 'miniprogram', 'cloudfunctions', 'api');
 const SUITE = [
   ['test-recruitment.js', true],
   ['test-recruitment-client.js', false],
+  ['test-recruitment-admin.js', false],
   ['test-recruitment-init.js', false],
   ['test-system.js', true],
   ['test-user-auth.js', true],

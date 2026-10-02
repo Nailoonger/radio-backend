@@ -61,7 +61,9 @@ eq('健康检查', match('GET', '/health').handlerKey, 'system.health');
 const userCount = RAW_ROUTES.filter(([k]) => k.includes(' /user/')).length;
 const adminCount = RAW_ROUTES.filter(([k]) => k.includes(' /admin/')).length;
 eq('用户端路由数', userCount, 38);
-eq('管理端路由数', adminCount, 104);
+eq('管理端路由数', adminCount, 108);
+eq('招新面试名单导出路由', match('GET', '/admin/recruitment/batches/sample/interview-order/export').handlerKey, 'admin.recruitment.exportInterviewOrder');
+eq('招新手动截止路由', match('POST', '/admin/recruitment/batches/sample/close').handlerKey, 'admin.recruitment.closeBatch');
 
 // ============ 2. 纯逻辑移植一致性 ============
 const oldT = require(path.join(ROOT, 'src', 'utils', 'bjTime'));

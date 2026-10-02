@@ -8,6 +8,8 @@ const path = require('path');
 const H = require('./harness');
 const API = process.env.HARNESS_API_DIR || path.join(__dirname, '..', 'cloudfunctions', 'api');
 const { sign } = require(path.join(__dirname, '..', 'cloudfunctions', 'api', 'lib', 'auth'));
+const Code = require(path.join(__dirname, '..', 'cloudfunctions', 'api', 'services', 'recruitmentCode'));
+const ExcelJS = require('exceljs');
 process.env.RECRUITMENT_CODE_KEY = 'd1'.repeat(32); // Test-only key, never a production default.
 
 let checked = 0;
@@ -42,8 +44,8 @@ async function success(method, url, body, token) {
 }
 const admin = '/admin/recruitment';
 const user = '/user/recruitment';
-const form = (batchId, studentNo, submissionKey) => ({ batchId, submissionKey,
-  name: ' 王同学 ', studentNo, grade: '高二', className: '3 班',
+const form = (batchId, qqNumber, submissionKey) => ({ batchId, submissionKey,
+  name: ' 王同学 ', qqNumber, grade: '高二', className: '3 班',
   answers: { intro: '介绍', skill: '爱播音', radio: 'a', days: ['mon', 'wed'] },
 });
 const config = () => ({ title: '秋季招新', intro: '仅限高一、初一学生报名。',
@@ -65,22 +67,22 @@ const config = () => ({ title: '秋季招新', intro: '仅限高一、初一学�
   equal('重复选项被拒绝', (await request('POST', `${admin}/batches`, bad, root)).code, 40001);
   let batch = await success('POST', `${admin}/batches`, config(), root);
   equal('草稿对公众隐藏', (await success('GET', `${user}/current`)).batch, null);
-  equal('草稿不可报名', (await request('POST', `${user}/apply`, form(batch.id, '001', '01'.repeat(16)))).code, 40304);
+  equal('草稿不可报名', (await request('POST', `${user}/apply`, form(batch.id, '11001', '01'.repeat(16)))).code, 40304);
   equal('普管不能发布', (await request('POST', `${admin}/batches/${batch.id}/publish`, { version: batch.version }, member)).code, 40301);
   batch = await success('POST', `${admin}/batches/${batch.id}/publish`, { version: batch.version }, root);
   equal('公开窗口开放', (await success('GET', `${user}/current`)).batch.windowState, 'open');
   equal('发布题目锁定', (await request('PUT', `${admin}/batches/${batch.id}`, { version: batch.version, questions: [] }, root)).code, 40912);
   const overlapping = await success('POST', `${admin}/batches`, config(), root);
   equal('重叠窗口发布被拒绝', (await request('POST', `${admin}/batches/${overlapping.id}/publish`, { version: overlapping.version }, root)).code, 40912);
-  const blank = form(batch.id, '001', '02'.repeat(16)); blank.name = '  ';
+  const blank = form(batch.id, '11001', '02'.repeat(16)); blank.name = '  ';
   equal('固定必填拒绝空白', (await request('POST', `${user}/apply`, blank)).code, 40001);
-  const invalid = form(batch.id, '001', '03'.repeat(16)); invalid.answers.radio = 'unknown';
+  const invalid = form(batch.id, '11001', '03'.repeat(16)); invalid.answers.radio = 'unknown';
   equal('拒绝不存在选项', (await request('POST', `${user}/apply`, invalid)).code, 40001);
-  const long = form(batch.id, '001', '04'.repeat(16)); long.answers.intro = '字'.repeat(201);
+  const long = form(batch.id, '11001', '04'.repeat(16)); long.answers.intro = '字'.repeat(201);
   equal('拒绝超长单行答案', (await request('POST', `${user}/apply`, long)).code, 40001);
-  const emptyMulti = form(batch.id, '001', '05'.repeat(16)); emptyMulti.answers.days = [];
+  const emptyMulti = form(batch.id, '11001', '05'.repeat(16)); emptyMulti.answers.days = [];
   equal('必填多选不可留空', (await request('POST', `${user}/apply`, emptyMulti)).code, 40001);
-  const body = form(batch.id, ' 001 ', '11'.repeat(16));
+  const body = form(batch.id, ' 11001 ', '11'.repeat(16));
   const a = await success('POST', `${user}/apply`, body);
   equal('四项自行填写并去空白', a.application.name, '王同学');
   equal('其他年级也可报名', a.application.grade, '高二');
@@ -90,26 +92,26 @@ const config = () => ({ title: '秋季招新', intro: '仅限高一、初一学�
   equal('响应丢失安全重试返回同记录', retry.application.id, a.application.id);
   const different = { ...body, name: '改变内容' };
   equal('同重试凭证不同内容冲突', (await request('POST', `${user}/apply`, different)).code, 40910);
-  const duplicate = await request('POST', `${user}/apply`, form(batch.id, '001', '12'.repeat(16)));
-  equal('同学号重复控制', duplicate.code, 40911);
+  const duplicate = await request('POST', `${user}/apply`, form(batch.id, '11001', '12'.repeat(16)));
+  equal('同 QQ 号重复控制', duplicate.code, 40911);
   yes('重复不泄露查询码', !JSON.stringify(duplicate).includes(a.queryCode));
-  const optional = form(batch.id, '002', '21'.repeat(16)); delete optional.answers.skill;
+  const optional = form(batch.id, '11002', '21'.repeat(16)); delete optional.answers.skill;
   const b = await success('POST', `${user}/apply`, optional);
   yes('不同记录不同查询码', b.queryCode !== a.queryCode);
   equal('无效查询码统一错误', (await request('POST', `${user}/query`, { queryCode: 'INVALID' })).code, 40404);
-  equal('学号不能查询', (await request('POST', `${user}/query`, { studentNo: '001' })).code, 40001);
+  equal('学号不能查询', (await request('POST', `${user}/query`, { studentNo: '11001' })).code, 40001);
   let viewA = await success('POST', `${user}/query`, { queryCode: ` ${a.queryCode.toLowerCase()} ` });
   equal('码忽略大小写空白', viewA.id, a.application.id);
   yes('查询不回显查询码和内部字段', !('queryCode' in viewA) && !('codeHash' in viewA) && !('internalNote' in viewA) && !('decision' in viewA));
-  const edit = { queryCode: a.queryCode, version: viewA.version, name: '修改姓名', studentNo: '002', grade: '初一', className: '1 班', answers: body.answers };
-  equal('改学号不能占他人学号', (await request('PUT', `${user}/application`, edit)).code, 40911);
-  viewA = await success('PUT', `${user}/application`, { ...edit, studentNo: '003' });
+  const edit = { queryCode: a.queryCode, version: viewA.version, name: '修改姓名', qqNumber: '11002', grade: '初一', className: '1 班', answers: body.answers };
+  equal('改 QQ 号不能占他人号码', (await request('PUT', `${user}/application`, edit)).code, 40911);
+  viewA = await success('PUT', `${user}/application`, { ...edit, qqNumber: '11003' });
   equal('修改表单', viewA.name, '修改姓名');
-  equal('旧版本修改被拒绝', (await request('PUT', `${user}/application`, { ...edit, studentNo: '004' })).code, 40910);
+  equal('旧版本修改被拒绝', (await request('PUT', `${user}/application`, { ...edit, qqNumber: '11004' })).code, 40910);
   let viewB = await success('POST', `${user}/query`, { queryCode: b.queryCode });
   viewB = await success('POST', `${user}/withdraw`, { queryCode: b.queryCode, version: viewB.version });
   equal('撤回状态', viewB.progress, 'withdrawn');
-  viewB = await success('POST', `${user}/resubmit`, { queryCode: b.queryCode, version: viewB.version, name: '同学乙', studentNo: '002', grade: '高一', className: '2 班', answers: optional.answers });
+  viewB = await success('POST', `${user}/resubmit`, { queryCode: b.queryCode, version: viewB.version, name: '同学乙', qqNumber: '11002', grade: '高一', className: '2 班', answers: optional.answers });
   equal('重新提交沿用记录', viewB.id, b.application.id);
   equal('截止前后台审核被拒绝', (await request('PUT', `${admin}/applications/${viewA.id}/review`, { version: viewA.version, decision: 'rejected' }, member)).code, 40304);
   const preArchive = await success('GET', `${admin}/batches/${batch.id}`, {}, root);
@@ -137,7 +139,7 @@ const config = () => ({ title: '秋季招新', intro: '仅限高一、初一学�
   equal('原生调用伪装HTTP不能通过变IP绕过限流', forgedHttp.code, 42901);
 
   now = base + 60000; // At deadline, editing closes and administrator review opens.
-  equal('截止时不能修改', (await request('PUT', `${user}/application`, { ...edit, studentNo: '003', version: viewA.version })).code, 40304);
+  equal('截止时不能修改', (await request('PUT', `${user}/application`, { ...edit, qqNumber: '11003', version: viewA.version })).code, 40304);
   equal('截止时不能撤回', (await request('POST', `${user}/withdraw`, { queryCode: a.queryCode, version: viewA.version })).code, 40304);
   equal('截止时不能新报名', (await request('POST', `${user}/apply`, form(batch.id, '005', '31'.repeat(16)))).code, 40304);
   equal('截止后原提交安全重试仍取同码', (await success('POST', `${user}/apply`, body)).queryCode, a.queryCode);
@@ -199,7 +201,7 @@ const config = () => ({ title: '秋季招新', intro: '仅限高一、初一学�
   batch = await success('POST', `${admin}/batches/${batch.id}/publish`, { version: batch.version }, root);
   const configuredKey = process.env.RECRUITMENT_CODE_KEY;
   delete process.env.RECRUITMENT_CODE_KEY;
-  equal('缺密钥时拒绝创建报名', (await request('POST', `${user}/apply`, form(batch.id, 'no-key', '51'.repeat(16)))).code, 50001);
+  equal('缺密钥时拒绝创建报名', (await request('POST', `${user}/apply`, form(batch.id, '21001', '51'.repeat(16)))).code, 50001);
   equal('缺密钥不占未决定计数', (await success('GET', `${admin}/batches/${batch.id}`, {}, root)).unresolvedCount, 0);
   process.env.RECRUITMENT_CODE_KEY = configuredKey;
   const runTransaction = H.fakeDb.runTransaction;
@@ -215,7 +217,7 @@ const config = () => ({ title: '秋季招新', intro: '仅限高一、初一学�
       return doc;
     } };
   } }));
-  const faultBody = form(batch.id, 'outage', '52'.repeat(16));
+  const faultBody = form(batch.id, '21002', '52'.repeat(16));
   const outage = await request('POST', `${user}/apply`, faultBody);
   H.fakeDb.runTransaction = runTransaction;
   equal('数据库写后失败返回通用错误', outage.code, 50001);
@@ -229,11 +231,183 @@ const config = () => ({ title: '秋季招新', intro: '仅限高一、初一学�
   equal('恢复只计一份报名', currentBatch.unresolvedCount, 1);
   H.setOpenid('parallel');
   const pair = await Promise.all([
-    H.call(H.req('POST', `${user}/apply`, form(batch.id, 'same', '41'.repeat(16)))),
-    H.call(H.req('POST', `${user}/apply`, form(batch.id, 'same', '42'.repeat(16)))),
+    H.call(H.req('POST', `${user}/apply`, form(batch.id, '21003', '41'.repeat(16)))),
+    H.call(H.req('POST', `${user}/apply`, form(batch.id, '21003', '42'.repeat(16)))),
   ]);
-  equal('并发同学号仅一条成功', pair.map(x => x.code).sort((x,y) => x-y), [0, 40911]);
+  equal('并发同 QQ 号仅一条成功', pair.map(x => x.code).sort((x,y) => x-y), [0, 40911]);
   equal('并发仅增加一个未决定计数', (await success('GET', `${admin}/batches/${batch.id}`, {}, root)).unresolvedCount, 2);
+
+  // QQ registration, early closure and preserved historical credentials.
+  now = base; H.reset(seed);
+  const basic = () => ({ ...config(), questions: [] });
+  const simpleForm = (batchId, qqNumber, key) => ({ batchId, submissionKey: key,
+    name: '新同学', qqNumber, grade: '初一', className: '1 班', answers: {} });
+  let early = await success('POST', `${admin}/batches`, basic(), root);
+  equal('草稿不能手动截止', (await request('POST', `${admin}/batches/${early.id}/close`, { version: early.version }, root)).code, 40912);
+  early = await success('POST', `${admin}/batches/${early.id}/publish`, { version: early.version }, root);
+  for (const qq of ['', '1234', '1234567890123', '12a45', 12345]) {
+    equal('QQ 必填且为 5～12 位数字字符串', (await request('POST', `${user}/apply`, simpleForm(early.id, qq, '61'.repeat(16)))).code, 40001);
+  }
+  const oldOnly = simpleForm(early.id, '100001', '62'.repeat(16)); delete oldOnly.qqNumber; oldOnly.studentNo = '100001';
+  equal('原学号不能新建报名', (await request('POST', `${user}/apply`, oldOnly)).code, 40001);
+  const earlyBody = simpleForm(early.id, ' 012345 ', '63'.repeat(16));
+  const earlyApplicant = await success('POST', `${user}/apply`, earlyBody);
+  equal('QQ 去空白保留前导零', earlyApplicant.application.qqNumber, '012345');
+  equal('新公开记录不返回学号', 'studentNo' in earlyApplicant.application, false);
+  equal('普管不能手动截止', (await request('POST', `${admin}/batches/${early.id}/close`, { version: early.version }, member)).code, 40301);
+  equal('过期批次版本不能截止', (await request('POST', `${admin}/batches/${early.id}/close`, { version: early.version }, root)).code, 40910);
+  let earlyLatest = await success('GET', `${admin}/batches/${early.id}`, {}, root);
+  equal('开放期不能生成面试顺序', (await request('POST', `${admin}/batches/${early.id}/interview-order`, { version: earlyLatest.version }, root)).code, 40304);
+  const planClose = earlyLatest.closesAt;
+  earlyLatest = await success('POST', `${admin}/batches/${early.id}/close`, { version: earlyLatest.version }, root);
+  equal('手动截止保存原计划时间', earlyLatest.closesAt, planClose);
+  equal('手动截止状态优先', earlyLatest.windowState, 'closed');
+  equal('截止不删除已报名记录', H.dump().recruitment_application.length, 1);
+  equal('截止释放占位窗口', H.dump().recruitment_control[0].windows.some(x => x.batchId === early.id), false);
+  const repeatClose = await success('POST', `${admin}/batches/${early.id}/close`, { version: 0 }, root);
+  equal('重复截止保持首次时间和版本', [repeatClose.closedAt, repeatClose.version], [earlyLatest.closedAt, earlyLatest.version]);
+  const closedEdit = { queryCode: earlyApplicant.queryCode, version: earlyApplicant.application.version,
+    name: '同学', qqNumber: '012345', grade: '初一', className: '1 班', answers: {} };
+  equal('手动截止后禁止新增', (await request('POST', `${user}/apply`, simpleForm(early.id, '912345', '64'.repeat(16)))).code, 40304);
+  equal('手动截止后禁止修改', (await request('PUT', `${user}/application`, closedEdit)).code, 40304);
+  equal('手动截止后禁止撤回', (await request('POST', `${user}/withdraw`, { queryCode: earlyApplicant.queryCode, version: closedEdit.version })).code, 40304);
+  equal('手动截止后禁止重提交', (await request('POST', `${user}/resubmit`, closedEdit)).code, 40304);
+  equal('手动截止后仍恢复响应丢失的原码', (await success('POST', `${user}/apply`, earlyBody)).queryCode, earlyApplicant.queryCode);
+  equal('不能通过调整时间重开', (await request('PUT', `${admin}/batches/${early.id}`, { version: earlyLatest.version, closesAt: base + 90000 }, root)).code, 40912);
+  let manuallyReviewed = await success('PUT', `${admin}/applications/${earlyApplicant.application.id}/review`, { version: closedEdit.version, internalNote: '人工截止即可审查' }, member);
+  equal('手动截止后立即进入审核', manuallyReviewed.internalNote, '人工截止即可审查');
+  const fresh = await success('POST', `${admin}/batches`, basic(), root);
+  const freshPublished = await success('POST', `${admin}/batches/${fresh.id}/publish`, { version: fresh.version }, root);
+  equal('释放占位后原时间可发布新批次', freshPublished.windowState, 'open');
+  equal('current 跳过提前关闭的旧开放时间窗', (await success('GET', `${user}/current`)).batch.id, fresh.id);
+  let future = await success('POST', `${admin}/batches`, { ...basic(), opensAt: base + 120000, closesAt: base + 180000 }, root);
+  future = await success('POST', `${admin}/batches/${future.id}/publish`, { version: future.version }, root);
+  future = await success('POST', `${admin}/batches/${future.id}/close`, { version: future.version }, root);
+  equal('尚未开始亦可截止', future.windowState, 'closed');
+  equal('空候选明确拒绝生成', (await request('POST', `${admin}/batches/${future.id}/interview-order`, { version: future.version }, root)).code, 40912);
+
+  const legacyId = 'legacy-application'; const legacyBatchId = 'legacy-batch';
+  const legacyKey = '65'.repeat(16); const legacyCode = Code.generate(); const legacyHash = Code.digest(legacyCode);
+  const legacyFields = { name: '旧同学', studentNo: '100001', grade: '高一', className: '2 班', answers: {} };
+  const legacyBatch = { _id: legacyBatchId, ...basic(), opensAt: base - 10000, closesAt: base + 60000,
+    publishedAt: base - 1000, resultPublishedAt: null, archivedAt: null, unresolvedCount: 1, version: 1, createdAt: base - 1000, updatedAt: base - 1000 };
+  const legacyRow = { _id: legacyId, batchId: legacyBatchId, ...legacyFields, progress: 'submitted', decision: null,
+    internalNote: '内部不可导出', publicNote: '', interview: null, version: 1, createdAt: base - 1000, updatedAt: base - 1000,
+    codeHash: legacyHash, codeCipher: Code.encrypt(legacyCode, legacyId), submissionKeyHash: Code.digest(legacyKey),
+    payloadHash: Code.payloadHash({ batchId: legacyBatchId, ...legacyFields }) };
+  H.reset({ ...seed, recruitment_batch: [legacyBatch], recruitment_application: [legacyRow],
+    recruitment_code: [{ _id: legacyHash, applicationId: legacyId }], recruitment_unique: [
+      { _id: `student:${Code.digest(JSON.stringify([legacyBatchId, legacyFields.studentNo]))}`, applicationId: legacyId },
+      { _id: `submit:${Code.digest(legacyKey)}`, applicationId: legacyId },
+    ] });
+  let legacyView = await success('POST', `${user}/query`, { queryCode: legacyCode });
+  equal('旧码仍查询且未填 QQ 不冒充学号', legacyView.qqNumber, '');
+  equal('原学号只在后台字段显示', (await success('GET', `${admin}/applications/${legacyId}`, {}, member)).legacyStudentNo, '100001');
+  yes('旧公开 DTO 不暴露学号或顺序字段', !('studentNo' in legacyView) && !('legacyStudentNo' in legacyView) && !('interviewSequence' in legacyView) && !('orderGeneratedAt' in legacyView.batch));
+  equal('缺 closedAt 旧批次仍可开放', (await success('GET', `${user}/current`)).batch.windowState, 'open');
+  const legacyRetry = { batchId: legacyBatchId, submissionKey: legacyKey, ...legacyFields };
+  equal('旧版原请求安全重试恢复原码', (await success('POST', `${user}/apply`, legacyRetry)).queryCode, legacyCode);
+  equal('旧请求改内容仍拒绝原码', (await request('POST', `${user}/apply`, { ...legacyRetry, name: '改动' })).code, 40910);
+  equal('不同凭证不能沿旧学号新建', (await request('POST', `${user}/apply`, { ...legacyRetry, submissionKey: '66'.repeat(16) })).code, 40001);
+  await success('POST', `${user}/apply`, simpleForm(legacyBatchId, '100001', '67'.repeat(16)));
+  yes('新 QQ 占位隔离旧学号命名空间', H.dump().recruitment_unique.some(x => x._id.startsWith('qq:')) && H.dump().recruitment_unique.some(x => x._id.startsWith('student:')));
+  const legacyEdit = { queryCode: legacyCode, version: legacyView.version, name: '旧同学', qqNumber: '100001', grade: '高一', className: '2 班', answers: {} };
+  equal('历史补填 QQ 也不能占用他人号码', (await request('PUT', `${user}/application`, legacyEdit)).code, 40911);
+  legacyView = await success('PUT', `${user}/application`, { ...legacyEdit, qqNumber: '100002' });
+  equal('历史记录修改后 QQ 已补填', legacyView.qqNumber, '100002');
+  equal('补填 QQ 后原学号仍保留', (await success('GET', `${admin}/applications/${legacyId}`, {}, member)).legacyStudentNo, '100001');
+  equal('补填后原提交凭证仍恢复同查询码', (await success('POST', `${user}/apply`, legacyRetry)).queryCode, legacyCode);
+
+  // > 1000 candidates prove both cloud-page coverage and the absence of an old
+  // findAllPaged default cap. Persisted order is tested independently of shuffle luck.
+  H.reset(seed); now = base;
+  let many = await success('POST', `${admin}/batches`, basic(), root);
+  many = await success('POST', `${admin}/batches/${many.id}/publish`, { version: many.version }, root);
+  const manyRows = Array.from({ length: 1105 }, (_, i) => ({ _id: `candidate-${String(i).padStart(4, '0')}`, batchId: many.id,
+    name: `候选 ${i}`, qqNumber: String(10000000 + i), grade: '高一', className: '1 班', answers: {}, progress: 'submitted', decision: null,
+    internalNote: '不可导出的内部备注', publicNote: '', interview: null, version: 1, createdAt: base, updatedAt: base }));
+  const historicCandidate = { ...manyRows[0], _id: 'historical-candidate', studentNo: '20260101' }; delete historicCandidate.qqNumber;
+  const excludedRows = [ { ...manyRows[0], _id: 'withdrawn-candidate', progress: 'withdrawn' }, { ...manyRows[0], _id: 'rejected-candidate', decision: 'rejected' } ];
+  await Promise.all([...manyRows, historicCandidate, ...excludedRows].map(row => H.fakeDb.collection('recruitment_application').doc(row._id).set({ data: row })));
+  await H.fakeDb.collection('recruitment_batch').doc(many.id).update({ data: { unresolvedCount: 1106 } });
+  equal('普通管理员不能生成顺序', (await request('POST', `${admin}/batches/${many.id}/interview-order`, { version: many.version }, member)).code, 40301);
+  equal('生成前不能导出不存在的顺序', (await request('GET', `${admin}/batches/${many.id}/interview-order/export`, {}, member)).code, 40912);
+  many = await success('POST', `${admin}/batches/${many.id}/close`, { version: many.version }, root);
+  many = await success('POST', `${admin}/batches/${many.id}/interview-order`, { version: many.version }, root);
+  const savedIds = H.dump().recruitment_batch[0].interviewOrderIds.slice();
+  equal('完整候选全部保存且每人恰好一次', [savedIds.length, new Set(savedIds).size], [1106, 1106]);
+  yes('撤回及拟不录取排除', !savedIds.includes('withdrawn-candidate') && !savedIds.includes('rejected-candidate'));
+  equal('批次 DTO 给出生成数量', many.interviewOrderCount, 1106);
+  const firstOrder = await success('GET', `${admin}/batches/${many.id}/interview-order`, { page: 1, pageSize: 100 }, member);
+  const lastOrder = await success('GET', `${admin}/batches/${many.id}/interview-order`, { page: 12, pageSize: 100 }, member);
+  equal('最后一页覆盖超过 1000 的记录', [lastOrder.items.length, lastOrder.items[0].interviewSequence], [6, 1101]);
+  equal('分页依据已保存 ID 顺序', firstOrder.items.map(x => x.id), savedIds.slice(0, 100));
+  equal('刷新顺序稳定', (await success('GET', `${admin}/batches/${many.id}/interview-order`, { pageSize: 100 }, member)).items.map(x => x.id), savedIds.slice(0, 100));
+  yes('名单 DTO 不含内部备注或凭证', firstOrder.items.every(x => !('internalNote' in x) && !('queryCode' in x) && !('codeHash' in x)));
+  equal('管理员报名详情带真实序号', (await success('GET', `${admin}/applications/${savedIds[0]}`, {}, member)).interviewSequence, 1);
+  equal('名单页上限 100', (await request('GET', `${admin}/batches/${many.id}/interview-order`, { pageSize: 101 }, member)).code, 40001);
+  equal('匿名不能读取名单', (await request('GET', `${admin}/batches/${many.id}/interview-order`)).code, 40101);
+  equal('未确认不覆盖旧顺序', (await request('POST', `${admin}/batches/${many.id}/interview-order`, { version: many.version }, root)).code, 40912);
+  const firstRow = await success('GET', `${admin}/applications/${savedIds[0]}`, {}, member);
+  await success('PUT', `${admin}/applications/${firstRow.id}/interview`, { version: firstRow.version, at: base + 120000, location: '最新广播室', note: '不要导出面试备注' }, member);
+  let scheduledRow = await success('GET', `${admin}/applications/${firstRow.id}`, {}, member);
+  scheduledRow = await success('PUT', `${admin}/applications/${firstRow.id}/review`, { version: scheduledRow.version, decision: 'accepted', internalNote: '不能导出此内容' }, member);
+  equal('审核变化不自动重排', H.dump().recruitment_batch[0].interviewOrderIds, savedIds);
+  const file = await success('GET', `${admin}/batches/${many.id}/interview-order/export`, {}, member);
+  const book = new ExcelJS.Workbook(); await book.xlsx.load(Buffer.from(file.base64, 'base64'));
+  const sheet = book.getWorksheet('面试名单');
+  equal('导出全名单而非当前页', sheet.rowCount, 1107);
+  equal('导出固定八列无内部备注', sheet.getRow(1).values.slice(1), ['序号', '姓名', 'QQ 号', '年级', '班级', '面试时间（北京时间）', '面试地点', '状态']);
+  equal('首行采用最新面试信息与北京时间', [sheet.getRow(2).getCell(6).value, sheet.getRow(2).getCell(7).value],
+    [new Date(base + 120000 + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' '), '最新广播室']);
+  equal('未发布决定标为拟录取', sheet.getRow(2).getCell(8).value, '拟录取·未发布');
+  yes('QQ 在 Excel 中保持文本格式', manyRows.every(row => { const sequence = savedIds.indexOf(row._id); const cell = sheet.getRow(sequence + 2).getCell(3); return typeof cell.value === 'string' && cell.numFmt === '@'; }));
+  equal('历史学号不导成 QQ', sheet.getRow(savedIds.indexOf(historicCandidate._id) + 2).getCell(3).value || '', '');
+  yes('导出序号连续且对应保存的名单', savedIds.every((id, i) => sheet.getRow(i + 2).getCell(1).value === i + 1));
+  yes('导出正文不包含内部评语', !JSON.stringify(sheet.getSheetValues()).includes('不可导出的内部备注') && !JSON.stringify(sheet.getSheetValues()).includes('不能导出此内容'));
+  const manyLatest = await success('GET', `${admin}/batches/${many.id}`, {}, root);
+  const randomInt = require('crypto').randomInt;
+  require('crypto').randomInt = () => 0;
+  now = base + 1;
+  try { many = await success('POST', `${admin}/batches/${many.id}/interview-order`, { version: manyLatest.version, confirm: 'REGENERATE' }, root); }
+  finally { require('crypto').randomInt = randomInt; }
+  yes('确认重新生成产生新时间且保留所有候选', many.orderGeneratedAt !== firstOrder.orderGeneratedAt && many.interviewOrderCount === 1106);
+
+  // A real review between the outside-transaction page read and the final write
+  // invalidates the batch fence. A previously saved full order remains untouched.
+  const originalCollection = H.fakeDb.collection; let changedDuringRead = false;
+  const beforeConflict = H.dump().recruitment_batch[0].interviewOrderIds.slice();
+  H.fakeDb.collection = name => {
+    const collection = originalCollection(name);
+    if (name === 'recruitment_application') {
+      const where = collection.where.bind(collection);
+      collection.where = condition => {
+        const q = where(condition); const get = q.get.bind(q);
+        q.get = async () => {
+          const result = await get();
+          if (!changedDuringRead && condition.batchId === many.id && condition.progress) {
+            changedDuringRead = true;
+            const target = (await originalCollection(name).doc(manyRows[1]._id).get()).data;
+            await success('PUT', `${admin}/applications/${target._id}/review`, { version: target.version, decision: 'rejected' }, member);
+          }
+          return result;
+        };
+        return q;
+      };
+    }
+    return collection;
+  };
+  let generatedConflict;
+  try { generatedConflict = await request('POST', `${admin}/batches/${many.id}/interview-order`, { version: many.version, confirm: 'REGENERATE' }, root); }
+  finally { H.fakeDb.collection = originalCollection; }
+  equal('生成期间审核改变返回版本冲突', generatedConflict.code, 40910);
+  equal('冲突未存半份或新顺序', H.dump().recruitment_batch[0].interviewOrderIds, beforeConflict);
+  await H.fakeDb.collection('recruitment_batch').doc(many.id).update({ data: { legacyMetadata: 'x'.repeat(890000) } });
+  const oversizedVersion = H.dump().recruitment_batch[0].version;
+  equal('容量超限明确拒绝', (await request('POST', `${admin}/batches/${many.id}/interview-order`, { version: oversizedVersion, confirm: 'REGENERATE' }, root)).code, 40912);
+  equal('容量失败不部分覆盖旧顺序', H.dump().recruitment_batch[0].interviewOrderIds, beforeConflict);
+  await H.fakeDb.collection('recruitment_batch').doc(many.id).update({ data: { resultPublishedAt: base + 2, legacyMetadata: '' } });
+  equal('结果发布后不得重排', (await request('POST', `${admin}/batches/${many.id}/interview-order`, { version: oversizedVersion, confirm: 'REGENERATE' }, root)).code, 40912);
 })().catch(error => { failed++; console.error('FAIL suite:', error.stack); }).finally(() => {
   Date.now = realNow;
   console.log(`结论：断言 ${checked} 项 / 失败 ${failed} 项`);

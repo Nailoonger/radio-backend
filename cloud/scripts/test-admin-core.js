@@ -6,7 +6,7 @@
  * 用法（仓库根目录）：
  *   node cloud/scripts/test-admin-core.js
  *
- * 覆盖：**93 条管理端路由的权限矩阵** + 除 submit / student 之外的 11 个模块行为
+ * 覆盖：全量管理端路由的权限矩阵 + 除 submit / student 之外的模块行为
  *       （auth · setting · switch · program · notice · message · stats ·
  *        cadre · staff · showcase · adminMgr）
  *       `admin.submit.*` → test-admin-submit.js；`admin.student.*` → test-admin-student.js
@@ -14,7 +14,7 @@
  * ⚠️ 权限矩阵为什么必须单独立一条：原 Express 把 `adminAuth` / `requireSuperAdmin`
  *    挂在**路由**上，云函数没有中间件层，权限判定散落到 93 个 handler 的第一行。
  *    漏写一处的后果是「接口能调通、但没登录 / 普管也能调」——**接口照样返回 200**，
- *    不报错、不告警（静默漂移 #2）。这里用「全量路由 × 三种身份」把 93 条一次扫完，
+ *    不报错、不告警（静默漂移 #2）。这里用「全量路由 × 三种身份」一次扫完，
  *    以后新增路由只要加进 router.js 就自动被覆盖。
  */
 
@@ -74,6 +74,7 @@ function baseSeed() {
 const SUPER_ONLY = new Set([
   'admin.recruitment.createBatch', 'admin.recruitment.updateBatch',
   'admin.recruitment.publishBatch', 'admin.recruitment.publishResults', 'admin.recruitment.archiveBatch',
+  'admin.recruitment.closeBatch', 'admin.recruitment.generateInterviewOrder',
   // 点歌：容量 / 窗口 / 时段 / 排期 / 规则 / 危险操作（V1 §2.1）
   'admin.submit.setQuota', 'admin.submit.sweepQueue', 'admin.submit.saveWindow',
   'admin.submit.saveSlots', 'admin.submit.previewSchedule', 'admin.submit.runSchedule',
@@ -109,6 +110,7 @@ const PLAIN_ONLY = new Set([
   'admin.recruitment.batches', 'admin.recruitment.batchDetail',
   'admin.recruitment.applications', 'admin.recruitment.applicationDetail',
   'admin.recruitment.review', 'admin.recruitment.interview',
+  'admin.recruitment.interviewOrder', 'admin.recruitment.exportInterviewOrder',
   'admin.auth.login', 'admin.auth.profile', 'admin.auth.changePassword', 'admin.auth.logout',
   // 点歌：**读** 全放行 + 审核动作；排期 / 配置 / 危险操作在 SUPER_ONLY
   'admin.submit.list', 'admin.submit.capacity', 'admin.submit.window', 'admin.submit.notice',
@@ -122,11 +124,11 @@ const PLAIN_ONLY = new Set([
 ]);
 
 (async () => {
-  /* ══════════════════ A. 权限矩阵（93 条 × 三种身份） ══════════════════ */
-  section('A. 权限矩阵（全部 93 条管理端路由）');
+  /* ══════════════════ A. 权限矩阵（全量路由 × 三种身份） ══════════════════ */
+  section('A. 权限矩阵（全量管理端路由）');
   reset(baseSeed());
 
-  eq('管理端路由总数', ADMIN_ROUTES.length, 104);
+  eq('管理端路由总数', ADMIN_ROUTES.length, 108);
 
   const anonBad = [];
   const plainBad = [];
@@ -160,12 +162,12 @@ const PLAIN_ONLY = new Set([
     if (r3.code === 40101 || r3.code === 40301) anonLeak.push(`${spec} → ${r3.code}/${r3.message}`);
   }
 
-  ok('匿名调 92 条路由（除登录）全部 40101', anonBad.length === 0, anonBad.slice(0, 8).join(' | '));
+  ok('匿名调全部路由（除登录）均为 40101', anonBad.length === 0, anonBad.slice(0, 8).join(' | '));
   ok('普管对超管专属路由全部 40301、对其它路由不被误拦', plainBad.length === 0, plainBad.slice(0, 8).join(' | '));
   ok('超管调全部路由均过鉴权', anonLeak.length === 0, anonLeak.slice(0, 8).join(' | '));
-  eq('超管专属 handlerKey 条数', SUPER_ONLY.size, 60);
+  eq('超管专属 handlerKey 条数', SUPER_ONLY.size, 62);
   // sweepQueue 一个 key 对应两条路由（/quota/sweep 与 /queue/sweep）→ 56 > 55
-  eq('落在超管专属 handlerKey 上的**路由**条数', ADMIN_ROUTES.filter(([, hk]) => SUPER_ONLY.has(hk)).length, 61);
+  eq('落在超管专属 handlerKey 上的**路由**条数', ADMIN_ROUTES.filter(([, hk]) => SUPER_ONLY.has(hk)).length, 63);
 
   // 权限规范必须**恰好覆盖**路由表。只声明「超管」是不够的 ——
   // 另一半（普管即可）如果只靠「不在 SUPER_ONLY 里」隐式推出，那么
@@ -177,8 +179,8 @@ const PLAIN_ONLY = new Set([
   ok('每个 handlerKey 都被显式分类（超管 ∪ 普管）', uncovered.length === 0, uncovered.join(' | '));
   ok('两类互不重叠', overlap.length === 0, overlap.join(' | '));
   eq('分类总数 = 路由表去重后的 key 数', SUPER_ONLY.size + PLAIN_ONLY.size, routeKeys.length);
-  eq('普管可调 handlerKey 条数', PLAIN_ONLY.size, 42);
-  eq('普管可调**路由**条数（capacity 一 key 两路由）', ADMIN_ROUTES.filter(([, hk]) => PLAIN_ONLY.has(hk)).length, 43);
+  eq('普管可调 handlerKey 条数', PLAIN_ONLY.size, 44);
+  eq('普管可调**路由**条数（capacity 一 key 两路由）', ADMIN_ROUTES.filter(([, hk]) => PLAIN_ONLY.has(hk)).length, 45);
 
   /* ══════════════════ B. auth ══════════════════ */
   section('B. 管理端登录 / 当前账号 / 改密 / 退出');

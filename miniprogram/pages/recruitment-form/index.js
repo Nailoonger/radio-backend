@@ -3,7 +3,7 @@ const recruitment = require('../../utils/recruitment.js');
 Page({
   data: {
     statusBarHeight: 20, loading: true, error: '', submitting: false, mode: 'apply', batch: null,
-    fields: { name: '', studentNo: '', grade: '', className: '' }, questions: [], locked: false, retrying: false,
+    fields: { name: '', qqNumber: '', grade: '', className: '' }, questions: [], locked: false, retrying: false, legacyRetry: false,
     canSubmit: false, closesText: '', fieldError: '',
   },
   onLoad() {
@@ -39,7 +39,7 @@ Page({
         if (pending) {
           this._pending = pending;
           this.answers = { ...(pending.payload.answers || {}) };
-          this.setData({ mode: 'apply', retrying: true, locked: true, canSubmit: true });
+          this.setData({ mode: 'apply', retrying: true, locked: true, canSubmit: true, legacyRetry: pending.legacyRetry === true });
           this.showForm(pending.batch, pending.payload);
         } else {
           const batch = context && context.batch || (await recruitment.current()).batch;
@@ -55,9 +55,9 @@ Page({
     if (!this._alive) return;
     this.setData({
       batch,
-      fields: { name: fields.name || '', studentNo: fields.studentNo || '', grade: fields.grade || '', className: fields.className || '' },
+      fields: { name: fields.name || '', qqNumber: fields.qqNumber || '', grade: fields.grade || '', className: fields.className || '' },
       questions: recruitment.decorateQuestions(batch && batch.questions, this.answers),
-      closesText: recruitment.timeText(batch && batch.closesAt),
+      closesText: recruitment.timeText(batch && (batch.closedAt || batch.closesAt)),
     });
   },
   inputField(event) {
@@ -124,13 +124,16 @@ Page({
         recruitment.goBack();
       }
     } catch (error) {
+      const legacyRejected = this._pending && this._pending.legacyRetry && Number(error && error.code) === 40001;
       // 明确校验/窗口/重复拒绝代表此次未创建，可修改；网络及未知失败保持原凭证原内容重试。
       if (this.data.mode === 'apply' && [40001, 40304, 40911].indexOf(Number(error && error.code)) >= 0) {
         recruitment.clearPending();
         this._pending = null;
-        if (this._alive) this.setData({ locked: false, retrying: false, canSubmit: Number(error.code) !== 40304 });
+        if (this._alive) this.setData({ locked: false, retrying: false, legacyRetry: false, canSubmit: Number(error.code) !== 40304 });
       } else if (this._pending && this._alive) this.setData({ retrying: true, locked: true });
-      if (this._alive) this.setData({ fieldError: recruitment.errorText(error) });
+      if (this._alive) this.setData({ fieldError: legacyRejected
+        ? '上次提交无法继续确认。若已报名，请使用原查询码查询或联系广播站；新报名需要填写 QQ 号。'
+        : recruitment.errorText(error) });
     } finally { if (this._alive) this.setData({ submitting: false }); }
   },
   copyCode() {

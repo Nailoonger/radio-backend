@@ -139,7 +139,7 @@ const modKeyToFile = (key) => key.replace(/\./g, '/') + '.js';
   const adminRoutes = RAW_ROUTES.filter(([k]) => pathOf(k).startsWith('/admin/'));
   const userRoutes = RAW_ROUTES.filter(([k]) => pathOf(k).startsWith('/user/'));
   const systemRoutes = RAW_ROUTES.filter(([, hk]) => hk.startsWith('system.'));
-  eq('★ admin 路由 104 条（含招新）', adminRoutes.length, 104);
+  eq('★ admin 路由 108 条（含招新）', adminRoutes.length, 108);
   eq('user 路由 38 条（含招新）', userRoutes.length, 38);
   eq('system 路由 2 条（/health + /system/init-collections）',
     systemRoutes.map(([k]) => k), ['GET /health', 'POST /system/init-collections']);

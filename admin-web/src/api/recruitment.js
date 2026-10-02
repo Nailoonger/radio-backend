@@ -4,13 +4,13 @@ import http, { requestMode, cloudApiUrl } from '@/utils/http';
 export const recruitmentAvailable = requestMode === 'cloud' && !!cloudApiUrl;
 export const recruitmentUnavailableMessage = '招新管理需要启用云端请求通道，请使用已配置云端通道的管理后台。';
 
-function call(method, path, data) {
+function call(method, path, data, config = {}) {
   if (!recruitmentAvailable) {
     const error = new Error(recruitmentUnavailableMessage);
     error.code = 'RECRUITMENT_CLOUD_REQUIRED';
     return Promise.reject(error);
   }
-  return method === 'get' ? http.get(path, { params: data }) : http[method](path, data);
+  return method === 'get' ? http.get(path, { ...config, params: data }) : http[method](path, data, config);
 }
 
 const base = '/admin/recruitment';
@@ -22,6 +22,10 @@ export const updateBatch = (id, body) => call('put', `${base}/batches/${idPath(i
 export const publishBatch = (id, version) => call('post', `${base}/batches/${idPath(id)}/publish`, { version });
 export const publishResults = (id, version) => call('post', `${base}/batches/${idPath(id)}/results`, { version });
 export const archiveBatch = (id, version) => call('post', `${base}/batches/${idPath(id)}/archive`, { version });
+export const closeBatch = (id, version) => call('post', `${base}/batches/${idPath(id)}/close`, { version });
+export const generateInterviewOrder = (id, version, regenerate = false) => call('post', `${base}/batches/${idPath(id)}/interview-order`, { version, ...(regenerate ? { confirm: 'REGENERATE' } : {}) });
+export const getInterviewOrder = (id, params) => call('get', `${base}/batches/${idPath(id)}/interview-order`, params);
+export const exportInterviewOrder = (id) => call('get', `${base}/batches/${idPath(id)}/interview-order/export`, undefined, { responseType: 'blob' });
 export const listApplications = (params) => call('get', `${base}/applications`, params);
 export const getApplication = (id) => call('get', `${base}/applications/${idPath(id)}`);
 export const reviewApplication = (id, body) => call('put', `${base}/applications/${idPath(id)}/review`, body);

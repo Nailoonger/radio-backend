@@ -15,8 +15,9 @@ Page({
       this.setData({
         batch: batch || null,
         opensText: batch ? recruitment.timeText(batch.opensAt) : '',
-        closesText: batch ? recruitment.timeText(batch.closesAt) : '',
-        windowText: batch ? ({ upcoming: '报名尚未开始', open: '正在报名', closed: '报名已截止' }[batch.windowState] || '报名暂未开放') : '',
+        closesText: batch ? recruitment.timeText(batch.closedAt || batch.closesAt) : '',
+        windowText: batch ? (batch.closedAt ? '报名已手动截止'
+          : ({ upcoming: '报名尚未开始', open: '正在报名', closed: '报名已截止' }[batch.windowState] || '报名暂未开放')) : '',
       });
     } catch (error) { this.setData({ error: recruitment.errorText(error) }); }
     finally { this.setData({ loading: false }); }

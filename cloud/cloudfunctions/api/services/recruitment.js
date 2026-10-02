@@ -5,25 +5,31 @@ const R = require('./recruitmentCodes');
 const S = require('./recruitmentStore');
 const F = require('./recruitmentForm');
 const Code = require('./recruitmentCode');
+const crypto = require('crypto');
+const bj = require('../lib/bjTime');
 const { C, _ } = S;
-const FORM_FIELDS = ['name', 'studentNo', 'grade', 'className', 'answers'];
+const FORM_FIELDS = ['name', 'qqNumber', 'grade', 'className', 'answers'];
 const BATCH_FIELDS = ['title', 'intro', 'opensAt', 'closesAt', 'questions'];
 
 function fail(code, message) { throw new ApiError(code, message); }
 function state(message) { fail(R.INVALID_STATE, message); }
 function iso(n) { return n === null || n === undefined ? null : new Date(n).toISOString(); }
+function manuallyClosed(row) { return row.closedAt !== null && row.closedAt !== undefined; }
 function windowState(batch, now = Date.now()) {
   if (batch.publishedAt === null) return 'draft';
+  if (manuallyClosed(batch)) return 'closed';
   if (now < batch.opensAt) return 'upcoming';
   return now < batch.closesAt ? 'open' : 'closed';
 }
 function batchDTO(row, admin = false) {
   const out = {
     id: row._id, title: row.title, intro: row.intro, opensAt: iso(row.opensAt), closesAt: iso(row.closesAt),
-    publishedAt: iso(row.publishedAt), resultPublishedAt: iso(row.resultPublishedAt), archivedAt: iso(row.archivedAt),
+    publishedAt: iso(row.publishedAt), closedAt: iso(row.closedAt), resultPublishedAt: iso(row.resultPublishedAt), archivedAt: iso(row.archivedAt),
     questions: row.questions, version: row.version, windowState: windowState(row),
   };
-  if (admin) Object.assign(out, { unresolvedCount: row.unresolvedCount, createdAt: iso(row.createdAt), updatedAt: iso(row.updatedAt) });
+  if (admin) Object.assign(out, { unresolvedCount: row.unresolvedCount, orderGeneratedAt: iso(row.orderGeneratedAt),
+    interviewOrderCount: Array.isArray(row.interviewOrderIds) ? row.interviewOrderIds.length : 0,
+    createdAt: iso(row.createdAt), updatedAt: iso(row.updatedAt) });
   return out;
 }
 function status(row) { return row.progress === 'withdrawn' ? 'withdrawn' : (row.decision || row.progress); }
@@ -31,13 +37,15 @@ function applicationDTO(row, batch, admin = false) {
   const published = batch.resultPublishedAt !== null && row.progress !== 'withdrawn';
   const out = {
     id: row._id, batchId: row.batchId, batch: batchDTO(batch, admin),
-    name: row.name, studentNo: row.studentNo, grade: row.grade, className: row.className,
+    name: row.name, qqNumber: row.qqNumber || '', grade: row.grade, className: row.className,
     answers: row.answers, progress: admin ? row.progress : (published ? row.decision : row.progress),
     interview: row.interview ? { at: iso(row.interview.at), location: row.interview.location, note: row.interview.note } : null,
     canEdit: windowState(batch) === 'open', version: row.version,
     createdAt: iso(row.createdAt), updatedAt: iso(row.updatedAt),
   };
-  if (admin) Object.assign(out, { decision: row.decision, internalNote: row.internalNote, publicNote: row.publicNote, status: status(row) });
+  if (admin) Object.assign(out, { decision: row.decision, internalNote: row.internalNote, publicNote: row.publicNote, status: status(row),
+    legacyStudentNo: row.studentNo || '',
+    interviewSequence: Array.isArray(batch.interviewOrderIds) && batch.interviewOrderIds.includes(row._id) ? batch.interviewOrderIds.indexOf(row._id) + 1 : null });
   else if (published) Object.assign(out, { decision: row.decision, publicNote: row.publicNote });
   return out;
 }
@@ -52,7 +60,7 @@ function assertOpen(row) {
 }
 function assertReview(row) {
   if (row.publishedAt === null) state('招新批次尚未发布');
-  if (Date.now() < row.closesAt) fail(R.WINDOW_CLOSED, '报名截止后才可审核和安排面试');
+  if (windowState(row) !== 'closed') fail(R.WINDOW_CLOSED, '报名截止后才可审核和安排面试');
   if (row.resultPublishedAt !== null || row.archivedAt !== null) state('录取结果已发布，无法修改');
 }
 async function requireBatch(db, id) {
@@ -65,7 +73,7 @@ function touch(batch, patch = {}) {
   if (!Number.isSafeInteger(next.unresolvedCount) || next.unresolvedCount < 0) state('报名统计异常，请联系广播站');
   return next;
 }
-const uniqueId = (batchId, studentNo) => `student:${Code.digest(JSON.stringify([batchId, studentNo]))}`;
+const uniqueId = (batchId, qqNumber) => `qq:${Code.digest(JSON.stringify([batchId, qqNumber]))}`;
 const submitId = (keyHash) => `submit:${keyHash}`;
 async function credentials(db, queryCode) {
   const codeHash = Code.digest(Code.normalize(queryCode));
@@ -87,12 +95,21 @@ function pager(query) {
 
 async function current() {
   const now = Date.now();
-  let rows = await S.list(C.BATCH, { publishedAt: _.neq(null), archivedAt: null, opensAt: _.lte(now), closesAt: _.gt(now) }, { limit: 1, orderBy: [['publishedAt', 'desc']] });
-  if (!rows.length) rows = await S.list(C.BATCH, { publishedAt: _.neq(null), archivedAt: null }, { limit: 1, orderBy: [['publishedAt', 'desc']] });
-  return { batch: rows.length ? batchDTO(rows[0]) : null };
+  // Old documents lack closedAt. Avoid a null equality query which would exclude
+  // them; filter closed windows in pages, including when the newest was closed early.
+  for (let skip = 0; ; skip += 100) {
+    const rows = await S.list(C.BATCH, { publishedAt: _.neq(null), archivedAt: null, opensAt: _.lte(now), closesAt: _.gt(now) }, { skip, limit: 100, orderBy: [['publishedAt', 'desc']] });
+    const open = rows.find((row) => windowState(row, now) === 'open');
+    if (open) return { batch: batchDTO(open) };
+    if (rows.length < 100) break;
+  }
+  const latest = await S.list(C.BATCH, { publishedAt: _.neq(null), archivedAt: null }, { limit: 1, orderBy: [['publishedAt', 'desc']] });
+  return { batch: latest.length ? batchDTO(latest[0]) : null };
 }
 async function apply(body) {
-  F.keys(body, ['batchId', 'submissionKey', ...FORM_FIELDS]);
+  // studentNo is accepted solely to recover a pre-upgrade, already committed
+  // submission's lost response. It can never create a new registration.
+  F.keys(body, ['batchId', 'submissionKey', ...FORM_FIELDS, 'studentNo']);
   const batchId = F.id(body.batchId, '批次标识');
   const keyHash = Code.submissionKey(body.submissionKey);
   // Both transaction retries and explicit credential collisions leave no partial records.
@@ -104,7 +121,9 @@ async function apply(body) {
           const row = await tx.get(C.APPLICATION, retry.applicationId);
           if (!row || row.batchId !== batchId || row.submissionKeyHash !== keyHash) fail(R.VERSION_CONFLICT, '提交凭证与报名内容不一致');
           const batch = await requireBatch(tx, row.batchId);
-          const fields = F.application(body, batch.questions);
+          const legacy = F.own(body, 'studentNo') && !F.own(body, 'qqNumber') && F.own(row, 'studentNo');
+          F.keys(body, ['batchId', 'submissionKey', ...(legacy ? FORM_FIELDS.filter((k) => k !== 'qqNumber').concat('studentNo') : FORM_FIELDS)]);
+          const fields = F.application(body, batch.questions, legacy);
           if (row.payloadHash !== Code.payloadHash({ batchId, ...fields })) fail(R.VERSION_CONFLICT, '提交凭证与报名内容不一致');
           const originalCode = Code.decrypt(row.codeCipher, row._id);
           if (Code.digest(originalCode) !== row.codeHash) fail(Codes.SERVER_ERROR, '招新查询凭证暂不可用，请联系广播站');
@@ -112,9 +131,10 @@ async function apply(body) {
         }
         const batch = await requireBatch(tx, batchId);
         assertOpen(batch);
+        F.keys(body, ['batchId', 'submissionKey', ...FORM_FIELDS]);
         const fields = F.application(body, batch.questions);
-        const studentKey = uniqueId(batchId, fields.studentNo);
-        if (await tx.get(C.UNIQUE, studentKey)) fail(R.DUPLICATE_STUDENT, '该学号已报名，请使用原查询码查询');
+        const studentKey = uniqueId(batchId, fields.qqNumber);
+        if (await tx.get(C.UNIQUE, studentKey)) fail(R.DUPLICATE_STUDENT, '该 QQ 号已报名，请使用原查询码查询');
         const queryCode = Code.generate(); const codeHash = Code.digest(queryCode);
         if (await tx.get(C.CODE, codeHash)) { const error = new Error('Recruitment credential collision'); error.recruitmentCollision = true; throw error; }
         const applicationId = Code.randomId(); const now = Date.now();
@@ -156,18 +176,22 @@ async function mutate(body, action) {
     } else {
       if (action === 'resubmit' ? row.progress !== 'withdrawn' : row.progress !== 'submitted') state('当前报名无法执行此操作');
       const fields = F.application(body, batch.questions);
-      if (fields.studentNo !== row.studentNo) {
-        oldStudentKey = uniqueId(row.batchId, row.studentNo); newStudentKey = uniqueId(row.batchId, fields.studentNo);
-        const owner = await tx.get(C.UNIQUE, oldStudentKey); const target = await tx.get(C.UNIQUE, newStudentKey);
-        if (!owner || owner.applicationId !== row._id) state('报名数据异常，请联系广播站');
-        if (target && target.applicationId !== row._id) fail(R.DUPLICATE_STUDENT, '该学号已报名，请使用原查询码查询');
+      if (fields.qqNumber !== row.qqNumber) {
+        // Legacy studentNo remains as historical data and keeps its old reservation.
+        // It is never interpreted as a QQ number or silently migrated.
+        oldStudentKey = row.qqNumber ? uniqueId(row.batchId, row.qqNumber) : null;
+        newStudentKey = uniqueId(row.batchId, fields.qqNumber);
+        const owner = oldStudentKey ? await tx.get(C.UNIQUE, oldStudentKey) : null;
+        const target = await tx.get(C.UNIQUE, newStudentKey);
+        if (oldStudentKey && (!owner || owner.applicationId !== row._id)) state('报名数据异常，请联系广播站');
+        if (target && target.applicationId !== row._id) fail(R.DUPLICATE_STUDENT, '该 QQ 号已报名，请使用原查询码查询');
       }
       patch = fields;
       if (action === 'resubmit') { Object.assign(patch, { progress: 'submitted', decision: null, interview: null }); countDelta = 1; }
     }
     const next = { ...row, ...patch, version: row.version + 1, updatedAt: Date.now() };
     const nextBatch = touch(batch, { unresolvedCount: batch.unresolvedCount + countDelta });
-    if (newStudentKey) { await tx.set(C.UNIQUE, newStudentKey, { applicationId: row._id }); await tx.remove(C.UNIQUE, oldStudentKey); }
+    if (newStudentKey) { await tx.set(C.UNIQUE, newStudentKey, { applicationId: row._id }); if (oldStudentKey) await tx.remove(C.UNIQUE, oldStudentKey); }
     await tx.set(C.APPLICATION, row._id, next); await tx.set(C.BATCH, batch._id, nextBatch);
     return applicationDTO(next, nextBatch);
   });
@@ -186,7 +210,8 @@ async function batches(query) {
 }
 async function createBatch(body) {
   F.keys(body, BATCH_FIELDS); const fields = F.batch(body); const id = Code.randomId(); const now = Date.now();
-  const row = { _id: id, ...fields, publishedAt: null, resultPublishedAt: null, archivedAt: null, unresolvedCount: 0, version: 1, createdAt: now, updatedAt: now };
+  const row = { _id: id, ...fields, publishedAt: null, closedAt: null, resultPublishedAt: null, archivedAt: null,
+    interviewOrderIds: [], orderGeneratedAt: null, unresolvedCount: 0, version: 1, createdAt: now, updatedAt: now };
   await S.transaction(async (tx) => { await tx.set(C.BATCH, id, row); });
   return batchDTO(row, true);
 }
@@ -205,7 +230,7 @@ async function updateBatch(id, body) {
     const supplied = BATCH_FIELDS.filter((k) => F.own(body, k));
     if (row.publishedAt !== null) {
       if (supplied.includes('questions') || supplied.includes('title')) state('发布后题目结构和批次名称已锁定');
-      if (Date.now() >= row.opensAt && supplied.some((k) => ['opensAt', 'closesAt'].includes(k))) state('报名开始后时间已锁定');
+      if ((manuallyClosed(row) || Date.now() >= row.opensAt) && supplied.some((k) => ['opensAt', 'closesAt'].includes(k))) state('报名开始或手动截止后时间已锁定');
     }
     const fields = F.batch({ ...row, ...body }, row.publishedAt !== null);
     const next = touch(row, fields);
@@ -229,6 +254,125 @@ async function publishBatch(id, body) {
     await tx.set(C.CONTROL, 'global', control); await tx.set(C.BATCH, row._id, next);
     return batchDTO(next, true);
   });
+}
+async function closeBatch(id, body) {
+  F.keys(body, ['version']);
+  return S.transaction(async (tx) => {
+    const row = await requireBatch(tx, id);
+    if (row.publishedAt === null || row.archivedAt !== null) state('只能截止已发布且未归档的批次');
+    if (manuallyClosed(row)) return batchDTO(row, true);
+    expectVersion(row, body.version);
+    const control = await tx.get(C.CONTROL, 'global');
+    const next = touch(row, { closedAt: Date.now() });
+    const windows = (control ? control.windows : []).filter((window) => window.batchId !== row._id);
+    await tx.set(C.CONTROL, 'global', { windows, updatedAt: Date.now() });
+    await tx.set(C.BATCH, row._id, next);
+    return batchDTO(next, true);
+  });
+}
+function savedOrder(batch) {
+  const ids = batch.interviewOrderIds === undefined ? [] : batch.interviewOrderIds;
+  if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string') || new Set(ids).size !== ids.length) state('面试顺序数据异常，请联系广播站');
+  return ids;
+}
+function shuffle(ids) {
+  const out = ids.slice();
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = crypto.randomInt(i + 1);
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+function assertOrderSize(batch, ids) {
+  // JSON does not include BSON's array-index keys and per-string metadata.
+  // Count those conservatively, then retain headroom below the 1 MiB document cap.
+  const next = { ...batch, interviewOrderIds: ids, orderGeneratedAt: Date.now(), version: batch.version + 1 };
+  if (Buffer.byteLength(JSON.stringify(next), 'utf8') + ids.length * 16 > 900 * 1024) {
+    state('面试名单超过批次存储容量，未保存任何顺序，请联系广播站');
+  }
+}
+async function generateInterviewOrder(id, body) {
+  F.keys(body, ['version', 'confirm']);
+  if (body.confirm !== undefined && body.confirm !== 'REGENERATE') fail(Codes.PARAM_ERROR, '覆盖确认无效');
+  const row = await requireBatch(S, id); expectVersion(row, body.version); assertReview(row);
+  if (row.orderGeneratedAt != null && body.confirm !== 'REGENERATE') state('请确认覆盖已有面试顺序');
+  const candidates = [];
+  // No findAllPaged default maximum: every candidate page is read to completion.
+  // Keep only IDs so even long answers do not accumulate in function memory.
+  for (let skip = 0; ; skip += 100) {
+    const page = await S.list(C.APPLICATION, { batchId: row._id, progress: _.in(['submitted', 'interview']), decision: _.neq('rejected') },
+      { skip, limit: 100, orderBy: [['_id', 'asc']] });
+    page.forEach((application) => candidates.push(application._id));
+    assertOrderSize(row, candidates);
+    if (page.length < 100) break;
+  }
+  if (!candidates.length) state('没有可生成顺序的有效报名');
+  const order = shuffle(candidates);
+  return S.transaction(async (tx) => {
+    const latest = await requireBatch(tx, id); expectVersion(latest, body.version); assertReview(latest);
+    if (latest.orderGeneratedAt != null && body.confirm !== 'REGENERATE') state('请确认覆盖已有面试顺序');
+    assertOrderSize(latest, order);
+    const next = touch(latest, { interviewOrderIds: order, orderGeneratedAt: Date.now() });
+    await tx.set(C.BATCH, latest._id, next);
+    return batchDTO(next, true);
+  });
+}
+function orderItem(row, sequence) {
+  return {
+    id: row._id, name: row.name, qqNumber: row.qqNumber || '', grade: row.grade, className: row.className,
+    interview: row.interview ? { at: iso(row.interview.at), location: row.interview.location, note: row.interview.note } : null,
+    status: status(row), interviewSequence: sequence,
+  };
+}
+async function orderRows(batch, ids, start = 0) {
+  if (!ids.length) return [];
+  const rows = await S.list(C.APPLICATION, { batchId: batch._id, _id: _.in(ids) }, { limit: ids.length });
+  const byId = new Map(rows.map((row) => [row._id, row]));
+  if (byId.size !== ids.length) state('面试名单存在缺失记录，请联系广播站');
+  return ids.map((id, i) => orderItem(byId.get(id), start + i + 1));
+}
+async function interviewOrder(id, query = {}) {
+  F.keys(query, ['page', 'pageSize']);
+  const batch = await requireBatch(S, id); const p = pager(query); const ids = savedOrder(batch);
+  const items = await orderRows(batch, ids.slice(p.skip, p.skip + p.pageSize), p.skip);
+  // A regenerated order or review during the read must not mix two versions.
+  expectVersion(await requireBatch(S, id), batch.version);
+  return { batch: batchDTO(batch, true), items, total: ids.length, page: p.page, pageSize: p.pageSize, orderGeneratedAt: iso(batch.orderGeneratedAt) };
+}
+function beijingTime(value) {
+  if (!value) return '';
+  const date = bj.shifted(new Date(value).getTime());
+  return `${bj.ymd(date)} ${bj.pad2(date.getUTCHours())}:${bj.pad2(date.getUTCMinutes())}`;
+}
+async function exportInterviewOrder(id, query = {}) {
+  F.keys(query, []);
+  const batch = await requireBatch(S, id); const ids = savedOrder(batch);
+  if (batch.orderGeneratedAt == null) state('请先生成面试顺序');
+  const ExcelJS = require('exceljs');
+  const workbook = new ExcelJS.Workbook(); const sheet = workbook.addWorksheet('面试名单');
+  sheet.columns = [
+    { header: '序号', key: 'sequence', width: 8 }, { header: '姓名', key: 'name', width: 18 },
+    { header: 'QQ 号', key: 'qqNumber', width: 18, style: { numFmt: '@' } },
+    { header: '年级', key: 'grade', width: 16 }, { header: '班级', key: 'className', width: 16 },
+    { header: '面试时间（北京时间）', key: 'at', width: 25 }, { header: '面试地点', key: 'location', width: 28 },
+    { header: '状态', key: 'status', width: 14 },
+  ];
+  sheet.getRow(1).font = { bold: true }; sheet.views = [{ state: 'frozen', ySplit: 1 }];
+  const labels = { submitted: '已提交', interview: '待面试',
+    accepted: batch.resultPublishedAt == null ? '拟录取·未发布' : '已录取',
+    rejected: batch.resultPublishedAt == null ? '拟不录取·未发布' : '未录取', withdrawn: '已撤回' };
+  // Read the entire stored list, irrespective of the table's page and filters.
+  for (let start = 0; start < ids.length; start += 100) {
+    const items = await orderRows(batch, ids.slice(start, start + 100), start);
+    items.forEach((item) => sheet.addRow({ sequence: item.interviewSequence, name: item.name, qqNumber: item.qqNumber,
+      grade: item.grade, className: item.className, at: beijingTime(item.interview && item.interview.at),
+      location: item.interview ? item.interview.location : '', status: labels[item.status] || item.status }));
+  }
+  expectVersion(await requireBatch(S, id), batch.version);
+  const buffer = await workbook.xlsx.writeBuffer();
+  const title = batch.title.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 60);
+  return { filename: `招新面试名单_${title}_${bj.dayKey(Date.now()).replace(/-/g, '')}.xlsx`,
+    base64: Buffer.from(buffer).toString('base64'), mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
 }
 async function publishResults(id, body) {
   F.keys(body, ['version']);
@@ -314,4 +458,6 @@ async function interview(id, body) {
   });
 }
 
-module.exports = { current, apply, query, mutate, batches, createBatch, batchDetail, updateBatch, publishBatch, publishResults, archiveBatch, applications, applicationDetail, review, interview, _internals: { batchDTO, applicationDTO, windowState, status, uniqueId } };
+module.exports = { current, apply, query, mutate, batches, createBatch, batchDetail, updateBatch, publishBatch, closeBatch,
+  generateInterviewOrder, interviewOrder, exportInterviewOrder, publishResults, archiveBatch, applications, applicationDetail,
+  review, interview, _internals: { batchDTO, applicationDTO, windowState, status, uniqueId, shuffle, assertOrderSize } };

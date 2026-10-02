@@ -24,13 +24,14 @@
       </view>
       <view class="card stack recruitment-gap" wx:if="{{retrying}}">
         <view class="t-strong">确认上次提交</view>
-        <view class="t-cap">提交结果尚未确认，已保留原内容。请重试以获取同一查询码；暂存凭证保留 24 小时，请及时确认。</view>
+        <view class="t-cap" wx:if="{{legacyRetry}}">报名表已更新为填写 QQ 号。这里仅确认原提交并取回查询码，不会把学号转换为 QQ 号。取回后可在截止前补填 QQ 号。</view>
+        <view class="t-cap" wx:else>提交结果尚未确认，已保留原内容。请重试以获取同一查询码；暂存凭证保留 24 小时，请及时确认。</view>
       </view>
       <view class="form">
         <view class="t-section">基本信息</view>
         <view class="t-cap">以下四项均为必填，请如实填写。</view>
         <view class="field"><view class="field-label">姓名 *</view><input class="input" placeholder-class="ph" placeholder="填写姓名，最多 40 字" value="{{fields.name}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="name" bindinput="inputField" /></view>
-        <view class="field"><view class="field-label">学号 *</view><input class="input" placeholder-class="ph" placeholder="填写学号，最多 32 字" value="{{fields.studentNo}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="studentNo" bindinput="inputField" /></view>
+        <view class="field"><view class="field-label">QQ 号 *</view><input class="input" type="number" placeholder-class="ph" placeholder="填写 5～12 位数字的 QQ 号" value="{{fields.qqNumber}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="qqNumber" bindinput="inputField" /></view>
         <view class="field"><view class="field-label">年级 *</view><input class="input" placeholder-class="ph" placeholder="例如：高一或初一，最多 40 字" value="{{fields.grade}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="grade" bindinput="inputField" /></view>
         <view class="field"><view class="field-label">班级 *</view><input class="input" placeholder-class="ph" placeholder="填写班级，最多 40 字" value="{{fields.className}}" maxlength="-1" disabled="{{locked || submitting}}" data-field="className" bindinput="inputField" /></view>
       </view>

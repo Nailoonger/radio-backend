@@ -75,9 +75,13 @@ function batch(value, complete = false) {
   if (out.opensAt !== null && out.closesAt !== null && out.opensAt >= out.closesAt) bad('开始时间必须早于截止时间');
   return out;
 }
-function application(value, qs) {
+function application(value, qs, legacy = false) {
+  const identity = legacy
+    ? { studentNo: text(value.studentNo, '原学号', 32) }
+    : { qqNumber: text(value.qqNumber, 'QQ 号', 12) };
+  if (!legacy && !/^[0-9]{5,12}$/.test(identity.qqNumber)) bad('QQ 号须为 5～12 位数字');
   const out = {
-    name: text(value.name, '姓名', 40), studentNo: text(value.studentNo, '学号', 32),
+    name: text(value.name, '姓名', 40), ...identity,
     grade: text(value.grade, '年级', 40), className: text(value.className, '班级', 40), answers: {},
   };
   const raw = value.answers === undefined ? {} : object(value.answers, '答案');

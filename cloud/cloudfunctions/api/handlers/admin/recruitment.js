@@ -7,10 +7,15 @@ async function createBatch(ctx) { asSuper(ctx); return recruitment.createBatch(c
 async function batchDetail(ctx) { asAdmin(ctx); return recruitment.batchDetail(ctx.params.id); }
 async function updateBatch(ctx) { asSuper(ctx); return recruitment.updateBatch(ctx.params.id, ctx.body || {}); }
 async function publishBatch(ctx) { asSuper(ctx); return recruitment.publishBatch(ctx.params.id, ctx.body || {}); }
+async function closeBatch(ctx) { asSuper(ctx); return recruitment.closeBatch(ctx.params.id, ctx.body || {}); }
+async function generateInterviewOrder(ctx) { asSuper(ctx); return recruitment.generateInterviewOrder(ctx.params.id, ctx.body || {}); }
+async function interviewOrder(ctx) { asAdmin(ctx); return recruitment.interviewOrder(ctx.params.id, ctx.query || {}); }
+async function exportInterviewOrder(ctx) { asAdmin(ctx); return recruitment.exportInterviewOrder(ctx.params.id, ctx.query || {}); }
 async function publishResults(ctx) { asSuper(ctx); return recruitment.publishResults(ctx.params.id, ctx.body || {}); }
 async function archiveBatch(ctx) { asSuper(ctx); return recruitment.archiveBatch(ctx.params.id, ctx.body || {}); }
 async function applications(ctx) { asAdmin(ctx); return recruitment.applications(ctx.query || {}); }
 async function applicationDetail(ctx) { asAdmin(ctx); return recruitment.applicationDetail(ctx.params.id); }
 async function review(ctx) { asAdmin(ctx); return recruitment.review(ctx.params.id, ctx.body || {}); }
 async function interview(ctx) { asAdmin(ctx); return recruitment.interview(ctx.params.id, ctx.body || {}); }
-module.exports = { batches, createBatch, batchDetail, updateBatch, publishBatch, publishResults, archiveBatch, applications, applicationDetail, review, interview };
+module.exports = { batches, createBatch, batchDetail, updateBatch, publishBatch, closeBatch, generateInterviewOrder, interviewOrder,
+  exportInterviewOrder, publishResults, archiveBatch, applications, applicationDetail, review, interview };

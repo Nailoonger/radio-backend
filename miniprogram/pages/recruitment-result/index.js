@@ -49,7 +49,7 @@ Page({
       statusText: STATUS[application.progress] || '已提交',
       statusClass: TAGS[application.progress] || 'tag-pending',
       interviewText: recruitment.timeText(application.interview && application.interview.at),
-      closesText: recruitment.timeText(batch.closesAt),
+      closesText: recruitment.timeText(batch.closedAt || batch.closesAt),
       createdText: recruitment.timeText(application.createdAt),
     });
   },

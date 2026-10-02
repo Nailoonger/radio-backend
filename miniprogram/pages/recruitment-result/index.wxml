@@ -18,7 +18,7 @@
         <view class="field"><view class="field-label">查询码</view><input class="input recruitment-code-input" placeholder-class="ph" placeholder="输入报名时保存的查询码" value="{{queryInput}}" maxlength="64" disabled="{{querying}}" bindinput="inputCode" bindconfirm="query" confirm-type="search" /></view>
         <button class="btn btn-primary btn-block" bindtap="query" loading="{{querying}}" disabled="{{querying}}">查询报名</button>
       </view>
-      <view class="t-cap">查询码不区分字母大小写。遗失查询码请联系广播站，姓名和学号不能用于查询。</view>
+      <view class="t-cap">查询码不区分字母大小写。遗失查询码请联系广播站，姓名和 QQ 号不能用于查询。</view>
     </block>
     <block wx:else>
       <view class="card stack recruitment-gap">
@@ -37,7 +37,7 @@
       <view class="card stack recruitment-gap">
         <view class="t-section">报名信息</view>
         <view class="recruitment-detail"><view class="t-sub">姓名</view><view class="t-body">{{application.name}}</view></view>
-        <view class="recruitment-detail"><view class="t-sub">学号</view><view class="t-body">{{application.studentNo}}</view></view>
+        <view class="recruitment-detail"><view class="t-sub">QQ 号</view><view class="t-body">{{application.qqNumber || '未填写'}}</view></view>
         <view class="recruitment-detail"><view class="t-sub">年级</view><view class="t-body">{{application.grade}}</view></view>
         <view class="recruitment-detail"><view class="t-sub">班级</view><view class="t-body">{{application.className}}</view></view>
       </view>
