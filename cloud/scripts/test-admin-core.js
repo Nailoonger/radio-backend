@@ -79,7 +79,7 @@ const SUPER_ONLY = new Set([
   'admin.recruitment.interviewPlan', 'admin.recruitment.deleteBatch',
   // 点歌：容量 / 窗口 / 时段 / 排期 / 规则 / 危险操作（V1 §2.1）
   'admin.submit.setQuota', 'admin.submit.sweepQueue', 'admin.submit.saveWindow',
-  'admin.submit.saveSlots', 'admin.submit.previewSchedule', 'admin.submit.runSchedule',
+  'admin.submit.saveSlots', 'admin.submit.saveSlotDates', 'admin.submit.previewSchedule', 'admin.submit.runSchedule',
   'admin.submit.lock', 'admin.submit.unlock', 'admin.submit.saveRules',
   'admin.submit.purgeSongs', 'admin.submit.revoke', 'admin.submit.assign', 'admin.submit.played',
   // 系统设置 / 开关
@@ -89,6 +89,8 @@ const SUPER_ONLY = new Set([
   'admin.cadre.list', 'admin.cadre.detail', 'admin.cadre.create', 'admin.cadre.update', 'admin.cadre.remove', 'admin.cadre.toggle',
   'admin.staff.list', 'admin.staff.detail', 'admin.staff.create', 'admin.staff.update', 'admin.staff.remove', 'admin.staff.toggle',
   'admin.showcase.list', 'admin.showcase.toggle',
+  // 头像上传（2026-10-08 补挂）：src/routes/admin.js 挂的是 requireSuperAdmin
+  'admin.upload.avatar',
   // 管理员账号
   'admin.adminMgr.list', 'admin.adminMgr.create', 'admin.adminMgr.update', 'admin.adminMgr.remove',
   // 学生账号：**19 条全是超管**（src/routes/admin.js 逐条 requireSuperAdmin）
@@ -130,7 +132,7 @@ const PLAIN_ONLY = new Set([
   section('A. 权限矩阵（全量管理端路由）');
   reset(baseSeed());
 
-  eq('管理端路由总数', ADMIN_ROUTES.length, 110);
+  eq('管理端路由总数', ADMIN_ROUTES.length, 112);   // 111 → 112：2026-10-09 加 PUT /admin/submit/slot-dates（关闭接收日期）
 
   const anonBad = [];
   const plainBad = [];
@@ -167,9 +169,9 @@ const PLAIN_ONLY = new Set([
   ok('匿名调全部路由（除登录）均为 40101', anonBad.length === 0, anonBad.slice(0, 8).join(' | '));
   ok('普管对超管专属路由全部 40301、对其它路由不被误拦', plainBad.length === 0, plainBad.slice(0, 8).join(' | '));
   ok('超管调全部路由均过鉴权', anonLeak.length === 0, anonLeak.slice(0, 8).join(' | '));
-  eq('超管专属 handlerKey 条数', SUPER_ONLY.size, 64);
-  // sweepQueue 一个 key 对应两条路由（/quota/sweep 与 /queue/sweep）→ 65 > 64
-  eq('落在超管专属 handlerKey 上的**路由**条数', ADMIN_ROUTES.filter(([, hk]) => SUPER_ONLY.has(hk)).length, 65);
+  eq('超管专属 handlerKey 条数', SUPER_ONLY.size, 66);   // 65 → 66：+ admin.submit.saveSlotDates
+  // sweepQueue 一个 key 对应两条路由（/quota/sweep 与 /queue/sweep）→ 66 > 65
+  eq('落在超管专属 handlerKey 上的**路由**条数', ADMIN_ROUTES.filter(([, hk]) => SUPER_ONLY.has(hk)).length, 67);   // 66 → 67
 
   // 权限规范必须**恰好覆盖**路由表。只声明「超管」是不够的 ——
   // 另一半（普管即可）如果只靠「不在 SUPER_ONLY 里」隐式推出，那么

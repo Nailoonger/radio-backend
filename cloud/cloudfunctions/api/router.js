@@ -99,6 +99,7 @@ const ADMIN_ROUTES = [
   ['PUT /admin/submit/notice', 'admin.submit.saveNotice'],
   ['GET /admin/submit/timeslots', 'admin.submit.timeslots'],
   ['PUT /admin/submit/slots', 'admin.submit.saveSlots'],
+  ['PUT /admin/submit/slot-dates', 'admin.submit.saveSlotDates'],
   ['GET /admin/submit/schedule', 'admin.submit.schedule'],
   ['GET /admin/submit/week', 'admin.submit.week'],
   ['POST /admin/submit/schedule/preview', 'admin.submit.previewSchedule'],
@@ -164,6 +165,10 @@ const ADMIN_ROUTES = [
 
   ['GET /admin/showcase/list', 'admin.showcase.list'],
   ['PUT /admin/showcase/:type/:id/toggle', 'admin.showcase.toggle'],
+
+  // ---- 文件上传（2026-10-08 补：原作者实现的控制器从未挂过路由）----
+  // admin-web 两条通道都走这里：cloud 收 `{filename, fileBase64}`（见 handlers/admin/upload.js 文件头）
+  ['POST /admin/upload/avatar', 'admin.upload.avatar'],
 
   ['GET /admin/admin/list', 'admin.adminMgr.list'],
   ['POST /admin/admin/create', 'admin.adminMgr.create'],

@@ -24,7 +24,7 @@
     <el-table :data="rows" v-loading="loading" stripe>
       <el-table-column label="头像" width="76" align="center">
         <template #default="{ row }">
-          <el-avatar :src="row.avatar" :size="40" shape="circle" />
+          <el-avatar :src="avatarSrc(row.avatar)" :size="40" shape="circle" />
         </template>
       </el-table-column>
       <el-table-column label="姓名" prop="name" width="100" show-overflow-tooltip />
@@ -82,7 +82,7 @@
       <el-form-item label="头像" prop="avatar">
         <el-upload class="avatar-uploader" :show-file-list="false" :http-request="uploadAvatar"
           :before-upload="beforeAvatarUpload" accept="image/jpeg,image/png,image/webp">
-          <img v-if="form.avatar" :src="form.avatar" class="avatar-preview" />
+          <img v-if="form.avatar" :src="avatarSrc(form.avatar)" class="avatar-preview" />
           <el-icon v-else class="avatar-uploader-icon"><IconPlus :size="24" /></el-icon>
         </el-upload>
         <div class="hint">支持 jpg/png/webp，≤ 2MB</div>
@@ -129,6 +129,8 @@
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import http from '@/utils/http';
+// 头像可能是云存储 fileID（cloud://…），浏览器不认 → 统一走 avatarSrc 换算成 https
+import { avatarSrc } from '@/utils/avatar';
 import {
   IconSearch, IconPlus, IconEdit, IconTrash,
 } from '@/components/icons';

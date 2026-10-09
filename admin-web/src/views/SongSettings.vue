@@ -411,13 +411,14 @@
               <span class="micro">与用户端同源</span>
             </div>
             <div class="stack gap13">
-              <div v-for="day in weekDays" :key="day" class="rowc gap13 slot-day-row">
-                <span class="micro slot-day-label">{{ day }}</span>
-                <span class="rowc gap8 wrap">
+              <div v-for="day in previewDays" :key="day.key" class="rowc gap13 slot-day-row">
+                <span class="micro slot-day-label">{{ day.label }}</span>
+                <span class="rowc gap8 wrap" v-if="!day.closed">
                   <span v-for="slot in slotTimes" :key="slot.time" class="chip-pick on">
                     {{ slot.label }} {{ slot.time }}
                   </span>
                 </span>
+                <span v-else class="micro slot-closed-hint">该日不接收点歌</span>
               </div>
             </div>
           </div>
@@ -425,8 +426,55 @@
 
         <div class="tip">
           <IconInfo :size="14" />
-          <span>可选日期范围固定为<b>下一周的周一 ~ 周五</b>，不在这里改。留空则退回解析「开播时间」设置，再退回默认三个。<br>
+          <span>日期范围固定为<b>下一周的周一 ~ 周五</b>（哪天收 / 哪天不收看下面的<b>接收日期</b>）。场次留空则退回解析「开播时间」设置，再退回默认三个。<br>
           每格能排几首在 <b>② 排期</b> 里设（当前每格 <b>{{ capUnlimited ? '不限' : `${cap.capacity || 0} 首` }}</b>）。</span>
+        </div>
+      </div>
+
+      <!-- 下一播出周 · 接收日期（2026-10-08：节日/活动当天不接收学生点歌） -->
+      <div class="cfg">
+        <div class="cfg-head">
+          <span class="cfg-t">下一播出周 · 接收日期</span>
+          <span class="pill pass">仅超管可改</span>
+          <span class="sp">
+            <span class="micro">关掉的那天，学生端点歌时整个日期不出现</span>
+            <span class="save-state" :class="blackoutDirty ? 'dirty' : 'ok'" v-if="auth.isSuperAdmin">
+              {{ blackoutDirty ? '有未保存的改动' : '已保存 ✓' }}
+            </span>
+          </span>
+        </div>
+
+        <div class="stack gap13">
+          <div v-for="d in blackoutDays" :key="d.date" class="rowc gap13 dayrow">
+            <span class="dayrow-wk">{{ d.weekday }}</span>
+            <span class="dayrow-md">{{ d.monthDay }}</span>
+            <span class="dayrow-state" :class="{ closed: d.closed }">{{ d.closed ? '已关闭' : '接收中' }}</span>
+            <!-- 开关语义 = 「接收」：开=接收（closed:false），关=不接收（closed:true） -->
+            <el-switch
+              v-model="d.closed"
+              class="dayrow-switch"
+              :active-value="false"
+              :inactive-value="true"
+              :disabled="!auth.isSuperAdmin"
+            />
+          </div>
+        </div>
+
+        <div class="btns">
+          <el-button
+            type="primary" :loading="blackoutSaving"
+            :disabled="!auth.isSuperAdmin || !blackoutDirty"
+            @click="saveBlackout"
+          >
+            <IconCheck :size="15" class="btn-icon" />保存接收日期
+          </el-button>
+          <span class="micro" v-if="!auth.isSuperAdmin">只读 · 由超级管理员维护</span>
+        </div>
+
+        <div class="tip">
+          <IconInfo :size="14" />
+          <span>默认全开。<b>关掉一天 = 那天所有场次都不接收</b>（不是只关某一场），学生端整组消失；约束在<b>服务端</b>，直接调接口也会被拒。<br>
+          这张表只作用于<b>下一播出周</b>（当前 {{ slotConfig?.weekStart || '—' }} ~ {{ slotConfig?.weekEnd || '—' }}），日期过了自动失效，不用手工清。</span>
         </div>
       </div>
 
@@ -795,6 +843,15 @@ const weekDays = computed(() => {
   });
 });
 
+/** 右侧「用户会看到」预览：优先用后端下发的 days（带 closed 标记），拿不到再退回按 weekStart 算的 5 天 */
+const previewDays = computed(() => {
+  const days = slotConfig.value?.days;
+  if (Array.isArray(days) && days.length) {
+    return days.map((d) => ({ key: d.date, label: `${d.weekday} ${d.monthDay}`, closed: !!d.closed }));
+  }
+  return weekDays.value.map((d) => ({ key: d, label: d, closed: false }));
+});
+
 /** 标签提示里的样例串：用真实的第一天 + 第一个时段拼 —— 别再写死日期，写死必然过期 */
 const slotSample = computed(() => {
   const day = weekDays.value[0] || '周一';
@@ -806,6 +863,7 @@ async function fetchSlots() {
   // GET 走 /admin/submit/timeslots（/submit/slots 只注册了 PUT，GET 会被 /submit/:id 吃掉）
   slotConfig.value = await http.get('/admin/submit/timeslots');
   slotTimes.value = (slotConfig.value?.times || []).map((t) => ({ time: t.time, label: t.label || '' }));
+  syncBlackout();
   base.slots = sigSlots.value;
 }
 function addSlot() {
@@ -829,6 +887,38 @@ async function saveSlots() {
     await fetchSchedule();   // 时段变了 → 格子数变 → 下周正式位跟着变
     ElMessage.success('已发布，用户端立即生效');
   } finally { slotSaving.value = false; }
+}
+
+/* ─────────── 下一播出周 · 接收日期（2026-10-08：节日当天不接收点歌） ─────────── */
+/** 每项 { date, weekday, monthDay, closed }；来自 GET /admin/submit/timeslots 的 days */
+const blackoutDays = ref([]);
+const blackoutSaving = ref(false);
+/** 已保存态基线（= 服务端当前值），用来算「有未保存的改动」 */
+let blackoutBase = '';
+
+/** 稳定签名：只比「被关闭的日期集合」，与顺序无关 */
+const sigBlackout = computed(() =>
+  blackoutDays.value.filter((d) => d.closed).map((d) => d.date).sort().join(',')
+);
+const blackoutDirty = computed(() => sigBlackout.value !== blackoutBase);
+
+/** 从 slotConfig.days 同步；保存后也走它回读服务端归一化过的权威值 */
+function syncBlackout() {
+  blackoutDays.value = (slotConfig.value?.days || []).map((d) => ({
+    date: d.date, weekday: d.weekday, monthDay: d.monthDay, closed: !!d.closed,
+  }));
+  blackoutBase = sigBlackout.value;
+}
+
+async function saveBlackout() {
+  blackoutSaving.value = true;
+  try {
+    // 整体覆盖语义：提交「当前关闭的那几天」，服务端全量写入
+    const closedDates = blackoutDays.value.filter((d) => d.closed).map((d) => d.date);
+    await http.put('/admin/submit/slot-dates', { closedDates });
+    await fetchSlots();   // 回读权威状态（顺带重置「未保存」基线）
+    ElMessage.success(closedDates.length ? `已关闭 ${closedDates.length} 天接收` : '已恢复全部日期');
+  } finally { blackoutSaving.value = false; }
 }
 
 /* ─────────── 注意事项 ─────────── */
@@ -1153,6 +1243,21 @@ onBeforeUnmount(() => {
 
 /* 按钮行 */
 .btns { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-top: var(--s4); }
+
+/* ══════════ 下一播出周 · 接收日期 ══════════ */
+/* 逐行开关：周一 10-12 · 接收中 [开关]。整行 align-items:center（守「标签/文字垂直居中」硬规则） */
+.dayrow { padding: 11px 0; border-bottom: 1px solid var(--divider); }
+.dayrow:last-child { border-bottom: none; }
+.dayrow-wk { width: 44px; flex: none; font-weight: 600; }
+.dayrow-md {
+  width: 62px; flex: none; color: var(--muted);
+  font-variant-numeric: tabular-nums; letter-spacing: var(--ls-wide-sm);
+}
+.dayrow-state { font-size: var(--fs-sm); font-weight: 600; color: var(--accent); }
+.dayrow-state.closed { color: var(--muted); }
+.dayrow-switch { margin-left: auto; }
+/* 该日不接收时，右侧预览里替代时段胶囊的说明文字 */
+.slot-closed-hint { color: var(--muted); }
 
 /* ══════════ 点歌时间窗口（深色卡） ══════════ */
 /* 表单行包一层：让末行 .kv:last-child 的 border-bottom 能正常去掉 */

@@ -31,6 +31,7 @@ const { C, _, countByField, findAllPaged } = require('../lib/db');
 const KV_SCHEDULE = 'broadcast_schedule';
 const KV_SLOT_TIMES = 'song_slot_times';   // 后台发布的时段列表（JSON），优先于 broadcast_schedule
 const KV_CAPACITY = 'song_slot_capacity';  // 每个时段可排的点歌数，0 / 未设置 = 不限
+const KV_BLACKOUT = 'song_slot_blackout';  // 不接收点歌的播出日期（JSON 数组，YYYY-MM-DD）
 const DEFAULT_TIMES = ['07:20', '12:20', '17:30'];
 const MAX_SLOTS = 6;
 const CACHE_TTL = 30 * 1000;
@@ -55,6 +56,47 @@ async function setCapacity(n) {
   const v = Math.max(parseInt(n, 10) || 0, 0);
   await kv.set(KV_CAPACITY, v, '每个播出时段可排的点歌数（0=不限）');
   return v;
+}
+
+/* ------------------------------------------------------------------ *
+ * 不接收点歌的日期（后台「下一播出周 · 接收日期」，源文件同名前三个函数）
+ *
+ * 存**具体日期**（YYYY-MM-DD）而不是「星期几」—— 节日是日历上的某一天，
+ * 而本服务的格子本来就按「下一周的具体日期」派生，按日期做集合判断最省且不串周。
+ * ⚠️ 只对「下一播出周」生效：getSlots() 只生成下一周那 5 天，别的日期永远不匹配。
+ * ------------------------------------------------------------------ */
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+
+/** 归一化关闭日期：只留合法 YYYY-MM-DD、去重、升序 */
+function normalizeDates(list) {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set();
+  const out = [];
+  list.forEach((item) => {
+    const s = String(item || '').trim();
+    if (!YMD.test(s) || seen.has(s)) return;
+    seen.add(s);
+    out.push(s);
+  });
+  out.sort();
+  return out;
+}
+
+/** 被关闭（整天不接收点歌）的日期列表；坏值当没配 */
+async function getBlackout() {
+  try {
+    return normalizeDates(JSON.parse(String(await kv.get(KV_BLACKOUT, ''))));
+  } catch (e) {
+    return [];
+  }
+}
+
+/** 整体覆盖写入关闭日期（后台保存时全量提交下一周那 5 天的状态） */
+async function setBlackout(list) {
+  const norm = normalizeDates(list);
+  await kv.set(KV_BLACKOUT, JSON.stringify(norm), '不接收点歌的播出日期（JSON 数组，YYYY-MM-DD）');
+  clearCache();
+  return norm;
 }
 
 /** 早间 / 午间 / 晚间：按时段起点的小时判断，够用且不依赖配置文案 */
@@ -157,6 +199,8 @@ async function getAdminConfig(now = Date.now()) {
     rangeText: slots.rangeText,
     count: slots.list.length,
     fullCount: slots.list.filter((s) => s.full).length,
+    days: slots.days,                 // 下一周 5 天框架 + closed 标记（后台「接收日期」卡）
+    closedDates: slots.closedDates,
   };
 }
 
@@ -176,28 +220,41 @@ function slotValue(dateStr, period, time) {
 async function getSlots(now = Date.now()) {
   const periods = await getPeriods();
   const { start } = bj.nextWeekRange(now);
-  const list = [];
+  const closed = new Set(await getBlackout());
 
-  // 下一周的周一 ~ 周五
+  // ① 日期框架：下一周的周一 ~ 周五。**先算框架再剔格子** ——
+  //    即使 5 天被全关，范围文案（rangeText）依然拿得到，不会变成空串。
+  const frames = [];
   for (let i = 0; i < 5; i++) {
     const d = new Date(start.getTime() + i * bj.DAY_MS);
     const dateStr = bj.ymd(bj.shifted(d.getTime()));
     const wd = bj.WEEKDAY_CN[bj.weekdayOf(d.getTime())];
-    const md = dateStr.slice(5);                       // 09-21
-    periods.forEach((p) => {
-      list.push({
-        key: `${dateStr}_${p.time}`,
-        date: dateStr,
-        weekday: '周' + wd,
-        monthDay: md,
-        period: p.period,
-        time: p.time,
-        label: `周${wd} ${md} · ${p.period} ${p.time}`,
-        shortLabel: `周${wd} ${p.period}`,
-        value: slotValue(dateStr, p.period, p.time),
-      });
+    frames.push({
+      date: dateStr,
+      weekday: '周' + wd,
+      monthDay: dateStr.slice(5),                      // 09-21
+      closed: closed.has(dateStr),
     });
   }
+
+  // ② 可选格子：被关闭的那天**整天不生成**（学生端整组消失；isValidSlot 同步拒绝）
+  const list = [];
+  frames.forEach((f) => {
+    if (f.closed) return;
+    periods.forEach((p) => {
+      list.push({
+        key: `${f.date}_${p.time}`,
+        date: f.date,
+        weekday: f.weekday,
+        monthDay: f.monthDay,
+        period: p.period,
+        time: p.time,
+        label: `${f.weekday} ${f.monthDay} · ${p.period} ${p.time}`,
+        shortLabel: `${f.weekday} ${p.period}`,
+        value: slotValue(f.date, p.period, p.time),
+      });
+    });
+  });
 
   // ── 占用统计（fail-open：统计失败不影响可选列表本身）──
   const capacity = await getCapacity();
@@ -217,14 +274,17 @@ async function getSlots(now = Date.now()) {
     list.forEach((s) => { s.picked = 0; s.full = false; });
   }
 
-  const first = list[0];
-  const last = list[list.length - 1];
+  // 范围文案取自「日期框架」而非可选格子 —— 全关时 list 为空，仍要报出这一周是哪几天
+  const first = frames[0];
+  const last = frames[frames.length - 1];
   return {
     weekStart: first ? first.date : '',
     weekEnd: last ? last.date : '',
     rangeText: first && last ? `${first.monthDay} ~ ${last.monthDay}` : '',
     periods: periods.map((p) => ({ period: p.period, time: p.time })),
     capacity,
+    days: frames,                                                       // 5 天框架 + closed（后台「接收日期」卡）
+    closedDates: frames.filter((f) => f.closed).map((f) => f.date),      // 仅本范围内的关闭日期
     list,
   };
 }
@@ -312,6 +372,7 @@ module.exports = {
   KV_SCHEDULE,
   KV_SLOT_TIMES,
   KV_CAPACITY,
+  KV_BLACKOUT,
   DEFAULT_TIMES,
   MAX_SLOTS,
   getPeriods,
@@ -322,6 +383,9 @@ module.exports = {
   setCapacity,
   setSlotTimes,
   isValidSlot,
+  getBlackout,
+  setBlackout,
+  normalizeDates,
   clearCache,
   slotValue,
   SLOT_FULL_REASON,

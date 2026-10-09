@@ -148,7 +148,7 @@
             </view>
             <view class="slot-arrow"></view>
           </view>
-          <view class="slot-sub" wx:if="{{slotRangeText}}">可选范围：{{slotRangeText}}（下周一到周五）</view>
+          <view class="slot-sub" wx:if="{{slotRangeText}}">可选范围：{{slotRangeText}}（下一周 · {{slotDays.length}} 天可选）</view>
         </view>
 
         <!-- 接受调剂（协议版 allow_reschedule）：首选排满时能不能被调到别的时段，学生自己定。
@@ -220,7 +220,7 @@
   <view class="slot-sheet" style="height: {{slotSheetH}}vh" catchtap="stopBubble">
     <view class="slot-sheet-head">
       <view class="slot-sheet-title">选择播出时段</view>
-      <view class="slot-sheet-sub" wx:if="{{slotRangeText}}">{{slotRangeText}} · 下周一到周五</view>
+      <view class="slot-sheet-sub" wx:if="{{slotRangeText}}">{{slotRangeText}} · 下一周 {{slotDays.length}} 天可选</view>
       <!-- 选到一半也得知道截止点 -->
       <view class="slot-sheet-win" wx:if="{{winEnabled}}">点歌时间：{{winLine1}} · {{winLine2}}</view>
     </view>
@@ -228,11 +228,10 @@
       <view class="slot-day" wx:for="{{slotDays}}" wx:key="date" wx:for-item="day">
         <view class="slot-day-head">{{day.weekday}} {{day.monthDay}}</view>
         <view class="slot-chips">
-          <view class="slot-chip {{it.selected ? 'on' : ''}} {{it.full ? 'off' : ''}}"
+          <view class="slot-chip {{it.selected ? 'on' : ''}}"
                 wx:for="{{day.items}}" wx:key="key" wx:for-item="it"
                 data-value="{{it.value}}" bindtap="pickSlot" hover-class="pressed">
             <text>{{it.label}}</text>
-            <text class="slot-picked" wx:if="{{it.picked > 0}}">{{it.full ? '已排满' : '已点 ' + it.picked}}</text>
           </view>
         </view>
       </view>

@@ -760,6 +760,29 @@ function byId(id) {
   eq('来源变成 custom', r.data.source, 'custom');
   eq('时段数变了 → 周槽位跟着变', (await H.call(H.req('GET', '/admin/submit/week', {}, SUPER_TOKEN))).data.slots, 10);
 
+  // ---- 下一播出周 · 关闭日期（2026-10-08：节日当天不接收点歌）
+  r = await H.call(H.req('GET', '/admin/submit/timeslots', {}, PLAIN_TOKEN));
+  eq('timeslots 下发 5 天日期框架', r.data.days.length, 5);
+  eq('默认无关闭日期', r.data.closedDates, []);
+  const allDays = r.data.days.map((d) => d.date);
+
+  eq('普管调 slot-dates → 40301', (await H.call(H.req('PUT', '/admin/submit/slot-dates', { closedDates: [allDays[2]] }, PLAIN_TOKEN))).code, 40301);
+  r = await H.call(H.req('PUT', '/admin/submit/slot-dates', {}, SUPER_TOKEN));
+  eq('closedDates 非数组 → 40001', [r.code, r.message], [40001, '请传 closedDates 数组，如 ["2026-10-14"]']);
+
+  r = await H.call(H.req('PUT', '/admin/submit/slot-dates', { closedDates: [allDays[2]] }, SUPER_TOKEN));
+  eq('关闭一天 → code 0', [r.code, r.data.closedDates], [0, [allDays[2]]]);
+  r = await H.call(H.req('GET', '/admin/submit/timeslots', {}, PLAIN_TOKEN));
+  eq('读回：那天 closed=true', r.data.days.find((d) => d.date === allDays[2]).closed, true);
+  eq('closedDates 一并下发', r.data.closedDates, [allDays[2]]);
+  eq('其余四天仍开放', r.data.days.filter((d) => !d.closed).length, 4);
+  // ⚠️ admin 接口下发的是 count（格子总数），不下发 list —— 前面 5 天 × 2 时段 = 10
+  eq('可选格子少一天（10 → 4×2）', r.data.count, 8);
+  ok('范围文案不受影响（仍是 5 天那一段）', typeof r.data.rangeText === 'string' && r.data.rangeText.indexOf('~') > 0, `rangeText=${r.data.rangeText}`);
+
+  r = await H.call(H.req('PUT', '/admin/submit/slot-dates', { closedDates: [] }, SUPER_TOKEN));
+  eq('传空数组 → 全部恢复', [r.code, r.data.closedDates], [0, []]);
+
   // ---- 时间窗口
   r = await H.call(H.req('GET', '/admin/submit/window', {}, PLAIN_TOKEN));
   eq('window → code 0', r.code, 0);

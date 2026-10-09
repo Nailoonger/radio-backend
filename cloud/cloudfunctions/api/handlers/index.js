@@ -53,6 +53,7 @@ const REGISTRY = {
   'admin.cadre': () => require('./admin/cadre'),
   'admin.staff': () => require('./admin/staff'),
   'admin.showcase': () => require('./admin/showcase'),
+  'admin.upload': () => require('./admin/upload'),
   'admin.adminMgr': () => require('./admin/adminMgr'),
   'admin.student': () => require('./admin/student'),
   'admin.submit': () => require('./admin/submit'),

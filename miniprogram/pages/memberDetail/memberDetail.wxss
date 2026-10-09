@@ -12,7 +12,7 @@
 }
 .hero-photo-wrap {
   width: 220rpx; height: 220rpx;
-  border-radius: 44rpx;
+  border-radius: 50%;            /* 2026-10-08：原 44rpx 圆角方 → 正圆（与风采页列表口径一致） */
   overflow: hidden;
   background: var(--parchment);
   margin-bottom: 12rpx;

@@ -294,6 +294,24 @@ const fakeDb = {
   RegExp: (o) => o,
 };
 
+// ---------------- 假云存储（内存）----------------
+/**
+ * 真实 SDK 的云函数端签名：
+ *   uploadFile({ cloudPath, fileContent }) → { fileID, statusCode }
+ *   getTempFileURL({ fileList })           → { fileList: [{ fileID, tempFileURL, status }] }
+ *   downloadFile({ fileID })               → { fileContent, statusCode }
+ *   deleteFile({ fileList })               → { fileList: [{ fileID, status }] }
+ *
+ * fileID 形如 `cloud://<envId>.<bucket>/<cloudPath>` —— 与线上同构，
+ * 这样 admin-web 那条「cloud:// → https 直链」的换算逻辑也测得出来。
+ *
+ * 2026-10-08 加：为了让 `handlers/admin/upload.js`（头像上传）能**不连云**就跑断言。
+ */
+const storage = new Map();                  // fileID -> Buffer
+const STORAGE_PREFIX = 'cloud://test-env.6a79-test-env-1300000000';
+const fileIdOf = (cloudPath) => `${STORAGE_PREFIX}/${cloudPath}`;
+const cloudPathOf = (fileID) => String(fileID).slice(STORAGE_PREFIX.length + 1);
+
 // ---------------- 拦截 wx-server-sdk ----------------
 let wxContext = { OPENID: '', UNIONID: '' };
 const fakeSdk = {
@@ -302,6 +320,32 @@ const fakeSdk = {
   getWXContext: () => ({ ...wxContext }),
   DYNAMIC_CURRENT_ENV: 'test-env',
   openapi: {},
+
+  uploadFile: async ({ cloudPath, fileContent }) => {
+    if (!cloudPath) { const e = new Error('cloudPath is required'); e.errCode = -1; throw e; }
+    const fileID = fileIdOf(cloudPath);
+    storage.set(fileID, Buffer.isBuffer(fileContent) ? fileContent : Buffer.from(fileContent || ''));
+    return { fileID, statusCode: 200 };
+  },
+  getTempFileURL: async ({ fileList }) => ({
+    fileList: (fileList || []).map((f) => {
+      const fileID = typeof f === 'string' ? f : f.fileID;
+      return storage.has(fileID)
+        ? { fileID, tempFileURL: `https://test-env.tcb.qcloud.la/${cloudPathOf(fileID)}`, status: 0, maxAge: 86400 }
+        : { fileID, tempFileURL: '', status: -1, errMsg: 'file not exist' };
+    }),
+  }),
+  downloadFile: async ({ fileID }) => {
+    if (!storage.has(fileID)) { const e = new Error('file not exist'); e.errCode = -1; throw e; }
+    return { fileContent: storage.get(fileID), statusCode: 200 };
+  },
+  deleteFile: async ({ fileList }) => ({
+    fileList: (fileList || []).map((f) => {
+      const fileID = typeof f === 'string' ? f : f.fileID;
+      const existed = storage.delete(fileID);
+      return { fileID, status: existed ? 0 : -1 };
+    }),
+  }),
 };
 
 const origLoad = Module._load;
@@ -323,6 +367,7 @@ const API_DIR = process.env.HARNESS_API_DIR || path.join(__dirname, '..', 'cloud
 /** 重置数据库并写入种子数据 */
 function reset(seed = {}) {
   store.clear();
+  storage.clear();
   autoId.n = 0;
   wxContext = { OPENID: '', UNIONID: '' };
   Object.keys(seed).forEach((name) => {
@@ -346,4 +391,4 @@ async function call(event) {
 
 const req = (method, pathname, body = {}, token = '') => ({ method, path: pathname, body, token });
 
-module.exports = { reset, setOpenid, call, req, dump, fakeDb, store };
+module.exports = { reset, setOpenid, call, req, dump, fakeDb, store, storage };

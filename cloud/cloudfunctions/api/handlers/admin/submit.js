@@ -1073,6 +1073,22 @@ async function saveSlots(ctx) {
   }
 }
 
+/**
+ * PUT /admin/submit/slot-dates —— 设置「下一播出周」不接收点歌的日期（仅超管）
+ *
+ * 整体覆盖语义：body.closedDates 就是「当前要关闭的全部日期」，空数组 = 全部恢复。
+ * 与源控制器 admin/submitController.saveSlotDates 等价（返回体只留 closedDates，
+ * 文案由网关侧的 success 包装决定）。
+ */
+async function saveSlotDates(ctx) {
+  asSuper(ctx);
+  const { closedDates } = ctx.body || {};
+  if (!Array.isArray(closedDates)) {
+    throw new ApiError(Codes.PARAM_ERROR, '请传 closedDates 数组，如 ["2026-10-14"]');
+  }
+  return { closedDates: await broadcastSlot.setBlackout(closedDates) };
+}
+
 /** GET /admin/submit/rules */
 async function rules(ctx) {
   asAdmin(ctx);
@@ -1143,6 +1159,7 @@ module.exports = {
   window,
   saveWindow,
   saveSlots,
+  saveSlotDates,
   rules,
   saveRules,
   purgeSongs,

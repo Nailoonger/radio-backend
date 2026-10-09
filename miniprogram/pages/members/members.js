@@ -79,7 +79,17 @@ Page({
     try {
       const data = await request('/user/showcase');
       const origin = getApp().globalData.baseURL.replace(/\/api\/?$/, '');
-      const absUrl = (u) => (u && u.startsWith('http')) ? u : (origin + (u || ''));
+      // 头像地址补全（2026-10-08 重写）：
+      //   · 空值 → 返回 ''，让 wxml 的 wx:if 走首字兜底分支。
+      //     ⚠️ 原实现是 `origin + (u || '')`，没传照片时返回的是**baseURL 字符串**（非空！）
+      //     ⇒ wx:if 判真、渲染一张坏图，首字兜底永远出不来。
+      //   · cloud:// 是云存储 fileID，`<image src>` 原生支持，**不能**再拼 baseURL。
+      //   · 旧的相对路径（/uploads/…）仍按原样补全，保持兼容。
+      const absUrl = (u) => {
+        if (!u) return '';
+        if (u.startsWith('cloud://') || u.startsWith('http')) return u;
+        return origin + u;
+      };
 
       const cadre = (data.cadre || []).map((m) => ({
         ...m,

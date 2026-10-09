@@ -28,8 +28,10 @@ Page({
         const programList = m.programs
           ? m.programs.split(/[,，、]/).map(s => s.trim()).filter(Boolean)
           : [];
-        // 头像补全
-        if (m.avatar && !m.avatar.startsWith('http')) {
+        // 头像补全（与 pages/members 同一口径，2026-10-08）：
+        //   cloud:// → 云存储 fileID，`<image src>` 原生支持，原样透传；
+        //   http(s) → 原样；其余相对路径 → 补 baseURL（兼容旧数据）。
+        if (m.avatar && !m.avatar.startsWith('http') && !m.avatar.startsWith('cloud://')) {
           const origin = getApp().globalData.baseURL.replace(/\/api\/?$/, '');
           m.avatar = origin + m.avatar;
         }

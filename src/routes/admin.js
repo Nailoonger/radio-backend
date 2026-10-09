@@ -105,6 +105,31 @@ router.get('/profile', adminAuth, auth.profile);
 
 /**
  * @swagger
+ * /api/admin/upload/avatar:
+ *   post:
+ *     tags: [管理端-上传]
+ *     summary: 上传成员头像（超管）
+ *     description: |
+ *       multipart/form-data，字段名 `file`，仅 jpg/png/webp，≤2MB。
+ *       ⚠️ 2026-10-08 补挂：控制器与 multer 中间件（src/middlewares/upload.js）一直是写好的，
+ *       但这条路由**从未挂载**，于是 admin-web 的上传按钮点了必然 404。
+ *       云函数侧同契约见 cloud/cloudfunctions/api/handlers/admin/upload.js。
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file: { type: string, format: binary }
+ *     responses:
+ *       200:
+ *         description: 成功，data.url 为头像相对路径
+ */
+router.post('/upload/avatar', adminAuth, requireSuperAdmin, ...upload.uploadAvatar);
+
+/**
+ * @swagger
  * /api/admin/change-password:
  *   put:
  *     tags: [管理端-账号]
@@ -303,6 +328,26 @@ router.get('/submit/timeslots', adminAuth, requireAdmin, submit.timeslots);
  */
 // V1 §2.1：配置播出时段属超管
 router.put('/submit/slots', adminAuth, requireSuperAdmin, submit.saveSlots);
+
+/**
+ * @swagger
+ * /api/admin/submit/slot-dates:
+ *   put:
+ *     tags: [管理端-投稿审核]
+ *     summary: 设置「下一播出周」不接收点歌的日期（整天关闭）
+ *     description: |
+ *       节日/活动当天要播专题、不接收学生点歌时，提前把下一播出周的某一天关掉。
+ *       传 `{closedDates:["2026-10-14"]}`（**整体覆盖**；传空数组 = 全部恢复接收）。
+ *       ⚠️ 只作用于**下一播出周** —— 可选格子本来就由「下一周周一~周五」派生；
+ *       关掉那天 = 整天所有场次都不生成，学生端整组消失、`isValidSlot()` 同步拒绝。
+ *       保存后立即生效（清 30 秒读缓存）。读取走 `GET /submit/timeslots` 的 `days` / `closedDates`。
+ *       ⚠️ 字面量段必须注册在 `/submit/:id` 之前。
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: ok }
+ */
+// 与「播出时段」同属播出安排配置 → 仅超管
+router.put('/submit/slot-dates', adminAuth, requireSuperAdmin, submit.saveSlotDates);
 
 /**
  * @swagger

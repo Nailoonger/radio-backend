@@ -12,6 +12,19 @@
   - admin-web `src/utils/http.js`＝**门面**：`direct` 导出原 axios 实例（行为逐字不变），`cloud` 导出同形状门面
     → 全站 114 处调用零改动。xlsx 改走 `{filename,base64,mime}` → `atob` 还原 Blob。
     ⚠️ 认证分支**别再加** `body?.code === 40101`（原后端失败统一返 HTTP 401，与 cloud 模式已对齐，加了就是改行为）。
+  - ⚠️⚠️ **HTTP 访问服务的请求体上限 ≈100KB（2026-10-08 实测本环境）**：
+    `POST body 80KB → 200` / `POST body 150KB → HTTP 413 EXCEED_MAX_PAYLOAD_SIZE`
+    （CloudBase 文档：云函数「文本类型请求体」100KB；与「云函数返回值 ≤1MB」是两码事）。
+    ⇒ **凡是走 base64 往云函数送文件的功能，都受这条约束**，且 base64 还要 +33%：
+      · 头像上传 → 前端必须先压（`admin-web/src/utils/imageCompress.js`：400px / q0.82 / 60KB 预算 / 5 档自适应）
+      · ⚠️ **既有的学生名册导入（`admin/student/importPreview`，同样走 base64）也有这个上限**，
+        只是几十 KB 的表能过、几千行的表会 413 —— 尚未处理，改动前先量文件大小。
+      · 小程序侧走 `wx.cloud.callFunction`，上限约 1MB，**不受 100KB 这条约束**。
+  - **文件类数据统一存云存储 fileID（`cloud://…`），不存 https 链接**：
+    小程序 `<image>` 原生支持 fileID 且**不过下载域名校验**（这正是上云开发的理由）；
+    网页端由 `admin-web/src/utils/avatar.js` 换算 `<bucket>.tcb.qcloud.la` 直链
+    （官方「组件支持」页的 WXS 同款算法，纯字符串处理、不消耗 API、不过期）。
+    ⚠️ **前置条件**：控制台 → 存储 → 权限设置 → 「所有用户可读，仅创建者可写」，否则非上传者一律 403。
 - **阶段 8 数据迁移（`cloud/migration/`，手册 `README.md`）**：只 SELECT 原库 → JSON Lines → 控制台导入 → 控制台导出 → `verify.js` 双向校验。
   - 官方三约束：JSON **Lines**、时间必须 `{"$date":"<ISO>"}`（裸 ISO 串 → 导入后是普通字符串，**时间条件静默失效**）、Upsert 可重复。
   - 三个「不报错」陷阱：① **`unique_keys` 必须补登记**（文档库无 UNIQUE，不补＝能建重名管理员**且不报错**），
@@ -28,6 +41,15 @@
   脚本会列出两轮命令。⚠️ 产物模式 `HARNESS_API_DIR=miniprogram/cloudfunctions/api` **项数必须与源码模式一致**。
   打包/删 dist 一律 `NODE_OPTIONS=""`（safe-delete 拦 `fs.rmSync`）。云端端到端验收：`MSYS_NO_PATHCONV=1 node cloud/scripts/verify-user.js ws://127.0.0.1:9420`。
 
+## ⚠️ 新增 / 改动管理端路由时（4 处硬编码计数会红）
+加一条 `/admin/**` 路由后必须同步，否则云侧回归必挂：
+1. `cloud/scripts/test-admin-core.js` 的 **`SUPER_ONLY` 集合** —— 超管专属路由不登记 → 报"未分类"。
+2. 同文件三个数：`管理端路由总数` / `超管专属 handlerKey 条数` / `落在超管专属…路由条数`。
+3. `cloud/scripts/test-admin-routes.js` 的 `admin 路由 N 条（含招新）`。
+4. `cloud/scripts/selfcheck.js` 的 `管理端路由数`。
+（2026-10-09 加 `PUT /admin/submit/slot-dates` 时一次性踩齐）
+⚠️ 另一个：`GET /admin/submit/timeslots` 走 `getAdminConfig()`，**不下发 `list`**（只有 `count`）；写断言别用 `data.list.map()`。
+
 ## 点歌体系（现行＝协议版，细则 `docs/song-protocol.md`）
 - 提交**不判容量**；审核通过只拿候选资格，`initialAllocate` 按首选时段分组、组内按提交时间升序取前 capacity，其余 `WAITING`；到 `schedule_lock_at` 跑 `lockWeek`，剩余 `AUTO_REJECTED`。
 - ⛔ **点播截止前 `reschedule` 只做原位递补、绝不跨时段**（`canCrossSlot()` = `now >= applicationEndAt`）；只有 `lockWeek()` 与超管手动「执行排期」传 `crossSlot:true`。选址成本表在 `songRescheduleCost.js`。
@@ -39,6 +61,10 @@
 - ⚠️ **周行锚点跟着配置刷新**（`ensureWeek → refreshAnchors`）：学生端窗口＝实时读 KV；`DRAFT/APPLICATION/REVIEW` 重新对齐，**`SCHEDULING/LOCKED/CANCELLED` 冻结**。
 - ⚠️ **两个「周」分清**：点播窗口锚**点播周**；播出时段固定下一周周一~周五、锚**播出周**。
 - **提交路径只有 5 个拦截码**：`40303`/`40907`/`40001`/`40903`/`40901`。**`40902/40904/40906` 已无生产路径**（仅存常量）；`SLOT_FULL_REASON` 是排期阶段理由。
+- **关闭接收日期**（2026-10-09 落地）：KV **`song_slot_blackout`** 存**具体日期** → `getSlots()` 那天整天不生成格子
+  （学生端整组消失 + `isValidSlot()` 同步拒绝）。⚠️ `getSlots()` 已改成「**先算 5 天日期框架，再剔格子**」——
+  否则全关时 `rangeText` 会塌成空串。`days` / `closedDates` 随 `getSlots` 与 `getAdminConfig` 下发。
+  接口 `PUT /admin/submit/slot-dates`（仅超管，整体覆盖，空数组＝全恢复）；后台卡在「③ 播出安排」。
 
 ## admin-web 点歌页（视觉参数）
 - **周状态带**：一个阶段只有两种形态——进行中带「中」，已完成与未到都不带；只由胶囊颜色表达（深 `--ink`＝当前 / 绿＝走过 / 羊皮纸＝未到 / 浅灰＝已取消）。⚠️⚠️ **必须与后端 `WEEK_STATUS` 六态对齐**（曾漏 `CANCELLED` → `findIndex` −1 → 整条链全落「未到」，静默错）。

@@ -1032,6 +1032,30 @@ exports.saveSlots = async (req, res, next) => {
   }
 };
 
+/**
+ * PUT /admin/submit/slot-dates —— 设置「下一播出周」不接收点歌的日期（仅超管）
+ *
+ * 整体覆盖语义：body.closedDates 就是「当前要关闭的全部日期」，
+ * 传空数组 = 全部恢复接收。非日期格式的项被静默丢弃（见 broadcastSlot.normalizeDates）。
+ */
+exports.saveSlotDates = async (req, res, next) => {
+  try {
+    const { closedDates } = req.body || {};
+    if (!Array.isArray(closedDates)) {
+      throw new ApiError(Codes.PARAM_ERROR, '请传 closedDates 数组，如 ["2026-10-14"]');
+    }
+    const r = await broadcastSlot.setBlackout(closedDates);
+    return success(
+      res,
+      { closedDates: r },
+      r.length ? `已关闭 ${r.length} 天接收点歌` : '已恢复全部日期接收点歌'
+    );
+  } catch (e) {
+    if (e.code === 40001) return fail(res, Codes.PARAM_ERROR, e.message);
+    return next(e);
+  }
+};
+
 exports.rules = async (req, res, next) => {
   try {
     const rules = await submitRule.getRules();

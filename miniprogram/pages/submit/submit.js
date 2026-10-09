@@ -3,8 +3,10 @@
 // 点歌前置四件事（v8 方案落地 / 2026-09-20 点歌规则 v2）：
 //   ① 注意事项闸门：进点歌先弹「点歌注意事项」，滑到页底才能点「我已知晓」，
 //      确认调 POST /user/submit/notice/ack；服务端在提交时会再校验一次（40303 = 没确认）。
-//   ② 播出时段只可选不手输：GET /user/submit/timeslots 下发下一周一 ~ 周五的可选时段；
-//      v2 起每格带容量（capacity / seated / left / full），满了划掉不可选、还能进候补。
+//   ② 播出时段只可选不手输：GET /user/submit/timeslots 下发下一周一 ~ 周五的可选时段。
+//      满格的时段**照常可选**（2026-10-08 陛下定案：不置灰、不标已点几首、不给任何标记）——
+//      协议版提交不判容量，提交一律进审核；排不下由排期算法决定进该时段候补还是被调剂。
+//      （后端仍会下发 full / picked（协议口径），前端一律不展示。）
 //   ③ 点歌时间窗口（v2 新增）：GET /user/submit/window。状态条常驻在标题下
 //      （两行：规则 + 此刻状态与倒计时），未开放时提交按钮置灰。
 //      文案一律服务端下发，前端不硬编码星期与时刻；窗口结束 = 审核截止。
@@ -46,7 +48,8 @@ Page({
     slotShow: false,
     slotSheetH: 72,         // 弹层高度（vh），按天数自适应
     slotRangeText: '',
-    slotDays: [],           // [{date, weekday, monthDay, items:[{key,label,value,selected,picked,full}]}]
+    slotAllClosed: false,   // 下一播出周是否已全部关闭（用于给出准确提示，而不是“稍后再试”）
+    slotDays: [],           // [{date, weekday, monthDay, items:[{key,label,value,selected}]}]
     slotCapacity: 0,        // 每场名额上限（0 = 不限）
 
     // ── 表单骨架（v8 方案 ⑤：>300ms 才显示） ──
@@ -197,15 +200,17 @@ Page({
           label: s.period + ' ' + s.time,
           value: s.value,
           selected: false,
-          // v8 方案 ④：已排满的场次划掉、不可选；picked 用于显示「已点 N」
-          picked: s.picked || 0,
-          full: !!s.full,
+          // 刻意不带 picked / full：满格照常可选，弹层不显示任何「已点 N / 已满」信息
         });
       });
+      // 「下一播出周全部日期都被关掉」= 本周不收歌。要和「拉取失败」分开：
+      // 后者才该说“稍后再试”，前者明天来结果也一样。
+      const allClosed = Array.isArray(d.days) && d.days.length > 0 && d.days.every((x) => x.closed);
       this.setData({
         slotDays: days,
         slotRangeText: d.rangeText || '',
         slotCapacity: d.capacity || 0,
+        slotAllClosed: !!allClosed,
         _slotList: d.list || [],
       });
     }).catch((e) => {
@@ -372,7 +377,10 @@ Page({
         await this.loadSlots();
       }
       if (!this.data.slotDays.length) {
-        return wx.showToast({ title: '暂时没有可选的播出时段，请稍后再试', icon: 'none' });
+        return wx.showToast({
+          title: this.data.slotAllClosed ? '本周暂不接收点歌' : '暂时没有可选的播出时段，请稍后再试',
+          icon: 'none',
+        });
       }
     }
 
@@ -396,10 +404,8 @@ Page({
   pickSlot(e) {
     const value = e.currentTarget.dataset.value;
     const item = (this.data._slotList || []).find((s) => s.value === value);
-    // v8 方案 ④：已排满的场次不可选（但提交仍可进候补，见下方 doSubmit 的 queued 分支）
-    if (item && item.full) {
-      return wx.showToast({ title: '该场已排满，换一个时段吧', icon: 'none' });
-    }
+    // 满格照常选中（2026-10-08 陛下定案）：不再拦截。协议版提交不判容量，
+    // 排不下时由排期算法决定进该时段候补、或全局调剂到别处。
     this.setData({
       wantBroadcastTime: value,
       slotLabel: item ? item.label : value,
@@ -533,7 +539,7 @@ Page({
       wx.showToast({ title: (e && e.message) || '提交失败', icon: 'none' });
       if (e && [40902, 40903, 40904, 40906].indexOf(e.code) >= 0) {
         this.loadQuota();
-        this.loadSlots();      // 容量变了，弹层里的「已排满」要跟着更新
+        this.loadSlots();      // 时段列表跟着刷新（弹层已不再展示「已满」，仅保持数据最新）
       }
     } finally {
       this.setData({ submitting: false });

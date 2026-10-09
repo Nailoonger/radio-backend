@@ -170,11 +170,12 @@ button.btn-primary[disabled] {
   display: inline-flex; align-items: center; justify-content: center; gap: 8rpx;
 }
 .slot-chip.on { background: var(--ink); color: #ffffff; }
-/* v8 方案 ④：已排满的场次划掉、不可选 */
-.slot-chip.off { background: var(--divider); color: var(--soft); }
-.slot-chip.off text:first-child { text-decoration: line-through; }
-.slot-picked { font-size: 21rpx; color: var(--muted); letter-spacing: 0.5rpx; }
-.slot-chip.on .slot-picked { color: rgba(255, 255, 255, 0.7); }
+/* 满格照常可选（2026-10-08 陛下定案）
+   ----------------------------------------------------------------
+   曾经满格的胶囊会灰底 + 划线 + 点了被拦（v8 方案 ④）。但协议版提交**不判容量** ——
+   提交一律进审核，排不下由排期算法决定进该时段候补、或全局调剂到别处。
+   所以这里不给满格任何特殊外观，也**不标「已点 N」**：所有可选时段长得一模一样，
+   只呈现"能点"这一件事。后端仍会下发 full / picked，前端一律不展示。 */
 
 /* ── 表单骨架（尺寸=真实组件） ── */
 .sk { border-radius: 12rpx; background: var(--divider); }
