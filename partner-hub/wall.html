@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>菁悠伙伴端 · 69 屏全览 · v151</title>
+<style>
+:root{
+  --accent:#0066CC; --accent-tint:#EAF3FD;
+  --tile:#272729; --parchment:#F5F5F7; --canvas:#fff;
+  --ink:#1D1D1F; --muted:#7A7A7A; --soft:#C7C7CC;
+  --hairline:#E0E0E0; --sh-lift:0 4px 12px -4px rgba(0,0,0,.10);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--parchment);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+img{max-width:100%}
+
+.top{background:#fff;color:var(--ink);padding:26px 34px 24px;border-bottom:1px solid var(--hairline)}
+.top .cap{font-size:10.5px;letter-spacing:1.6px;color:var(--soft)}
+.top h1{margin:10px 0 0;font-size:27px;font-weight:700;letter-spacing:.4px;line-height:1.3}
+.top h1 em{font-style:normal;color:var(--accent)}
+.top p{margin:12px 0 0;font-size:12.5px;line-height:1.85;color:#4A4A4A;max-width:780px}
+.top .lg{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.top .lg span{font-size:11px;line-height:1.35;padding:6px 11px;border-radius:9999px;border:1px solid var(--hairline);color:var(--muted);background:var(--parchment)}
+.top .lg span b{font-weight:600;color:var(--ink)}
+.top .cta{display:inline-flex;align-items:center;line-height:1;margin-top:18px;font-size:12.5px;font-weight:500;
+  background:var(--accent);color:#fff;border-radius:9999px;padding:11px 18px}
+
+.grp{padding:30px 34px 0}
+.grp h2{margin:0;font-size:15px;font-weight:600;letter-spacing:.2px;display:flex;align-items:center;gap:10px}
+.grp h2 i{font-style:normal;font-size:11px;color:var(--muted);font-weight:400}
+.grp h2 s{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none}
+.grp.mgr h2 s{background:#7FD8A4}
+.grp.sup h2 s{background:#FAC775}
+.grp .hint{margin:8px 0 0;font-size:11.5px;color:var(--muted);line-height:1.7}
+
+.wall{display:flex;flex-wrap:wrap;gap:20px;padding:18px 34px 8px;justify-content:center}
+.card{width:273px;max-width:100%;flex:0 0 auto}
+.card .cap{display:flex;align-items:baseline;gap:7px;margin-bottom:8px;overflow:hidden}
+/* ⚠️ nowrap 的 flex 子项必须 min-width:0，否则撑宽卡片导致整页横向溢出（手机右侧被切） */
+.card .cap b{font-size:12.5px;font-weight:500;min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .cap i{font-style:normal;font-size:10px;color:var(--soft);font-variant-numeric:tabular-nums;flex:none}
+.shot{display:block;width:273px;max-width:100%;height:592px;overflow:hidden;border-radius:26px;background:#fff;
+  box-shadow:0 8px 22px -10px rgba(0,0,0,.18),0 0 0 1px rgba(0,0,0,.06);position:relative;transition:transform .2s cubic-bezier(.4,0,.2,1)}
+.shot:hover{transform:translateY(-3px)}
+.shot iframe{width:390px;height:846px;border:0;display:block;transform:scale(.7);transform-origin:0 0;pointer-events:none}
+.foot{padding:26px 34px 60px;font-size:11px;color:var(--muted);line-height:1.9}
+.foot b{color:var(--ink);font-weight:500}
+
+/* 点开就地放大的浮层 */
+.lb{position:fixed;inset:0;background:rgba(24,24,26,.60);display:flex;align-items:center;justify-content:center;z-index:99;padding:24px}
+.lb[hidden]{display:none}
+.lb-in{background:#fff;border-radius:22px;overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:0 30px 80px -24px rgba(0,0,0,.45)}
+.lb-hd{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--hairline)}
+.lb-hd b{font-size:13.5px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb-hd a,.lb-hd span{font-size:12.5px;color:var(--accent);cursor:pointer;flex:none;line-height:1}
+.lb-hd .x{color:var(--muted)}
+#lbF{width:390px;height:798px;border:0;display:block;background:var(--parchment)}
+@media (max-width:560px){
+  .lb{padding:0}
+  .lb-in{border-radius:0;width:100%;height:100%}
+  #lbF{width:100%;height:calc(100% - 49px)}
+}
+
+@media (max-width:700px){
+  .top{padding:20px 16px 18px}
+  .top h1{font-size:22px}
+  .grp{padding:24px 16px 0}
+  .wall{padding:14px 16px 6px;gap:16px}
+  .foot{padding:20px 16px 48px}
+}
+
+/* Codex 语气覆盖（墙页） */
+:root{--r-card:18px}
+.top{background:#FFF;border-bottom:1px solid var(--hairline)}
+.top h1{font-size:30px;font-weight:600;letter-spacing:-1.2px}
+.top .cap{font-size:9px;letter-spacing:1.8px}
+.top p{font-size:13px;line-height:1.95;color:var(--muted)}
+.top .lg span{background:var(--parchment);border-color:var(--hairline);font-size:11px}
+.top .cta{background:var(--accent);color:#FFF;border-radius:13px;min-height:46px;display:inline-flex;align-items:center;padding:0 18px;font-size:13px}
+.grp h2{font-size:17px;font-weight:600;letter-spacing:-.4px}
+.grp .hint{font-size:12px;line-height:1.9}
+.card .cap b{font-size:13px;font-weight:500;color:var(--ink2)}
+.card .cap i{font-size:10px;color:var(--muted)}
+.shot{border-radius:26px;box-shadow:0 12px 30px -16px rgba(0,0,0,.22)}
+.foot{font-size:12px;line-height:1.95}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="cap">JINGYOU / PARTNER WORKSPACE</div>
+  <h1>菁悠伙伴端 · <em>72 屏</em>全览 · v151</h1>
+  <p>全套统一<b>圆角胶囊</b>：按钮、标签、日期、格子、列表行、输入框都是胶囊，卡片是大圆角（卡片真做成胶囊会切到文字，这个我实测过）。<br>
+     站员端已按新口径重做：底部<b>四个模块</b>（工作台/稿件/班表/我的），首页是<b>大白卡（正式值班安排）+ 需要你处理</b>，稿件模块融合稿件功能并接入 AI 找稿，我的只留个人介绍 + 可排时间/考勤/请假进度 + 退出登录；社干端与超管端维持上一版。<br>
+     班表是<b>周表格</b>（列＝周一到周五，行＝早会/午间/下午），<b>一个时段可以多人</b>，一人一颗名字胶囊、各自带状态色。<br>
+     全站零深色块。<b>点任意一屏就地放大</b>，不用跳来跳去；这一页就是全部。<br>
+     <b>底部 tab 角标＝待办件数</b>（同一件事只归一处：工作台/审核/稿件/我的；班表查看型不亮；归零即隐；超 99 显示 99+，列表与角标同源；角标贴图标右上角）。<br>
+     分段控件＝<b>全圆胶囊</b>（灰槽 + 白色选中药丸 + accent 字，按钮 flex:1 填满轨道）；筛选类胶囊<b>独立成行、去外层背景卡与统计数字</b>；考勤五天＝<b>五个独立方块</b>；可排时间＝<b>具体时段</b>（早会 06:50–07:30 / 午间 12:10–12:30 / 下午 17:40–18:10）。<br>
+     全屏对齐审计：57 屏 × 三端逐屏量过——<b>块左线/右线全一致、容器无空档、纵向节奏统一 12px</b>（有意例外：通栏欢迎带出血、悬浮 dock/操作条内缩 16px、宫格最后一行不满）。<br>
+     <b>超管端具备社干端全部功能</b>：审核、考勤、请假、补位、排班、名册都能用，工作台再多「账号 / 排班规则 / 考勤总览」三块。</p>
+  <div class="lg">
+    <span>共 <b>66 屏</b></span>
+    <span>站员 <b>12</b></span>
+    <span>社干 <b>25</b></span>
+    <span>超管 <b>29</b></span>
+    <span>深色块 <b>0</b></span>
+  </div>
+  <a class="cta" href="app.html">打开可交互版（切身份 · 看每页怎么排）↗</a>
+</div>
+
+<div id="walls"></div>
+
+<div class="lb" id="lb" hidden>
+  <div class="lb-in">
+    <div class="lb-hd"><b id="lbT"></b>
+      <a id="lbNew" target="_blank">新标签打开 ↗</a>
+      <span class="x" id="lbX">关闭 ✕</span></div>
+    <iframe id="lbF" src="about:blank" scrolling="yes" title="单屏预览"></iframe>
+  </div>
+</div>
+
+<div class="foot">
+  <b>怎么验</b>：① 点任一屏放大；② 可交互版里右栏写「这一页怎么排」；
+  ③ 试真实流转：写稿页打字看时长尺走字、「提交审核」会自动切到社干审稿台、驳回理由空着点驳回会被拦、
+  请假批准后班表那一格让开、考勤三态点一下上面统计跟着变。<br>
+  本套为交互原型，数据是虚拟样例，未接入正式业务；v1–v4 全部保留未动。
+</div>
+
+<script>
+var GROUPS=[
+  {cls:'',role:'member',label:'站员',hint:'底部四个模块：工作台 / 稿件 / 班表 / 我的。首页＝欢迎区 + 大白卡（正式值班安排）+ 需要你处理；稿件模块融合稿件功能并接入 AI 找稿；我的只做个人介绍 + 可排时间 / 考勤 / 请假进度 + 退出登录。',
+   items:[['home','工作台 · Codex 式欢迎卡 + 大白卡','d'],['my-drafts','稿件 · 我的稿件+AI 找稿','l'],['versions','版本记录','l'],
+          ['aifind','找稿 · AI 联网检索','d'],['editor','写稿 · 时长尺','l'],['my-att','我的考勤','l'],
+          ['leave','请假申请','l'],['feedback','互评','l'],['notices','站内公告','l'],
+          ['schedule','班表 · 同格可多人','l'],['people','可排时间填报 · 具体时段','l'],['me','我的 · 个人介绍+三件事+互评公告','d']]},
+  {cls:'mgr',role:'manager',label:'社干',hint:'底部五个模块：工作台 / 审核 / 稿件 / 班表 / 我的。工作台＝Codex 式欢迎卡 + 听众投稿 / 站内协作（**不要「需要你处理」卡**）；审核＝点歌 / 文稿 / 留言三段 + 圆角胶囊（全部·待审·已通过·已驳回，**点筛选真过滤、通过/驳回真改队列**）；**排班支持同一时段多部门**；**值班时段＝周一~周五各自设（每天几个、叫什么、几点）+ 滚轮选时间 + 周排期锁定发布（社干/超管共享同一份）**；**班表草稿＝真加人/换人/撤下（只列可排时间已确认的人）**；**工作台大白卡＝可左右滑的轮播（班表 / 点歌排期）**；我的＝**已加入广播站 N 天**（按首次登录日起算，不含站标）+ 姓名 + 职位·年级 → 互评 / 可排时间 / 请假进度 / 我的考勤（只看不录）/ 伙伴名册 + 退出（**不展示出勤、不展示编号**）；考勤录入＝与同页三联卡同款语言的**通栏瓷砖**。',
+   items:[['desk','工作台 · 欢迎卡+大白卡+待办','d'],['attendance','考勤录入 · 五个独立方块','l'],['mgr-schedule','班表 · 一卡：排班/草稿/轮值/记录/导出','l'],
+          ['planning','排班工作台 · 每时段可多部门','l'],['draft','班表草稿与调整 · 按部门分组','l'],['slots-pub','值班时段发布 · 周一到周五各自设/滚轮选时间/周排期锁定发布','l'],['workload','人员轮值情况','l'],
+          ['history','发布与调整记录','l'],['leave-approve','请假审批','l'],['fill','岗位补位','l'],
+          ['submissions','审核 · 三段+圆角胶囊','l'],['submission-detail','审核处理台 · 对齐正式','l'],['messages','留言审核','l'],
+          ['review','内部稿件处理台','l'],['song-schedule','歌曲排期与候补','l'],
+          ['my-drafts','稿件 · 我的稿件+AI 找稿','l'],['versions','版本记录','l'],['roster','伙伴名册 · 可批量','l'],
+          ['me','我的 · 个人介绍+五件事','d'],['aifind','找稿 · AI 联网检索','d'],['editor','写稿 · 时长尺','l'],
+          ['my-att','我的考勤 · 只看不录','l'],['feedback','互评','l'],['people','可排时间填报 · 具体时段','l'],['leave','请假进度','l']]},
+  {cls:'sup',role:'super',label:'超管',hint:'与社干端完全同一套 UI：底部五个模块（工作台 / 审核 / 稿件 / 班表 / 我的）、同一张欢迎卡与大白卡、同一套待办与角标；工作台多出「管理」块（账号 / 排班规则 / 考勤总览），模块开关/系统设置/看板/批量导出只在电脑端。',
+   items:[['desk','工作台 · 欢迎卡+大白卡+管理块','d'],['accounts','账号 · 分发/重置/导入/删除/停用','l'],
+          ['rules','排班规则 · 含发布值班时段','l'],['att-overview','考勤总览','l'],
+          ['mgr-schedule','班表 · 一卡：排班/草稿/轮值/记录/导出','l'],['planning','排班工作台 · 每时段可多部门','l'],['slots-pub','值班时段发布 · 周一到周五各自设/滚轮选时间/周排期锁定发布','l'],
+          ['draft','班表草稿与调整 · 可锁人','l'],['workload','人员轮值情况','l'],
+          ['history','发布与调整记录','l'],['attendance','考勤录入 · 五个独立方块','l'],
+          ['leave-approve','请假审批','l'],['fill','岗位补位','l'],
+          ['submissions','审核 · 三段+圆角胶囊','l'],['submission-detail','审核处理台 · 对齐正式','l'],
+          ['messages','留言审核','l'],['review','内部稿件处理台','l'],
+          ['song-schedule','歌曲排期与候补','l'],['timeslots','值班时段配置','l'],
+          ['my-drafts','稿件 · 我的稿件+AI 找稿','l'],['versions','版本记录','l'],['roster','伙伴名册 · 可批量','l'],
+          ['me','我的 · 个人介绍+五件事','d'],['aifind','找稿 · AI 联网检索','d'],['editor','写稿 · 时长尺','l'],
+          ['my-att','我的考勤 · 只看不录','l'],['feedback','互评','l'],['people','可排时间填报 · 具体时段','l'],['leave','请假进度','l']]}
+];
+
+var html='',n=0;
+GROUPS.forEach(function(g){
+  html+='<div class="grp '+g.cls+'"><h2><s></s>'+g.label+' <i>'+g.items.length+' 屏</i></h2><p class="hint">'+g.hint+'</p></div><div class="wall">';
+  g.items.forEach(function(it){
+    n++;
+    var u='app.html?embed=1#'+g.role+',L1,'+it[0];
+    html+='<div class="card"><div class="cap"><i>'+String(n).padStart(2,'0')+'</i><b>'+it[1]+'</b>'
+     +'</div>'
+     +'<a class="shot" href="'+u+'" data-open="'+g.role+',L1,'+it[0]+'" data-title="'+it[1]+'" onclick="return false" title="点开看「'+it[1]+'」">'
+     +'<iframe src="'+u+'" scrolling="no" loading="lazy" title="'+it[1]+'"></iframe></a></div>';
+  });
+  html+='</div>';
+});
+document.getElementById('walls').innerHTML=html;
+
+/* 点卡片 → 就地放大（同一页看完，不用跳走） */
+var lb=document.getElementById('lb'),lbF=document.getElementById('lbF'),
+    lbT=document.getElementById('lbT'),lbNew=document.getElementById('lbNew');
+function closeLb(){lb.hidden=true;lbF.src='about:blank'}
+document.addEventListener('click',function(e){
+  var a=e.target.closest('[data-open]');
+  if(a){e.preventDefault();
+    var p=a.dataset.open.split(',');
+    var u='app.html?embed=1#'+p[0]+',L1,'+p[2];
+    lbF.src=u;lbT.textContent=a.dataset.title;lbNew.href=u;
+    lb.hidden=false;document.body.style.overflow='hidden';return;}
+  if(e.target.id==='lb'||e.target.id==='lbX'){closeLb();document.body.style.overflow='';}
+});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!lb.hidden){closeLb();document.body.style.overflow='';}});
+</script>
+</body>
+</html>

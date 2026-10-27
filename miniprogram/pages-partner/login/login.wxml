@@ -1,0 +1,73 @@
+<!-- 菁悠伙伴端·小程序登录。账号仍使用现有 adminLogin，视觉与手机预览保持一致。 -->
+<view class="partner-login-page">
+  <view class="login-backdrop" aria-hidden="true">
+    <image class="login-backdrop-image" src="/assets/me-bg.jpg" mode="aspectFill"></image>
+  </view>
+
+  <view class="login-status-space" style="height: {{statusBarHeight}}px"></view>
+  <view class="login-nav">
+    <button class="login-back" bindtap="goBack" aria-label="返回" hover-class="login-control-pressed">‹</button>
+    <text class="login-nav-title">伙伴登录</text>
+  </view>
+
+  <view class="login-brand">
+    <image class="login-badge" src="/assets/station-badge.png" mode="aspectFit"></image>
+    <view class="login-brand-copy">
+      <text class="login-station">菁悠广播站</text>
+      <text class="login-brand-en">JINGYOU RADIO</text>
+    </view>
+    <text class="login-partner-tag">伙伴端</text>
+  </view>
+
+  <view class="login-panel">
+    <view class="login-kicker"><view class="login-kicker-dot"></view><text>菁悠伙伴端</text></view>
+    <text class="login-title">欢迎回来。</text>
+    <text class="login-subtitle">登录，接好今天的声音。</text>
+
+    <view class="login-form">
+      <view class="login-field">
+        <text class="login-label">伙伴账号</text>
+        <input class="login-input"
+          value="{{username}}"
+          placeholder="请输入伙伴账号"
+          placeholder-class="login-placeholder"
+          maxlength="80"
+          confirm-type="next"
+          adjust-position="{{true}}"
+          bindinput="inputUsername"
+          aria-label="伙伴账号" />
+      </view>
+
+      <view class="login-field">
+        <text class="login-label">密码</text>
+        <view class="login-password-row">
+          <input class="login-input login-password-input"
+            password="{{!showPwd}}"
+            value="{{password}}"
+            placeholder="请输入密码"
+            placeholder-class="login-placeholder"
+            maxlength="128"
+            confirm-type="done"
+            adjust-position="{{true}}"
+            bindinput="inputPassword"
+            bindconfirm="doLogin"
+            aria-label="密码" />
+          <button class="login-password-toggle" bindtap="togglePwd" aria-label="{{showPwd ? '隐藏密码' : '显示密码'}}" hover-class="login-control-pressed">{{showPwd ? '隐藏' : '显示'}}</button>
+        </view>
+      </view>
+
+      <view class="login-help-row">
+        <text>和伙伴一起，把每一场准备好。</text>
+        <button class="login-help" bindtap="showLoginHelp" hover-class="login-control-pressed">登录帮助</button>
+      </view>
+
+      <text class="login-error" wx:if="{{loginError}}" role="alert">{{loginError}}</text>
+      <button class="login-submit" bindtap="doLogin" loading="{{loading}}" disabled="{{loading}}" hover-class="login-submit-pressed">{{loading ? '登录中……' : '登录'}}</button>
+      <text class="login-account-note">账号由站内管理员开通</text>
+    </view>
+    <view class="login-panel-footer">
+      <text>菁菁校园情，悠悠广播声。</text>
+      <button class="login-student" bindtap="goStudentLogin" hover-class="login-control-pressed">切换至学生端</button>
+    </view>
+  </view>
+</view>

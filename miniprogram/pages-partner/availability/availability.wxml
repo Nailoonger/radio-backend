@@ -1,0 +1,102 @@
+<!-- 伙伴端 · 可排时间填报（P1）
+     结构：周切换条 → 进度卡 → 代录选择 → 按天分组的时段方块 → 说明 → 底部提交
+     ⚠️ 视觉沿用 me 页那套（羊皮纸底 + 白卡 + 细描边），不引入新色。
+        能来=绿(--green)，不能=红(--red)，待选=白底灰字。 -->
+<view class="page">
+
+  <!-- 周切换条 -->
+  <view class="bar" style="padding-top:{{statusBarHeight}}px">
+    <view class="bar-in">
+      <view class="nav" bindtap="onPrevWeek" hover-class="nav-hover">‹</view>
+      <view class="wk">
+        <text class="wk-label">{{weekLabel || '加载中'}}</text>
+        <text class="wk-sub">可排时间 · {{isProxy ? '代录' : '本人填报'}}</text>
+      </view>
+      <view class="nav" bindtap="onNextWeek" hover-class="nav-hover">›</view>
+    </view>
+  </view>
+
+  <!-- 进度卡：谁填了谁没填 -->
+  <view class="card prog">
+    <view class="prog-hd">
+      <view class="prog-nums">
+        <text class="prog-num">{{summary.confirmed}}</text>
+        <text class="prog-den">/ {{summary.total}} 人已确认</text>
+      </view>
+      <text class="prog-link" bindtap="onShowPending" wx:if="{{summary.pending > 0}}">名单 ›</text>
+      <text class="prog-link ok" wx:else>全员已填</text>
+    </view>
+    <view class="prog-track">
+      <view class="prog-fill" style="width:{{summary.total ? (summary.confirmed * 100 / summary.total) : 0}}%"></view>
+    </view>
+  </view>
+
+  <!-- 代录：社干可以替别人填（必须写原因） -->
+  <picker mode="selector" range="{{personNames}}" value="{{personIndex}}" bindchange="onPickPerson">
+    <view class="picker" hover-class="picker-hover">
+      <text class="pk-label">{{isProxy ? '代录对象' : '填写人'}}</text>
+      <text class="pk-val">{{isProxy ? targetName : '我自己'}}</text>
+      <text class="pk-ar">›</text>
+    </view>
+  </picker>
+
+  <!-- 时段未发布：这一页没法填，给出明确下一步 -->
+  <view class="empty" wx:if="{{!loading && !ready}}">
+    <text class="empty-t">本周值班时段还没发布</text>
+    <text class="empty-s">等超管在「值班时段」里发布后，这里才会出现可选的时段。</text>
+  </view>
+
+  <!-- 时段版本变了：之前的填报已失效 -->
+  <view class="warn" wx:if="{{stale}}">
+    <text class="warn-t">值班时段已更新</text>
+    <text class="warn-s">你上次填的内容基于旧时段，请重新确认后提交。</text>
+  </view>
+
+  <!-- 按天分组 -->
+  <view class="day" wx:for="{{days}}" wx:key="day" wx:for-item="d" wx:for-index="i">
+    <view class="day-hd">
+      <text class="day-name">{{d.name}}</text>
+      <text class="day-date">{{d.dateText}}</text>
+    </view>
+
+    <view class="slot {{item.cls}}"
+          wx:for="{{d.slots}}"
+          wx:key="slotKey"
+          wx:for-item="item"
+          wx:for-index="j"
+          data-i="{{i}}"
+          data-j="{{j}}"
+          bindtap="onTapSlot"
+          hover-class="slot-hover">
+      <view class="slot-l">
+        <text class="slot-title">{{item.title}}</text>
+        <text class="slot-meta">{{item.timeText}}{{item.dept ? ' · ' + item.dept : ''}} · 需 {{item.count}} 人</text>
+      </view>
+      <text class="slot-state">{{item.stateText}}</text>
+    </view>
+  </view>
+
+  <!-- 说明 -->
+  <view class="card note" wx:if="{{ready}}">
+    <view class="note-hd">
+      <text class="lbl">说明</text>
+      <text class="lbl-tip">{{isProxy ? '必填 · 写明代录原因' : (cannotCount > 0 ? '必填 · 有不能来的时段' : '选填')}}</text>
+    </view>
+    <textarea class="ta"
+              value="{{reason}}"
+              placeholder="{{isProxy ? '例：他手机坏了，托我代填' : '例：周三下午有课来不了'}}"
+              placeholder-class="ta-ph"
+              maxlength="200"
+              bindinput="onReasonInput"
+              auto-height></textarea>
+    <text class="cnt">{{reasonLen}}/200</text>
+  </view>
+
+  <!-- 底部操作 -->
+  <view class="foot" wx:if="{{ready}}">
+    <button class="btn ghost" bindtap="onReset">清空</button>
+    <button class="btn primary" loading="{{submitting}}" bindtap="onSubmit">{{isProxy ? '提交代录' : '提交'}}</button>
+  </view>
+
+  <view class="pad"></view>
+</view>

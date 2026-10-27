@@ -197,6 +197,28 @@ const ADMIN_ROUTES = [
   ['DELETE /admin/student/:id', 'admin.student.remove'],
 ];
 
+// ---- 伙伴端 /partner（2026-10-27：身份 + 值班时段 / 可排时间）----
+//
+// ⚠️ 与 /admin 是**两套命名空间**，不是别名：伙伴端 handler 会多查一次 admin 文档拿
+//    资格字段（dutyRoles / department），且人员值班线后续会扩到请假 / 考勤 / 轮值。
+//    小程序 pages-partner 走 /partner/*，admin-web 电脑端走 /admin/*，互不串。
+const PARTNER_ROUTES = [
+  ['GET /partner/me', 'partner.me.profile'],
+  ['PUT /partner/me/duty', 'partner.me.saveDuty'],
+
+  ['GET /partner/people', 'partner.me.people'],
+  ['GET /partner/people/:id', 'partner.me.personDetail'],
+
+  ['GET /partner/slots', 'partner.slots.get'],
+  ['GET /partner/slots/published', 'partner.slots.publishedOnly'],
+  ['PUT /partner/slots/draft', 'partner.slots.saveDraft'],
+  ['POST /partner/slots/publish', 'partner.slots.publish'],
+
+  ['GET /partner/availability', 'partner.availability.get'],
+  ['PUT /partner/availability', 'partner.availability.save'],
+  ['DELETE /partner/availability', 'partner.availability.reset'],
+];
+
 // 系统自检 / 初始化（不属于业务接口，但用同一套网关）
 const SYSTEM_ROUTES = [
   ['GET /health', 'system.health'],
@@ -204,7 +226,7 @@ const SYSTEM_ROUTES = [
   ['POST /system/init-collections', 'system.initCollections'],
 ];
 
-const RAW_ROUTES = [...SYSTEM_ROUTES, ...USER_ROUTES, ...ADMIN_ROUTES];
+const RAW_ROUTES = [...SYSTEM_ROUTES, ...USER_ROUTES, ...ADMIN_ROUTES, ...PARTNER_ROUTES];
 
 // 预编译：拆成 method + 段数组，避免每次请求都做字符串切割
 const COMPILED = RAW_ROUTES.map(([key, handlerKey]) => {
@@ -242,4 +264,4 @@ function match(method, path) {
   return null;
 }
 
-module.exports = { match, RAW_ROUTES, USER_ROUTES, ADMIN_ROUTES };
+module.exports = { match, RAW_ROUTES, USER_ROUTES, ADMIN_ROUTES, PARTNER_ROUTES };

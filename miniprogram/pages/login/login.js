@@ -139,8 +139,12 @@ Page({
     else wx.switchTab({ url: '/pages/index/index' });
   },
 
-  /** 管理员入口（2026-10-01）：进管理端分包，与学生登录完全两条链路 */
+  /**
+   * 伙伴端入口：进伙伴端分包 pages-partner，与学生登录完全两条链路。
+   * ⚠️ 方法名保留 goAdminLogin —— 它走的仍是 admin 表账号体系（/admin/login），
+   *    只是 2026-10-27 把入口文案由「管理员登录」改成了「伙伴端登录」。
+   */
   goAdminLogin() {
-    wx.navigateTo({ url: '/pages-admin/login/login' });
+    wx.navigateTo({ url: '/pages-partner/login/login' });
   },
 });

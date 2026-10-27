@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>伙伴端 · 登录 · v1</title>
+<style>
+  :root{
+    --ink:#1D1D1F; --muted:#8A8A90; --soft:#C7C7CC; --hairline:#E6E6EA;
+    --parchment:#F5F5F7; --accent:#0066CC; --live:#FF453A;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    background:#EFEFF3; display:flex; align-items:center; justify-content:center;
+    font:15px/1.6 -apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    color:var(--ink); -webkit-font-smoothing:antialiased;
+  }
+
+  /* ── 手机 ── */
+  .phone{
+    position:relative; width:390px; height:844px; background:var(--parchment);
+    border-radius:44px; overflow:hidden;
+    box-shadow:0 30px 80px -30px rgba(0,0,0,.35), 0 0 0 1px #E4E4E8;
+  }
+  /* 背景：园林 + 白纱布（与「我的」页同一套：图 390 宽、底部渐隐、左侧提白） */
+  .bg{position:absolute; inset:0; z-index:0; overflow:hidden; background:var(--parchment)}
+  .bg img{
+    position:absolute; left:0; top:0; width:390px; height:auto; opacity:1;
+    -webkit-mask-image:linear-gradient(180deg,#000 46%,rgba(0,0,0,.42) 70%,rgba(0,0,0,0) 92%);
+            mask-image:linear-gradient(180deg,#000 46%,rgba(0,0,0,.42) 70%,rgba(0,0,0,0) 92%);
+  }
+  .bg .veil{
+    position:absolute; inset:0;
+    background:linear-gradient(90deg, rgba(255,255,255,1) 0%, rgba(255,255,255,.88) 30%, rgba(255,255,255,.25) 50%, rgba(255,255,255,0) 64%);
+  }
+
+  /* ── 状态栏 ── */
+  .sb{position:relative; z-index:2; display:flex; justify-content:space-between;
+    padding:14px 26px 0; font-size:13px; font-weight:600}
+
+  /* ── 品牌区 ── */
+  .brand{position:relative; z-index:2; padding:64px 28px 0}
+  .brand .row{display:flex; align-items:center; gap:10px}
+  .badge{width:34px; height:34px; border-radius:10px; background:#fff; overflow:hidden;
+    box-shadow:0 2px 8px rgba(0,0,0,.10), 0 0 0 1px rgba(0,0,0,.04)}
+  .badge img{width:100%; height:100%; object-fit:cover; display:block}
+  .brand .name{font-size:13px; color:#4A4A52; letter-spacing:.3px; font-weight:500}
+  .brand h1{margin:22px 0 0; font-size:34px; font-weight:600; letter-spacing:-1.2px; line-height:1.1}
+  .brand .sub{margin:10px 0 0; font-size:13px; color:#55555E; line-height:1.7}
+
+  /* ── 液态玻璃登录卡 ── */
+  .card{
+    position:relative; z-index:2; margin:72px 20px 0; padding:24px 20px 26px;
+    border-radius:26px;
+    background:rgba(255,255,255,.52);
+    -webkit-backdrop-filter:blur(22px) saturate(180%);
+            backdrop-filter:blur(22px) saturate(180%);
+    box-shadow:
+      0 18px 44px -18px rgba(0,0,0,.24),
+      inset 0 1px 0 rgba(255,255,255,.85),
+      0 0 0 .5px rgba(255,255,255,.6);
+  }
+  .field + .field{margin-top:12px}
+  .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:7px}
+  .inp{
+    display:flex; align-items:center; gap:10px; height:54px; padding:0 18px;
+    border-radius:9999px; background:rgba(255,255,255,.9);
+    box-shadow:inset 0 0 0 1px var(--hairline);
+  }
+  .inp.focus{background:#fff; box-shadow:inset 0 0 0 1.5px var(--accent)}
+  .inp input{
+    flex:1; min-width:0; border:0; outline:0; background:none; font:inherit;
+    font-size:16px; color:var(--ink); letter-spacing:.2px;
+  }
+  .inp input::placeholder{color:#B4B4BA}
+  .eye{flex:none; width:24px; height:24px; display:grid; place-items:center; color:#A9A9B0}
+  .eye svg{width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.6}
+
+  .btn{
+    margin-top:20px; width:100%; height:54px; border:0; border-radius:9999px;
+    background:var(--accent); color:#fff; font:inherit; font-size:16px; font-weight:600;
+    letter-spacing:.4px; cursor:pointer;
+  }
+  .btn:active{opacity:.86}
+  .btn[disabled]{background:#C9C9CF; color:#fff}
+
+  .hint{margin:14px 2px 0; font-size:12px; color:var(--muted); line-height:1.7; text-align:center}
+  .hint b{color:var(--ink); font-weight:600}
+
+  /* ── 底部 ── */
+  .foot{position:absolute; left:0; right:0; bottom:30px; z-index:2; text-align:center;
+    font-size:11.5px; color:#A9A9B0; letter-spacing:.2px}
+  .foot .dot{margin:0 8px; color:#D6D6DA}
+
+  .err{margin:12px 2px 0; font-size:12.5px; color:var(--live); display:none}
+  .err.show{display:block}
+</style>
+</head>
+<body>
+<div class="phone">
+  <!-- 背景 -->
+  <div class="bg">
+    <img src="assets/me-bg.jpg" alt="">
+    <div class="veil"></div>
+  </div>
+
+  <div class="sb"><span>9:41</span><span>▮▮▮</span></div>
+
+  <!-- 品牌 -->
+  <div class="brand">
+    <div class="row">
+      <span class="badge"><img src="assets/station-badge.png" alt="菁悠"></span>
+      <span class="name">菁悠广播站 · 伙伴端</span>
+    </div>
+    <h1>登录</h1>
+    <p class="sub">用管理员账号进来；忘记密码找超管重置。</p>
+  </div>
+
+  <!-- 玻璃卡 -->
+  <form class="card" onsubmit="return false">
+    <div class="field">
+      <label>账号</label>
+      <div class="inp" id="f1">
+        <input id="user" type="text" placeholder="管理员账号" autocomplete="username">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>密码</label>
+      <div class="inp" id="f2">
+        <input id="pwd" type="password" placeholder="密码" autocomplete="current-password">
+        <span class="eye" id="eye" role="button" aria-label="显示密码">
+          <svg viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.8"/></svg>
+        </span>
+      </div>
+    </div>
+
+    <button class="btn" id="go" type="submit">登录</button>
+    <div class="err" id="err">账号或密码不正确</div>
+    <p class="hint">登录即表示同意站内<b>值班与考勤规则</b><br>账号由超管分配，不开放自助注册</p>
+  </form>
+
+  <div class="foot">菁菁校园情<span class="dot">·</span>悠悠广播声</div>
+</div>
+
+<script>
+  // 只做视觉预览：聚焦态、密码可见、按钮可用/不可用
+  ['user','pwd'].forEach(function(id){
+    var el = document.getElementById(id);
+    var box = el.parentNode;
+    el.addEventListener('focus', function(){ box.classList.add('focus'); });
+    el.addEventListener('blur', function(){ box.classList.remove('focus'); syncBtn(); });
+    el.addEventListener('input', syncBtn);
+  });
+
+  var eye = document.getElementById('eye');
+  eye.addEventListener('click', function(){
+    var p = document.getElementById('pwd');
+    p.type = (p.type === 'password') ? 'text' : 'password';
+  });
+
+  var wasFocus = false;
+  function syncBtn(){ /* 按钮恒为可用态，点空时给提示 */ }
+  syncBtn();
+
+  document.getElementById('go').addEventListener('click', function(){
+    var u = document.getElementById('user').value.trim();
+    var p = document.getElementById('pwd').value;
+    var err = document.getElementById('err');
+    if (!u || !p) {
+      err.textContent = !u ? '请输入账号' : '请输入密码';
+      err.classList.add('show');
+      setTimeout(function(){ err.classList.remove('show'); }, 1600);
+      return;
+    }
+    err.textContent = '账号或密码不正确';
+    // 预览里只演示错误态：真实实现接 /admin/login
+    err.classList.add('show');
+    setTimeout(function(){ err.classList.remove('show'); }, 1800);
+  });
+</script>
+</body>
+</html>

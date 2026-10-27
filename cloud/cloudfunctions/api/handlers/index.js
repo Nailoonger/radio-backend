@@ -58,6 +58,13 @@ const REGISTRY = {
   'admin.student': () => require('./admin/student'),
   'admin.submit': () => require('./admin/submit'),
   'admin.recruitment': () => require('./admin/recruitment'),
+
+  // ---- 伙伴端（2026-10-27）----
+  // 与 admin.* 的区别：伙伴端要查「资格」（dutyRoles / department），
+  // 且人员值班线是一整套独立业务（时段/可排时间/请假/考勤/轮值），单独命名空间便于收敛。
+  'partner.me': () => require('./partner/me'),
+  'partner.slots': () => require('./partner/slots'),
+  'partner.availability': () => require('./partner/availability'),
 };
 
 const cache = new Map();

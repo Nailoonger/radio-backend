@@ -7,7 +7,19 @@
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
     "seed": "node src/utils/seed.js",
-    "db:init": "node src/utils/init-db.js"
+    "db:init": "node src/utils/init-db.js",
+
+    "//": "云开发网关 —— 改完 cloud/ 必须 sync 再部署（见 cloud/scripts/deploy-cloud.js 头注）",
+    "cloud:sync": "node cloud/scripts/sync.js",
+    "cloud:selfcheck": "node cloud/scripts/selfcheck.js",
+    "cloud:deploy": "node cloud/scripts/deploy-cloud.js",
+
+    "//contract": "前后端接口对齐：check 抓路径写错，verify 抓字段漂移",
+    "check:contract": "node cloud/scripts/check-contract.js",
+    "verify:contract": "node cloud/scripts/verify-contract.js",
+    "test:partner": "node cloud/scripts/test-partner-duty.js",
+    "test:concurrency": "node cloud/scripts/test-concurrency.js",
+    "check:all": "node cloud/scripts/check-contract.js && node cloud/scripts/verify-contract.js && node cloud/scripts/selfcheck.js && node cloud/scripts/test-gateway.js && node cloud/scripts/test-concurrency.js"
   },
   "keywords": [
     "wechat",

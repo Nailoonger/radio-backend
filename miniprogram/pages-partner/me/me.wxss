@@ -1,0 +1,154 @@
+/* 伙伴端 · 我的（v151 定稿）
+   尺寸换算：设计稿 390pt → 750rpx，1px ≈ 1.923rpx
+   v151 参数：图 390px 宽（→750rpx，高 434rpx）· 白纱布 1→.72@26%→0@57%
+              · 卡片上移 13px（→25rpx）· 玻璃白 31% */
+
+.page {
+  min-height: 100vh;
+  padding: 0 32rpx 40rpx;
+  background: var(--parchment, #F5F5F7);
+  position: relative;
+  box-sizing: border-box;
+}
+
+/* ── 背景层：通栏（负边距吃掉页面左右 padding） ── */
+.mebg {
+  position: absolute;
+  top: 0;
+  left: -32rpx;
+  right: -32rpx;
+  height: 434rpx;          /* = 图高 */
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.mebg-img {
+  width: 750rpx;
+  height: 434rpx;
+  display: block;
+  /* 底部渐隐：46% → 92%（图在卡片第一行开始变淡） */
+  -webkit-mask-image: linear-gradient(180deg, #000 46%, rgba(0,0,0,.42) 70%, rgba(0,0,0,0) 92%);
+          mask-image: linear-gradient(180deg, #000 46%, rgba(0,0,0,.42) 70%, rgba(0,0,0,0) 92%);
+}
+/* 白纱布：横向提亮左侧文字区；纵向淡出，只在介绍带生效（否则卡片左下会白成一团） */
+.mebg-veil {
+  position: absolute;
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: linear-gradient(90deg,
+    rgba(255,255,255,1) 0%,
+    rgba(255,255,255,.72) 26%,
+    rgba(255,255,255,0) 57%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, rgba(0,0,0,.85) 42%, rgba(0,0,0,.25) 62%, rgba(0,0,0,0) 76%);
+          mask-image: linear-gradient(180deg, #000 0%, rgba(0,0,0,.85) 42%, rgba(0,0,0,.25) 62%, rgba(0,0,0,0) 76%);
+}
+
+/* ── 介绍带 ── */
+.hero {
+  position: relative;
+  z-index: 2;
+  padding: 36rpx 4rpx 28rpx;
+  min-height: 192rpx;      /* v151：介绍带最小高 168px≈323rpx，这里含上下 padding 取整 */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.eb {
+  font-size: 22rpx;
+  color: #8A8A90;
+  letter-spacing: .4rpx;
+}
+.nm {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 58rpx;        /* 30px */
+  font-weight: 600;
+  letter-spacing: -1.6rpx;
+  line-height: 1.15;
+  color: var(--ink, #1D1D1F);
+}
+.post {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 23rpx;
+  color: #6E6E76;
+}
+.ten {
+  margin-top: 18rpx;
+  font-size: 22rpx;
+  color: #8A8A90;
+}
+.ten .num {
+  margin: 0 4rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--ink, #1D1D1F);
+}
+
+/* ── 液态玻璃卡 ──
+   小程序没有 backdrop-filter: url(#filter)，用 blur + 半透明白降级：
+   不支持的机型会自动忽略 blur，只剩半透明白底，仍然可读 */
+.glass {
+  position: relative;
+  z-index: 1;
+  margin-top: -25rpx;      /* 上移 13px 压住背景 */
+  border-radius: 38rpx;    /* 20px */
+  overflow: hidden;
+  background: rgba(255, 255, 255, .31);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+          backdrop-filter: blur(18px) saturate(160%);
+  box-shadow:
+    0 24rpx 68rpx -28rpx rgba(0, 0, 0, .22),
+    inset 0 2rpx 0 rgba(255, 255, 255, .75),
+    0 0 0 2rpx rgba(255, 255, 255, .55);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  min-height: 100rpx;      /* 52px */
+  padding: 22rpx 30rpx;
+  border-bottom: 2rpx solid rgba(0, 0, 0, .055);
+  box-sizing: border-box;
+}
+.row:last-child { border-bottom: 0; }
+.row-hover { background: rgba(0, 0, 0, .035); }
+
+.lb {
+  flex: 1;
+  min-width: 0;
+  font-size: 29rpx;
+  color: var(--ink, #1D1D1F);
+}
+.st {
+  flex: none;
+  max-width: 300rpx;
+  font-size: 24rpx;
+  color: var(--muted, #7A7A7A);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ar {
+  flex: none;
+  margin-left: 12rpx;
+  font-size: 30rpx;
+  color: #C7C7CC;
+}
+
+/* ── 退出登录 ── */
+.logout {
+  position: relative;
+  z-index: 1;
+  margin-top: 32rpx;
+  width: 100%;
+  height: 96rpx;           /* 50px */
+  line-height: 96rpx;
+  border-radius: 9999rpx;
+  background: #FFFFFF;
+  color: var(--live, #FF453A);
+  font-size: 29rpx;
+  font-weight: 500;
+  border: 0;
+}
+.logout::after { border: 0; }

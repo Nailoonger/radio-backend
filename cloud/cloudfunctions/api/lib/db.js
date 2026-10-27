@@ -47,6 +47,18 @@ const C = {
   STATUS_LOG: 'request_status_log',
   UNIQUE_KEYS: 'unique_keys',
   SEQUENCE: 'sequence',
+
+  // ---- 伙伴端 · 人员值班线（2026-10-27）----
+  // ⚠️ 与 WEEKLY（weekly_schedule）**不是一回事**：那张是「点歌排期」（哪首歌排到哪个时段），
+  //    这里 8 张是「人值班」（谁在哪个时段守台）。命名刻意分开，避免再次混用。
+  DUTY_SLOT_VERSION: 'duty_slot_versions',
+  DUTY_WEEK: 'duty_weeks',
+  DUTY_ASSIGNMENT: 'duty_assignments',
+  DUTY_AVAILABILITY: 'duty_availability',
+  DUTY_LEAVE: 'duty_leaves',
+  DUTY_ATTENDANCE: 'duty_attendance',
+  DUTY_RULE: 'duty_rules',
+  DUTY_LOG: 'duty_logs',
 };
 
 const coll = (name) => db.collection(name);

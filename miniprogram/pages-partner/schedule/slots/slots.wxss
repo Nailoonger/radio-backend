@@ -1,0 +1,306 @@
+/* 伙伴端 · 值班时段配置（P1）
+   尺寸换算：设计稿 390pt → 750rpx，1px ≈ 1.923rpx
+   ⚠️ 底部两个按钮宽度必须一致：flex:1 明确分配，不要给 .btn 写 width:100%
+      （那会和 flex 冲突，出现 2:3 的怪比例 —— v129 踩过一次） */
+
+.page {
+  min-height: 100vh;
+  padding: 0 32rpx;
+  background: var(--parchment, #F5F5F7);
+  box-sizing: border-box;
+}
+
+/* ── 头部 ── */
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0 -32rpx;
+  padding: 0 32rpx;
+  background: rgba(245, 245, 247, .92);
+  backdrop-filter: saturate(180%) blur(20rpx);
+}
+.bar-in {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 20rpx 0 18rpx;
+}
+.bar-l { display: flex; flex-direction: column; }
+.bar-t {
+  font-size: 40rpx;
+  font-weight: 600;
+  color: var(--ink, #1D1D1F);
+  letter-spacing: -1rpx;
+}
+.bar-s {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: var(--muted, #7A7A7A);
+}
+.badge {
+  flex: none;
+  margin-left: 16rpx;
+  padding: 6rpx 16rpx;
+  border-radius: 9999rpx;
+  background: var(--amber-bg, #FEF3C7);
+  color: var(--amber-fg, #8A6100);
+  font-size: 21rpx;
+  line-height: 1.5;
+}
+.badge.ro {
+  background: var(--divider, #F0F0F0);
+  color: var(--muted, #7A7A7A);
+}
+
+/* ── 只读提示 ── */
+.tip {
+  margin-top: 8rpx;
+  padding: 24rpx 28rpx;
+  background: var(--accent-tint, #EAF3FD);
+  border-radius: 26rpx;
+  display: flex;
+  flex-direction: column;
+}
+.tip-t {
+  font-size: 26rpx;
+  font-weight: 500;
+  color: var(--accent, #0066CC);
+}
+.tip-s {
+  margin-top: 8rpx;
+  font-size: 23rpx;
+  color: var(--accent, #0066CC);
+  opacity: .78;
+  line-height: 1.5;
+}
+
+/* ── 天切换 ── */
+.tabs {
+  display: flex;
+  margin: 20rpx -32rpx 0;
+  padding: 0 32rpx;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+.tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 16rpx 26rpx;
+  margin-right: 14rpx;
+  border-radius: 9999rpx;
+  background: var(--canvas, #FFF);
+  border: 1rpx solid var(--hairline, #E0E0E0);
+  box-sizing: border-box;
+}
+.tab.on {
+  background: var(--ink, #1D1D1F);
+  border-color: var(--ink, #1D1D1F);
+}
+.tab-n {
+  font-size: 26rpx;
+  color: var(--ink-2, #333);
+}
+.tab.on .tab-n { color: #FFF; }
+.tab-c {
+  margin-left: 8rpx;
+  font-size: 21rpx;
+  color: var(--muted, #7A7A7A);
+}
+.tab.on .tab-c { color: rgba(255, 255, 255, .62); }
+
+/* ── 时段行 ── */
+.day-rows { margin-top: 24rpx; }
+.row {
+  padding: 26rpx 28rpx;
+  margin-bottom: 16rpx;
+  background: var(--canvas, #FFF);
+  border: 1rpx solid var(--hairline, #E0E0E0);
+  border-radius: 30rpx;
+  box-shadow: var(--sh-card, 0 2rpx 4rpx rgba(0, 0, 0, .04));
+  box-sizing: border-box;
+}
+
+.row-hd {
+  display: flex;
+  align-items: center;
+}
+.in-title {
+  flex: 1;
+  height: 60rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+  color: var(--ink, #1D1D1F);
+  min-width: 0;
+}
+.ph { color: var(--soft, #C7C7CC); font-weight: 400; }
+.del {
+  flex: none;
+  margin-left: 16rpx;
+  padding: 8rpx 18rpx;
+  border-radius: 9999rpx;
+  background: var(--red-bg, #FDE8E8);
+  color: var(--red-fg, #B42318);
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+.del-hover { opacity: .72; }
+
+/* 起止时间 */
+.row-times {
+  display: flex;
+  align-items: center;
+  margin-top: 16rpx;
+}
+.tm {
+  padding: 14rpx 24rpx;
+  border-radius: 20rpx;
+  background: var(--parchment, #F5F5F7);
+  font-size: 30rpx;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink, #1D1D1F);
+  line-height: 1.3;
+}
+.tm.ro {
+  background: transparent;
+  color: var(--ink-2, #333);
+  padding-left: 0;
+}
+.tm-sep {
+  margin: 0 14rpx;
+  font-size: 26rpx;
+  color: var(--soft, #C7C7CC);
+}
+
+/* 部门 / 岗位 / 人数 */
+.row-meta {
+  display: flex;
+  align-items: center;
+  margin-top: 18rpx;
+  flex-wrap: wrap;
+}
+.chip {
+  margin-right: 14rpx;
+  margin-bottom: 8rpx;
+  padding: 10rpx 22rpx;
+  border-radius: 9999rpx;
+  background: var(--parchment, #F5F5F7);
+  border: 1rpx solid var(--hairline, #E0E0E0);
+  font-size: 23rpx;
+  color: var(--ink-2, #333);
+  line-height: 1.4;
+}
+.chip.ro {
+  background: transparent;
+  border-color: var(--divider, #F0F0F0);
+  color: var(--muted, #7A7A7A);
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  background: var(--parchment, #F5F5F7);
+  border-radius: 9999rpx;
+  padding: 4rpx;
+}
+.st-btn {
+  width: 56rpx;
+  height: 56rpx;
+  line-height: 52rpx;
+  text-align: center;
+  border-radius: 9999rpx;
+  background: var(--canvas, #FFF);
+  border: 1rpx solid var(--hairline, #E0E0E0);
+  font-size: 32rpx;
+  color: var(--ink, #1D1D1F);
+  box-sizing: border-box;
+}
+.st-hover { background: var(--divider, #F0F0F0); }
+.st-num {
+  padding: 0 18rpx;
+  font-size: 24rpx;
+  color: var(--ink-2, #333);
+  font-variant-numeric: tabular-nums;
+}
+.st-ro {
+  margin-left: auto;
+  font-size: 23rpx;
+  color: var(--muted, #7A7A7A);
+}
+
+/* ── 空态 ── */
+.empty {
+  padding: 56rpx 32rpx;
+  background: var(--canvas, #FFF);
+  border: 1rpx dashed var(--hairline, #E0E0E0);
+  border-radius: 30rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.empty-t {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: var(--ink-2, #333);
+}
+.empty-s {
+  margin-top: 10rpx;
+  font-size: 23rpx;
+  color: var(--muted, #7A7A7A);
+}
+
+/* ── 添加 ── */
+.add {
+  margin-top: 8rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  text-align: center;
+  border: 1rpx dashed var(--soft, #C7C7CC);
+  border-radius: 30rpx;
+  font-size: 27rpx;
+  color: var(--accent, #0066CC);
+  background: transparent;
+}
+.add-hover { background: var(--accent-tint, #EAF3FD); }
+
+/* ── 汇总 ── */
+.sum {
+  margin-top: 26rpx;
+  text-align: center;
+}
+.sum-t {
+  font-size: 22rpx;
+  color: var(--muted, #7A7A7A);
+}
+
+/* ── 底部操作 ── */
+.foot {
+  display: flex;
+  margin-top: 28rpx;
+}
+.btn {
+  flex: 1;
+  height: 92rpx;
+  line-height: 92rpx;
+  border-radius: 9999rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+.btn::after { border: none; }
+.btn.ghost {
+  margin-right: 20rpx;
+  background: var(--canvas, #FFF);
+  border: 1rpx solid var(--hairline, #E0E0E0);
+  color: var(--ink-2, #333);
+}
+.btn.primary {
+  background: var(--ink, #1D1D1F);
+  color: #FFF;
+}
+
+.pad { height: 60rpx; }

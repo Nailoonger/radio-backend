@@ -1,0 +1,113 @@
+<!-- 伙伴端 · 值班时段配置（P1）
+     编辑态（超管）：周一到周五各自增删时段 → 存草稿 → 发布
+     只读态（社干）：同一套布局，输入全部置灰、没有底部操作
+     ⚠️ 置灰只是体验，真正的拦截在云函数（PUT/POST 都是仅超管） -->
+<view class="page">
+
+  <!-- 头部 -->
+  <view class="bar" style="padding-top:{{statusBarHeight}}px">
+    <view class="bar-in">
+      <view class="bar-l">
+        <text class="bar-t">值班时段</text>
+        <text class="bar-s">{{publishedInfo}}</text>
+      </view>
+      <text class="badge" wx:if="{{canEdit && pendingDraft}}">草稿 v{{draftVersion}} 待发布</text>
+      <text class="badge ro" wx:elif="{{!canEdit}}">只读</text>
+    </view>
+  </view>
+
+  <!-- 社干只读提示 -->
+  <view class="tip" wx:if="{{!canEdit}}">
+    <text class="tip-t">值班时段由超管维护</text>
+    <text class="tip-s">你可以在这里查看当前生效的时段；需要调整请找老师或超管。</text>
+  </view>
+
+  <!-- 天切换 -->
+  <scroll-view class="tabs" scroll-x enable-flex show-scrollbar="{{false}}">
+    <view class="tab {{dayIndex === index ? 'on' : ''}}"
+          wx:for="{{dayTabs}}"
+          wx:key="day"
+          wx:for-item="tab"
+          wx:for-index="index"
+          data-i="{{index}}"
+          bindtap="onSwitchDay">
+      <text class="tab-n">{{tab.name}}</text>
+      <text class="tab-c">{{tab.count}}</text>
+    </view>
+  </scroll-view>
+
+  <!-- 当前天的时段列表 -->
+  <view class="day-rows">
+    <view class="row" wx:for="{{dayRows}}" wx:key="idx" wx:for-item="r">
+      <!-- 第一行：名称 + 删除 -->
+      <view class="row-hd">
+        <input class="in-title"
+               value="{{r.title}}"
+               placeholder="时段名称"
+               placeholder-class="ph"
+               disabled="{{!canEdit}}"
+               data-idx="{{r.idx}}"
+               bindinput="onEditTitle"
+               maxlength="20" />
+        <view class="del" wx:if="{{canEdit}}" data-idx="{{r.idx}}" bindtap="onRemoveRow" hover-class="del-hover">删除</view>
+      </view>
+
+      <!-- 第二行：起止时间 -->
+      <view class="row-times">
+        <picker mode="time" value="{{r.startText}}" disabled="{{!canEdit}}"
+                data-idx="{{r.idx}}" data-field="start" bindchange="onTimeChange">
+          <view class="tm {{canEdit ? '' : 'ro'}}">{{r.startText}}</view>
+        </picker>
+        <text class="tm-sep">—</text>
+        <picker mode="time" value="{{r.endText}}" disabled="{{!canEdit}}"
+                data-idx="{{r.idx}}" data-field="end" bindchange="onTimeChange">
+          <view class="tm {{canEdit ? '' : 'ro'}}">{{r.endText}}</view>
+        </picker>
+      </view>
+
+      <!-- 第三行：部门 / 岗位 / 人数 -->
+      <view class="row-meta">
+        <picker range="{{deptOptions}}" disabled="{{!canEdit}}"
+                data-idx="{{r.idx}}" bindchange="onPickDept">
+          <view class="chip {{canEdit ? '' : 'ro'}}">{{r.deptText}}</view>
+        </picker>
+        <picker range="{{roleOptions}}" disabled="{{!canEdit}}"
+                data-idx="{{r.idx}}" bindchange="onPickRole">
+          <view class="chip {{canEdit ? '' : 'ro'}}">{{r.roleText}}</view>
+        </picker>
+
+        <view class="stepper" wx:if="{{canEdit}}">
+          <view class="st-btn" data-idx="{{r.idx}}" data-delta="-1" bindtap="onStepCount" hover-class="st-hover">−</view>
+          <text class="st-num">{{r.count}} 人</text>
+          <view class="st-btn" data-idx="{{r.idx}}" data-delta="1" bindtap="onStepCount" hover-class="st-hover">+</view>
+        </view>
+        <text class="st-ro" wx:else>需 {{r.count}} 人</text>
+      </view>
+    </view>
+
+    <!-- 空天 -->
+    <view class="empty" wx:if="{{!dayRows.length}}">
+      <text class="empty-t">{{dayTabs[dayIndex].name}}还没有时段</text>
+      <text class="empty-s" wx:if="{{canEdit}}">点下面的「添加时段」开始配置。</text>
+      <text class="empty-s" wx:else>这一天不排班。</text>
+    </view>
+  </view>
+
+  <!-- 添加 -->
+  <view class="add" wx:if="{{canEdit}}" bindtap="onAddRow" hover-class="add-hover">
+    + 添加时段
+  </view>
+
+  <!-- 汇总 -->
+  <view class="sum">
+    <text class="sum-t">共 {{totalCount}} 个时段 · 5 个值班日</text>
+  </view>
+
+  <!-- 底部操作 -->
+  <view class="foot" wx:if="{{canEdit}}">
+    <button class="btn ghost" loading="{{saving}}" bindtap="onSaveDraft">存草稿</button>
+    <button class="btn primary" loading="{{publishing}}" bindtap="onPublish">发布</button>
+  </view>
+
+  <view class="pad"></view>
+</view>

@@ -1,0 +1,35 @@
+<!-- 伙伴端 · 我的（v151 定稿）
+     布局：园林背景层（通栏）→ 透明介绍带 → 液态玻璃卡（上移压住背景）
+     ⚠️ 小程序不支持 backdrop-filter: url()，这里用 blur + 半透明白降级，视觉上等价于"浅玻璃" -->
+<view class="page">
+
+  <!-- 背景层：图 + 白纱布 -->
+  <view class="mebg">
+    <image class="mebg-img" src="/assets/me-bg.jpg" mode="aspectFill"></image>
+    <view class="mebg-veil"></view>
+  </view>
+
+  <!-- 介绍带（透明，让出背景） -->
+  <view class="hero">
+    <text class="eb">菁悠广播站 · {{role.tag}}</text>
+    <text class="nm">{{role.name}}</text>
+    <text class="post">{{role.post}}{{role.grade ? ' · ' + role.grade : ''}}</text>
+    <view class="ten">已加入广播站<text class="num">{{days}}</text>天</view>
+  </view>
+
+  <!-- 玻璃卡 -->
+  <view class="glass">
+    <view class="row"
+          wx:for="{{rows}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          hover-class="row-hover"
+          bindtap="onNav">
+      <text class="lb">{{item.label}}</text>
+      <text class="st">{{item.state}}</text>
+      <text class="ar">›</text>
+    </view>
+  </view>
+
+  <button class="logout" bindtap="onLogout">退出登录</button>
+</view>

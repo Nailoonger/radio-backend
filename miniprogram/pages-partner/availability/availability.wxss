@@ -1,0 +1,331 @@
+/* 伙伴端 · 可排时间填报（P1）
+   尺寸换算：设计稿 390pt → 750rpx，1px ≈ 1.923rpx
+   视觉沿用设计系统 v2：羊皮纸底 + 白卡 + 细描边，不引入新色
+   ⚠️ 三态色只用已有的 --green / --red 系列，不为这一页新增变量 */
+
+.page {
+  min-height: 100vh;
+  padding: 0 32rpx;
+  background: var(--parchment, #F5F5F7);
+  box-sizing: border-box;
+}
+
+/* ── 周切换条 ── */
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0 -32rpx;
+  padding: 0 32rpx;
+  background: rgba(245, 245, 247, .92);
+  backdrop-filter: saturate(180%) blur(20rpx);
+}
+.bar-in {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 0 16rpx;
+}
+.nav {
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 9999rpx;
+  background: var(--canvas, #FFF);
+  border: 1rpx solid var(--hairline, #E0E0E0);
+  color: var(--ink, #1D1D1F);
+  font-size: 40rpx;
+  line-height: 62rpx;
+  text-align: center;
+  box-sizing: border-box;
+}
+.nav-hover { background: var(--divider, #F0F0F0); }
+.wk {
+  flex: 1;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+.wk-label {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--ink, #1D1D1F);
+  letter-spacing: -.4rpx;
+}
+.wk-sub {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: var(--muted, #7A7A7A);
+}
+
+/* ── 通用白卡 ── */
+.card {
+  background: var(--canvas, #FFF);
+  border: 1rpx solid var(--hairline, #E0E0E0);
+  border-radius: 34rpx;
+  padding: 28rpx 28rpx;
+  margin-top: 20rpx;
+  box-shadow: var(--sh-card, 0 2rpx 4rpx rgba(0, 0, 0, .04));
+  box-sizing: border-box;
+}
+
+/* ── 进度卡 ── */
+.prog { margin-top: 8rpx; }
+.prog-hd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.prog-nums { display: flex; align-items: baseline; }
+.prog-num {
+  font-size: 52rpx;
+  font-weight: 600;
+  color: var(--ink, #1D1D1F);
+  letter-spacing: -1rpx;
+}
+.prog-den {
+  margin-left: 8rpx;
+  font-size: 24rpx;
+  color: var(--muted, #7A7A7A);
+}
+.prog-link {
+  font-size: 24rpx;
+  color: var(--accent, #0066CC);
+}
+.prog-link.ok { color: var(--green-fg, #1E7A46); }
+.prog-track {
+  margin-top: 18rpx;
+  height: 10rpx;
+  border-radius: 9999rpx;
+  background: var(--divider, #F0F0F0);
+  overflow: hidden;
+}
+.prog-fill {
+  height: 100%;
+  border-radius: 9999rpx;
+  background: var(--green-fg, #1E7A46);
+  transition: width .3s var(--ease, ease);
+}
+
+/* ── 代录选择 ── */
+.picker {
+  display: flex;
+  align-items: center;
+  margin-top: 20rpx;
+  padding: 26rpx 28rpx;
+  background: var(--canvas, #FFF);
+  border: 1rpx solid var(--hairline, #E0E0E0);
+  border-radius: 26rpx;
+  box-sizing: border-box;
+}
+.picker-hover { background: var(--divider, #F0F0F0); }
+.pk-label {
+  font-size: 26rpx;
+  color: var(--muted, #7A7A7A);
+}
+.pk-val {
+  flex: 1;
+  text-align: right;
+  font-size: 28rpx;
+  color: var(--ink, #1D1D1F);
+  margin-right: 8rpx;
+}
+.pk-ar {
+  font-size: 32rpx;
+  color: var(--soft, #C7C7CC);
+  line-height: 1;
+}
+
+/* ── 空态 / 警告 ── */
+.empty {
+  margin-top: 40rpx;
+  padding: 56rpx 32rpx;
+  background: var(--canvas, #FFF);
+  border: 1rpx dashed var(--hairline, #E0E0E0);
+  border-radius: 34rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.empty-t {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: var(--ink-2, #333);
+}
+.empty-s {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: var(--muted, #7A7A7A);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.warn {
+  margin-top: 20rpx;
+  padding: 24rpx 28rpx;
+  background: var(--amber-bg, #FEF3C7);
+  border-radius: 26rpx;
+  display: flex;
+  flex-direction: column;
+}
+.warn-t {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--amber-fg, #8A6100);
+}
+.warn-s {
+  margin-top: 8rpx;
+  font-size: 23rpx;
+  color: var(--amber-fg, #8A6100);
+  opacity: .85;
+  line-height: 1.5;
+}
+
+/* ── 天分组 ── */
+.day { margin-top: 32rpx; }
+.day-hd {
+  display: flex;
+  align-items: baseline;
+  padding: 0 6rpx 14rpx;
+}
+.day-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--ink, #1D1D1F);
+}
+.day-date {
+  margin-left: 12rpx;
+  font-size: 23rpx;
+  color: var(--muted, #7A7A7A);
+}
+
+/* ── 时段方块（三态） ── */
+.slot {
+  display: flex;
+  align-items: center;
+  padding: 26rpx 26rpx;
+  margin-bottom: 14rpx;
+  background: var(--canvas, #FFF);
+  border: 1rpx solid var(--hairline, #E0E0E0);
+  border-radius: 26rpx;
+  box-sizing: border-box;
+}
+.slot-hover { opacity: .88; }
+.slot-l {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.slot-title {
+  font-size: 29rpx;
+  font-weight: 500;
+  color: var(--ink, #1D1D1F);
+}
+.slot-meta {
+  margin-top: 8rpx;
+  font-size: 23rpx;
+  color: var(--muted, #7A7A7A);
+}
+.slot-state {
+  margin-left: 20rpx;
+  flex: none;
+  padding: 8rpx 20rpx;
+  border-radius: 9999rpx;
+  font-size: 23rpx;
+  line-height: 1.4;
+  background: var(--divider, #F0F0F0);
+  color: var(--muted, #7A7A7A);
+}
+
+/* 能来 */
+.slot.on {
+  background: var(--green-bg, #E7F5EC);
+  border-color: rgba(30, 122, 70, .28);
+}
+.slot.on .slot-title { color: var(--green-fg, #1E7A46); }
+.slot.on .slot-meta { color: rgba(30, 122, 70, .7); }
+.slot.on .slot-state {
+  background: var(--green-fg, #1E7A46);
+  color: #FFF;
+}
+
+/* 不能来 */
+.slot.off {
+  background: var(--red-bg, #FDE8E8);
+  border-color: rgba(180, 35, 24, .26);
+}
+.slot.off .slot-title { color: var(--red-fg, #B42318); }
+.slot.off .slot-meta { color: rgba(180, 35, 24, .7); }
+.slot.off .slot-state {
+  background: var(--red-fg, #B42318);
+  color: #FFF;
+}
+
+/* ── 说明 ── */
+.note { margin-top: 32rpx; }
+.note-hd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.lbl {
+  font-size: 27rpx;
+  font-weight: 500;
+  color: var(--ink, #1D1D1F);
+}
+.lbl-tip {
+  font-size: 22rpx;
+  color: var(--muted, #7A7A7A);
+}
+.ta {
+  width: 100%;
+  min-height: 120rpx;
+  margin-top: 16rpx;
+  padding: 22rpx 24rpx;
+  background: var(--parchment, #F5F5F7);
+  border-radius: 23rpx;
+  font-size: 27rpx;
+  color: var(--ink, #1D1D1F);
+  line-height: 1.6;
+  box-sizing: border-box;
+}
+.ta-ph { color: var(--soft, #C7C7CC); }
+.cnt {
+  display: block;
+  margin-top: 10rpx;
+  text-align: right;
+  font-size: 21rpx;
+  color: var(--soft, #C7C7CC);
+}
+
+/* ── 底部操作 ──
+   ⚠️ 两个按钮宽度必须一致：用 flex 明确分配（各 flex:1），
+      不要给 .btn 写 width:100% —— 那会和 flex 冲突，出现 2:3 的怪比例（v129 踩过）。 */
+.foot {
+  display: flex;
+  margin-top: 36rpx;
+}
+.btn {
+  flex: 1;
+  height: 92rpx;
+  line-height: 92rpx;
+  border-radius: 9999rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+.btn::after { border: none; }
+.btn.ghost {
+  margin-right: 20rpx;
+  background: var(--canvas, #FFF);
+  border: 1rpx solid var(--hairline, #E0E0E0);
+  color: var(--ink-2, #333);
+}
+.btn.primary {
+  background: var(--ink, #1D1D1F);
+  color: #FFF;
+}
+
+.pad { height: 60rpx; }

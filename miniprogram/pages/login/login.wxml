@@ -84,11 +84,13 @@
       </view>
     </block>
 
-    <!-- 管理端入口：一行灰字，**不做按钮** —— 按钮会被学生误点，
-         灰字老师找得到、学生不会留意（2026-10-01，与学生登录完全两条链路） -->
+    <!-- 伙伴端入口：一行灰字，**不做按钮** —— 按钮会被学生误点，
+         灰字老师找得到、学生不会留意（2026-10-01，与学生登录完全两条链路）
+         2026-10-27：文案由「管理员登录」改为「伙伴端登录」，入口位置与样式不变，
+         跳转目标仍是 /pages-partner/login/login（伙伴端走 admin 表账号） -->
     <view class="admin-entry" wx:if="{{step === 'login'}}"
           hover-class="pressed" bindtap="goAdminLogin">
-      <text>管理员登录</text>
+      <text>伙伴端登录</text>
       <text class="arw">→</text>
     </view>
 

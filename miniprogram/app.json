@@ -57,19 +57,22 @@
       }
     ]
   },
-  "subPackages": [
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "subpackages": [
     {
-      "root": "pages-admin",
-      "name": "admin",
+      "root": "pages-partner",
+      "name": "partner",
       "pages": [
+        "me/me",
         "login/login",
         "todo/todo",
         "review/review",
         "review-detail/detail",
-        "message/message"
+        "message/message",
+        "availability/availability",
+        "schedule/slots/slots"
       ]
     }
-  ],
-  "style": "v2",
-  "sitemapLocation": "sitemap.json"
+  ]
 }
