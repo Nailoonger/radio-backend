@@ -158,7 +158,9 @@
 
 /* 待审行的动作：换满一行、右对齐（原型 flex-basis:100% + justify-content:flex-end） */
 .r-act {
-  flex-basis: 100%;
+  flex: 0 0 100%;
+  width: 100%;
+  box-sizing: border-box;
   display: flex;
   gap: 12rpx;
   justify-content: flex-end;
@@ -182,6 +184,15 @@
 /* ══════════ 行内动作按钮（.sm2） ══════════ */
 button.sm2 {
   flex: none;
+  /* ⚠️⚠️ `width: auto` 和 `display: block` 必须显式写，不能只靠 `flex: none`：
+     微信内置的 button 样式优先级高于单个类名，默认把按钮撑成整行宽 ——
+     同一 flex 行里放两个，就各自被压成「半个卡片宽的胶囊、文字居中」，
+     也就是 2026-10-30 截到的那张（通过 / 驳回 变成两条灰长条）。
+     app.wxss 的 `button.btn` 当初也是靠 `width: auto` 这一招压回去的，同一个坑。 */
+  display: block;
+  width: auto;
+  min-width: 0;
+  box-sizing: border-box;
   font-size: 23rpx;              /* 12px */
   font-weight: 500;
   line-height: 1;

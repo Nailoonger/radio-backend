@@ -1,0 +1,134 @@
+/* pages-partner/leave/leave.wxss · v1（2026-10-28 请假）
+   .view padding 10 18 112 ⇒ 19/35；卡 r18(35rpx) p16(31rpx)；tag 四色；sm2 行内按钮 */
+
+.page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(45deg);
+  margin-left: 6rpx;
+}
+.body {
+  flex: 1;
+  padding: 19rpx 35rpx 80rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 23rpx;
+}
+
+/* 周导航 */
+.wk-nav { display: flex; align-items: center; justify-content: space-between; padding: 2rpx 4rpx; }
+.wk-b { font-size: 25rpx; color: #0066CC; }
+.wk-b.off { color: #B3B3B8; }
+.wk-c { font-size: 25rpx; color: #1D1D1F; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* 卡片 */
+.card { background: #FFFFFF; border-radius: 35rpx; padding: 31rpx; display: flex; flex-direction: column; gap: 18rpx; }
+.sec-h { display: flex; align-items: center; justify-content: space-between; }
+.sec-h2 { padding: 6rpx 6rpx 0; }
+.sec-t { font-size: 25rpx; font-weight: 600; color: #1D1D1F; }
+
+/* 场次 chips */
+.chips { display: flex; flex-wrap: wrap; gap: 15rpx; }
+.chip {
+  background: #F5F5F7;
+  border-radius: 13rpx;
+  padding: 15rpx 26rpx;
+  font-size: 22rpx;
+  color: #76767E;
+  line-height: 1;
+}
+.chip.on { background: #EAF3FD; color: #0066CC; font-weight: 600; }
+
+.ta {
+  width: 100%;
+  min-height: 150rpx;
+  font-size: 26rpx;
+  line-height: 1.7;
+  color: #1D1D1F;
+  background: #F5F5F7;
+  border-radius: 20rpx;
+  padding: 20rpx 24rpx;
+  box-sizing: border-box;
+}
+.ph { color: #B3B3B8; }
+
+/* 列表 */
+.rows { background: #FFFFFF; border-radius: 35rpx; padding: 0 31rpx; }
+.row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 19rpx; padding: 31rpx 0; }
+.row + .row { border-top: 2rpx solid #E3E3E8; }
+.r-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.r-top { display: flex; align-items: center; gap: 13rpx; }
+.r-name { font-size: 27rpx; font-weight: 600; color: #1D1D1F; }
+.r-note { font-size: 24rpx; color: #1D1D1F; }
+.r-reason { font-size: 21rpx; color: #76767E; margin-top: 8rpx; line-height: 1.5; }
+.r-reject { font-size: 21rpx; color: #C0392B; margin-top: 8rpx; line-height: 1.5; }
+.r-time { font-size: 21rpx; color: #B3B3B8; margin-top: 6rpx; font-variant-numeric: tabular-nums; }
+.r-right { display: flex; flex-direction: column; align-items: flex-end; gap: 14rpx; }
+.r-cancel { font-size: 21rpx; color: #0066CC; }
+.r-act {
+  flex: 0 0 100%;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  gap: 12rpx;
+  justify-content: flex-end;
+}
+
+/* 标签 */
+.tag {
+  flex: none;
+  font-size: 19rpx;
+  line-height: 1.5;
+  padding: 8rpx 13rpx;
+  border-radius: 13rpx;
+  white-space: nowrap;
+}
+.tag.warn { background: #FDF3DC; color: #B26A00; }
+.tag.done { background: #EAF7EF; color: #1E8E4E; }
+.tag.no   { background: #FDECEA; color: #C0392B; }
+
+/* 行内按钮 */
+button.sm2 {
+  flex: none;
+  /* ⚠️⚠️ 同 review.wxss：微信内置 button 样式会压过单个类名、默认撑满整行，
+     两个按钮挤在一行就各自变成「半个卡片宽的胶囊」。`width: auto` 是必须的。 */
+  display: block;
+  width: auto;
+  min-width: 0;
+  box-sizing: border-box;
+  font-size: 23rpx;
+  font-weight: 500;
+  line-height: 1;
+  padding: 17rpx 27rpx;
+  border-radius: 23rpx;
+  background: #F5F5F7;
+  color: #0066CC;
+  margin: 0;
+  border: 0;
+}
+button.sm2::after { border: 0; }
+button.sm2.q { color: #76767E; font-weight: 400; }
+
+button.btn {
+  height: 96rpx;
+  border-radius: 9999rpx;
+  font-size: 27rpx;
+  font-weight: 500;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  box-sizing: border-box;
+}
+button.btn::after { border: 0; }
+button.btn.primary { background: #0066CC; color: #FFFFFF; }
+button.btn[disabled] { opacity: .45; }
+
+.note { font-size: 21rpx; color: #76767E; line-height: 1.7; text-align: center; }
+.hint-note { text-align: center; font-size: 23rpx; color: #76767E; padding: 30rpx 0; }
+.pressed { opacity: .72; }
