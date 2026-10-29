@@ -170,7 +170,13 @@ async function get(ctx) {
     people,
     me: availabilityDto(mineDoc, slots, version),
     target: targetId === p.id ? null : availabilityDto(targetDoc, slots, version),
-    targetId,
+    // ⚠️⚠️ 前端契约：**0 = 自己**。传别人的 personId 才是代录。
+    //    这里曾经无条件返回 `targetId`（自己时也是自己 id），前端 `isProxy = !!targetId`
+    //    就恒为 true ⇒ 自己填自己也被当成代录：说明框提示「写明代录原因」、
+    //    提交强制要原因、还把上次存的原因回填进输入框（陛下 2026-10-29 打回：
+    //    「我从来没填过这个原因为什么每次点开都有自带的」）。
+    //    「本人」这一侧必须回 0，让前端能区分。
+    targetId: targetId === p.id ? 0 : targetId,
     summary: {
       total: rows.length,
       confirmed,

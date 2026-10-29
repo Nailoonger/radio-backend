@@ -235,8 +235,13 @@ Page({
           };
         });
 
-        const isProxyNow = !!targetId;
+        const isProxyNow = !!targetId && targetId !== meIdNow;
         const cannotNow = days.reduce((n, d) => n + d.slots.filter((s) => s.can === 0).length, 0);
+
+        // ⚠️⚠️ 说明**不回填**：说明是「这次填报的理由」，不是持久属性。
+        //    之前把上次存的 reason 灌进输入框，人一打开就看到一段自己没写过的话
+        //    （陛下 2026-10-29：「我从来没填过这个原因为什么每次点开都有自带的」）。
+        //    旧原因仍留在库里，只是不再出现在界面上。
 
         this.setData({
           loading: false,
@@ -251,8 +256,8 @@ Page({
           targetId,
           targetName,
           isProxy: isProxyNow,
-          reason: (shown && shown.reason) || '',
-          reasonLen: ((shown && shown.reason) || '').length,
+          reason: '',
+          reasonLen: 0,
           reasonTip: isProxyNow ? '必填 · 写明代录原因' : (cannotNow > 0 ? '必填 · 有不能来的时段' : '选填'),
           reasonPh: isProxyNow ? '例：他手机坏了，托我代填' : '例：周三下午有课来不了',
           // 已经填过的人再进来，确认框默认勾上，省一次点击
@@ -401,6 +406,8 @@ Page({
       return wx.showToast({ title: '还没有选择任何时段', icon: 'none' });
     }
 
+    // 说明只认**这次输入框里写的东西**：不预填、也不偷偷沿用上次存的那句。
+    // 沿用会让「界面上明明是空的」和「库里还留着旧原因」对不上（陛下 2026-10-29 打回）。
     const reason = String(this.data.reason || '').trim();
     const hasCannot = picks.some((p) => !p.can);
     if (!this.data.isProxy && hasCannot && reason.length < 2) {
@@ -417,7 +424,7 @@ Page({
     this.setData({ submitting: true });
 
     const body = { week: this.data.weekStart, picks, reason };
-    if (this.data.targetId) body.personId = this.data.targetId;
+    if (this.data.isProxy) body.personId = this.data.targetId;
 
     adminRequest('/partner/availability', 'PUT', body)
       .then(() => {
@@ -443,7 +450,8 @@ Page({
       success: (res) => {
         if (!res.confirm) return;
         const body = { week: this.data.weekStart };
-        if (this.data.targetId) body.personId = this.data.targetId;
+        // 只有代录态才带 personId（本人时 targetId=0，后端按「0=自己」理解）
+        if (this.data.isProxy) body.personId = this.data.targetId;
         adminRequest('/partner/availability', 'DELETE', body)
           .then(() => {
             wx.showToast({ title: '已清空', icon: 'success' });

@@ -245,6 +245,9 @@ const TPL = [
     eq('第一天是周一', r.data.weekDates[0], '2026-11-02');
     eq('最后一天是周五', r.data.weekDates[4], '2026-11-06');
     eq('未填报 me=null', r.data.me, null);
+    // ⚠️ 契约：0 = 自己。曾经无条件回自己的 id，前端 `isProxy = !!targetId` 恒真，
+    //    导致「自己填自己」被当成代录（说明强制必填、还回填上次的原因）。
+    eq('本人时 targetId=0（不是自己的 id）', r.data.targetId, 0);
     eq('汇总总数=人员池', r.data.summary.total, 3);
     eq('已确认 0', r.data.summary.confirmed, 0);
   }
@@ -317,6 +320,18 @@ const TPL = [
 
   section('8. 代录');
   {
+    // 代录态：读别人的记录时 targetId 必须是那个人的 id，前端据此判 isProxy
+    const r = await call('GET', '/partner/availability', { week: WEEK, personId: 4 }, MGR_TOKEN);
+    eq('代录读别人 targetId=4', r.data.targetId, 4);
+    eq('对方还没填 → target=null', r.data.target, null);
+  }
+  {
+    // 显式传自己的 id，后端也要归一成 0（前端永远按「0=自己」判）
+    const r = await call('GET', '/partner/availability', { week: WEEK, personId: 2 }, MGR_TOKEN);
+    eq('传自己的 id 也归一成 targetId=0', r.data.targetId, 0);
+    eq('传自己的 id 时 target=null', r.data.target, null);
+  }
+  {
     const r = await call('PUT', '/partner/availability', {
       week: WEEK, personId: 4, picks: [{ slotKey: '0-1', can: true }],
     }, MGR_TOKEN);
@@ -338,6 +353,7 @@ const TPL = [
   {
     const r = await call('GET', '/partner/availability', { week: WEEK, personId: 4 }, MGR_TOKEN);
     eq('代录后 target 有数据', r.data.target.canCount, 2);
+    eq('代录后 targetId 仍是 4', r.data.targetId, 4);
     eq('汇总已确认 2', r.data.summary.confirmed, 2);
   }
 
