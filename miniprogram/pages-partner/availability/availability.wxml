@@ -2,7 +2,7 @@
      ⚠️⚠️ 这里**不用 <template>**：方块点不动的根因就是 template 里的
         bindtap 拿不到页面方法 / dataset（陛下 2026-10-29 两次打回）。宁可重复写两遍。
      ⚠️ 弹层用 hidden 常驻，不挂 wx:if —— 里面有 textarea，wx:if 销毁重建会吞字。
-     ⚠️ 能来 / 不能 / 待选三态在 js 里算成 cls（on / off / ''），模板不写嵌套三元。 -->
+     ⚠️ 两态：能来 / 不能来，在 js 里算成 cls（on / off），模板不写嵌套三元。 -->
 
 <view class="page">
 

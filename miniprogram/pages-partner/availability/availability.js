@@ -33,16 +33,16 @@ function shortDate(ymd) {
 }
 
 /**
- * 三态 → 展示文案与样式类
+ * 两态 → 展示文案与样式类（对齐 v151 `S.av.picks[k] ? 0 : 1`）
  *
- * ⚠️ 在 JS 里算好，不写成 WXML 里的嵌套三元（`{{a===1?'x':a===0?'y':'z'}}`）：
- *    嵌套三元在 WXML 里能跑，但一旦要加第四态（比如「待定」）就得改模板字符串，
- *    而这里改一行就够。模板只负责渲染，不负责判断。
+ * ⚠️⚠️ 只有两态：蓝＝能来，灰＝不能来。**没有「待选」**（陛下 2026-10-29 打回：
+ *    「按钮不就两种状态吗这有三种，蓝色消失后为啥还要点两下才会再亮」）。
+ *    三态循环（能来→不能来→待选）会让用户每点亮一次都得多点一下，是自创出来的东西。
+ * ⚠️ 在 JS 里算好，不写 WXML 里的嵌套三元：模板只负责渲染，不负责判断。
  */
 function stateOf(can) {
   if (can === 1) return { stateText: '能来', cls: 'on' };
-  if (can === 0) return { stateText: '不能', cls: 'off' };
-  return { stateText: '待选', cls: '' };
+  return { stateText: '不能', cls: 'off' };
 }
 
 /** 把云函数返回的扁平 slots 按天分组，并把已选状态贴回每个格子上 */
@@ -71,8 +71,9 @@ function groupByDay(slots, weekDates, pickMap) {
     });
 
     const slotList = blocks.map((b) => {
-      // 组内任意一格有表态就代表整场
-      let can = null;
+      // 默认「不能来」（灰）：与 v151 一致（picks 空对象 → 全部不亮），点一下才是能来。
+      // 组内任意一格有记录就代表整场。
+      let can = 0;
       b.keys.forEach((k) => { if (pickMap[k] !== undefined) can = pickMap[k]; });
       return Object.assign({
         // ⚠️⚠️ 聚合键**必须带天**：`名称|起止` 在不同天会重复（每天都有「午间 12:10-12:40」），
@@ -304,17 +305,14 @@ Page({
 
   /**
    * 全选 / 取消全选（v151 avSheet 顶部那个「全选 ›」）
-   * 已全选时再点 = 全部退回待选，方便重填。
+   * 全选 = 全部能来；再点 = 全部不能来（没有「待选」这一层）。
    */
   onToggleAll() {
-    const target = this.data.allOn ? null : 1;
+    const target = this.data.allOn ? 0 : 1;
     const st = stateOf(target);
     const days = (this.data.days || []).map((d) => {
       const slots = d.slots.map((s) => {
-        (s.keys || [s.slotKey]).forEach((k) => {
-          if (target === null) delete this._pickMap[k];
-          else this._pickMap[k] = target;
-        });
+        (s.keys || [s.slotKey]).forEach((k) => { this._pickMap[k] = target; });
         return Object.assign({}, s, st, { can: target });
       });
       return Object.assign({}, d, { slots, onCount: target === 1 ? slots.length : 0 });
@@ -323,7 +321,7 @@ Page({
     this.recount();
   },
 
-  /** 点方块：未选 → 能来 → 不能来 → 未选 */
+  /** 点方块：能来 ⇄ 不能来（两态，点一下即变） */
   onTapSlot(e) {
     // ⚠️⚠️ 用**数字索引**定位（data-di / data-si），不要靠字符串 key 传定位信息：
     //    聚合键 `名称|起止` 跨天会重复，字符串一撞车就是「点一个亮一片」（批量 chips 踩过）。
@@ -338,12 +336,10 @@ Page({
     }
     const slot = days[di].slots[sj];
 
-    const next = slot.can === null ? 1 : (slot.can === 1 ? 0 : null);
+    // 两态互切（v151：picks[k] ? 0 : 1）—— 点一下即变，不需要第三下
+    const next = slot.can === 1 ? 0 : 1;
     // 一个方块可能对应多个 slotKey（早会＝主持部 + 播音部两行），整块一起写
-    (slot.keys || [slot.slotKey]).forEach((k) => {
-      if (next === null) delete this._pickMap[k];
-      else this._pickMap[k] = next;
-    });
+    (slot.keys || [slot.slotKey]).forEach((k) => { this._pickMap[k] = next; });
 
     // ⚠️ 整体替换 days，不用 `days[0].slots[0].cls` 深层路径 setData
     const st = stateOf(next);

@@ -333,7 +333,7 @@
 .pad { height: 60rpx; }
 
 /* ══════════ v151 对齐：时段方块 / 人员卡片 / 弹层 / 批量代录 ══════════
-   换算 1px ≈ 1.923rpx。不引入新色：能来=accent 浅底蓝字，不能=灰底，待选=白底描边。 */
+   换算 1px ≈ 1.923rpx。不引入新色：能来=accent 浅底蓝字，不能来=灰底灰字（只有这两种）。 */
 
 .days { display: flex; flex-direction: column; gap: 14rpx; }
 .day-cnt { margin-left: auto; font-size: 19rpx; color: var(--muted, #76767E); font-variant-numeric: tabular-nums; }
