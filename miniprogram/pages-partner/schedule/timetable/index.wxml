@@ -3,7 +3,7 @@
   <view class="band" wx:for="{{singles}}" wx:key="key">
     <text class="band-label">{{item.dayName}}{{item.slot}}<text class="band-time">{{item.timeText}}</text></text>
     <view class="band-people">
-      <view class="group band-group" wx:for="{{item.groups}}" wx:for-item="group" wx:key="key" bindtap="edit" data-day="{{group.day}}" data-slot="{{group.slot}}" data-slot-key="{{group.slotKey}}" data-department="{{group.department}}" data-role="{{group.role}}" data-count="{{group.count}}">
+      <view class="group band-group" wx:for="{{item.groups}}" wx:for-item="group" wx:key="key" bindtap="edit" data-day="{{group.day}}" data-day-name="{{group.dayName}}" data-time="{{group.timeText}}" data-slot="{{group.slot}}" data-slot-key="{{group.slotKey}}" data-department="{{group.department}}" data-role="{{group.role}}" data-count="{{group.count}}">
         <view class="chip one {{p.cls}} {{editable && p.fixed ? 'fixed' : ''}}" wx:for="{{group.chips}}" wx:for-item="p" wx:key="key">{{p.name}}<text class="pin" wx:if="{{editable && p.fixed}}">·固定</text></view>
       </view>
     </view>
@@ -13,7 +13,7 @@
     <block wx:for="{{matrix}}" wx:for-item="row" wx:key="key">
       <view class="row-label"><text class="day">{{row.slot}}</text><text class="tm">{{row.timeText}}</text></view>
       <view class="cell" wx:for="{{row.cells}}" wx:for-item="cell" wx:key="day">
-        <view class="group" wx:for="{{cell.groups}}" wx:for-item="group" wx:key="key" bindtap="edit" data-day="{{group.day}}" data-slot="{{group.slot}}" data-slot-key="{{group.slotKey}}" data-department="{{group.department}}" data-role="{{group.role}}" data-count="{{group.count}}">
+        <view class="group" wx:for="{{cell.groups}}" wx:for-item="group" wx:key="key" bindtap="edit" data-day="{{group.day}}" data-day-name="{{group.dayName}}" data-time="{{group.timeText}}" data-slot="{{group.slot}}" data-slot-key="{{group.slotKey}}" data-department="{{group.department}}" data-role="{{group.role}}" data-count="{{group.count}}">
           <view class="chip {{p.cls}} {{editable && p.fixed ? 'fixed' : ''}}" wx:for="{{group.chips}}" wx:for-item="p" wx:key="key"><text class="person">{{p.name}}</text><text class="dept" wx:if="{{p.department}}">{{p.department}}</text><text class="pin" wx:if="{{editable && p.fixed}}">固定</text></view>
         </view>
       </view>

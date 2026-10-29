@@ -24,19 +24,54 @@
     </block>
   </view>
 </view>
-<!-- ⚠️ 同 slots：hidden 常驻，防 wx:if 销毁重建吞字 -->
+<!-- ⚠️ 同 slots：hidden 常驻，防 wx:if 销毁重建吞字
+     ⚠️⚠️ 这个弹层的结构逐条照 v151 `swapSheet()`（v109 的换人弹层），不要自己另起一套：
+        .sw-hd  = 「周一 10/27 日 · 午间播音」+「12:10-12:40。手工换人也会检查同一组硬条件。」
+        .sw-cur = 「当前：陈舟」+「固定当前人员 / 取消固定」按钮（没有当前人就不显示按钮）
+        .sw-row = 姓名 + 「部门 · 条件」两行，★右侧圆点★ 选中时边框加粗成实心（原型 .dot border-width 6px）
+        .sw-reason = 「换人原因（必填，记进调整记录，300 字以内）」
+        .sw-foot   = 一个整宽「保存」
+     ⚠️ 原型是单选（`S.hire.picked` 只留一个），我们是「一格 N 人」（后端 personIds 数组），
+        所以圆点允许多个同时亮 —— 视觉照抄，语义按真实业务。 -->
   <view class="overlay" hidden="{{!sheetOpen}}" catchtap="closeSheet" catchtouchmove="stopTap">
-  <view class="sheet" catchtap="stopTap">
-    <view class="sheet-head"><text class="state-title">安排岗位</text><button class="close" bindtap="closeSheet">关闭</button></view>
-    <text class="edit-title">{{editTitle}}</text><text class="note">需 {{edit.count}} 人 · 已选 {{selectedCount}} 人</text>
-    <scroll-view class="candidate-list" scroll-y>
+  <!-- ⚠️ v151 v133 的统一口径：所有弹层「四分之三屏 + **整块滚动**」——
+      标题、当前人选、原因栏、保存按钮一起走，不做固定头/固定底。
+      所以这里用 scroll-view 直接当弹层容器，.sw-list 只是普通分组。 -->
+  <scroll-view class="sheet" scroll-y catchtap="stopTap">
+    <view class="sw-hd">
+      <view class="sw-hd-l">
+        <text class="sw-hd-t">{{editTitle}}</text>
+        <text class="sw-hd-p">{{editTime}} · 需 {{edit.count}} 人，已选 {{selectedCount}} 人。手工换人也会检查同一组硬条件。</text>
+      </view>
+      <text class="sw-x" bindtap="closeSheet">关闭</text>
+    </view>
+
+    <view class="sw-cur">
+      <text class="sw-cur-lb">当前：<text class="sw-cur-nm {{curText === '空缺' ? 'none' : ''}}">{{curText}}</text></text>
+      <button class="sw-fix" wx:if="{{selectedCount > 0}}" disabled="{{busy}}" bindtap="onToggleFixed">{{fixed ? '取消固定' : '固定当前人员'}}</button>
+    </view>
+
+    <view class="sw-list">
       <text class="hint-note" wx:if="{{candidateLoading}}">正在检查候选人……</text>
       <view wx:elif="{{candidateError}}"><text class="issue">{{candidateError}}</text><button class="btn ghost" bindtap="loadCandidates">重试</button></view>
-      <view class="candidate {{item.selected ? 'selected' : ''}} {{!item.eligible ? 'unavailable' : ''}}" wx:for="{{candidates}}" wx:key="personId" data-id="{{item.personId}}" bindtap="onPick"><view class="pick">{{item.selected ? '✓' : ''}}</view><view class="candidate-main"><text class="candidate-name">{{item.name}}</text><text class="candidate-note">{{item.department}} · {{item.reasonText}}</text></view></view>
+      <view class="sw-row {{item.selected ? 'on' : ''}} {{item.eligible ? '' : 'off'}}"
+            wx:for="{{candidates}}" wx:key="personId"
+            data-id="{{item.personId}}" bindtap="onPick">
+        <view class="sw-tx">
+          <text class="sw-nm">{{item.name}}</text>
+          <text class="sw-st">{{item.department ? item.department + ' · ' : ''}}{{item.reasonText}}</text>
+        </view>
+        <view class="dot"></view>
+      </view>
       <text class="hint-note" wx:if="{{!candidateLoading && !candidateError && !candidates.length}}">暂时没有人员，请先配置伙伴岗位资格。</text>
-    </scroll-view>
-    <view class="fixed-option"><text>固定人选，再次生成时保留</text><switch color="#0066CC" checked="{{fixed}}" bindchange="onFixed"/></view>
-    <input class="reason" placeholder="填写调整原因（必填）" value="{{reason}}" maxlength="200" bindinput="onReason"/>
-    <button class="btn primary" disabled="{{busy || candidateLoading || !!candidateError}}" loading="{{busy}}" bindtap="onSaveCell">保存岗位安排</button>
-  </view>
+    </view>
+
+    <view class="sw-reason">
+      <textarea class="sw-ta" value="{{reason}}" placeholder="换人原因（必填，记进调整记录，300 字以内）" placeholder-class="sw-ta-ph" maxlength="300" bindinput="onReason"/>
+    </view>
+
+    <view class="sw-foot">
+      <button class="btn primary" disabled="{{busy || candidateLoading || !!candidateError}}" loading="{{busy}}" bindtap="onSaveCell">保存</button>
+    </view>
+  </scroll-view>
 </view>

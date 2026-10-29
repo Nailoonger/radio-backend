@@ -5,7 +5,7 @@ Page({
     ready: false, statusBarHeight: 20, loading: true, loadError: '', busy: false, isSuper: false, myId: 0,
     week: {}, state: 'empty', stateText: '', stateClass: 'none', slotReady: false, summary: { needed: 0, filled: 0, missing: 0, fixed: 0 },
     slotHint: '', ruleHint: '', availabilityHint: '', preparationError: '', checked: false, checkText: '', issues: [], missing: [],
-    sheetOpen: false, candidateLoading: false, candidateError: '', candidates: [], selectedCount: 0, edit: {}, editTitle: '', reason: '', fixed: true,
+    sheetOpen: false, candidateLoading: false, candidateError: '', candidates: [], selectedCount: 0, edit: {}, editTitle: '', editTime: '', curText: '空缺', reason: '', fixed: true,
   },
   onLoad() {
     const app = getApp();
@@ -132,8 +132,23 @@ Page({
   onEdit(e) {
     if (this.data.state !== 'draft' || this.data.busy) return;
     const edit = e.detail;
-    this.setData({ sheetOpen: true, edit, editTitle: `${vm.shortDate(edit.day)} ${edit.slot} · ${edit.department || '不限部门'}${edit.role ? '·' + edit.role : ''}`, reason: '', fixed: true, candidateLoading: true, candidateError: '', candidates: [], selectedCount: 0 });
+    // 标题照 v151 `.sw-hd`：「周一 10/27 日 · 午间播音」；
+    // 副标题里的起止时间也来自格子（view-model 带下来的 timeText）。
+    const d = String(edit.day || '');
+    const md = (d.length >= 10 ? d.slice(5) : d).replace('-', '/');
+    const head = [edit.dayName || '', md ? `${md} 日` : ''].filter(Boolean).join(' ');
+    const editTitle = [head, edit.slot || ''].filter(Boolean).join(' · ');
+    this.setData({
+      sheetOpen: true, edit, editTitle, editTime: edit.time || '',
+      reason: '', fixed: true, candidateLoading: true, candidateError: '',
+      candidates: [], selectedCount: 0, curText: '空缺',
+    });
     this.loadCandidates();
+  },
+  /** 「当前：陈舟、许桑旋」/「当前：空缺」——选中名单实时跟着候选人变 */
+  composeCur() {
+    const names = (this.data.candidates || []).filter((p) => p.selected).map((p) => p.name);
+    this.setData({ curText: names.length ? names.join('、') : '空缺' });
   },
   loadCandidates() {
     const edit = this.data.edit;
@@ -142,6 +157,7 @@ Page({
       .then((r) => {
         const candidates = (r.list || []).map((p) => Object.assign({}, p, { selected: !!p.selected, reasonText: (p.reasons || []).map((s) => typeof s === 'string' ? s : s.message || '').join('；') || (p.eligible ? '时间与资格符合' : '不符合排班条件') }));
         this.setData({ candidates, selectedCount: candidates.filter((p) => p.selected).length });
+        this.composeCur();
       }).catch((e) => this.setData({ candidateError: e.message || '候选人加载失败' })).finally(() => this.setData({ candidateLoading: false }));
   },
   onPick(e) {
@@ -150,9 +166,11 @@ Page({
     if (!person.selected && this.data.selectedCount >= Number(this.data.edit.count || 1)) return wx.showToast({ title: '已达到该岗位人数', icon: 'none' });
     const candidates = this.data.candidates.map((p) => p === person ? Object.assign({}, p, { selected: !p.selected }) : p);
     this.setData({ candidates, selectedCount: candidates.filter((p) => p.selected).length });
+    this.composeCur();
   },
   onReason(e) { this.setData({ reason: e.detail.value }); },
-  onFixed(e) { this.setData({ fixed: e.detail.value }); },
+  /** 「固定当前人员 / 取消固定」按钮（v151 是 .sw-cur 里的按钮，不是 switch） */
+  onToggleFixed() { this.setData({ fixed: !this.data.fixed }); },
   onSaveCell() {
     if (this.data.busy || this.data.candidateLoading || this.data.candidateError) return;
     const reason = this.data.reason.trim();

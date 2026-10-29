@@ -55,6 +55,9 @@ function timetable(week, myId, visiblePeople, leaves) {
         key: group.slotKey || `${day.day}-${key}-${group.department || ''}`,
         day: day.day, slot: slot.slot, slotKey: group.slotKey || '',
         department: group.department || '', role: group.role || '', count, chips,
+        // 换人弹层的标题要「周一 10/27 日 · 午间播音」+「12:10-12:40」，
+        // 所以把周几和起止时间一起带到格子上（v151 `.sw-hd` 的两行）
+        dayName: day.name || '', timeText: slot.timeText || '',
       });
     });
   }));
@@ -80,6 +83,7 @@ function timetable(week, myId, visiblePeople, leaves) {
       groups: EARLY.map((d, gi) => ({
         key: `duty-early-${gi}`, day: '', slot: '早会', slotKey: '',
         department: d.dept, role: d.role, count: d.n,
+        dayName: '周一', timeText: '06:50-07:30',
         chips: Array.from({ length: d.n }, (_, k) => ({
           key: `duty-early-${gi}-${k}`, name: '空缺',
           department: d.dept.replace(/部$/, ''), cls: 'empty', fixed: false,

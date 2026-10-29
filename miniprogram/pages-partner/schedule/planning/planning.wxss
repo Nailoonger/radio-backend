@@ -3,6 +3,54 @@
 .link{display:flex;align-items:center;gap:23rpx;min-height:119rpx;font-size:27rpx;color:#1D1D1F;padding:23rpx 31rpx;box-sizing:border-box}
 .link image{width:42rpx;height:42rpx;flex-shrink:0}
 .hint{font-size:21rpx;color:#76767E;text-align:right;flex:1;min-width:0}
-.link .ar{font-size:31rpx;color:#C7C7CC;flex:none}.overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1000;display:flex;align-items:flex-end}.sheet{background:#fff;width:100%;max-height:88vh;padding:30rpx 35rpx calc(30rpx + env(safe-area-inset-bottom));border-radius:38rpx 38rpx 0 0;box-sizing:border-box;display:flex;flex-direction:column;gap:20rpx}.sheet-head{display:flex;align-items:center;justify-content:space-between}button.close{background:transparent;color:#0066CC;font-size:25rpx;padding:0;margin:0;line-height:1.5}.edit-title{font-size:25rpx;font-weight:500}.candidate-list{height:40vh;min-height:100rpx;flex-shrink:1}.candidate{display:flex;align-items:center;gap:18rpx;padding:22rpx 16rpx;border-radius:22rpx}.candidate+.candidate{margin-top:6rpx}.candidate.selected{background:#EAF3FD}.candidate.unavailable{color:#999DA6}.candidate-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:6rpx}.candidate-name{font-size:27rpx}.candidate-note{font-size:21rpx;color:#76767E;line-height:1.5}.pick{width:35rpx;height:35rpx;border:2rpx solid #C7C7CC;border-radius:11rpx;text-align:center;font-size:25rpx;line-height:35rpx;flex-shrink:0}.selected .pick{background:#0066CC;color:#fff;border-color:#0066CC}.fixed-option{display:flex;align-items:center;justify-content:space-between;font-size:23rpx;color:#76767E}.reason{height:80rpx;line-height:80rpx;padding:0 24rpx;background:#F5F5F7;border-radius:20rpx;font-size:25rpx;box-sizing:border-box;width:100%}
+.link .ar{font-size:31rpx;color:#C7C7CC;flex:none}.overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1000;display:flex;align-items:flex-end}/* v151 v133：弹层统一「四分之三屏 + 整块滚动」（.sheet-body max-height:75vh / overflow-y:auto），
+   不做固定头/固定底 —— 标题和保存按钮都跟着内容走。 */
+.sheet{background:#fff;width:100%;max-height:75vh;padding:0;border-radius:38rpx 38rpx 0 0;box-sizing:border-box;overflow-y:auto}/* ══════════ 换人弹层（逐条对齐 v151 `swapSheet()` 的 .sw-* ，1px = 2rpx） ══════════
+   ⚠️ 之前这里是「安排岗位」那套（左侧方框勾选 + 固定 switch + 底部 input），
+      跟原型完全不是一回事（陛下 2026-10-29 打回）。原型：右上角圆点、选中边框加粗成实心，
+      「当前：X」单独一条并挂「固定当前人员」按钮，原因是 textarea，按钮就叫「保存」。 */
+.sw-hd{display:flex;align-items:flex-start;gap:16rpx;padding:40rpx 36rpx 24rpx}
+.sw-hd-l{flex:1;min-width:0;display:flex;flex-direction:column}
+.sw-hd-t{font-size:42rpx;font-weight:500;letter-spacing:-.8rpx;color:#1D1D1F;line-height:1.35}
+.sw-hd-p{margin-top:12rpx;font-size:26rpx;color:#76767E;line-height:1.6}
+.sw-x{flex:none;font-size:25rpx;color:#0066CC;line-height:1.35}
+
+.sw-cur{margin:0 36rpx 24rpx;border:2rpx solid #E8E9EF;border-radius:32rpx;padding:28rpx}
+.sw-cur-lb{display:block;font-size:26rpx;color:#1D1D1F;line-height:1.5}
+.sw-cur-nm{font-weight:600}
+.sw-cur-nm.none{font-weight:400;color:#76767E}
+button.sw-fix{
+  display:flex;align-items:center;justify-content:center;
+  width:100%;min-height:88rpx;margin:20rpx 0 0;padding:0;
+  border:2rpx solid #0066CC;border-radius:24rpx;background:transparent;
+  color:#0066CC;font-size:26rpx;line-height:1.3;
+}
+button.sw-fix::after{border:0}
+
+.sw-list{padding:0 36rpx 16rpx;box-sizing:border-box}
+.sw-row{
+  display:flex;align-items:center;gap:20rpx;
+  min-height:148rpx;padding:24rpx 28rpx;margin-bottom:18rpx;
+  border:2rpx solid #EBEBEF;border-radius:28rpx;background:#FFF;
+  box-sizing:border-box;
+}
+.sw-row.on{border-color:#0066CC;background:#EAF3FD}
+.sw-row.off{opacity:.5}
+.sw-tx{flex:1;min-width:0;display:flex;flex-direction:column}
+.sw-nm{font-size:30rpx;font-weight:500;color:#1D1D1F;line-height:1.4}
+.sw-st{margin-top:6rpx;font-size:23rpx;color:#76767E;line-height:1.55}
+.dot{flex:none;width:40rpx;height:40rpx;border-radius:50%;border:3rpx solid #D6D6DC;box-sizing:border-box}
+.sw-row.on .dot{border-color:#0066CC;border-width:12rpx}
+
+.sw-reason{margin:0 36rpx 20rpx}
+.sw-ta{
+  width:100%;height:176rpx;box-sizing:border-box;
+  padding:24rpx;border:2rpx solid #E8E9EF;border-radius:24rpx;background:#F5F5F7;
+  font-size:25rpx;line-height:1.7;
+}
+.sw-ta-ph{color:#A9A9B0}
+
+.sw-foot{padding:16rpx 36rpx calc(40rpx + env(safe-area-inset-bottom))}
+.sw-foot button.btn{width:100%;min-height:92rpx}
 .state.withdrawn{background:#FDECEA;color:#B42318}.empty-note{padding:0 6rpx}
 .empty-note{display:block;background:#fff;border:1rpx solid #E8E9EF;border-radius:31rpx;box-shadow:0 10rpx 38rpx rgba(32,36,49,.03);padding:23rpx 27rpx;font-size:24rpx;line-height:1.65;color:#76767E}
