@@ -252,13 +252,22 @@ async function reset(ctx) {
   const reason = String(body.reason || '').trim();
   if (reason.length < 2) throw new ApiError(Codes.PARAM_ERROR, '请填写重置原因（不少于 2 个字）');
 
-  const before = await findMany(C.DUTY_SLOT_VERSION, {}, { limit: 100 });
-  const removed = await removeWhere(C.DUTY_SLOT_VERSION, {});
+  // ⚠️⚠️ 云开发**不允许** `where({}).remove()`（防误删整表，直接报错 ⇒ 前端只看到 50001）。
+  //    lib/db 的 removeWhere 会原样透传 where，所以这里只能按 _id 逐条删。
+  //    版本表的量很小（每次保存/发布 +1 条），分批 200 循环几轮就清完了。
+  const cleared = [];
+  let removed = 0;
+  for (let guard = 0; guard < 20; guard++) {
+    const batch = await findMany(C.DUTY_SLOT_VERSION, {}, { limit: 200 });
+    if (!batch.length) break;
+    for (const v of batch) {
+      if (!v || !v._id) continue;
+      if (cleared.length < 100) cleared.push({ version: Number(v.version) || 0, state: v.state || '' });
+      removed += await removeWhere(C.DUTY_SLOT_VERSION, { _id: v._id });
+    }
+  }
   console.log(`[partner.slots] reset by admin#${p.id}: removed=${removed}, reason=${reason}`);
-  return {
-    removed,
-    cleared: before.map((v) => ({ version: Number(v.version) || 0, state: v.state || '' })),
-  };
+  return { removed, cleared };
 }
 
 module.exports = { get, saveDraft, publish, publishedOnly, reset, findPublished, versionDto };
