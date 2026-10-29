@@ -7,6 +7,7 @@
         ftags   gap 8、按钮 padding 7/14 radius 7 fs 11.5、底 #F5F5F7、选中 #EAF3FD + 600
                 ⚠️ 2026-10-29 改：底 #F5F5F7 与页面底同色 ⇒ 未选中看不见胶囊，压到 #EBEBEF、
                    fs 11.5→13、padding 7/14→7.5/15、radius 7→8（见 .ftag 处注释）
+                   ⚠️ 2026-10-30：字号**回退**原值 22rpx（陛下觉得太大），只保留灰底与略宽的内边距
         rows    白卡 radius 18、padding 0 16
         row     padding 16px 0、gap 10、行间 border-top 1px
         tag     fs 10 padding 4/7 radius 7（warn/done/no/ok 四色）
@@ -92,13 +93,13 @@
 /* ══════════ 类型标签（.ftags） ══════════
    ⚠️⚠️ 未选中也必须**看得见是一颗胶囊**：原来底是 #F5F5F7，跟页面底 #F5F5F7 一模一样，
       渲染出来就是"光秃秃四个字"，像没做样式（陛下 2026-10-29 打回）。
-      灰底压到 #EBEBEF（比页面底深一档），字号 11px → 13px 再放大一级。 */
+      灰底压到 #EBEBEF（比页面底深一档）；字号保持原型 11.5px 那一档不变。 */
 .ftags { display: flex; gap: 15rpx; }
 .ftag {
   background: #EBEBEF;
-  border-radius: 16rpx;
-  padding: 15rpx 30rpx;
-  font-size: 26rpx;
+  border-radius: 15rpx;
+  padding: 14rpx 28rpx;
+  font-size: 22rpx;
   color: #5F5F66;
   line-height: 1;
 }
