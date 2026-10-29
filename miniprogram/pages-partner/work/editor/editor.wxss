@@ -1,0 +1,187 @@
+/* pages-partner/work/editor/editor.wxss · v1（2026-10-28 写稿 · 时长尺）
+   .view padding 10 18 112 ⇒ 19rpx 35rpx；卡 r18(35rpx) p16(31rpx)；kv/正文 12px(23rpx) */
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #F5F5F7;
+}
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(45deg);
+  margin-left: 6rpx;
+}
+
+.body {
+  flex: 1;
+  padding: 19rpx 35rpx 80rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 23rpx;
+}
+
+/* 只读提示 */
+.lockbar {
+  background: #FDF3DC;
+  color: #8A5A12;
+  font-size: 22rpx;
+  line-height: 1.5;
+  padding: 18rpx 24rpx;
+  border-radius: 20rpx;
+}
+
+/* 卡片 */
+.card {
+  background: #FFFFFF;
+  border-radius: 35rpx;
+  padding: 31rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+
+/* 标题 */
+.title-input {
+  font-size: 38rpx;
+  font-weight: 600;
+  color: #1D1D1F;
+  line-height: 1.35;
+  min-height: 60rpx;
+}
+.ph { color: #B3B3B8; font-weight: 400; }
+.meta-row { display: flex; gap: 24rpx; }
+.meta-t { font-size: 21rpx; color: #76767E; font-variant-numeric: tabular-nums; }
+
+/* 小节头 */
+.sec-h { display: flex; align-items: center; justify-content: space-between; }
+.sec-t { font-size: 25rpx; font-weight: 600; color: #1D1D1F; }
+
+/* 栏目 chips */
+.chips { display: flex; flex-wrap: wrap; gap: 15rpx; }
+.chip {
+  background: #F5F5F7;
+  border-radius: 13rpx;
+  padding: 13rpx 27rpx;
+  font-size: 22rpx;
+  color: #76767E;
+  line-height: 1;
+}
+.chip.on { background: #EAF3FD; color: #0066CC; font-weight: 600; }
+
+/* 目标时长 */
+.targets { display: flex; gap: 10rpx; }
+.tg {
+  font-size: 21rpx;
+  color: #76767E;
+  background: #F5F5F7;
+  border-radius: 12rpx;
+  padding: 8rpx 16rpx;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.tg.on { background: #EAF3FD; color: #0066CC; font-weight: 600; }
+
+/* ── 时长尺 ── */
+.dial { display: flex; flex-direction: column; gap: 14rpx; }
+.dial-track {
+  position: relative;
+  height: 14rpx;
+  border-radius: 9999rpx;
+  background: #EDEFF3;
+  overflow: visible;
+}
+.dial-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  border-radius: 9999rpx;
+  background: #0066CC;
+  max-width: 100%;
+}
+/* 目标刻线：黄三角（原型是黄三角刻线） */
+.dial-target {
+  position: absolute;
+  top: -10rpx;
+  width: 4rpx;
+  height: 34rpx;
+  background: #D99A00;
+  border-radius: 2rpx;
+  transform: translateX(-50%);
+}
+.dial-meta { display: flex; align-items: baseline; justify-content: space-between; }
+.dial-cur {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: #0066CC;
+  font-variant-numeric: tabular-nums;
+}
+.dial-tgt { font-size: 21rpx; color: #76767E; font-variant-numeric: tabular-nums; }
+.dial-hint { font-size: 21rpx; color: #76767E; line-height: 1.5; }
+
+/* 正文 */
+.ta {
+  width: 100%;
+  min-height: 480rpx;
+  font-size: 27rpx;
+  line-height: 1.85;
+  color: #1D1D1F;
+  box-sizing: border-box;
+}
+
+/* 操作 */
+.acts { display: flex; gap: 18rpx; margin-top: 4rpx; }
+button.btn {
+  flex: 1;
+  height: 100rpx;
+  border-radius: 9999rpx;
+  font-size: 27rpx;
+  font-weight: 500;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  box-sizing: border-box;
+}
+button.btn::after { border: 0; }
+button.btn.ghost {
+  background: #FFFFFF;
+  color: #0066CC;
+  box-shadow: inset 0 0 0 2rpx #E2E2E7;
+}
+button.btn.primary { background: #0066CC; color: #FFFFFF; }
+button.btn[disabled] { opacity: .45; }
+.note {
+  font-size: 21rpx;
+  color: #76767E;
+  line-height: 1.7;
+  text-align: center;
+  padding: 0 20rpx;
+}
+.hint-note {
+  text-align: center;
+  font-size: 23rpx;
+  color: #76767E;
+  padding: 60rpx 0;
+}
+
+/* ── AI 能帮的：三格（原型 .grid/.gcell） ── */
+.grid { display: flex; gap: 15rpx; }
+.gcell {
+  flex: 1;
+  min-width: 0;
+  background: #F5F5F7;
+  border-radius: 20rpx;
+  padding: 24rpx 10rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+}
+.gic { width: 40rpx; height: 40rpx; }
+.gt { font-size: 21rpx; color: #3A3A3E; line-height: 1.2; }
+.pressed { opacity: .72; }

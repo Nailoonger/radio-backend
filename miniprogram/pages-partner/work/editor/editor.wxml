@@ -1,0 +1,116 @@
+<!-- pages-partner/work/editor/editor.wxml · v1（2026-10-28 写稿 · 时长尺）
+     事实源：partner-hub/app.html V.editor（标题 / 栏目 / 时长尺 / 正文 / 存草稿 · 提交审核）
+     ⚠️ 原型里的「AI 已搭骨架」「AI 能帮的（续写 / 换个说法 / 通读校对）」没有服务端能力，
+        一并砍掉 —— 不给假按钮。这里只做「人写稿 + 时长尺 + 存/交」。
+     ⚠️ 底部操作区不 fixed：textarea 是原生组件，fixed 层会盖不住它（会穿透）。 -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">{{isNew ? '写稿' : '改稿'}}</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body" wx:if="{{loading}}">
+    <view class="hint-note">正在加载……</view>
+  </view>
+
+  <view class="body" wx:elif="{{notFound}}">
+    <view class="hint-note">这篇稿不存在，或已被删除</view>
+  </view>
+
+  <block wx:else>
+    <view class="body">
+      <!-- 只读提示（待审 / 已通过都不允许改） -->
+      <view class="lockbar" wx:if="{{readonly}}">
+        <text>{{lockText}}</text>
+      </view>
+
+      <!-- 标题 -->
+      <view class="card">
+        <input class="title-input" value="{{title}}" bindinput="onTitle"
+               placeholder="给这篇稿起个标题" placeholder-class="ph"
+               maxlength="80" disabled="{{readonly}}" />
+        <view class="meta-row">
+          <text class="meta-t">{{wordCount}} 字</text>
+          <text class="meta-t">约 {{curText}}</text>
+          <text class="meta-t">第 {{version}} 版</text>
+        </view>
+      </view>
+
+      <!-- 栏目：从本周节目名去重得来；拉不到就只留自定义输入 -->
+      <view class="card" wx:if="{{columns.length}}">
+        <view class="sec-h"><text class="sec-t">栏目</text></view>
+        <view class="chips">
+          <view class="chip {{columnName === item ? 'on' : ''}}"
+                wx:for="{{columns}}" wx:key="*this"
+                data-v="{{item}}" bindtap="pickColumn">{{item}}</view>
+        </view>
+      </view>
+
+      <!-- 时长尺：字数 / 语速 = 时长，蓝游标对黄刻线 -->
+      <view class="card">
+        <view class="sec-h">
+          <text class="sec-t">时长尺</text>
+          <view class="targets">
+            <view class="tg {{targetSec === item.sec ? 'on' : ''}}"
+                  wx:for="{{targets}}" wx:key="sec"
+                  data-v="{{item.sec}}" bindtap="pickTarget">{{item.label}}</view>
+          </view>
+        </view>
+        <view class="dial">
+          <view class="dial-track">
+            <view class="dial-fill" style="width: {{pct}}%;"></view>
+            <view class="dial-target" style="left: {{targetPct}}%;"></view>
+          </view>
+          <view class="dial-meta">
+            <text class="dial-cur">{{curText}}</text>
+            <text class="dial-tgt">目标 {{targetText}}</text>
+          </view>
+          <view class="dial-hint">{{dialHint}}</view>
+        </view>
+      </view>
+
+      <!-- 正文 -->
+      <view class="card">
+        <view class="sec-h"><text class="sec-t">正文</text></view>
+        <textarea class="ta" value="{{body}}" bindinput="onBody"
+                  placeholder="开始写吧。段落之间空一行，提交后社干看到的也是这个样子。"
+                  placeholder-class="ph" maxlength="20000" auto-height
+                  disabled="{{readonly}}" show-confirm-bar="{{false}}" />
+      </view>
+
+      <!-- AI 能帮的（照 v151 的 gridCell 三格）
+           ⚠️ 服务未接入：按钮照方案摆着，点了提示「暂未开放」，不留空白也不装死 -->
+      <view class="card">
+        <view class="sec-h"><text class="sec-t">AI 能帮的</text></view>
+        <view class="grid">
+          <view class="gcell" hover-class="pressed" data-act="续写这段" bindtap="onAiAction">
+            <image class="gic" src="/assets/partner/ic-pen.png"/>
+            <text class="gt">续写这段</text>
+          </view>
+          <view class="gcell" hover-class="pressed" data-act="换个说法" bindtap="onAiAction">
+            <image class="gic" src="/assets/partner/ic-refresh.png"/>
+            <text class="gt">换个说法</text>
+          </view>
+          <view class="gcell" hover-class="pressed" data-act="通读校对" bindtap="onAiAction">
+            <image class="gic" src="/assets/partner/ic-chk.png"/>
+            <text class="gt">通读校对</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 操作 -->
+      <view class="acts">
+        <button class="btn ghost" hover-class="pressed" bindtap="onSave"
+                disabled="{{readonly || saving}}">存草稿</button>
+        <button class="btn primary" hover-class="pressed" bindtap="onSubmit"
+                disabled="{{readonly || saving}}">提交审核</button>
+      </view>
+      <view class="note">提交后进社干的待办台；驳回会带理由，你能在原处看到为什么。</view>
+    </view>
+  </block>
+</view>

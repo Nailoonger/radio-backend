@@ -1,0 +1,68 @@
+<!-- pages-partner/work/versions/versions.wxml · v1（2026-10-28 版本记录）
+     事实源：partner-hub/app.html V.versions —— 当前第 N 版 + 版本列表（时间/字数/时长/审核结果）。
+     ⚠️ 恢复旧版的语义是「另存为新草稿」，不覆盖当前版 —— 页面上必须写明，否则用户不敢点。 -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">版本记录</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body" wx:if="{{loading}}">
+    <view class="hint-note">正在加载……</view>
+  </view>
+
+  <view class="body" wx:elif="{{notFound}}">
+    <view class="hint-note">这篇稿不存在，或已被删除</view>
+  </view>
+
+  <block wx:else>
+    <view class="body">
+      <!-- 顶部：当前第几版 -->
+      <view class="card">
+        <view class="big">当前第 {{current}} 版 · {{curStatusText}}</view>
+        <view class="bigd">《{{title}}》{{columnName ? ' · ' + columnName : ''}}</view>
+      </view>
+
+      <!-- 版本列表 -->
+      <view class="card">
+        <view class="sec-h"><text class="sec-t">这一篇的版本</text></view>
+        <view class="vlist">
+          <view class="vrow {{item.current ? 'cur' : ''}}" wx:for="{{list}}" wx:key="v"
+                hover-class="row-hover" data-v="{{item.v}}" bindtap="onOpen">
+            <view class="v-main">
+              <text class="v-name">v{{item.v}}</text>
+              <text class="v-meta">{{item.metaText}}</text>
+            </view>
+            <text class="tag {{item.tagCls}}">{{item.statusText}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="note">恢复旧版<b>不是覆盖</b>：它会作为一份新草稿进入编辑器，你正在改的那一版原样留着。</view>
+    </view>
+
+    <!-- 正文预览（点某一版展开，只读） -->
+    <view class="preview" wx:if="{{open}}">
+      <view class="pv-mask" bindtap="closeOpen"></view>
+      <view class="pv-card">
+        <view class="pv-h">
+          <text class="pv-t">v{{open.v}} 全文</text>
+          <text class="pv-x" bindtap="closeOpen">关闭</text>
+        </view>
+        <scroll-view class="pv-body" scroll-y>
+          <text class="pv-text">{{open.body}}</text>
+        </scroll-view>
+        <view class="pv-acts">
+          <button class="btn ghost" hover-class="pressed" bindtap="closeOpen">只看</button>
+          <button class="btn primary" hover-class="pressed" bindtap="onRestore"
+                  data-v="{{open.v}}" wx:if="{{!open.current}}">恢复这一版</button>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>

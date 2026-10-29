@@ -1,0 +1,82 @@
+<!-- pages-partner/work/work.wxml · v1（2026-10-28 稿件模块）
+     事实源：partner-hub/app.html V['my-drafts']（稿件屏）+ 实测几何，1px = 1.923rpx。
+     结构：顶部「继续写」卡 → 状态 tab（.stabs）→ 稿件列表（.rows/.row）→ 沉底导出
+
+     与方案的差异：**没有差异**。v151 的 tab 就 3 档（待审核/已通过/已驳回），
+     草稿由顶部「继续写今天这篇」那张卡承接 —— 之前多给的「草稿」tab 已于 2026-10-30 删掉。
+     不做：AI 找稿 / AI 续写 —— 没有 AI 服务，不给假入口。 -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-spacer"></view>
+    <view class="navbar-title">稿件</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <!-- 顶部两张入口卡（照 v151：AI 找稿 / 继续写今天这篇）
+         ⚠️ AI 找稿服务未接入 ⇒ 按钮照方案摆着，点了提示「暂未开放」，不留空白也不装死 -->
+    <view class="mods">
+      <view class="mod" hover-class="row-hover" bindtap="onAiFind">
+        <text class="mod-t">AI 找稿</text>
+        <text class="mod-d">联网找素材</text>
+        <view class="mod-f"><text class="mod-n"></text><text class="mod-arrow">›</text></view>
+      </view>
+      <view class="mod" hover-class="row-hover" bindtap="onContinue">
+        <text class="mod-t">{{latest ? '继续写今天这篇' : '写新稿'}}</text>
+        <text class="mod-d">{{latest ? (latest.columnName || '未选栏目') : '从空白开始'}}</text>
+        <view class="mod-f">
+          <text wx:if="{{latest}}" class="mod-n on">{{latest.timeText}}<text class="u">/ {{latest.targetText}}</text></text>
+          <text wx:else class="mod-n"></text>
+          <text class="mod-arrow">›</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 状态（照原型 .stabs：文字 tab + 方块数字 + 下划线） -->
+    <view class="stabs">
+      <view class="stab {{tabIdx === index ? 'on' : ''}}"
+            wx:for="{{tabs}}" wx:key="key"
+            data-idx="{{index}}" bindtap="switchTab">
+        <text>{{item.label}}</text>
+        <text class="n">{{item.count}}</text>
+      </view>
+    </view>
+
+    <view class="hint-note" wx:if="{{loading && list.length === 0}}">正在加载……</view>
+    <view class="hint-note" wx:elif="{{list.length === 0}}">{{emptyText}}</view>
+
+    <view class="rows" wx:else>
+      <view class="row" wx:for="{{list}}" wx:key="id"
+            hover-class="row-hover" data-id="{{item.id}}" bindtap="onOpen">
+        <view class="r-main">
+          <text class="r-title">{{item.title}}</text>
+          <text class="r-note">{{item.meta}}</text>
+          <text wx:if="{{item.rejectReason}}" class="r-reject">驳回理由：{{item.rejectReason}}</text>
+        </view>
+        <text class="tag {{item.tagCls}}">{{item.statusText}}</text>
+      </view>
+    </view>
+
+    <!-- 沉底：导出已通过的稿（纯前端拼文本，不造假接口） -->
+    <view class="rows" wx:if="{{counts.approved > 0}}">
+      <view class="row" hover-class="row-hover" bindtap="onExport">
+        <text class="r-main r-export">导出已通过的稿</text>
+        <text class="r-meta2">{{counts.approved}} 篇 ›</text>
+      </view>
+    </view>
+
+    <!-- 新写一篇（v151 没有独立入口，稿是从找稿/续写进来的；这里补一行，否则写了草稿才有入口） -->
+    <view class="rows">
+      <view class="row" hover-class="row-hover" bindtap="onNew">
+        <image class="ric2" src="/assets/partner/ic-plus.png"/>
+        <text class="r-main r-export">写一篇新的</text>
+      </view>
+    </view>
+
+    <view class="hint-note" wx:if="{{list.length && hasMore}}">上滑加载更多</view>
+  </view>
+</view>
+
+<partner-tabbar wx:if="{{ready}}" role="{{roleKey}}" active="my-drafts" badges="{{badges}}" bind:switch="onTab"/>
