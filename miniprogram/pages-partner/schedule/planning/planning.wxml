@@ -6,7 +6,6 @@
     <view class="error" wx:elif="{{loadError}}"><text>班表未能加载</text><text class="note">{{loadError}}</text><button class="btn ghost" bindtap="load">重试</button></view>
     <block wx:else>
       <view class="state {{stateClass}}"><text class="state-title">{{stateText}}</text><text>{{stateSub}}</text></view>
-      <view class="summary"><view><text class="number">{{summary.filled}}<text class="denom">/{{summary.needed}}</text></text><text>已安排</text></view><view><text class="number">{{summary.missing}}</text><text>缺岗</text></view><view><text class="number">{{summary.fixed}}</text><text>已固定</text></view></view>
       <text class="empty-note" wx:if="{{state !== 'published' && state !== 'draft'}}">本周班表尚未生成</text><duty-timetable wx:else week="{{week}}" my-id="{{myId}}" editable="{{state === 'draft'}}" show-fixed="{{true}}" bind:edit="onEdit"/>
       <view class="ops" wx:if="{{state === 'draft'}}">
         <view class="buttons"><button class="btn ghost" disabled="{{busy}}" bindtap="onGenerate">再次生成</button><button class="btn ghost" disabled="{{busy}}" bindtap="onCheck">检查班表</button><button class="btn primary" disabled="{{busy}}" bindtap="onPublish">确认发布</button></view>

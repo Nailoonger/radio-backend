@@ -213,7 +213,6 @@ button.btn.primary { background: #0066CC; color: #FFFFFF; }
 
 .hint-note { text-align: center; font-size: 23rpx; color: #76767E; padding: 30rpx 0; }
 .pressed { opacity: .72; }
-.personal-actions{display:flex;gap:16rpx}.personal-actions button.btn{flex:1;min-width:0;font-size:25rpx}
 .pl-state.published{background:#EAF3FD;color:#0066CC}
 button.btn{width:100%}
 
