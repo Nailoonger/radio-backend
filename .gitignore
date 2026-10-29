@@ -62,6 +62,11 @@ Thumbs.db
 
 # =============== 调试 / 临时文件（下划线开头 = 本机排查垃圾）===============
 _*
+# ⚠️⚠️ 但云函数内部以下划线开头的模块级辅助件（_kit / _published / _people）**是正式源码**。
+#    漏掉它们的后果：本地一切正常（文件就在磁盘上），CI 干净 clone 里 require 直接
+#    「Cannot find module './_kit'」—— 2026-10-29 CI 三连红（#16/#17/#18）就是这个，
+#    排查了一天，最后一靠干净 worktree 才照出来。
+!/cloud/cloudfunctions/api/**/_*.js
 # 管理接口共用的正式源码，不属于临时文件
 !/cloud/cloudfunctions/api/handlers/admin/_kit.js
 !/cloud/cloudfunctions/api/handlers/admin/_people.js
