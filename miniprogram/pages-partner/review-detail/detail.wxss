@@ -27,10 +27,13 @@
 /* ⚠️ 这里原有一个 .navbar-quiet（顶栏右侧显示「点歌 / 文稿」）—— 已删：
    自定义导航右上角是微信胶囊的地盘，放那儿会被盖掉；类型在卡里已经写了。 */
 
-/* 底部固定操作条要占位，否则最后一张卡会被压住 */
+/* 底部固定操作条要占位，否则最后一张卡会被压住。
+   ⚠️ 留白 = 栏高（20 + 108 + 28 + 安全区 ≈ 214rpx）+ 渐隐带 ≈ 40rpx，宁可多给不能少给：
+      2026-10-30 之前写 220rpx，正好等于栏高 ⇒ 最后一张卡和操作条贴在一起，
+      看起来像被白条「切了一刀」。 */
 .body {
   flex: 1;
-  padding: 0 36rpx 220rpx;
+  padding: 0 36rpx 300rpx;
   display: flex;
   flex-direction: column;
   gap: 24rpx;
@@ -58,9 +61,9 @@
   box-shadow: var(--sh-lift);
   flex: none;
 }
-.pod { padding: 28rpx 30rpx; }
-.card-sec { padding: 26rpx 28rpx; }
-.reject-box { padding: 28rpx; }
+.pod { padding: 31rpx; }
+.card-sec { padding: 0 31rpx 8rpx; }
+.reject-box { padding: 0 31rpx 24rpx; }
 
 /* ── 投稿人卡 ── */
 .pod-person { display: flex; align-items: center; gap: 20rpx; }
@@ -94,30 +97,42 @@
 }
 .pod-stats {
   display: flex;
-  gap: 16rpx;
   margin-top: 24rpx;
   padding-top: 22rpx;
   border-top: 2rpx solid var(--divider);
 }
-.pod-stat { flex: 1; min-width: 0; }
-.pod-stat-l { font-size: 22rpx; color: var(--muted); }
-.pod-stat-n { font-size: 40rpx; font-weight: 600; color: var(--ink); margin-top: 4rpx; line-height: 1.15; }
-.pod-stat-d { font-size: 30rpx; font-weight: 600; color: var(--ink); margin-top: 10rpx; }
+/* 三组各占 1/3 且**组内居中**。
+   ⚠️ 原来是左对齐：前两组是「0」，第三组是最长的日期时间 ⇒ 整行被第三组拽偏，
+      看着像三组没对齐（2026-10-30 被指出）。居中后每组以自己那一格的中线为准。
+   ⚠️ 0 是 40rpx、日期是 30rpx，所以两者都用 line-height:1 + 同一个 margin-top：
+      顶部对齐（v151 也是这么排的），不会一个高一个低。 */
+.pod-stat { flex: 1; min-width: 0; text-align: center; }
+.pod-stat-l { font-size: 22rpx; color: var(--muted); line-height: 1.2; }
+.pod-stat-n {
+  font-size: 40rpx; font-weight: 600; color: var(--ink);
+  margin-top: 8rpx; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.pod-stat-d {
+  font-size: 30rpx; font-weight: 600; color: var(--ink);
+  margin-top: 8rpx; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
 
 /* ── 小节卡 ── */
 .sec-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18rpx;
+  padding: 31rpx 0 23rpx;
 }
 .sh-t { font-size: 27rpx; font-weight: 600; color: var(--ink); }
 .sh-m { font-size: 22rpx; color: var(--muted); }
 
-.kv { display: flex; gap: 20rpx; padding: 14rpx 0; align-items: flex-start; }
+.kv { display: flex; gap: 20rpx; padding: 25rpx 0; align-items: flex-start; }
 .kv + .kv { border-top: 2rpx solid var(--divider); }
-.kv .k { width: 160rpx; flex: none; font-size: 25rpx; color: var(--muted); line-height: 1.55; }
-.kv .v { flex: 1; min-width: 0; font-size: 26rpx; line-height: 1.6; color: var(--ink-2); }
+.kv .k { width: 160rpx; flex: none; font-size: 23rpx; color: var(--muted); line-height: 1.55; }
+.kv .v { flex: 1; min-width: 0; font-size: 23rpx; line-height: 1.6; color: var(--ink-2); }
 .kv .v.strong { font-weight: 600; color: var(--ink); }
 
 /* ── 名额条：白卡里嵌灰块 ── */
@@ -141,7 +156,7 @@
 .q-hint { font-size: 22rpx; color: var(--muted); margin-top: 16rpx; line-height: 1.55; }
 
 /* ── 驳回原因箱 ── */
-.rb-head { display: flex; align-items: center; justify-content: space-between; }
+.rb-head { display: flex; align-items: center; justify-content: space-between; padding: 31rpx 0 23rpx; }
 .rb-t { font-size: 27rpx; font-weight: 500; color: var(--ink); }
 .rb-req {
   font-size: 21rpx;
@@ -190,24 +205,34 @@
 .record { font-size: 24rpx; color: var(--muted); line-height: 1.75; }
 .rec-line { word-break: break-all; }
 
-/* ══════════ 底部固定操作条 ══════════ */
+/* ══════════ 底部固定操作条 ══════════
+   v151 的 `.actbar` 是「贴底 + 上边缘渐隐到羊皮纸」，**不是**白条加一条分隔线：
+   白条压在白卡上会被看成一刀把卡片切开（2026-10-30 被指出）。
+   所以这里：fixed 钉在屏幕底 + 同一套 parchment 渐隐，按钮像浮在内容之上。
+
+   ⚠️ 安全区写两遍：老基础库不认 `env()` 时，整条 padding 声明会失效变 0，
+      按钮就贴到屏幕最底边被 home 指示条压住 —— 看起来同样是「被切」。
+      先给 constant()，再给 env()，最后还有一条纯 28rpx 兜底（顺序不能反）。 */
 .actionbar2 {
   position: fixed;
   left: 0; right: 0; bottom: 0;
-  padding: 22rpx 36rpx calc(32rpx + env(safe-area-inset-bottom));
-  border-top: 2rpx solid var(--divider);
+  padding: 20rpx 36rpx 28rpx;
+  padding-bottom: calc(28rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(28rpx + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(245, 245, 247, 0) 0%, var(--parchment) 30%);
   display: flex;
   gap: 18rpx;
-  background: var(--canvas);
   z-index: 20;
 }
+/* 渐隐要把按钮上方的内容压淡，所以留一条往下渐变的遮罩带；
+   它本身就是 .actionbar2 的背景，不再额外加一层元素（多一层会挡住点击）。 */
 button.btn-lg2 {
   flex: 1;
-  height: 92rpx;
-  border-radius: 26rpx;
+  height: 108rpx;
+  border-radius: 9999rpx;
   border: none;
-  font-size: 30rpx;
-  font-weight: 600;
+  font-size: 25rpx;
+  font-weight: 500;
   padding: 0;
   line-height: 1;
   display: flex;
@@ -217,10 +242,12 @@ button.btn-lg2 {
 }
 button.btn-lg2::after { border: none; }
 button.btn-lg2.pass { background: var(--accent); color: #fff; }
+/* 次级按钮：白胶囊浮在羊皮纸上（v151 `.btn.ghost` 是白底 + 投影，不描边 ——
+   手机里不要装饰性描边框，留边只给「有状态含义」的件） */
 button.btn-lg2.rej {
   background: var(--canvas);
-  color: var(--ink-2);
-  box-shadow: inset 0 0 0 2rpx var(--hairline);
+  color: var(--accent);
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, .06);
 }
 button.btn-lg2[disabled] { opacity: 0.45; }
 
