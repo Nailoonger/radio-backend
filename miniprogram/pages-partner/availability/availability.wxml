@@ -1,102 +1,212 @@
-<!-- 伙伴端 · 可排时间填报（P1）
-     结构：周切换条 → 进度卡 → 代录选择 → 按天分组的时段方块 → 说明 → 底部提交
-     ⚠️ 视觉沿用 me 页那套（羊皮纸底 + 白卡 + 细描边），不引入新色。
-        能来=绿(--green)，不能=红(--red)，待选=白底灰字。 -->
+<!-- 伙伴端 · 可排时间 / 值班时间代录（对齐 v151 `proxy` 屏）
+     ⚠️⚠️ 这里**不用 <template>**：方块点不动的根因就是 template 里的
+        bindtap 拿不到页面方法 / dataset（陛下 2026-10-29 两次打回）。宁可重复写两遍。
+     ⚠️ 弹层用 hidden 常驻，不挂 wx:if —— 里面有 textarea，wx:if 销毁重建会吞字。
+     ⚠️ 能来 / 不能 / 待选三态在 js 里算成 cls（on / off / ''），模板不写嵌套三元。 -->
+
 <view class="page">
 
-  <!-- 周切换条 -->
+  <!-- 顶部：返回 + 周标签 + 翻周 -->
   <view class="bar" style="padding-top:{{statusBarHeight}}px">
     <view class="bar-in">
-      <view class="nav" bindtap="onPrevWeek" hover-class="nav-hover">‹</view>
+      <view class="back" bindtap="goBack" hover-class="nav-hover">‹</view>
       <view class="wk">
         <text class="wk-label">{{weekLabel || '加载中'}}</text>
-        <text class="wk-sub">可排时间 · {{isProxy ? '代录' : '本人填报'}}</text>
+        <text class="wk-sub">{{isMember ? '我的可排时间' : '值班时间代录'}}</text>
       </view>
-      <view class="nav" bindtap="onNextWeek" hover-class="nav-hover">›</view>
-    </view>
-  </view>
-
-  <!-- 进度卡：谁填了谁没填 -->
-  <view class="card prog">
-    <view class="prog-hd">
-      <view class="prog-nums">
-        <text class="prog-num">{{summary.confirmed}}</text>
-        <text class="prog-den">/ {{summary.total}} 人已确认</text>
+      <view class="wk-nav">
+        <view class="nav" bindtap="onPrevWeek" hover-class="nav-hover">‹</view>
+        <view class="nav" bindtap="onNextWeek" hover-class="nav-hover">›</view>
       </view>
-      <text class="prog-link" bindtap="onShowPending" wx:if="{{summary.pending > 0}}">名单 ›</text>
-      <text class="prog-link ok" wx:else>全员已填</text>
-    </view>
-    <view class="prog-track">
-      <view class="prog-fill" style="width:{{summary.total ? (summary.confirmed * 100 / summary.total) : 0}}%"></view>
     </view>
   </view>
 
-  <!-- 代录：社干可以替别人填（必须写原因） -->
-  <picker mode="selector" range="{{personNames}}" value="{{personIndex}}" bindchange="onPickPerson">
-    <view class="picker" hover-class="picker-hover">
-      <text class="pk-label">{{isProxy ? '代录对象' : '填写人'}}</text>
-      <text class="pk-val">{{isProxy ? targetName : '我自己'}}</text>
-      <text class="pk-ar">›</text>
+  <!-- ══════ 站员：就地填报 ══════ -->
+  <block wx:if="{{isMember}}">
+    <view class="empty" wx:if="{{!loading && !ready}}">
+      <text class="empty-t">本周值班时段还没发布</text>
+      <text class="empty-s">等超管在「值班时段」里发布后，这里才会出现可选的时段。</text>
     </view>
-  </picker>
-
-  <!-- 时段未发布：这一页没法填，给出明确下一步 -->
-  <view class="empty" wx:if="{{!loading && !ready}}">
-    <text class="empty-t">本周值班时段还没发布</text>
-    <text class="empty-s">等超管在「值班时段」里发布后，这里才会出现可选的时段。</text>
-  </view>
-
-  <!-- 时段版本变了：之前的填报已失效 -->
-  <view class="warn" wx:if="{{stale}}">
-    <text class="warn-t">值班时段已更新</text>
-    <text class="warn-s">你上次填的内容基于旧时段，请重新确认后提交。</text>
-  </view>
-
-  <!-- 按天分组 -->
-  <view class="day" wx:for="{{days}}" wx:key="day" wx:for-item="d" wx:for-index="i">
-    <view class="day-hd">
-      <text class="day-name">{{d.name}}</text>
-      <text class="day-date">{{d.dateText}}</text>
+    <view class="warn" wx:if="{{stale}}">
+      <text class="warn-t">值班时段已更新</text>
+      <text class="warn-s">你上次填的内容基于旧时段，请重新确认后提交。</text>
     </view>
 
-    <view class="slot {{item.cls}}"
-          wx:for="{{d.slots}}"
-          wx:key="slotKey"
-          wx:for-item="item"
-          wx:for-index="j"
-          data-i="{{i}}"
-          data-j="{{j}}"
-          bindtap="onTapSlot"
-          hover-class="slot-hover">
-      <view class="slot-l">
-        <text class="slot-title">{{item.title}}</text>
-        <text class="slot-meta">{{item.timeText}}{{item.dept ? ' · ' + item.dept : ''}} · 需 {{item.count}} 人</text>
+    <view class="days">
+      <view class="day" wx:for="{{days}}" wx:key="day" wx:for-item="d" wx:for-index="di">
+        <view class="day-hd">
+          <text class="day-name">{{d.name}}</text>
+          <text class="day-date">{{d.dateText}}</text>
+          <text class="day-cnt">{{d.onCount}} / {{d.slots.length}} 个时段</text>
+        </view>
+        <view class="avg">
+          <view class="avslot {{s.cls}}" wx:for="{{d.slots}}" wx:for-item="s" wx:for-index="si" wx:key="slotKey"
+                data-di="{{di}}" data-si="{{si}}" bindtap="onTapSlot" hover-class="avslot-hover">
+            <text class="avslot-t">{{s.title}}</text>
+            <text class="avslot-s">{{s.timeText}}</text>
+          </view>
+        </view>
       </view>
-      <text class="slot-state">{{item.stateText}}</text>
     </view>
-  </view>
 
-  <!-- 说明 -->
-  <view class="card note" wx:if="{{ready}}">
-    <view class="note-hd">
-      <text class="lbl">说明</text>
-      <text class="lbl-tip">{{isProxy ? '必填 · 写明代录原因' : (cannotCount > 0 ? '必填 · 有不能来的时段' : '选填')}}</text>
+    <view class="note">
+      <view class="note-hd"><text class="lbl">说明</text><text class="lbl-tip">{{reasonTip}}</text></view>
+      <textarea class="ta" model:value="{{reason}}" placeholder="{{reasonPh}}" placeholder-class="ta-ph" maxlength="200" auto-height></textarea>
+      <text class="cnt">{{reasonLen}}/200</text>
     </view>
-    <textarea class="ta"
-              value="{{reason}}"
-              placeholder="{{isProxy ? '例：他手机坏了，托我代填' : '例：周三下午有课来不了'}}"
-              placeholder-class="ta-ph"
-              maxlength="200"
-              bindinput="onReasonInput"
-              auto-height></textarea>
-    <text class="cnt">{{reasonLen}}/200</text>
-  </view>
 
-  <!-- 底部操作 -->
-  <view class="foot" wx:if="{{ready}}">
-    <button class="btn ghost" bindtap="onReset">清空</button>
-    <button class="btn primary" loading="{{submitting}}" bindtap="onSubmit">{{isProxy ? '提交代录' : '提交'}}</button>
-  </view>
+    <view class="confirm" bindtap="onToggleConfirm" hover-class="confirm-hover">
+      <view class="cbox {{confirmed ? 'on' : ''}}"><text class="cbox-t" wx:if="{{confirmed}}">✓</text></view>
+      <text class="ctext">我确认已完整填写本周可排时间。</text>
+    </view>
+
+    <view class="foot" wx:if="{{ready}}">
+      <button class="btn ghost" bindtap="onReset">清空</button>
+      <button class="btn primary" loading="{{submitting}}" bindtap="onSubmit">提交</button>
+    </view>
+  </block>
+
+  <!-- ══════ 社干 / 超管 ══════ -->
+  <block wx:else>
+    <view class="pl-head">
+      <text class="pl-title">值班时间代录</text>
+      <text class="pl-sub">管理人员也参与值班。勾选伙伴不能参加的场次；没勾的视为可排，保存必须写原因。</text>
+    </view>
+
+    <view class="bulk" wx:if="{{isSuper}}" bindtap="openBulk" hover-class="bulk-hover">
+      <view class="bulk-l">
+        <text class="bulk-t">批量代录可排时间</text>
+        <text class="bulk-s">可一次替全部 {{cards.length}} 位在岗人员填同一组场次；仅超管可用。</text>
+      </view>
+      <text class="bulk-b">开始代录</text>
+    </view>
+
+    <view class="empty" wx:if="{{!loading && !ready}}">
+      <text class="empty-t">本周值班时段还没发布</text>
+      <text class="empty-s">发布之后才能收可排时间。</text>
+    </view>
+
+    <view class="pc-grid">
+      <view class="pc" wx:for="{{cards}}" wx:key="personId" data-id="{{item.personId}}" bindtap="openAv" hover-class="pc-hover">
+        <view class="pc-top">
+          <text class="pc-av">{{item.initial}}</text>
+          <view class="pc-nm">
+            <text class="pc-name">{{item.name}}{{item.isMe ? '（我）' : ''}}</text>
+            <text class="pc-cap">{{item.cap}}</text>
+          </view>
+          <text class="pc-bd {{item.confirmed ? 'blue' : 'warn'}}">{{item.confirmed ? '已提交' : '未提交'}}</text>
+        </view>
+        <text class="pc-p">{{item.desc}}</text>
+        <view class="pc-foot">
+          <text class="pc-stat">{{item.statText}}</text>
+          <text class="pc-go">{{item.isMe ? '填写我的时间' : '查看／代录'}} ›</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="ts-note">代录不会绕过硬条件：请假、岗位资格、场次上限照常校验；记录里能查到「谁替谁填、什么时候、为什么」。</view>
+  </block>
 
   <view class="pad"></view>
+</view>
+
+<!-- ══════ 单人代录弹层 ══════ -->
+<view class="overlay" hidden="{{!sheetOpen}}" catchtap="closeAv">
+  <view class="sheet" catchtap="stop">
+    <view class="sheet-hd">
+      <view class="sheet-hd-l">
+        <text class="sheet-t">{{avTitle}}</text>
+        <text class="sheet-sub">蓝色＝能来，灰色＝不能来；点一下切换。</text>
+      </view>
+      <text class="sheet-x" bindtap="closeAv">关闭</text>
+    </view>
+
+    <scroll-view class="sheet-body" scroll-y>
+      <view class="av-head">
+        <text class="av-head-t">点一下切换：能来 / 不能来</text>
+        <text class="av-head-a" bindtap="onToggleAll">{{allOn ? '取消全选' : '全选'}} ›</text>
+      </view>
+
+      <view class="days">
+        <view class="day" wx:for="{{days}}" wx:key="day" wx:for-item="d" wx:for-index="di">
+          <view class="day-hd">
+            <text class="day-name">{{d.name}}</text>
+            <text class="day-date">{{d.dateText}}</text>
+            <text class="day-cnt">{{d.onCount}} / {{d.slots.length}} 个时段</text>
+          </view>
+          <view class="avg">
+            <view class="avslot {{s.cls}}" wx:for="{{d.slots}}" wx:for-item="s" wx:for-index="si" wx:key="slotKey"
+                  data-di="{{di}}" data-si="{{si}}" bindtap="onTapSlot" hover-class="avslot-hover">
+              <text class="avslot-t">{{s.title}}</text>
+              <text class="avslot-s">{{s.timeText}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="note">
+        <view class="note-hd"><text class="lbl">说明</text><text class="lbl-tip">{{reasonTip}}</text></view>
+        <textarea class="ta" model:value="{{reason}}" placeholder="{{reasonPh}}" placeholder-class="ta-ph" maxlength="200" auto-height></textarea>
+        <text class="cnt">{{reasonLen}}/200</text>
+      </view>
+
+      <view class="confirm" bindtap="onToggleConfirm" hover-class="confirm-hover">
+        <view class="cbox {{confirmed ? 'on' : ''}}"><text class="cbox-t" wx:if="{{confirmed}}">✓</text></view>
+        <text class="ctext">我确认已完整填写本周可排时间。</text>
+      </view>
+      <view class="pad-sm"></view>
+    </scroll-view>
+
+    <view class="sheet-foot">
+      <button class="btn ghost" bindtap="closeAv">取消</button>
+      <button class="btn primary" loading="{{submitting}}" bindtap="saveAv">保存</button>
+    </view>
+  </view>
+</view>
+
+<!-- ══════ 批量代录弹层（仅超管） ══════ -->
+<view class="overlay" hidden="{{!bulkOpen}}" catchtap="closeBulk">
+  <view class="sheet" catchtap="stop">
+    <view class="sheet-hd">
+      <view class="sheet-hd-l">
+        <text class="sheet-t">批量代录可排时间</text>
+        <text class="sheet-sub">选择本周可以参加的场次；保存后这些人按这次统一覆盖。</text>
+      </view>
+      <text class="sheet-x" bindtap="closeBulk">关闭</text>
+    </view>
+
+    <scroll-view class="sheet-body" scroll-y>
+      <view class="bsec">
+        <view class="bsec-hd">
+          <text class="bsec-t">选择人员（{{bulkPickCount}} / {{bulkPeople.length}}）</text>
+          <text class="bsec-a" bindtap="bulkAll">全选</text>
+        </view>
+        <view class="chips chips-3">
+          <view class="chip {{item.on ? 'on' : ''}}" wx:for="{{bulkPeople}}" wx:key="personId"
+                data-id="{{item.personId}}" bindtap="toggleBulkPerson">{{item.name}}</view>
+        </view>
+      </view>
+
+      <view class="bsec">
+        <view class="bsec-hd">
+          <text class="bsec-t">选择场次（{{bulkEventCount}} / {{bulkEvents.length}}）</text>
+        </view>
+        <view class="chips chips-2">
+          <view class="chip {{item.on ? 'on' : ''}}" wx:for="{{bulkEvents}}" wx:key="id"
+                data-di="{{item.di}}" data-si="{{item.si}}" bindtap="toggleBulkEvent">{{item.label}}</view>
+        </view>
+      </view>
+
+      <view class="note">
+        <view class="note-hd"><text class="lbl">代录说明</text><text class="lbl-tip">必填</text></view>
+        <textarea class="ta" model:value="{{bulkReason}}" placeholder="说明已向哪些人核实、以及统一代录的原因。" placeholder-class="ta-ph" maxlength="200" auto-height></textarea>
+      </view>
+      <view class="pad-sm"></view>
+    </scroll-view>
+
+    <view class="sheet-foot">
+      <button class="btn ghost" bindtap="closeBulk">取消</button>
+      <button class="btn primary" loading="{{bulkSaving}}" bindtap="saveBulk">保存代录</button>
+    </view>
+  </view>
 </view>

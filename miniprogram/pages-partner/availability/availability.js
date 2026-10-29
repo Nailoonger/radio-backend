@@ -51,27 +51,50 @@ function groupByDay(slots, weekDates, pickMap) {
   for (let i = 0; i < 5; i++) {
     const date = (weekDates && weekDates[i]) || '';
     const mine = (slots || []).filter((s) => Number(s.day) === i);
-    days.push({
-      day: i,
-      name: DAY_NAMES[i],
-      date,
-      dateText: shortDate(date),
-      slots: mine.map((s) => {
-        // null = 未表态；1 = 能来；0 = 不能来
-        const can = pickMap[s.slotKey] === undefined ? null : pickMap[s.slotKey];
-        return Object.assign({
-          slotKey: s.slotKey,
-          title: s.title,
-          timeText: s.timeText,
-          dept: s.dept || '',
-          role: s.role || '',
-          count: s.count || 1,
-          can,
-        }, stateOf(can));
-      }),
+
+    // ⚠️ 先按「名称 + 起止」聚合成**场次块**，再渲染成方块。
+    //    一个时段可能要多个部门（早会＝主持部 1 + 播音部 2），后端是逐行的，
+    //    直接一行一个方块会出现两个「早会 06:50-07:30」（陛下 2026-10-29 打回）。
+    //    填可排时间的粒度是「这一场你能不能来」，与部门无关。
+    const blocks = [];
+    const seen = {};
+    mine.forEach((s) => {
+      const bk = `${s.title}|${s.timeText}`;
+      if (seen[bk] === undefined) {
+        seen[bk] = blocks.length;
+        blocks.push({ bk, title: s.title, timeText: s.timeText, keys: [], depts: [], count: 0 });
+      }
+      const b = blocks[seen[bk]];
+      b.keys.push(s.slotKey);
+      if (s.dept && b.depts.indexOf(s.dept) < 0) b.depts.push(s.dept);
+      b.count += Number(s.count) || 1;
     });
+
+    const slotList = blocks.map((b) => {
+      // 组内任意一格有表态就代表整场
+      let can = null;
+      b.keys.forEach((k) => { if (pickMap[k] !== undefined) can = pickMap[k]; });
+      return Object.assign({
+        // ⚠️⚠️ 聚合键**必须带天**：`名称|起止` 在不同天会重复（每天都有「午间 12:10-12:40」），
+        //    拿它当 wx:key → 列表 diff 把 5 天的同名场次当同一个节点复用；
+        //    拿它当批量 chips 的匹配依据 → 点周一那场，周二到周五那 4 场一起亮（陛下 2026-10-29 打回）。
+        slotKey: `${i}|${b.bk}`, // 聚合块的唯一键（天 + 名称|起止）
+        keys: b.keys,         // 真实的 slotKey 列表，点击 / 提交时逐个写
+        title: b.title,
+        timeText: b.timeText,
+        dept: b.depts.join('/'),
+        count: b.count,
+        can,
+      }, stateOf(can));
+    });
+
+    // 当天「能来几个 / 一共几个」—— v151 的 .avdh 右侧计数
+    const onCount = slotList.filter((s) => s.can === 1).length;
+    if (slotList.length) {
+      days.push({ day: i, name: DAY_NAMES[i], date, dateText: shortDate(date), slots: slotList, onCount });
+    }
   }
-  return days.filter((d) => d.slots.length > 0);
+  return days;
 }
 
 Page({
@@ -96,10 +119,29 @@ Page({
     pickedCount: 0,
     canCount: 0,
     cannotCount: 0,
+    allOn: false,          // 全部方块都是「能来」→ 全选按钮显示「取消全选」
     submitting: false,
     dirty: false,
     slotVersion: 0,
     stale: false,
+    // ── v151 对齐：角色视图 ──
+    isMember: false,       // 站员：就地填报
+    isSuper: false,        // 超管：多批量代录
+    cards: [],             // 人员卡片（社干/超管）
+    // ── 单人代录弹层 ──
+    sheetOpen: false,
+    avTitle: '',
+    confirmed: false,
+    reasonTip: '选填',
+    reasonPh: '',
+    // ── 批量代录弹层（仅超管） ──
+    bulkOpen: false,
+    bulkPeople: [],
+    bulkEvents: [],
+    bulkPickCount: 0,
+    bulkEventCount: 0,
+    bulkReason: '',
+    bulkSaving: false,
   },
 
   /** 内部状态：slotKey → 0/1，不直接放 setData 以外的地方 */
@@ -113,10 +155,20 @@ Page({
       wx.reLaunch({ url: '/pages-partner/login/login' });
       return;
     }
+    const info = (app.globalData && app.globalData.adminInfo) || {};
+    const role = Number(info.role);
     this.setData({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
+      isMember: role === 2,
+      isSuper: role === 0,
     });
     this.fetch({});
+  },
+
+  /** 返回上一级（之前这页没有返回键，只能靠手势，陛下 2026-10-29 指出） */
+  goBack() {
+    if (getCurrentPages().length > 1) wx.navigateBack();
+    else wx.reLaunch({ url: '/pages-partner/desk/desk' });
   },
 
   onPullDownRefresh() {
@@ -161,20 +213,49 @@ Page({
 
         const days = groupByDay(data.slots, data.weekDates, pickMap);
 
+        // ── v151 人员卡片：用 summary.rows（它带 confirmed / canCount），
+        //    data.people 是原始名单，没有提交状态，拿不到徽章。
+        const meIdNow = this._myId(data);
+        const totalSlots = days.reduce((n, d) => n + d.slots.length, 0);
+        const cards = ((data.summary && data.summary.rows) || []).map((r) => {
+          const submitted = !!r.confirmed;
+          const n = Number(r.canCount) || 0;
+          return {
+            personId: r.personId,
+            name: r.name || '伙伴',
+            cap: [r.department, ((r.dutyRoles || [])[0] || '')].filter(Boolean).join(' · '),
+            initial: String(r.name || '伙').slice(0, 1),
+            isMe: Number(r.personId) === meIdNow,
+            confirmed: submitted,
+            desc: submitted
+              ? `本周可排 ${n} / ${totalSlots} 个时段。`
+              : '下一周时间尚未提交；可以当面核实后替他填。',
+            statText: `本周 ${n} / ${totalSlots} 个时段`,
+          };
+        });
+
+        const isProxyNow = !!targetId;
+        const cannotNow = days.reduce((n, d) => n + d.slots.filter((s) => s.can === 0).length, 0);
+
         this.setData({
           loading: false,
           ready: !!data.ready,
           weekStart: data.weekStart || '',
           weekLabel: this.labelOf(data.weekStart, data.weekDates),
           days,
+          cards,
           people,
           personNames: people.map((p) => p.name + (p.department ? ' · ' + p.department : '')),
           personIndex: personIndex < 0 ? 0 : personIndex,
           targetId,
           targetName,
-          isProxy: !!targetId,
+          isProxy: isProxyNow,
           reason: (shown && shown.reason) || '',
           reasonLen: ((shown && shown.reason) || '').length,
+          reasonTip: isProxyNow ? '必填 · 写明代录原因' : (cannotNow > 0 ? '必填 · 有不能来的时段' : '选填'),
+          reasonPh: isProxyNow ? '例：他手机坏了，托我代填' : '例：周三下午有课来不了',
+          // 已经填过的人再进来，确认框默认勾上，省一次点击
+          confirmed: !!((shown && shown.picks) || []).length,
           summary: data.summary || { total: 0, confirmed: 0, pending: 0, rows: [] },
           slotVersion: data.slotVersion || 0,
           stale: !!(shown && shown.stale),
@@ -207,35 +288,73 @@ Page({
     let picked = 0;
     let can = 0;
     let cannot = 0;
+    let total = 0;
     this.data.days.forEach((d) => {
       d.slots.forEach((s) => {
+        total += 1;
         if (s.can === 1) { picked++; can++; }
         else if (s.can === 0) { picked++; cannot++; }
       });
     });
-    this.setData({ pickedCount: picked, canCount: can, cannotCount: cannot });
+    this.setData({
+      pickedCount: picked, canCount: can, cannotCount: cannot,
+      allOn: total > 0 && can === total,
+    });
+  },
+
+  /**
+   * 全选 / 取消全选（v151 avSheet 顶部那个「全选 ›」）
+   * 已全选时再点 = 全部退回待选，方便重填。
+   */
+  onToggleAll() {
+    const target = this.data.allOn ? null : 1;
+    const st = stateOf(target);
+    const days = (this.data.days || []).map((d) => {
+      const slots = d.slots.map((s) => {
+        (s.keys || [s.slotKey]).forEach((k) => {
+          if (target === null) delete this._pickMap[k];
+          else this._pickMap[k] = target;
+        });
+        return Object.assign({}, s, st, { can: target });
+      });
+      return Object.assign({}, d, { slots, onCount: target === 1 ? slots.length : 0 });
+    });
+    this.setData({ days, dirty: true });
+    this.recount();
   },
 
   /** 点方块：未选 → 能来 → 不能来 → 未选 */
   onTapSlot(e) {
-    const { i, j } = e.currentTarget.dataset;
+    // ⚠️⚠️ 用**数字索引**定位（data-di / data-si），不要靠字符串 key 传定位信息：
+    //    聚合键 `名称|起止` 跨天会重复，字符串一撞车就是「点一个亮一片」（批量 chips 踩过）。
+    //    索引不会撞，参数没取到时下面还会留 console.warn 便于定罪。
+    const di = Number(e.currentTarget.dataset.di);
+    const sj = Number(e.currentTarget.dataset.si);
     const days = this.data.days;
-    const slot = days[i] && days[i].slots[j];
-    if (!slot) return;
+    if (!days[di] || !days[di].slots[sj]) {
+      // 参数没取到时留个可查的痕迹（不会弹给用户），下次再"点不动"能直接从 Console 定罪
+      console.warn('[availability] onTapSlot 定位失败', e.currentTarget.dataset, 'days=' + (days || []).length);
+      return;
+    }
+    const slot = days[di].slots[sj];
 
     const next = slot.can === null ? 1 : (slot.can === 1 ? 0 : null);
-    slot.can = next;
-    if (next === null) delete this._pickMap[slot.slotKey];
-    else this._pickMap[slot.slotKey] = next;
+    // 一个方块可能对应多个 slotKey（早会＝主持部 + 播音部两行），整块一起写
+    (slot.keys || [slot.slotKey]).forEach((k) => {
+      if (next === null) delete this._pickMap[k];
+      else this._pickMap[k] = next;
+    });
 
+    // ⚠️ 整体替换 days，不用 `days[0].slots[0].cls` 深层路径 setData
     const st = stateOf(next);
-    // 只更新这一格的路径，避免整页 days 重渲染（方块多时会有明显卡顿）
-    const patch = {};
-    patch[`days[${i}].slots[${j}].can`] = next;
-    patch[`days[${i}].slots[${j}].stateText`] = st.stateText;
-    patch[`days[${i}].slots[${j}].cls`] = st.cls;
-    patch.dirty = true;
-    this.setData(patch);
+    const nextDay = Object.assign({}, days[di], {
+      slots: days[di].slots.map((x, i) => (i === sj ? Object.assign({}, x, st, { can: next }) : x)),
+    });
+    nextDay.onCount = nextDay.slots.filter((x) => x.can === 1).length;
+
+    const nextDays = days.slice();
+    nextDays[di] = nextDay;
+    this.setData({ days: nextDays, dirty: true });
     this.recount();
   },
 
@@ -263,6 +382,11 @@ Page({
   },
 
   onSubmit() {
+    return this._doSubmit();
+  },
+
+  /** 真正的提交 —— 站员的「提交」和代录弹层的「保存」共用这一份 */
+  _doSubmit(after) {
     if (this.data.submitting) return;
     if (!this.data.ready) {
       return wx.showToast({ title: '本周值班时段尚未发布', icon: 'none' });
@@ -271,7 +395,9 @@ Page({
     const picks = [];
     this.data.days.forEach((d) => {
       d.slots.forEach((s) => {
-        if (s.can === 1 || s.can === 0) picks.push({ slotKey: s.slotKey, can: s.can === 1 });
+        if (s.can !== 1 && s.can !== 0) return;
+        // 聚合块要展开成真实的 slotKey 逐个提交（后端按行存）
+        (s.keys || [s.slotKey]).forEach((k) => picks.push({ slotKey: k, can: s.can === 1 }));
       });
     });
 
@@ -287,6 +413,10 @@ Page({
     if (this.data.isProxy && reason.length < 2) {
       return wx.showToast({ title: '代录必须填写原因', icon: 'none' });
     }
+    // v151 的确认勾选框：不勾不许交
+    if (!this.data.confirmed) {
+      return wx.showToast({ title: '请先勾选「我确认已完整填写」', icon: 'none' });
+    }
 
     this.setData({ submitting: true });
 
@@ -297,6 +427,7 @@ Page({
       .then(() => {
         this.setData({ submitting: false, dirty: false });
         wx.showToast({ title: this.data.isProxy ? '已代录' : '已提交', icon: 'success' });
+        if (after) after();
         // 提交后重新拉一次：汇总里的「已确认 x/y」要立刻反映出来
         this.fetch({ week: this.data.weekStart, personId: this.data.targetId || undefined });
       })
@@ -337,5 +468,136 @@ Page({
       showCancel: false,
       confirmText: '知道了',
     });
+  },
+
+  /* ══════════ 单人代录弹层（v151 avSheet） ══════════ */
+
+  /**
+   * 点人员卡片 → 拉那个人的可排时间 → 开弹层。
+   * 不另开数据通道：fetch 换 targetId 后 days 就是目标的，弹层和站员页共用同一份模板。
+   */
+  openAv(e) {
+    const id = Number(e.currentTarget.dataset.id);
+    if (!id) return;
+    const meId = this._myId();
+    const card = (this.data.cards || []).find((c) => Number(c.personId) === id) || {};
+    this.setData({ avTitle: `${card.name || '该成员'} · 下一周可排时间` });
+    return this.fetch({ week: this.data.weekStart, personId: id === meId ? 0 : id })
+      .then(() => this.setData({ sheetOpen: true, confirmed: false }));
+  },
+
+  closeAv() {
+    if (this.data.submitting) return;
+    this.setData({ sheetOpen: false });
+  },
+
+  stop() {},
+
+  onToggleConfirm() {
+    this.setData({ confirmed: !this.data.confirmed });
+  },
+
+  saveAv() {
+    return this._doSubmit(() => this.setData({ sheetOpen: false }));
+  },
+
+  /* ══════════ 批量代录（v151 bulkSheet，仅超管） ══════════ */
+
+  openBulk() {
+    if (!this.data.isSuper) return;
+    if (!this.data.ready) return wx.showToast({ title: '本周值班时段还没发布', icon: 'none' });
+    const people = (this.data.cards || []).map((c) => ({
+      personId: c.personId, name: c.name, on: true,
+    }));
+    const events = [];
+    // ⚠️⚠️ 场次 chips 用**数字索引**定位（di/si），不拿 slotKey 字符串当匹配依据：
+    //    字符串一旦撞车就"点一个亮一片"；索引撞不了，而且和 onTapSlot 定位方式一致。
+    this.data.days.forEach((d, di) => d.slots.forEach((s, si) => {
+      events.push({
+        id: `e${di}_${si}`, di, si,
+        label: `${d.name} ${s.timeText}`, on: false,
+      });
+    }));
+    if (!events.length) return wx.showToast({ title: '这一周没有可选时段', icon: 'none' });
+    this.setData({
+      bulkOpen: true, bulkPeople: people, bulkEvents: events,
+      bulkPickCount: people.length, bulkEventCount: 0, bulkReason: '',
+    });
+  },
+
+  closeBulk() {
+    if (this.data.bulkSaving) return;
+    this.setData({ bulkOpen: false });
+  },
+
+  toggleBulkPerson(e) {
+    const id = Number(e.currentTarget.dataset.id);
+    const list = this.data.bulkPeople.map((p) => (Number(p.personId) === id ? Object.assign({}, p, { on: !p.on }) : p));
+    this.setData({ bulkPeople: list, bulkPickCount: list.filter((p) => p.on).length });
+  },
+
+  bulkAll() {
+    const allOn = (this.data.bulkPeople || []).every((p) => p.on);
+    const list = (this.data.bulkPeople || []).map((p) => Object.assign({}, p, { on: !allOn }));
+    this.setData({ bulkPeople: list, bulkPickCount: allOn ? 0 : list.length });
+  },
+
+  toggleBulkEvent(e) {
+    const di = Number(e.currentTarget.dataset.di);
+    const si = Number(e.currentTarget.dataset.si);
+    const list = (this.data.bulkEvents || []).map((v) => (
+      (v.di === di && v.si === si) ? Object.assign({}, v, { on: !v.on }) : v
+    ));
+    this.setData({ bulkEvents: list, bulkEventCount: list.filter((v) => v.on).length });
+  },
+
+  /**
+   * 批量保存：对每个选中的人各发一次 PUT。
+   * 口径与单人一致 —— 每个时段都要表态（选中的能来，其余不能来），不能只交「能来」那几条。
+   * ⚠️ 串行发，不并发：同一个 week 的写会撞 revision。
+   */
+  saveBulk() {
+    if (this.data.bulkSaving) return;
+    const reason = String(this.data.bulkReason || '').trim();
+    if (reason.length < 2) return wx.showToast({ title: '请填写代录说明', icon: 'none' });
+    const persons = (this.data.bulkPeople || []).filter((p) => p.on);
+    if (!persons.length) return wx.showToast({ title: '至少选一个人', icon: 'none' });
+    const picked = (this.data.bulkEvents || []).filter((v) => v.on);
+    if (!picked.length) return wx.showToast({ title: '至少选一个场次', icon: 'none' });
+
+    // 选中集合按「天-格」记，避免不同天同名场次被一起算进来
+    const onSet = {};
+    picked.forEach((v) => { onSet[`${v.di}-${v.si}`] = true; });
+
+    const picks = [];
+    this.data.days.forEach((d, di) => d.slots.forEach((s, si) => {
+      const on = !!onSet[`${di}-${si}`];
+      (s.keys || [s.slotKey]).forEach((k) => picks.push({ slotKey: k, can: on }));
+    }));
+
+    this.setData({ bulkSaving: true });
+    const week = this.data.weekStart;
+    let done = 0;
+    const next = (idx) => {
+      if (idx >= persons.length) {
+        this.setData({ bulkSaving: false, bulkOpen: false });
+        wx.showToast({ title: `已代录 ${done} 人`, icon: 'success' });
+        this.fetch({ week });
+        return;
+      }
+      adminRequest('/partner/availability', 'PUT', {
+        week, personId: persons[idx].personId, picks, reason,
+      })
+        .then(() => { done += 1; next(idx + 1); })
+        .catch((err) => {
+          this.setData({ bulkSaving: false });
+          wx.showModal({
+            title: '批量代录中断',
+            content: `已成功 ${done} 人，第 ${idx + 1} 人失败：${(err && err.message) || '请求失败'}`,
+            showCancel: false,
+          });
+        });
+    };
+    next(0);
   },
 });

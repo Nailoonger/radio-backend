@@ -324,8 +324,225 @@
   color: var(--ink-2, #333);
 }
 .btn.primary {
-  background: var(--ink, #1D1D1F);
+  /* ⚠️ 原来是 var(--ink, #1D1D1F) —— 黑色胶囊，与本页其他按钮和全站强调色都不一致。
+     项目唯一强调色是 --accent，主按钮一律用它（planning / index 页都是这么写的）。 */
+  background: var(--accent, #0066CC);
   color: #FFF;
 }
 
 .pad { height: 60rpx; }
+
+/* ══════════ v151 对齐：时段方块 / 人员卡片 / 弹层 / 批量代录 ══════════
+   换算 1px ≈ 1.923rpx。不引入新色：能来=accent 浅底蓝字，不能=灰底，待选=白底描边。 */
+
+.days { display: flex; flex-direction: column; gap: 14rpx; }
+.day-cnt { margin-left: auto; font-size: 19rpx; color: var(--muted, #76767E); font-variant-numeric: tabular-nums; }
+
+/* 一天一排方块，均分 */
+.avg { display: flex; gap: 12rpx; }
+.avslot {
+  flex: 1 1 0; min-width: 0; min-height: 96rpx;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6rpx;
+  padding: 12rpx 6rpx; box-sizing: border-box;
+  border-radius: 20rpx;                       /* 10px */
+  border: 2rpx solid var(--hairline, #E2E2E7);
+  background: #FFF;
+}
+.avslot-t { font-size: 23rpx; font-weight: 500; color: var(--ink, #1D1D1F); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.avslot-s { font-size: 19rpx; color: var(--muted, #76767E); font-variant-numeric: tabular-nums; }
+.avslot.on { background: var(--accent-tint, #EAF3FD); border-color: var(--accent, #0066CC); }
+.avslot.on .avslot-t { color: var(--accent, #0066CC); font-weight: 600; }
+.avslot.on .avslot-s { color: var(--accent, #0066CC); opacity: .8; }
+.avslot.off { background: #F5F5F7; border-color: transparent; }
+.avslot.off .avslot-t { color: var(--muted, #76767E); font-weight: 400; }
+.avslot-hover { opacity: .78; }
+
+/* 确认勾选 */
+.confirm { display: flex; align-items: center; gap: 14rpx; padding: 22rpx 8rpx 0; }
+.confirm-hover { opacity: .75; }
+.cbox {
+  width: 36rpx; height: 36rpx; flex: none; border-radius: 10rpx;
+  border: 2rpx solid var(--hairline, #E2E2E7); background: #FFF;
+  display: flex; align-items: center; justify-content: center;
+}
+.cbox.on { background: var(--accent, #0066CC); border-color: var(--accent, #0066CC); }
+.cbox-t { color: #FFF; font-size: 24rpx; line-height: 1; }
+.ctext { font-size: 23rpx; color: var(--ink, #1D1D1F); }
+
+/* 人员卡片 */
+.pc-grid { display: flex; flex-direction: column; gap: 18rpx; }
+.pc { background: #FFF; border-radius: 32rpx; padding: 24rpx 26rpx; box-sizing: border-box; }
+.pc-hover { opacity: .8; }
+.pc-top { display: flex; align-items: center; gap: 16rpx; }
+.pc-av {
+  width: 64rpx; height: 64rpx; flex: none; border-radius: 9999rpx;
+  background: var(--accent-tint, #EAF3FD); color: var(--accent, #0066CC);
+  font-size: 26rpx; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+}
+.pc-nm { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3rpx; }
+.pc-name { font-size: 27rpx; font-weight: 500; color: var(--ink, #1D1D1F); }
+.pc-cap { font-size: 21rpx; color: var(--muted, #76767E); }
+.pc-bd { flex: none; font-size: 19rpx; line-height: 1.5; padding: 5rpx 13rpx; border-radius: 9999rpx; }
+.pc-bd.blue { background: var(--accent-tint, #EAF3FD); color: var(--accent, #0066CC); }
+.pc-bd.warn { background: #FDF3DC; color: #B26A00; }
+.pc-p { display: block; margin-top: 14rpx; font-size: 22rpx; line-height: 1.6; color: var(--muted, #76767E); }
+.pc-foot { display: flex; align-items: center; margin-top: 14rpx; padding-top: 14rpx; border-top: 2rpx solid var(--divider, #F0F0F0); }
+.pc-stat { font-size: 20rpx; color: var(--muted, #76767E); font-variant-numeric: tabular-nums; }
+.pc-go {
+  margin-left: auto; font-size: 22rpx; font-weight: 500; color: var(--accent, #0066CC);
+  padding: 10rpx 22rpx; border-radius: 9999rpx; line-height: 1.3;
+  background: #FFF; box-shadow: inset 0 0 0 2rpx var(--accent, #0066CC);
+}
+
+/* 批量代录入口 */
+.bulk { display: flex; align-items: center; gap: 16rpx; background: #FFF; border-radius: 30rpx; padding: 22rpx 26rpx; margin: 18rpx 0 4rpx; }
+.bulk-hover { opacity: .82; }
+.bulk-l { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5rpx; }
+.bulk-t { font-size: 25rpx; font-weight: 600; color: var(--ink, #1D1D1F); }
+.bulk-s { font-size: 20rpx; line-height: 1.5; color: var(--muted, #76767E); }
+.bulk-b {
+  /* 方案里是「白底 + accent 描边 + 蓝字」的小胶囊，不是纯文字 */
+  flex: none; font-size: 22rpx; font-weight: 500; color: var(--accent, #0066CC);
+  padding: 10rpx 24rpx; border-radius: 9999rpx; line-height: 1.3;
+  background: #FFF; box-shadow: inset 0 0 0 2rpx var(--accent, #0066CC);
+}
+
+/* 弹层（照 planning 页那套：底部抽屉、白底、40rpx 圆角） */
+.overlay { position: fixed; inset: 0; z-index: 900; background: rgba(0, 0, 0, .32); display: flex; align-items: flex-end; }
+.sheet {
+  /* ⚠️ 必须是固定 height（不是 max-height）：scroll-view 在 flex 里要拿到确定高度才滚得动。
+      之前写 max-height + flex:1，内容一多就把底部的「取消/保存」压住，而且完全滑不动。 */
+  height: 88vh; width: 100%; background: #FFF;
+  border-radius: 40rpx 40rpx 0 0;
+  display: flex; flex-direction: column; box-sizing: border-box;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.sheet-hd { display: flex; align-items: flex-start; gap: 16rpx; padding: 30rpx 32rpx 16rpx; }
+.sheet-hd-l { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6rpx; }
+.sheet-t { font-size: 32rpx; font-weight: 600; color: var(--ink, #1D1D1F); }
+.sheet-sub { font-size: 21rpx; line-height: 1.6; color: var(--muted, #76767E); }
+.sheet-x { flex: none; font-size: 23rpx; color: var(--accent, #0066CC); padding: 4rpx 0 4rpx 16rpx; }
+.sheet-body {
+  /* scroll-view 当 flex 子项：height:0 + flex:1 才能真正撑开并滚动。
+     只写 flex:1 的话高度由内容决定，滚不动，还会顶穿底部按钮。 */
+  flex: 1 1 0; height: 0; min-height: 0;
+  padding: 0 32rpx; box-sizing: border-box;
+}
+.sheet-foot { display: flex; gap: 16rpx; padding: 18rpx 32rpx 24rpx; border-top: 2rpx solid var(--divider, #F0F0F0); }
+.sheet-foot button.btn { flex: 1; min-width: 0; }
+.pad-sm { height: 36rpx; }
+
+/* 批量弹层的两组胶囊 */
+.bsec { padding: 18rpx 0 8rpx; }
+.bsec-hd { display: flex; align-items: baseline; gap: 12rpx; margin-bottom: 12rpx; }
+.bsec-t { font-size: 22rpx; color: var(--muted, #76767E); }
+.bsec-a { margin-left: auto; font-size: 21rpx; color: var(--accent, #0066CC); }
+.chips { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.chip { font-size: 22rpx; line-height: 1.5; padding: 10rpx 20rpx; border-radius: 9999rpx; background: #F5F5F7; color: var(--ink, #1D1D1F); }
+.chip.on { background: var(--accent-tint, #EAF3FD); color: var(--accent, #0066CC); font-weight: 500; }
+
+.ts-note { padding: 26rpx 8rpx 0; font-size: 20rpx; line-height: 1.7; color: var(--muted, #76767E); }
+
+/* 方案顶部的页面标题（左图：「值班时间代录」26px + 一行说明） */
+.pl-head { display: flex; flex-direction: column; gap: 10rpx; padding: 6rpx 6rpx 20rpx; }
+.pl-title { font-size: 50rpx; font-weight: 600; letter-spacing: -1.2rpx; line-height: 1.35; color: var(--ink, #1D1D1F); }
+.pl-sub { font-size: 23rpx; line-height: 1.6; color: var(--muted, #76767E); }
+
+/* 说明区：站员页在灰底上，需要白卡；弹层里本身就是白底，再套卡片就成了「卡片套卡片」 */
+.note {
+  margin-top: 32rpx;
+  background: var(--canvas, #FFF);
+  border-radius: 34rpx;
+  padding: 28rpx;
+}
+.sheet .note { background: transparent; border-radius: 0; padding: 0; margin-top: 24rpx; }
+
+/* v151 弹层顶部的「点一下切换 / 全选」行 */
+.av-head {
+  display: flex; align-items: baseline; gap: 16rpx;
+  padding: 4rpx 6rpx 16rpx;
+}
+.av-head-t { font-size: 22rpx; color: var(--muted, #76767E); }
+.av-head-a {
+  margin-left: auto; font-size: 22rpx; font-weight: 500;
+  color: var(--accent, #0066CC); padding: 6rpx 0 6rpx 16rpx;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   以下按 v151 原型实测值覆盖上面的估值（1px = 1.923rpx），
+   对应 app.html 的 .pc / .pc-foot button / .bulk-entry / .dchip2 / .dept-chips。
+   ⚠️ 方案里的按钮是 radius 10px（19rpx）的**方圆角**，不是药丸 —— 上一版做成药丸被打回。
+   ══════════════════════════════════════════════════════════════ */
+
+/* 人员卡片：grid 1 列 gap 10px */
+.pc-grid { display: grid; grid-template-columns: 1fr; gap: 19rpx; }
+.pc { border: 2rpx solid #EBEBEF; border-radius: 31rpx; padding: 25rpx 27rpx; }
+.pc-top { gap: 19rpx; }
+.pc-av { width: 65rpx; height: 65rpx; font-size: 27rpx; }
+.pc-nm { gap: 2rpx; }
+.pc-name { font-size: 29rpx; font-weight: 550; }
+.pc-cap { font-size: 21rpx; margin-top: 2rpx; }
+.pc-bd { font-size: 20rpx; padding: 6rpx 15rpx; }
+.pc-p { margin-top: 15rpx; font-size: 23rpx; line-height: 1.6; }
+.pc-foot { margin-top: 19rpx; }
+.pc-stat { font-size: 21rpx; }
+
+/* 「查看／代录」：min-height 36px、radius 10px、字号 12.5px、padding 0 12px */
+.pc-go {
+  margin-left: auto; min-height: 69rpx; padding: 0 23rpx;
+  display: inline-flex; align-items: center;
+  border-radius: 19rpx; border: 2rpx solid var(--hairline, #E2E2E7);
+  background: #FFF; font-size: 24rpx; font-weight: 400;
+  color: var(--accent, #0066CC); box-shadow: none;
+}
+
+/* 批量入口：radius 18px、padding 14/16、带浅边框和 0 5px 20px 的投影 */
+.bulk {
+  gap: 23rpx; border-radius: 35rpx; padding: 27rpx 31rpx;
+  border: 2rpx solid #E8E9EF; box-shadow: 0 10rpx 38rpx rgba(32, 36, 49, .03);
+  margin: 0 0 27rpx;
+}
+.bulk-t { font-size: 27rpx; font-weight: 600; }
+.bulk-s { font-size: 22rpx; margin-top: 8rpx; }
+/* 「开始代录」：min-height 38px、radius 10px、透明底 + accent 描边 */
+.bulk-b {
+  min-height: 73rpx; padding: 0 23rpx;
+  display: inline-flex; align-items: center;
+  border-radius: 19rpx; border: 2rpx solid var(--accent, #0066CC);
+  background: none; font-size: 24rpx; font-weight: 400;
+  color: var(--accent, #0066CC); box-shadow: none;
+}
+
+/* 批量弹层：人员 3 列、场次 2 列等宽格子；胶囊 radius 12px、padding 12px 10px、13px 字 */
+.chips { display: grid; gap: 15rpx; }
+.chips-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.chips-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.chip {
+  min-width: 0; border-radius: 23rpx; padding: 23rpx 19rpx;
+  border: 2rpx solid var(--hairline, #E2E2E7); background: var(--paper, #F5F5F7);
+  font-size: 25rpx; line-height: 1.4; color: var(--ink, #1D1D1F);
+  text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+.chip.on {
+  background: var(--accent-tint, #EAF3FD); border-color: var(--accent, #0066CC);
+  color: var(--accent, #0066CC); font-weight: 500;
+}
+
+/* 弹层里的「点一下切换 / 全选」行：padding 0 18px 10px */
+.av-head { padding: 0 0 19rpx; }
+.av-head-t { font-size: 29rpx; font-weight: 600; color: var(--ink, #1D1D1F); }
+.av-head-a { font-size: 22rpx; font-weight: 400; }
+
+/* 顶部条：返回键 + 中间周标签 + 右侧翻周（原来只有翻周，没有返回） */
+.bar-in { display: flex; align-items: center; gap: 8rpx; }
+.back {
+  width: 56rpx; height: 56rpx; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 44rpx; line-height: 1; color: var(--ink, #1D1D1F);
+  margin-left: -12rpx;
+}
+.wk { flex: 1; min-width: 0; text-align: center; }
+.wk-nav { display: flex; align-items: center; gap: 4rpx; flex: none; }
+.wk-nav .nav { width: 56rpx; height: 56rpx; font-size: 36rpx; }
