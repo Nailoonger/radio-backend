@@ -441,8 +441,9 @@ const TPL = [
     eq('去重后入库', r.data.dutyRoles, ['播音', '记者']);
     r = await call('PUT', '/partner/people/4/duty', { dutyRoles: ['扫地'] }, SUPER_TOKEN);
     eq('非法岗位 → 40001', r.code, 40001);
-    r = await call('PUT', '/partner/people/4/duty', {}, SUPER_TOKEN);
-    eq('缺 dutyRoles → 40001', r.code, 40001);
+    // ⚠️ dutyRoles 现在是**可选的**（不传＝按部门自动推导，见下），所以这里改成校验「传了但不合法」
+    r = await call('PUT', '/partner/people/4/duty', { dutyRoles: '播音' }, SUPER_TOKEN);
+    eq('dutyRoles 不是数组 → 40001', r.code, 40001);
     r = await call('PUT', '/partner/people/999/duty', { dutyRoles: [] }, SUPER_TOKEN);
     eq('不存在的人 → 40401', r.code, 40401);
 
@@ -466,6 +467,20 @@ const TPL = [
     eq('清空部门可保存', r.code, 0);
     eq('有岗位但没部门 → qualified false', r.data.qualified, false);
     eq('岗位没被部门清空连带删掉', r.data.dutyRoles, ['播音']);
+
+    /* 只传部门 → 岗位按部门自动推导（2026-10-30 陛下：只配部门就够了，弹层撤掉岗位那一行） */
+    r = await call('PUT', '/partner/people/4/duty', { department: '播音部' }, SUPER_TOKEN);
+    eq('只传部门 → 岗位自动＝播音', r.data.dutyRoles, ['播音']);
+    eq('只传部门 → qualified', r.data.qualified, true);
+    r = await call('PUT', '/partner/people/4/duty', { department: '编辑部' }, SUPER_TOKEN);
+    eq('换部门 → 岗位跟着换', r.data.dutyRoles, ['编辑']);
+    r = await call('PUT', '/partner/people/4/duty', { department: '编辑部', dutyRoles: ['编辑', '记者'] }, SUPER_TOKEN);
+    eq('显式传岗位仍以显式为准', r.data.dutyRoles, ['编辑', '记者']);
+    r = await call('PUT', '/partner/people/4/duty', { department: '主持部' }, SUPER_TOKEN);
+    eq('自动推导时额外岗位（记者）保留', r.data.dutyRoles, ['主持', '记者']);
+    r = await call('PUT', '/partner/people/4/duty', { department: '' }, SUPER_TOKEN);
+    eq('清空部门 → 只剩额外岗位', r.data.dutyRoles, ['记者']);
+    eq('清空部门 → qualified false', r.data.qualified, false);
 
     // 越权：社干 / 停用 / 未登录
     r = await call('PUT', '/partner/people/4/duty', { dutyRoles: ['播音'] }, MGR_TOKEN);

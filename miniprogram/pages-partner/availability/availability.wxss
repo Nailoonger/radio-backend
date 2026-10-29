@@ -553,7 +553,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ══════════ 我的值班角色（社干 / 超管自助，2026-10-30 新规则） ══════════ */
+/* ══════════ 我的值班部门（社干 / 超管自助，2026-10-30；只配部门，岗位由后端推导） ══════════ */
 .rolecard {
   background: var(--canvas, #FFF);
   border-radius: 34rpx;
@@ -571,7 +571,10 @@
 }
 .rc-bd.on { background: var(--accent-tint, #EAF3FD); color: var(--accent, #0066CC); }
 .rc-chips { display: flex; gap: 14rpx; margin-top: 18rpx; }
-/* 三格等宽（flex:1 1 0），圆角与本页其他小控件一致（20rpx），不做药丸 */
+/* 三格等宽（flex:1 1 0），圆角与本页其他小控件一致（20rpx），不做药丸。
+   ⚠️ 内置的是「播音部 / 主持部 / 编辑部」三个三字词（原来是 2 字的岗位），
+      25rpx × 3 字 = 75rpx，chip 宽约 192rpx（750 − 44×2 页边 − 28×2 卡内 − 14×2 间距 ÷ 3），
+      不会顶边 —— 改成别的字数前先按这个算一遍。 */
 .rc-chip {
   flex: 1 1 0; min-width: 0; min-height: 76rpx;
   display: flex; align-items: center; justify-content: center;

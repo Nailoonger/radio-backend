@@ -5,7 +5,8 @@
 // 这一页吃三件事：
 //   ① 自己填：按天分组的方块，点一下在「能来 / 不能来」之间切换（两态，没有第三态）
 //   ② 代录（社干）：顶部选人，替某个成员填，必须写原因
-//   ③ 我的值班角色（社干 / 超管）：自己勾「播音 / 主持 / 编辑」，可多选（2026-10-30 新规则）
+//   ③ 我的值班部门（社干 / 超管）：自己选「播音部 / 主持部 / 编辑部」，单选（2026-10-30）
+//      ⚠️ 岗位（播音 / 主持 / 编辑）由后端按部门自动带，界面上不再让人选第二遍
 //
 // ⚠️ 顶部标题栏只写「值班时间代录」，**不写日期**；当周的月和日放在下面的周切换卡里居中显示
 //    （2026-10-30 陛下定：大粗体标题删掉，换成「10/26 — 10/30」+ 左右翻周按钮装进一张卡）。
@@ -22,14 +23,12 @@ const DAY_NAMES = ['周一', '周二', '周三', '周四', '周五'];
 const MAX_REASON = 200;
 
 /**
- * 代录页「我的值班角色」可选项（2026-10-30 新规则：超管 / 社干自己配，可多选）
+ * 部门白名单 —— 与后端 DEPARTMENTS 一致；换人弹层里「部门不匹配」就是拿它比的
  *
- * ⚠️⚠️ 后端 DUTY_ROLES 是 5 项（播音 / 主持 / 编辑 / 记者 / 技术），这里**只放前 3 项**
- *    —— 陛下点名的就是这三个。凡是库里已有的「记者 / 技术」**照原样带回**（见 _extraRoles），
- *    不能因为界面上没列出来，保存一次就被悄悄清掉。
+ * ⚠️⚠️ 2026-10-30 起**只配部门、不再配岗位**：岗位（播音 / 主持 / 编辑）由后端按部门自动推导
+ *    （`me.js#ROLE_BY_DEPT`），库里已有的记者 / 技术原样保留。
+ *    两个地方各选一遍必然对不上 —— 陛下当天就被这个坑过。
  */
-const ROLE_OPTIONS = ['播音', '主持', '编辑'];
-/** 部门白名单 —— 与后端 DEPARTMENTS 一致；换人弹层里「部门不匹配」就是拿它比的 */
 const DEPARTMENTS = ['播音部', '主持部', '编辑部'];
 
 /** '2026-11-02' ± n 天（纯日期运算，走 UTC 避免夏令时/时区干扰） */
@@ -161,11 +160,10 @@ Page({
     bulkEventCount: 0,
     bulkReason: '',
     bulkSaving: false,
-    // ── 我的值班角色（社干 / 超管自助，2026-10-30 新规则） ──
-    roleChips: [],         // [{ label: '播音', on: false }, ...]
-    rolePicked: 0,         // 已选个数（含界面没列出的记者 / 技术）
-    roleText: '未选',
-    roleHint: '',
+    // ── 我的值班部门（社干 / 超管自助，2026-10-30 新规则；岗位由部门推导，不再单选岗位） ──
+    deptChips: [],         // [{ label: '播音部', on: false }, ...]
+    roleText: '未选',      // 徽章文案（没配 = '未选'）
+    roleHint: '',          // 底部提示
     roleDirty: false,
     roleSaving: false,
     // ── 超管替别人配岗位（2026-10-30） ──
@@ -173,7 +171,6 @@ Page({
     roleTargetId: 0,
     roleTargetName: '',
     roleTargetDept: '',
-    roleTargetChips: [],
     roleTargetDepts: [],
     roleTargetSaving: false,
   },
@@ -186,10 +183,6 @@ Page({
   _baseWeek: '',
   /** 最近一次请求带的 week（空 = 本周）。基准周只在不带 week 的请求里认 */
   _fetchWeek: '',
-  /** 库里已有、但界面没列出来的岗位（记者 / 技术）—— 保存时原样带回，不许丢 */
-  _extraRoles: [],
-  /** 同上，但针对「超管给别人配岗位」那个弹层的目标人 */
-  _targetRoleExtra: [],
   /** 自己的部门（/partner/me 带回）。空 → 排班永远过不了「部门」这条门槛 */
   _myDept: '',
   /** /partner/me 是否真的拉到了。没拉到不许保存，否则会把别人的岗位写成空 */
@@ -285,7 +278,6 @@ Page({
             personId: r.personId,
             name: r.name || '伙伴',
             dept: r.department || '',
-            roles: Array.isArray(r.dutyRoles) ? r.dutyRoles : [],
             cap: [r.department, ((r.dutyRoles || [])[0] || '')].filter(Boolean).join(' · '),
             initial: String(r.name || '伙').slice(0, 1),
             isMe: Number(r.personId) === meIdNow,
@@ -361,89 +353,69 @@ Page({
     return `${a} – ${b}`;
   },
 
-  /* ══════════ 我的值班角色（社干 / 超管自助） ══════════
-     走现成的 PUT /partner/me/duty（handlers/partner/me.js#saveDuty），只改 dutyRoles，
-     department 不传 → 后端保留原值。没有为这件事新开接口。 */
+  /* ══════════ 我的值班部门（社干 / 超管自助） ══════════
+     走现成的 PUT /partner/me/duty（handlers/partner/me.js#saveDuty）。
+     ⚠️⚠️ 2026-10-30 统一成一个维度：**只配部门**。岗位（播音/主持/编辑）由后端按部门带，
+        和「配岗位」弹层同一套口径 —— 两个地方各选一遍必然对不上（陛下当天就被坑过）。 */
 
-  /**
-   * 拉自己的部门 / 岗位
-   *
-   * ⚠️ 部门一定要一起拿：排班硬条件里「部门」和「岗位」是两条独立的门槛，
-   *    只配岗位不配部门，换人弹层照样选不上人（陛下 2026-10-30 就卡在这）。
-   */
+  /** 拉自己的部门 */
   loadMe() {
     return adminRequest('/partner/me', 'GET')
       .then((d) => {
         this._myDept = String((d && d.department) || '');
-        this.applyRoles((d && d.dutyRoles) || []);
+        this._meLoaded = true;
+        this.setData(Object.assign({ deptChips: this._deptChips(this._myDept), roleDirty: false },
+          this._roleStat(this._myDept, false)));
       })
       .catch(() => {
         // 拉不到就空着渲染，但 _meLoaded 保持 false → 不许保存（见 onSaveRoles）
         this._meLoaded = false;
         this.setData({
-          roleChips: ROLE_OPTIONS.map((r) => ({ label: r, on: false })),
-          rolePicked: 0, roleText: '未选', roleDirty: false,
-          roleHint: '角色没拉到，下拉刷新再试。',
+          deptChips: this._deptChips(''), roleDirty: false,
+          roleText: '未选',
+          roleHint: '部门没拉到，下拉刷新再试。',
         });
       });
   },
 
-  /** 把后端的 dutyRoles 翻成三个胶囊 + 保留界面没列出的岗位 */
-  applyRoles(dutyRoles) {
-    const list = (Array.isArray(dutyRoles) ? dutyRoles : [])
-      .map((r) => String(r).trim()).filter(Boolean);
-    const chips = ROLE_OPTIONS.map((r) => ({ label: r, on: list.indexOf(r) >= 0 }));
-    // ⚠️ 记者 / 技术 不在界面上，但已经在库里 —— 存起来，保存时一起交回去
-    this._extraRoles = list.filter((r) => ROLE_OPTIONS.indexOf(r) < 0);
-    this._meLoaded = true;
-    this.setData(Object.assign({ roleChips: chips, roleDirty: false }, this._roleStat(chips, false)));
+  _deptChips(dept) {
+    return DEPARTMENTS.map((d) => ({ label: d, on: d === dept }));
   },
 
-  /** 由胶囊状态算出「已选几项 / 徽章文案 / 底部提示」—— 模板只渲染，不判断 */
-  _roleStat(chips, dirty) {
-    const picked = (chips || []).filter((c) => c.on).length + (this._extraRoles || []).length;
+  /** 徽章文案 + 底部提示（模板只渲染，不判断） */
+  _roleStat(dept, dirty) {
     let hint;
-    if (!this._myDept) {
-      // 岗位齐了但没部门，排班时照样过不了硬条件 —— 这句必须说出来，不然就是"配了也没用"
-      hint = '还没配部门，排班时过不了硬性条件（部门由超管在代录页「配岗位」里设）。';
-    } else if (dirty) hint = '改动还没保存。';
-    else if (picked > 0) hint = `已保存（${this._myDept}）。排班时按这些角色判断你能不能上某个时段。`;
-    else hint = '一个都没选，排班时不会把你排上岗。';
-    return {
-      rolePicked: picked,
-      roleText: picked > 0 ? `已选 ${picked} 项` : '未选',
-      roleHint: hint,
-    };
+    if (dirty) hint = '改动还没保存。';
+    else if (dept) hint = `已保存。排班时按「${dept}」的岗位认定你能不能上某个时段。`;
+    else hint = '还没配部门，排班时不会把你排上岗。';
+    return { roleText: dept || '未选', roleHint: hint };
   },
 
-  /** 点胶囊：多选，点一下切一下（不做单选互斥） */
-  onToggleRole(e) {
-    const label = String((e.currentTarget.dataset || {}).l || '');
-    if (ROLE_OPTIONS.indexOf(label) < 0) return;
-    const chips = (this.data.roleChips || []).map((c) => (
-      c.label === label ? Object.assign({}, c, { on: !c.on }) : c
-    ));
-    this.setData(Object.assign({ roleChips: chips, roleDirty: true }, this._roleStat(chips, true)));
+  /** 部门单选：再点一下同一个 = 清空 */
+  onPickMyDept(e) {
+    const label = String((e.currentTarget.dataset || {}).d || '');
+    if (DEPARTMENTS.indexOf(label) < 0) return;
+    const next = label === this._myDept ? '' : label;
+    this._myDept = next;
+    this.setData(Object.assign({ deptChips: this._deptChips(next), roleDirty: true },
+      this._roleStat(next, true)));
   },
 
   onSaveRoles() {
     if (this.data.roleSaving) return;
-    // ⚠️ 没拉到就保存 = 把人家已有的岗位写成空。宁可让他刷新，也不许静默清库
+    // ⚠️ 没拉到就保存 = 把已有的部门写成空。宁可让他刷新，也不许静默清库
     if (!this._meLoaded) {
-      return wx.showToast({ title: '角色还没加载出来，下拉刷新再试', icon: 'none' });
+      return wx.showToast({ title: '部门还没加载出来，下拉刷新再试', icon: 'none' });
     }
     if (!this.data.roleDirty) return;   // 没改就不发请求
 
-    const chips = this.data.roleChips || [];
-    const dutyRoles = chips.filter((c) => c.on).map((c) => c.label)
-      .concat(this._extraRoles || []);
-
+    const dept = this._myDept || '';
     this.setData({ roleSaving: true });
-    adminRequest('/partner/me/duty', 'PUT', { dutyRoles })
+    adminRequest('/partner/me/duty', 'PUT', { department: dept })
       .then(() => {
-        this.setData(Object.assign({ roleSaving: false, roleDirty: false }, this._roleStat(chips, false)));
-        wx.showToast({ title: '角色已保存', icon: 'success' });
-        // 人员卡片的副标题是「部门 · 第一个岗位」，改了角色要跟着变
+        this.setData(Object.assign({ roleSaving: false, roleDirty: false }, this._roleStat(dept, false)));
+        wx.showToast({ title: '值班部门已保存', icon: 'success' });
+        // 人员卡片的副标题是「部门 · 第一个岗位」，改了部门要跟着变
         this.fetch({ week: this.data.weekStart, personId: this.data.targetId || undefined });
       })
       .catch((err) => {
@@ -637,25 +609,23 @@ Page({
     });
   },
 
-  /* ══════════ 超管替别人配值班角色（2026-10-30 新增） ══════════
-     入口：人员卡片底部的「配岗位」。走 PUT /partner/people/:id/duty，仅超管可调。
-     ⚠️ 只改岗位，不改部门（部门会牵动「部门不匹配」这条排班硬条件）。
-     ⚠️ 和上面「我的值班角色」是两条路：那条自助（没 :id），这条代配（必须 :id）。 */
+  /* ══════════ 超管替别人配值班部门（2026-10-30） ══════════
+     入口：人员卡片底部的「配部门」。走 PUT /partner/people/:id/duty，仅超管可调。
+     ⚠️⚠️ 只有一个维度：**部门**。岗位（播音/主持/编辑）由后端按部门自动带，
+        记者/技术那种额外岗位原样保留 —— 陛下 2026-10-30：「只配部门就够了，其他的不要了」。
+        界面上再摆一行岗位，等于把同一件事让人选两遍，而且两处不一致就选不上人。 */
 
   openRoleSheet(e) {
     if (!this.data.isSuper) return;
     const id = Number((e.currentTarget.dataset || {}).id || 0);
     const card = (this.data.cards || []).find((c) => Number(c.personId) === id);
     if (!card) return;
-    const roles = card.roles || [];
     const dept = card.dept || '';
-    this._targetRoleExtra = roles.filter((r) => ROLE_OPTIONS.indexOf(r) < 0);
     this.setData({
       roleSheetOpen: true,
       roleTargetId: id,
       roleTargetName: card.name || '该成员',
       roleTargetDept: dept,
-      roleTargetChips: ROLE_OPTIONS.map((r) => ({ label: r, on: roles.indexOf(r) >= 0 })),
       // 部门是单选；当前没配就三个都不亮
       roleTargetDepts: DEPARTMENTS.map((d) => ({ label: d, on: d === dept })),
       roleTargetSaving: false,
@@ -667,7 +637,7 @@ Page({
     this.setData({ roleSheetOpen: false });
   },
 
-  /** 部门单选：再点一下同一个 = 清空（清空后这人排班时过不了硬条件，弹层里会提示） */
+  /** 部门单选：再点一下同一个 = 清空 */
   onPickTargetDept(e) {
     const label = String((e.currentTarget.dataset || {}).d || '');
     if (DEPARTMENTS.indexOf(label) < 0) return;
@@ -679,45 +649,32 @@ Page({
     });
   },
 
-  onToggleTargetRole(e) {
-    const label = String((e.currentTarget.dataset || {}).l || '');
-    if (ROLE_OPTIONS.indexOf(label) < 0) return;
-    this.setData({
-      roleTargetChips: (this.data.roleTargetChips || []).map((c) => (
-        c.label === label ? Object.assign({}, c, { on: !c.on }) : c
-      )),
-    });
-  },
-
   saveTargetRoles() {
     if (this.data.roleTargetSaving) return;
     const id = Number(this.data.roleTargetId || 0);
     if (!id) return;
-    // 界面上没列出的记者 / 技术原样带回，别因为这里没勾就清掉
-    const dutyRoles = (this.data.roleTargetChips || []).filter((c) => c.on).map((c) => c.label)
-      .concat(this._targetRoleExtra || []);
-    // 部门一定要一起发：只发岗位的话，部门还是空的，换人弹层照样「尚未配置部门」
     const department = this.data.roleTargetDept || '';
 
-    // 两边都没配就别拦，但空部门 + 有岗位 = 配了也选不上，先提醒一句
-    if (!department && dutyRoles.length) {
+    // 清空部门 = 让这个人选不上人，手滑一下就会点成「不亮」，先确认一次
+    if (!department) {
       wx.showModal({
-        title: '还没选部门',
-        content: '没配部门的人，排班时过不了「部门」这条硬性条件，照样选不上。要一起配部门吗？',
-        cancelText: '就这样存', confirmText: '回去选',
-        success: (r) => { if (r.confirm) return; this._doSaveTargetRoles(id, '', dutyRoles); },
+        title: '不配部门',
+        content: '没部门的人在排班时会被判定为「尚未配置部门」，换人弹层里选不上他。确定要清空吗？',
+        cancelText: '返回去选', confirmText: '确定清空', confirmColor: '#B42318',
+        success: (r) => { if (r.confirm) this._doSaveTargetRoles(id, ''); },
       });
       return;
     }
-    this._doSaveTargetRoles(id, department, dutyRoles);
+    this._doSaveTargetRoles(id, department);
   },
 
-  _doSaveTargetRoles(id, department, dutyRoles) {
+  /** 只发部门 —— 岗位由后端按部门推导（前端不再传 dutyRoles，传了反而会盖掉记者/技术） */
+  _doSaveTargetRoles(id, department) {
     this.setData({ roleTargetSaving: true });
-    adminRequest(`/partner/people/${id}/duty`, 'PUT', { department, dutyRoles })
+    adminRequest(`/partner/people/${id}/duty`, 'PUT', { department })
       .then(() => {
         this.setData({ roleTargetSaving: false, roleSheetOpen: false });
-        wx.showToast({ title: '值班资格已更新', icon: 'success' });
+        wx.showToast({ title: '值班部门已更新', icon: 'success' });
         // 卡片副标题（部门 · 首个岗位）和排班资格都依赖它
         this.fetch({ week: this.data.weekStart, personId: this.data.targetId || undefined });
       })

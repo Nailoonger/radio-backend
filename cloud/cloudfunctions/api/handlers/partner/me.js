@@ -124,14 +124,26 @@ async function saveDuty(ctx) {
 }
 
 /**
- * PUT /partner/people/:id/duty   body: { department?, dutyRoles: [] }
+ * 部门 → 默认岗位（2026-10-30 简化：陛下说「只配部门就够了，其他的不要了」）
+ *
+ * ⚠️ 为什么是「自动带」而不是「干脆不看岗位」：
+ *    排班的硬条件里 `def.role` 与 `person.dutyRoles` 是一条独立的门槛（schedule.js#reasonsFor），
+ *    直接把岗位砍掉会让所有人卡在「尚未配置值班岗位」。
+ *    所以界面上只让选部门，岗位由这里**推导后落库**，两条硬条件都能过。
+ * ⚠️ 记者 / 技术 不挂部门，不在这张表里 —— 更新时**原样保留**，不许被覆盖掉。
+ */
+const ROLE_BY_DEPT = { 播音部: '播音', 主持部: '主持', 编辑部: '编辑' };
+const MAPPED_ROLES = Object.keys(ROLE_BY_DEPT).map((d) => ROLE_BY_DEPT[d]);
+
+/**
+ * PUT /partner/people/:id/duty   body: { department?, dutyRoles?: [] }
  *
  * 超管**替别人**配值班资格（2026-10-30 新增：陛下要求「代录页超管可以为社干配置值班角色」）。
  *
- * ⚠️ 部门必须一起能配，否则这个接口没用：
- *    排班硬条件里「部门」和「岗位」是**两条独立的门槛**（见 schedule.js#reasonsFor），
+ * ⚠️ 部门必须是能配的：排班硬条件里「部门」和「岗位」是两条独立的门槛，
  *    只配岗位、部门空着，换人弹层照样报「尚未配置部门 / 部门不匹配」。
- *    陛下 2026-10-30 就是这么被卡住的（配了角色还是选不上人）。
+ * ⚠️ dutyRoles **可以不传**：不传就按部门自动推导（同时保留记者/技术那种额外岗位）。
+ *    前端弹层现在只发 department，简化成一个维度 —— 别再在界面上让用户选两遍。
  * ⚠️ 与 PUT /partner/me/duty 的分工：
  *    那条是**自助**（谁调都是改自己，锁死 p.admin._id）；
  *    这条必须显式给 :id，且只有超管能调 —— 别把两条合成一条，合并后
@@ -147,7 +159,7 @@ async function saveDutyFor(ctx) {
 
   const body = ctx.body || {};
 
-  // 部门：不传＝保持原值；传空串＝清空（清空后这个人排班时永远过不了硬条件，前端要拦一下）
+  // 部门：不传＝保持原值；传空串＝清空（清空后这个人排班时永远过不了硬条件）
   let department = target.department || '';
   if (body.department !== undefined) {
     department = String(body.department || '').trim();
@@ -156,10 +168,18 @@ async function saveDutyFor(ctx) {
     }
   }
 
-  let dutyRoles = body.dutyRoles;
-  if (!Array.isArray(dutyRoles)) throw new ApiError(Codes.PARAM_ERROR, 'dutyRoles 必须是数组');
-  dutyRoles = dutyRoles.map((r) => String(r).trim()).filter(Boolean);
-  dutyRoles = dutyRoles.filter((r, i) => dutyRoles.indexOf(r) === i);
+  let dutyRoles;
+  if (body.dutyRoles === undefined) {
+    // 只给了部门 → 岗位跟着部门走，额外岗位（记者 / 技术）原样留着
+    const mapped = ROLE_BY_DEPT[department] ? [ROLE_BY_DEPT[department]] : [];
+    const keep = (Array.isArray(target.dutyRoles) ? target.dutyRoles : [])
+      .filter((r) => MAPPED_ROLES.indexOf(r) < 0);
+    dutyRoles = mapped.concat(keep);
+  } else {
+    if (!Array.isArray(body.dutyRoles)) throw new ApiError(Codes.PARAM_ERROR, 'dutyRoles 必须是数组');
+    dutyRoles = body.dutyRoles.map((r) => String(r).trim()).filter(Boolean);
+    dutyRoles = dutyRoles.filter((r, i) => dutyRoles.indexOf(r) === i);
+  }
   const bad = dutyRoles.filter((r) => DUTY_ROLES.indexOf(r) < 0);
   if (bad.length) {
     throw new ApiError(Codes.PARAM_ERROR, `岗位「${bad[0]}」不在可选范围内（${DUTY_ROLES.join(' / ')}）`);
