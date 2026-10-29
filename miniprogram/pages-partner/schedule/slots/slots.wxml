@@ -79,15 +79,15 @@
       <button class="btn primary pub" bindtap="onPublish" disabled="{{publishing}}">发布本周值班时段</button>
       <view class="act-note">当前这些改动只是草稿，发布后站员端的「可排时间」才会按它显示。</view>
     </view>
-    <view class="act-note ro-note" wx:elif="{{canEdit}}">改完保存会变成草稿；草稿要点「发布」才算生效，站员端才会跟着变。</view>
     <view class="act-note ro-note" wx:if="{{!canEdit}}">时段由超管发布；你在这里只能看。</view>
 
     <!-- 危险区：重置全部时段（回到「从未配置」）
          有了已发布版本之后，界面上没有任何办法把它清干净（发布拒绝空配置），
-         初始化 / 清理联调数据只能靠这个入口，不用再进云开发控制台。 -->
-    <view class="danger" wx:if="{{canEdit}}">
-      <button class="danger-btn" bindtap="onReset" disabled="{{resetting}}">重置全部值班时段</button>
-      <view class="danger-note">清掉所有版本（含已发布的），回到「从未配置」。日常改时段请直接编辑上面的卡片，别用这里。</view>
+         初始化 / 清理联调数据只能靠这个入口，不用再进云开发控制台。
+         ⚠️ 2026-10-30 陛下定：**不做按钮** —— 红字 + 下划线的一行文字链，落在页面最底部；
+            原来按钮下面「清掉所有版本…别用这里」那句说明一并删掉。 -->
+    <view class="reset-line" wx:if="{{canEdit}}">
+      <text class="reset-link" bindtap="onReset">{{resetting ? '正在重置……' : '重置全部值班时段'}}</text>
     </view>
   </view>
 

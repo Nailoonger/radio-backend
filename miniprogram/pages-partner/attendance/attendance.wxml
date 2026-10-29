@@ -1,0 +1,124 @@
+<!-- pages-partner/attendance/attendance.wxml · v2（2026-10-30 按 v151 v72 重做「考勤录入」）
+     社干：周导航 → 五个日期方块（没点完的天在角上带未点数字）→ 当日统计 → 按「日期 + 时段」分卡点名
+           （每行三个固定按钮：到岗 / 请假 / 缺勤）→ 底部固定「保存这天的考勤」
+     站员：我的本周 / 本月场次与到岗情况（只读）
+     ⚠️ 不显示节目名：我们的班表只有时段名（早会 / 午间 / 下午）+ 起止，没有节目字段（陛下 2026-10-30 定）。
+     ⚠️ 保存是**手动**的：改动先落内存，点底部按钮才提交这一天；按场次逐场 PUT，
+        只发「有改动且至少点了一个人」的场次。
+     接口：GET /partner/attendance/week · /overview · /mine · PUT /partner/attendance -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">考勤</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body {{isManager ? 'with-bar' : ''}}">
+    <view class="wk-nav">
+      <text class="wk-b" bindtap="prevWeek">‹ 上一周</text>
+      <text class="wk-c">{{weekText}}</text>
+      <text class="wk-b {{isThisWeek ? 'off' : ''}}" bindtap="nextWeek">下一周 ›</text>
+    </view>
+
+    <!-- ───── 社干：日期方块 + 当日点名 ───── -->
+    <block wx:if="{{isManager}}">
+      <!-- 五个日期方块（v151 .days）：选中整块变蓝；右上角数字＝这天还没点的人数 -->
+      <view class="days">
+        <view class="day {{attDay === index ? 'on' : ''}}"
+              wx:for="{{days}}" wx:key="day"
+              hover-class="pressed" data-i="{{index}}" bindtap="onPickDay">
+          <text class="d-n">{{item.dayName}}</text>
+          <text class="d-d">{{item.dateText}}</text>
+          <text class="d-b" wx:if="{{item.left > 0}}">{{item.left}}</text>
+        </view>
+      </view>
+
+      <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
+      <view class="hint-note" wx:elif="{{!days.length}}">这一周还没有班表，先排班再来点名</view>
+
+      <block wx:else>
+        <!-- 当日统计卡 -->
+        <view class="dhead" wx:if="{{dayView}}">
+          <view class="dhead-t">
+            <text class="dhead-n">{{dayView.title}} · 应到 {{dayView.total}} 岗</text>
+            <text class="dhead-m">已点名 {{dayView.marked}} / {{dayView.total}}</text>
+          </view>
+          <view class="astat">到岗 {{dayView.present}}<text class="adot">·</text>请假 {{dayView.leave}}<text class="adot">·</text>缺勤 {{dayView.absent}}</view>
+        </view>
+
+        <view class="hint-note" wx:if="{{dayView && !dayView.slots.length}}">这天没有安排岗位</view>
+
+        <!-- 按场次分卡：卡头 = 时段名 + 起止 · N 岗 + 右上 已点/总数 -->
+        <view class="agrp" wx:for="{{dayView.slots}}" wx:key="slot">
+          <view class="agrp-h">
+            <view class="ahl">
+              <text class="agrp-n">{{item.slot}}</text>
+              <text class="agrp-i">{{item.timeText ? item.timeText + ' · ' : ''}}{{item.count}} 岗</text>
+            </view>
+            <text class="achip">{{item.done}} / {{item.count}}</text>
+          </view>
+
+          <view class="arow" wx:for="{{item.people}}" wx:for-item="p" wx:key="personId">
+            <view class="ainfo">
+              <text class="ainfo-n">{{p.personName}}</text>
+              <text class="ainfo-i">{{p.department || '未填部门'}}</text>
+            </view>
+            <view class="astates">
+              <view class="st {{p.status === 1 ? 'on ok' : ''}}"
+                    data-slot="{{item.slot}}" data-pid="{{p.personId}}" data-st="1"
+                    catchtap="onMark">到岗</view>
+              <view class="st {{p.status === 2 ? 'on wa' : ''}}"
+                    data-slot="{{item.slot}}" data-pid="{{p.personId}}" data-st="2"
+                    catchtap="onMark">请假</view>
+              <view class="st {{p.status === 0 ? 'on no' : ''}}"
+                    data-slot="{{item.slot}}" data-pid="{{p.personId}}" data-st="0"
+                    catchtap="onMark">缺勤</view>
+            </view>
+          </view>
+        </view>
+      </block>
+
+      <!-- 全站总览（这周口径，保留） -->
+      <block wx:if="{{overview.length}}">
+        <view class="sec-h2"><text class="sec-t">全站这周</text></view>
+        <view class="rows">
+          <view class="row" wx:for="{{overview}}" wx:key="name">
+            <text class="r-main r-note">{{item.name}}</text>
+            <text class="r-time">{{item.posts}} 场 · 到 {{item.present}} · 缺 {{item.absent}} · 假 {{item.leave}}</text>
+          </view>
+        </view>
+      </block>
+    </block>
+
+    <!-- ───── 站员：我的考勤 ───── -->
+    <block wx:else>
+      <view class="sum">
+        <view class="sum-i"><text class="sum-n">{{mineWeek}}</text><text class="sum-l">本周场次</text></view>
+        <view class="sum-i"><text class="sum-n">{{monthShifts}}</text><text class="sum-l">本月场次</text></view>
+        <view class="sum-i"><text class="sum-n ok">{{minePresent}}</text><text class="sum-l">已到岗</text></view>
+      </view>
+      <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
+      <view class="hint-note" wx:elif="{{!mine.length}}">这一周没有你的班次</view>
+      <view class="rows" wx:else>
+        <view class="row" wx:for="{{mine}}" wx:key="k">
+          <view class="r-main">
+            <text class="r-note">{{item.dayName}} {{item.slot}}</text>
+            <text class="r-time">{{item.department}}</text>
+          </view>
+          <text class="tag {{item.tagCls}}">{{item.statusText}}</text>
+        </view>
+      </view>
+      <view class="note">考勤由社干按场点名，这里只看不录。</view>
+    </block>
+  </view>
+
+  <!-- 底部固定保存条（v151 .actbar）：不改位置，只在社干视角出现 -->
+  <view class="actionbar" wx:if="{{isManager}}">
+    <button class="save-btn" hover-class="pressed" bindtap="onSave" disabled="{{saving}}">保存这天的考勤</button>
+    <view class="ab-note">考勤全站公开：站员能看自己的，也能看别人的——所以录入只交社干。</view>
+  </view>
+</view>

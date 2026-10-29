@@ -1,0 +1,185 @@
+/* pages-partner/attendance/attendance.wxss · v2（2026-10-30 按 v151 v72 重做考勤录入，1px = 2rpx）
+   状态色沿用既有口径（v151 注释里写死的三条）：
+     到岗 = accent（浅蓝底 + 蓝字 + 蓝边）
+     请假 = #FDF3DC / #B26A00（琥珀）
+     缺勤 = #FDECEA / #C0392B（红）
+   ⚠️ 这里所有「胶囊 / 方块 / 按钮」都用 <view> 做，不用 <button>：
+      微信内置的 button 样式会压过单个类名、把宽度撑满（审核页 .sm2 就是栽在这上面），
+      <view> 没有默认样式，尺寸写了是多少就是多少。 */
+
+.page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(45deg);
+  margin-left: 6rpx;
+}
+.body {
+  flex: 1;
+  padding: 19rpx 35rpx 80rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 23rpx;
+}
+/* 底部有固定保存条的视角要多留一截，否则最后一张卡被压住 */
+.body.with-bar { padding-bottom: 330rpx; }
+
+.wk-nav { display: flex; align-items: center; justify-content: space-between; padding: 2rpx 4rpx; }
+.wk-b { font-size: 25rpx; color: #0066CC; }
+.wk-b.off { color: #B3B3B8; }
+.wk-c { font-size: 25rpx; color: #1D1D1F; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* ══════════ 五个日期方块（v151 .days） ══════════ */
+.days { display: flex; gap: 12rpx; }
+.day {
+  position: relative;
+  flex: 1; min-width: 0;
+  min-height: 136rpx;                 /* 68px */
+  border-radius: 44rpx;               /* 22px */
+  background: #FFFFFF;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 10rpx;
+  box-sizing: border-box;
+  box-shadow: inset 0 0 0 2rpx #E3E3E8, 0 4rpx 16rpx -10rpx rgba(0, 0, 0, .18);
+}
+.d-n { font-size: 30rpx; font-weight: 500; color: #1D1D1F; line-height: 1; }
+.d-d { font-size: 20rpx; color: #76767E; line-height: 1; font-variant-numeric: tabular-nums; }
+.day.on {
+  background: #0066CC;
+  box-shadow: 0 12rpx 32rpx -16rpx rgba(0, 0, 0, .35);
+}
+.day.on .d-n { color: #FFFFFF; }
+.day.on .d-d { color: rgba(255, 255, 255, .82); }
+
+/* 没点完的天：右上角一个未点人数（点完就消失，不占位） */
+.d-b {
+  position: absolute; top: 8rpx; right: 10rpx;
+  min-width: 32rpx; height: 32rpx; padding: 0 8rpx;
+  border-radius: 9999rpx;
+  background: #FDF3DC; color: #B26A00;
+  font-size: 19rpx; line-height: 32rpx; text-align: center;
+  box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
+}
+.day.on .d-b { background: rgba(255, 255, 255, .92); color: #0066CC; }
+
+/* ══════════ 当日统计卡 ══════════ */
+.dhead { background: #FFFFFF; border-radius: 36rpx; padding: 32rpx; }
+.dhead-t { display: flex; align-items: baseline; gap: 16rpx; }
+.dhead-n { flex: 1; min-width: 0; font-size: 28rpx; font-weight: 600; color: #1D1D1F; }
+.dhead-m { flex: none; font-size: 22rpx; color: #76767E; font-variant-numeric: tabular-nums; }
+.astat { margin-top: 18rpx; font-size: 24rpx; color: #76767E; font-variant-numeric: tabular-nums; }
+.adot { margin: 0 14rpx; color: #C7C7CC; }
+
+/* ══════════ 场次卡（卡头 + 每人一行三态） ══════════ */
+.agrp { background: #FFFFFF; border-radius: 36rpx; padding: 0 32rpx 8rpx; }
+.agrp-h { display: flex; align-items: center; gap: 20rpx; padding: 32rpx 0 20rpx; }
+.ahl { flex: 1; min-width: 0; }
+.agrp-n { display: block; font-size: 29rpx; font-weight: 600; color: #1D1D1F; line-height: 1.35; }
+.agrp-i {
+  display: block; font-size: 23rpx; color: #76767E; margin-top: 10rpx;
+  line-height: 1.3; font-variant-numeric: tabular-nums;
+}
+.achip {
+  flex: none;
+  background: #F5F5F7; color: #76767E;
+  font-size: 22rpx; font-weight: 600;
+  padding: 10rpx 20rpx; border-radius: 9999rpx; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.arow {
+  display: flex; align-items: center; gap: 24rpx;
+  padding: 26rpx 0;
+  border-top: 2rpx solid #F0F0F3;
+}
+.ainfo { flex: 1; min-width: 0; }
+.ainfo-n { display: block; font-size: 27rpx; font-weight: 500; color: #1D1D1F; line-height: 1.35; }
+.ainfo-i { display: block; font-size: 23rpx; color: #76767E; margin-top: 8rpx; line-height: 1.3; }
+
+/* 三态：三个固定宽度 112rpx（56px）的方块，点哪个是哪个 —— 不做循环切换 */
+.astates { flex: none; display: flex; gap: 12rpx; }
+.st {
+  width: 112rpx; height: 68rpx;
+  border-radius: 24rpx;
+  background: #FFFFFF;
+  color: #76767E;
+  font-size: 24rpx; font-weight: 500; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  box-sizing: border-box;
+  box-shadow: inset 0 0 0 2rpx #E3E3E8;
+}
+.st.on { font-weight: 600; }
+.st.on.ok { background: #EAF3FD; color: #0066CC; box-shadow: inset 0 0 0 2rpx #0066CC; }
+.st.on.wa { background: #FDF3DC; color: #B26A00; box-shadow: inset 0 0 0 2rpx rgba(178, 106, 0, .38); }
+.st.on.no { background: #FDECEA; color: #C0392B; box-shadow: inset 0 0 0 2rpx rgba(192, 57, 43, .38); }
+
+/* ══════════ 汇总条 / 列表（站员视角沿用） ══════════ */
+.sum {
+  display: flex;
+  background: #FFFFFF;
+  border-radius: 28rpx;
+  padding: 24rpx 10rpx;
+}
+.sum-i { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8rpx; }
+.sum-n { font-size: 34rpx; font-weight: 600; color: #1D1D1F; font-variant-numeric: tabular-nums; }
+.sum-n.ok { color: #1E8E4E; }
+.sum-n.no { color: #C0392B; }
+.sum-n.wa { color: #B26A00; }
+.sum-l { font-size: 19rpx; color: #76767E; }
+
+.rows { background: #FFFFFF; border-radius: 35rpx; padding: 0 31rpx; }
+.row { display: flex; align-items: center; gap: 19rpx; padding: 28rpx 0; }
+.row + .row { border-top: 2rpx solid #E3E3E8; }
+.r-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.r-note { font-size: 26rpx; color: #1D1D1F; }
+.r-time { font-size: 21rpx; color: #76767E; margin-top: 6rpx; }
+.sec-h2 { padding: 6rpx 6rpx 0; }
+.sec-t { font-size: 25rpx; font-weight: 600; color: #1D1D1F; }
+
+.tag {
+  flex: none;
+  font-size: 19rpx;
+  line-height: 1.5;
+  padding: 8rpx 13rpx;
+  border-radius: 13rpx;
+  white-space: nowrap;
+}
+.tag.warn { background: #FDF3DC; color: #B26A00; }
+.tag.done { background: #EAF7EF; color: #1E8E4E; }
+.tag.no   { background: #FDECEA; color: #C0392B; }
+
+.note { font-size: 21rpx; color: #76767E; line-height: 1.7; text-align: center; }
+.hint-note { text-align: center; font-size: 23rpx; color: #76767E; padding: 30rpx 0; }
+
+/* ══════════ 底部固定保存条（v151 .actbar：羊皮纸渐隐，不是白条 + 分隔线） ══════════
+   ⚠️ 安全区写三行兜底：老基础库不认 env() 时整条 padding 会失效变 0，
+      按钮直接贴到屏幕底被 home 指示条压住，看起来就是「被切」。 */
+.actionbar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 20;
+  padding: 20rpx 36rpx 28rpx;
+  padding-bottom: calc(28rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(28rpx + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(245, 245, 247, 0) 0%, #F5F5F7 26%);
+}
+/* ⚠️ 显式 width/height：微信内置 button 样式优先级高于单个类名，不写就会被撑成整行 + 高度漂移 */
+button.save-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 96rpx;
+  margin: 0; padding: 0; border: 0; border-radius: 9999rpx;
+  background: #0066CC; color: #FFFFFF;
+  font-size: 27rpx; font-weight: 500; line-height: 1;
+  box-sizing: border-box;
+}
+button.save-btn::after { border: 0; }
+button.save-btn[disabled] { opacity: .45; }
+.ab-note {
+  margin-top: 16rpx; text-align: center;
+  font-size: 21rpx; line-height: 1.7; color: #76767E;
+}
+
+.pressed { opacity: .72; }

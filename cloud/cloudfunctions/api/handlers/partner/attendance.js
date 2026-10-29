@@ -57,12 +57,14 @@ async function buildWeek(weekStart) {
     const day = a.day || '';
     const slot = a.slot || '';
     if (!byDay[day]) byDay[day] = {};
-    if (!byDay[day][slot]) byDay[day][slot] = [];
+    // ⚠️ 每场顺带带上起止时间（班表行上就有）：考勤卡头要显示「12:10–12:40 · 2 岗」，
+    //    原来只回 {slot, people}，前端拿不到时间只能打印空行（2026-10-30 补）。
+    if (!byDay[day][slot]) byDay[day][slot] = { timeText: a.timeText || '', people: [] };
     const pid = Number(a.personId) || 0;
     const mk = markMap[keyOf(day, slot, pid)];
     const isLeave = !!leaves[keyOf(day, slot, pid)];
     const status = mk === undefined ? (isLeave ? ST.LEAVE : null) : mk;
-    byDay[day][slot].push({
+    byDay[day][slot].people.push({
       personId: pid,
       personName: a.personName || '',
       department: a.department || '',
@@ -77,9 +79,10 @@ async function buildWeek(weekStart) {
     dayName: DAY_NAMES[i] || '',
     slots: Object.keys(byDay[date] || {}).map((slot) => ({
       slot,
-      people: byDay[date][slot],
+      timeText: byDay[date][slot].timeText,
+      people: byDay[date][slot].people,
     })),
-    total: Object.keys(byDay[date] || {}).reduce((n, sl) => n + byDay[date][sl].length, 0),
+    total: Object.keys(byDay[date] || {}).reduce((n, sl) => n + byDay[date][sl].people.length, 0),
   }));
 }
 
