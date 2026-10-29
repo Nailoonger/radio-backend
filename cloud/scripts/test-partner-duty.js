@@ -404,9 +404,17 @@ const TPL = [
   section('12. 权限矩阵');
   {
     const { PARTNER_ROUTES } = require(path.join(API_DIR, 'router'));
+    // ⚠️ 这两个是「改全局配置」的动作，按设计只给超管（asSuperPartner）：
+    //    时段会钉死在已发布的班表里，规则决定全站排班上限 —— 社干改错了影响面太大。
     const superOnly = new Set([
       'PUT /partner/slots/draft',
       'POST /partner/slots/publish',
+      // 重置全部时段（删库级）—— 与保存/发布同类，社干不能碰
+      'DELETE /partner/slots',
+      'POST /partner/schedule/withdraw',
+      'PUT /partner/rules',
+      'GET /partner/accounts/candidates',
+      'POST /partner/accounts/import',
     ]);
 
     for (const [key] of PARTNER_ROUTES) {

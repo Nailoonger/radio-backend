@@ -51,9 +51,14 @@
  *
  * ⑨ **并发冲突显式处理**（**有意的小改进**，源码此处是漏的）：
  *    `applyChange` 影响 0 行时返回 `{conflict:true, logs:[]}`，而源码 `approveOne`
- *    无视它、照样报 `changed:true`。云端改成「回读真实状态 + `changed:false`」——
- *    避免把内存里的乐观值当结果返回。frontend 契约不变（`admin-web` 的成功 `message`
- *    本来就被 http 拦截器丢掉，请求体/响应体字段名一个没动）。
+ *    无视它、照样报 `changed:true` —— 于是「电脑端驳回 + 手机端通过」同时发生时
+ *    会**双双返回成功**，落库只有一种结论，两边却都以为自己赢了。
+ *
+ *    云端改成「回读真实状态 → 按结论分流」（见 `conflictOf`）：
+ *      落库结论 == 我想要的 → 幂等成功（两端都点通过，不该报错）
+ *      落库结论 != 我想要的 → 抛 40901（真冲突，必须让用户知道）
+ *    frontend 契约不变（`admin-web` 的成功 `message` 本来就被 http 拦截器丢掉，
+ *    请求体/响应体字段名一个没动）。
  *
  * ⑩ **成功路径的自定义 message 一律不带**：原后端 `success(res, data, msg)` 的 `msg`
  *    被 `admin-web/src/utils/request.js` 的「`if (body?.code === 0) return body.data`」
@@ -177,6 +182,28 @@ async function reread(row) {
  * 内部：审核通过 / 驳回
  * ------------------------------------------------------------------ */
 /**
+ * 乐观锁抢晚了（`applyChange` 影响 0 行）之后怎么办 —— **按落库结论分流**。
+ *
+ * ═══════════ 为什么不能只 throw、也不能只 return ═══════════
+ * `S.applyChange` 冲突时返回 `{conflict:true}` 而**不抛错**（它是底层工具，
+ * 调度器要自己决定重试还是放弃）。原 `approveOne` 直接把这个返回值当成功往上抛，
+ * 于是「电脑端驳回 + 手机端通过」同时发生时会**双双返回 code:0** ——
+ * 落库只有一种结论，但两边都以为自己赢了，谁都不知道自己那条被吞了。
+ *
+ * 反过来「一律抛 40901」也不对：「两端都点通过」结论一致，报错纯属噪音。
+ * 所以回读一次，比对**结论**而不是比对「谁先到」：
+ *   ① 落库结论 == 我想要的结论 → 幂等成功（`changed:false, already:true`）
+ *   ② 落库结论 != 我想要的结论 → 抛 40901，让用户刷新看到真实状态
+ */
+async function conflictOf(submit, targetReview, actionText) {
+  const fresh = await reread(submit);
+  if (Number(fresh.reviewStatus) === Number(targetReview)) {
+    return { submit: fresh, changed: false, already: true };
+  }
+  throw new ApiError(Codes.CONFLICT, `这条点歌刚被其他人${actionText}，请刷新后重试`);
+}
+
+/**
  * 协议 §14：这里的 approve **只是审核通过**，不等于拿到位置。
  *   审核通过 → review=APPROVED / schedule=UNASSIGNED → 进排期候选池
  */
@@ -210,8 +237,8 @@ async function approveOne(submit, adminId) {
   const r = await S.applyChange(submit, changes, {
     operatorId: adminId, operatorName: 'ADMIN', reason: 'REVIEW_APPROVED',
   });
-  // 文件头 ⑨：抢晚了（影响 0 行）时回读真实状态，别把乐观值当结果
-  if (r.conflict) return { submit: await reread(submit), changed: false, conflict: true };
+  // 文件头 ⑨：抢晚了（影响 0 行）→ 回读真实状态后按结论分流（见 conflictOf）
+  if (r.conflict) return conflictOf(submit, S.REVIEW.APPROVED, '通过了');
   return { submit: r.row, changed: true };
 }
 
@@ -232,7 +259,16 @@ async function rejectOne(submit, adminId, reason) {
     rejectReason: reason,
     autoRejected: 0,
   }, { operatorId: adminId, operatorName: 'ADMIN', reason: 'REVIEW_REJECTED' });
-  return { submit: r.conflict ? await reread(submit) : r.row, wasSeated, conflict: !!r.conflict };
+
+  if (r.conflict) {
+    // 与入口判断同口径：别人也驳回了 → 和「连点两次」一个语义，不报冲突
+    const fresh = await reread(submit);
+    if (Number(fresh.reviewStatus) === S.REVIEW.REJECTED) {
+      throw new ApiError(Codes.PARAM_ERROR, '这条已是驳回状态，无需重复操作');
+    }
+    throw new ApiError(Codes.CONFLICT, '这条点歌刚被其他人处理过，请刷新后重试');
+  }
+  return { submit: r.row, wasSeated, conflict: false };
 }
 
 /* ------------------------------------------------------------------ *
@@ -528,7 +564,9 @@ async function revoke(ctx) {
     reviewerId: null,
     autoRejected: 0,
   }, { operatorId: ctx.admin.id, operatorName: 'ADMIN', reason: 'REVOKED' });
-  const row = r.conflict ? await reread(submit) : r.row;
+  // 撤销没有「同结论」的可能（目标是回到待审），抢晚了就一定是被别人抢先改了状态
+  if (r.conflict) throw new ApiError(Codes.CONFLICT, '这条点歌刚被其他人处理过，请刷新后重试');
+  const row = r.row;
 
   if (Number(row.type) === 1) {
     if (fromSlot) {

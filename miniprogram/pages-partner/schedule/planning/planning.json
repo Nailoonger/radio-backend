@@ -1,0 +1,6 @@
+{
+  "navigationStyle": "custom",
+  "usingComponents": { "duty-timetable": "../timetable/index" },
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
+}

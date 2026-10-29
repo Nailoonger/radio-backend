@@ -1,0 +1,43 @@
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar"><view class="navbar-back" bindtap="goBack" aria-label="返回"><view class="chev"></view></view><view class="navbar-title">排班工作台</view><view class="navbar-spacer"></view></view>
+  <view class="body">
+    <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
+    <view class="error" wx:elif="{{loadError}}"><text>班表未能加载</text><text class="note">{{loadError}}</text><button class="btn ghost" bindtap="load">重试</button></view>
+    <block wx:else>
+      <view class="state {{stateClass}}"><text class="state-title">{{stateText}}</text><text>{{stateSub}}</text></view>
+      <view class="summary"><view><text class="number">{{summary.filled}}<text class="denom">/{{summary.needed}}</text></text><text>已安排</text></view><view><text class="number">{{summary.missing}}</text><text>缺岗</text></view><view><text class="number">{{summary.fixed}}</text><text>已固定</text></view></view>
+      <text class="empty-note" wx:if="{{state !== 'published' && state !== 'draft'}}">本周班表尚未生成</text><duty-timetable wx:else week="{{week}}" my-id="{{myId}}" editable="{{state === 'draft'}}" show-fixed="{{true}}" bind:edit="onEdit"/>
+      <view class="ops" wx:if="{{state === 'draft'}}">
+        <view class="buttons"><button class="btn ghost" disabled="{{busy}}" bindtap="onGenerate">再次生成</button><button class="btn ghost" disabled="{{busy}}" bindtap="onCheck">检查班表</button><button class="btn primary" disabled="{{busy}}" bindtap="onPublish">确认发布</button></view>
+        <button class="mini" disabled="{{busy}}" bindtap="onClear">一键清空班表（清掉所有人员，重新生成）</button>
+      </view>
+      <view class="ops" wx:elif="{{state === 'published'}}"><view class="buttons"><button wx:if="{{isSuper}}" class="btn ghost" disabled="{{busy}}" bindtap="onWithdraw">撤回发布</button></view><button class="mini" bindtap="goFormal">我的班表（本人在正式版里的位置）</button></view>
+      <block wx:else><button class="btn primary" wx:if="{{slotReady}}" disabled="{{busy}}" bindtap="onGenerate">生成班表草稿</button><button class="btn primary" wx:elif="{{isSuper}}" bindtap="goSlots">去发布值班时段</button><button class="btn primary" wx:else bindtap="goSlotsRo">查看时段准备情况</button></block>
+      <view class="check" wx:if="{{checked}}"><text class="state-title">{{checkText}}</text><text class="issue" wx:for="{{issues}}" wx:key="key">{{item.text}}</text><text class="missing" wx:for="{{missing}}" wx:key="key">{{item.text}}</text></view>
+      <view class="links">
+        <view class="link" bindtap="goSlots"><image src="/assets/partner/ic-cal.png"/><text>值班时段</text><text class="hint">{{slotHint}}</text><text>›</text></view>
+        <view class="link" bindtap="goRules"><image src="/assets/partner/ic-star.png"/><text>排班规则</text><text class="hint">{{ruleHint}}</text><text>›</text></view>
+        <view class="link" bindtap="goProxy"><image src="/assets/partner/ic-chk.png"/><text>值班时间代录</text><text class="hint">{{availabilityHint}}</text><text>›</text></view>
+        <view class="link" bindtap="goHistory"><image src="/assets/partner/ic-refresh.png"/><text>发布与调整记录</text><text class="hint">谁调整、为什么</text><text>›</text></view>
+      </view>
+      <text class="note">排班不使用个人权重；先满足硬条件（时间冲突 / 请假 / 资格 / 场次上限），再按轮值均衡安排。</text>
+    </block>
+  </view>
+</view>
+<!-- ⚠️ 同 slots：hidden 常驻，防 wx:if 销毁重建吞字 -->
+  <view class="overlay" hidden="{{!sheetOpen}}" catchtap="closeSheet" catchtouchmove="stopTap">
+  <view class="sheet" catchtap="stopTap">
+    <view class="sheet-head"><text class="state-title">安排岗位</text><button class="close" bindtap="closeSheet">关闭</button></view>
+    <text class="edit-title">{{editTitle}}</text><text class="note">需 {{edit.count}} 人 · 已选 {{selectedCount}} 人</text>
+    <scroll-view class="candidate-list" scroll-y>
+      <text class="hint-note" wx:if="{{candidateLoading}}">正在检查候选人……</text>
+      <view wx:elif="{{candidateError}}"><text class="issue">{{candidateError}}</text><button class="btn ghost" bindtap="loadCandidates">重试</button></view>
+      <view class="candidate {{item.selected ? 'selected' : ''}} {{!item.eligible ? 'unavailable' : ''}}" wx:for="{{candidates}}" wx:key="personId" data-id="{{item.personId}}" bindtap="onPick"><view class="pick">{{item.selected ? '✓' : ''}}</view><view class="candidate-main"><text class="candidate-name">{{item.name}}</text><text class="candidate-note">{{item.department}} · {{item.reasonText}}</text></view></view>
+      <text class="hint-note" wx:if="{{!candidateLoading && !candidateError && !candidates.length}}">暂时没有人员，请先配置伙伴岗位资格。</text>
+    </scroll-view>
+    <view class="fixed-option"><text>固定人选，再次生成时保留</text><switch color="#0066CC" checked="{{fixed}}" bindchange="onFixed"/></view>
+    <input class="reason" placeholder="填写调整原因（必填）" value="{{reason}}" maxlength="200" bindinput="onReason"/>
+    <button class="btn primary" disabled="{{busy || candidateLoading || !!candidateError}}" loading="{{busy}}" bindtap="onSaveCell">保存岗位安排</button>
+  </view>
+</view>

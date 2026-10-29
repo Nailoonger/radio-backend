@@ -213,10 +213,63 @@ const PARTNER_ROUTES = [
   ['GET /partner/slots/published', 'partner.slots.publishedOnly'],
   ['PUT /partner/slots/draft', 'partner.slots.saveDraft'],
   ['POST /partner/slots/publish', 'partner.slots.publish'],
+  ['DELETE /partner/slots', 'partner.slots.reset'],
 
   ['GET /partner/availability', 'partner.availability.get'],
   ['PUT /partner/availability', 'partner.availability.save'],
   ['DELETE /partner/availability', 'partner.availability.reset'],
+
+  // ⚠️ 字面量段（/list、/review）必须排在 /:id 之前，否则 /list 会被当成 id
+  ['GET /partner/draft/list', 'partner.draft.list'],
+  ['GET /partner/draft/review', 'partner.draft.reviewList'],
+  ['GET /partner/draft/:id/versions', 'partner.draft.versions'],
+  ['GET /partner/draft/:id', 'partner.draft.detail'],
+  ['POST /partner/draft', 'partner.draft.create'],
+  ['PUT /partner/draft/:id/submit', 'partner.draft.submit'],
+  ['PUT /partner/draft/:id/review', 'partner.draft.review'],
+  ['PUT /partner/draft/:id', 'partner.draft.save'],
+  ['POST /partner/draft/:id/restore', 'partner.draft.restore'],
+
+  // 排班规则（两条硬约束）
+  ['GET /partner/rules', 'partner.rule.get'],
+  ['PUT /partner/rules', 'partner.rule.save'],
+
+  // 请假：站员申请、社干批
+  ['GET /partner/leave/mine', 'partner.leave.mine'],
+  ['GET /partner/leave/pending', 'partner.leave.pending'],
+  ['POST /partner/leave', 'partner.leave.create'],
+  ['PUT /partner/leave/:id/review', 'partner.leave.review'],
+  ['DELETE /partner/leave/:id', 'partner.leave.remove'],
+  ['GET /partner/leave/:id/impact', 'partner.leave.impact'],
+
+  // 考勤：按场点名 / 我的 / 总览
+  ['GET /partner/attendance/week', 'partner.attendance.week'],
+  ['GET /partner/attendance/mine', 'partner.attendance.mine'],
+  ['GET /partner/attendance/overview', 'partner.attendance.overview'],
+  ['PUT /partner/attendance', 'partner.attendance.mark'],
+
+  // 班表：读 / 我的班次 / 生成草稿 / 发布
+  ['GET /partner/schedule/mine', 'partner.schedule.mine'],
+  ['GET /partner/schedule/month', 'partner.schedule.month'],
+  ['GET /partner/schedule/check', 'partner.schedule.check'],
+  ['GET /partner/schedule/candidates', 'partner.schedule.candidates'],
+  ['GET /partner/schedule/history', 'partner.schedule.history'],
+  ['GET /partner/schedule', 'partner.schedule.get'],
+  ['PUT /partner/schedule/generate', 'partner.schedule.generate'],
+  ['POST /partner/schedule/publish', 'partner.schedule.publish'],
+  ['POST /partner/schedule/withdraw', 'partner.schedule.withdraw'],
+  ['PUT /partner/schedule/cell', 'partner.schedule.setCell'],
+  ['DELETE /partner/schedule/draft', 'partner.schedule.clear'],
+
+  // 账号管理（超管）：从学生名册拉人进伙伴端
+  ['GET /partner/accounts/candidates', 'partner.accounts.candidates'],
+  ['POST /partner/accounts/import', 'partner.accounts.importAccounts'],
+
+  // 互评：当场说一句，匿名聚合
+  ['GET /partner/feedback/pending', 'partner.feedback.pending'],
+  ['GET /partner/feedback/mine', 'partner.feedback.mine'],
+  ['GET /partner/feedback/overview', 'partner.feedback.overview'],
+  ['POST /partner/feedback', 'partner.feedback.create'],
 ];
 
 // 系统自检 / 初始化（不属于业务接口，但用同一套网关）

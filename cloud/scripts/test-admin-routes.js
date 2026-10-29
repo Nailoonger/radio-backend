@@ -95,7 +95,8 @@ const modKeyToFile = (key) => key.replace(/\./g, '/') + '.js';
   ok('REGISTRY 里每个 key 都能落到磁盘上的文件', notOnDisk.length === 0, notOnDisk.join(', '));
 
   eq('★ 双向刚好一一对应（数量相等）', REG.length, fileKeys.length);
-  eq('REGISTRY 条数（含招新：1 system + 11 user + 15 admin）', REG.length, 27);   // 26 → 27：+ admin.upload
+  // 27 → 37：伙伴端 handlers 落成一组（me/slots/availability/draft/rule/leave/attendance/schedule/accounts/feedback）
+  eq('REGISTRY 条数（1 system + 11 user + 15 admin + 10 partner）', REG.length, 37);
 
   // 辅助件必须真的是辅助件（没有被路由引用）
   const routeModKeys = [...new Set(RAW_ROUTES.map(([, hk]) => {
@@ -105,7 +106,8 @@ const modKeyToFile = (key) => key.replace(/\./g, '/') + '.js';
   const helpers = listHandlerFiles(HANDLERS_DIR)
     .filter((f) => path.basename(f).startsWith('_'))
     .map(fileToModKey);
-  eq('下划线辅助件清单', helpers.sort(), ['admin._kit', 'admin._people']);
+  // 2026-10-29：partner 侧新增 _published（已发布班表/时段的只读快照辅助件）
+  eq('下划线辅助件清单', helpers.sort(), ['admin._kit', 'admin._people', 'partner._kit', 'partner._published']);
   ok('辅助件没有被任何路由直接引用', helpers.every((h) => routeModKeys.indexOf(h) < 0), helpers.join(', '));
 
   /* ══════════════ B. 每条路由都能解析到真实导出 ══════════════ */
@@ -139,12 +141,16 @@ const modKeyToFile = (key) => key.replace(/\./g, '/') + '.js';
   const adminRoutes = RAW_ROUTES.filter(([k]) => pathOf(k).startsWith('/admin/'));
   const userRoutes = RAW_ROUTES.filter(([k]) => pathOf(k).startsWith('/user/'));
   const systemRoutes = RAW_ROUTES.filter(([, hk]) => hk.startsWith('system.'));
+  // ⚠️ 2026-10-29 起有第四种前缀：/partner/**（伙伴端小程序 + admin-web 共用）
+  const partnerRoutes = RAW_ROUTES.filter(([k]) => pathOf(k).startsWith('/partner/'));
   eq('★ admin 路由 112 条（含招新）', adminRoutes.length, 112);   // 111 → 112：+ PUT /admin/submit/slot-dates
   eq('user 路由 38 条（含招新）', userRoutes.length, 38);
   eq('system 路由 2 条（/health + /system/init-collections）',
     systemRoutes.map(([k]) => k), ['GET /health', 'POST /system/init-collections']);
-  eq('路由总数 = admin + user + system（没有第四种前缀）',
-    RAW_ROUTES.length, adminRoutes.length + userRoutes.length + systemRoutes.length);
+  eq('路由总数 = admin + user + system + partner（没有第五种前缀）',
+    RAW_ROUTES.length,
+    adminRoutes.length + userRoutes.length + systemRoutes.length + partnerRoutes.length);
+  ok('伙伴端路由确实存在（不是空组）', partnerRoutes.length > 0, `partner=${partnerRoutes.length}`);
   eq('★ 去重后的 handlerKey 数', seen.size, new Set(RAW_ROUTES.map(([, hk]) => hk)).size);
 
   /* ══════════════ C. 诊断文案契约（与移植进度无关） ══════════════ */

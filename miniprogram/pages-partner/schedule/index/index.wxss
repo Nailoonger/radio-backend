@@ -1,0 +1,209 @@
+/* pages-partner/schedule/index/index.wxss · v3（2026-10-29 照 v151 重做）
+   数值全部来自原型实测（1px = 1.923rpx）：
+     .pl-title 26px/600 ls-.7  ·  .pl-sub 12px muted
+     .pl-state radius 14 padding 11/14 fs 12.5；pub #272729 白字 / draft #FFF4DD+8A5A12 / none #F0F1F4+5A5A5F
+     .wk-sp flex gap10 bg parchment radius 12 padding 9/14 margin 2/0/12 + inset 0 0 0 1 line
+            .k 11.5 muted  ·  .ps gap6 wrap margin-left auto  ·  .ps b 11.5/500 ink2 bg#fff radius 8 pad 3/9
+     .sc-row min-height 62 padding 13/16 gap 12
+   ⚠️ .pl-state.pub 的深色（#272729）是原型既有件（与 .dark-strip 同类），照搬未改。 */
+
+.page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
+.body {
+  flex: 1;
+  padding: 19rpx 35rpx 215rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 23rpx;
+}
+
+/* 接口失败 */
+.err {
+  background: #FDECEA;
+  border-radius: 24rpx;
+  padding: 20rpx 26rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+.err-t { font-size: 22rpx; font-weight: 600; color: #C0392B; }
+.err-d { font-size: 20rpx; color: #C0392B; line-height: 1.5; opacity: .9; }
+
+/* ── 班表管理：抬头 ── */
+.pl-head { padding: 0 6rpx; display: flex; flex-direction: column; gap: 10rpx; }
+.pl-title { font-size: 50rpx; font-weight: 600; letter-spacing: -1.3rpx; line-height: 1.35; color: #1D1D1F; }
+.pl-sub { font-size: 23rpx; color: #76767E; line-height: 1.6; }
+
+/* ── 班表管理：状态条 ── */
+.pl-state {
+  border-radius: 27rpx;
+  padding: 21rpx 27rpx;
+  font-size: 24rpx;
+  line-height: 1.55;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+.pl-state .ps-b { font-weight: 600; }
+.pl-state.pub { background: #272729; color: #FFFFFF; }
+.pl-state.draft { background: #FFF4DD; color: #8A5A12; }
+.pl-state.none { background: #F0F1F4; color: #5A5A5F; }
+.pl-state.wd { background: #FDECEA; color: #B42318; }
+.pl-state .ps-s { opacity: .78; }
+
+/* ── 周表格 ── */
+.wk { background: #FFFFFF; border-radius: 35rpx; padding: 35rpx 31rpx 31rpx; }
+.wk-hd {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 0;
+  margin-bottom: 31rpx;
+}
+.wk-hd-b { font-size: 33rpx; font-weight: 600; letter-spacing: -0.8rpx; line-height: 1.6; color: #1D1D1F; font-variant-numeric: tabular-nums; }
+.wk-hd-s { font-size: 21rpx; line-height: 1.6; color: #76767E; }
+
+/* 只在一天出现的时段（早会）→ 横带 */
+.wk-sp {
+  display: flex;
+  align-items: center;
+  gap: 19rpx;
+  background: #F5F5F7;
+  border-radius: 23rpx;
+  padding: 17rpx 27rpx;
+  margin: 4rpx 0 23rpx;
+  box-shadow: inset 0 0 0 2rpx #E3E3E8;
+}
+.wk-sp-k { font-size: 22rpx; line-height: 1.6; color: #76767E; letter-spacing: .4rpx; flex: none; }
+.wk-sp-ps { display: flex; gap: 12rpx; flex-wrap: wrap; margin-left: auto; }
+
+.wk-grid {
+  display: grid;
+  grid-template-columns: 81rpx repeat(5, 1fr);
+  gap: 12rpx;
+  align-items: center;
+}
+.wk-ch { text-align: center; font-size: 21rpx; color: #76767E; line-height: 1.35; }
+.wk-ch-n { display: block; font-size: 23rpx; font-weight: 500; color: #1D1D1F; }
+.wk-ch-d { display: block; }
+
+.wk-rh { font-size: 20rpx; color: #76767E; line-height: 1.35; }
+.wk-rh-n { display: block; font-size: 23rpx; font-weight: 500; color: #1D1D1F; }
+
+/* ⚠️ 照原型 .wk-c：**透明**、无圆角、无 padding —— 只有胶囊自己有色。
+   之前给它加了灰底圆角块，看起来就像"一个大格子罩住里面两个小胶囊"。 */
+.wk-c {
+  min-height: 108rpx;      /* 56px */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8rpx;               /* 4px */
+}
+
+/* 人名胶囊 —— 网格里的（原型 .wk-c b）
+   ⚠️ **不是药丸**：radius 12px(23rpx)；fs 11px(21rpx)；padding 8px 2px(15rpx 4rpx)；block + 居中 */
+.pp {
+  display: block;
+  font-weight: 500;
+  font-size: 21rpx;
+  line-height: 1;
+  padding: 15rpx 4rpx;
+  border-radius: 23rpx;
+  background: #F5F5F7;
+  color: #1D1D1F;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.pp-n { display: block; font-size: 21rpx; }
+.pp-d { display: block; font-size: 17rpx; line-height: 1.3; font-weight: 400; color: #76767E; }
+.pp.me { background: #EAF3FD; color: #0066CC; font-weight: 600; }
+.pp.leave { background: #FDF3DC; color: #B26A00; }
+.pp.ok { background: #EAF7EF; color: #1E8E4E; }
+/* 空缺：透明底 + 1.5px 描边（原型 b.empty） */
+.pp.empty { background: transparent; color: #B3B3B8; font-weight: 400; box-shadow: inset 0 0 0 3rpx #E3E3E8; }
+
+.wk-lg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 19rpx 27rpx;
+  padding: 27rpx 0 0;
+  border-top: 2rpx solid #E3E3E8;
+  margin-top: 31rpx;
+}
+.lg-i { display: flex; align-items: center; gap: 10rpx; font-size: 21rpx; line-height: 1; color: #76767E; }
+.dot { width: 21rpx; height: 21rpx; border-radius: 8rpx; display: inline-block; flex: none; }
+.dot.me { background: #EAF3FD; box-shadow: inset 0 0 0 2rpx #0066CC; }
+.dot.leave { background: #FDF3DC; box-shadow: inset 0 0 0 2rpx #D99A00; }
+.dot.ok { background: #EAF7EF; box-shadow: inset 0 0 0 2rpx #1E8E4E; }
+.dot.empty { background: #F7F8FA; box-shadow: inset 0 0 0 2rpx #E3E3E8; }
+.lg-note { flex-basis: 100%; font-size: 21rpx; color: #B3B3B8; line-height: 1.5; }
+
+/* ── 通用块（我的请假 / 本月场次） ── */
+.blk { background: #FFFFFF; border-radius: 35rpx; padding: 0 31rpx 16rpx; }
+.blk-h { display: flex; align-items: baseline; justify-content: space-between; padding: 26rpx 0 12rpx; }
+.blk-h .t { font-size: 25rpx; font-weight: 600; color: #1D1D1F; }
+.blk-h .more { font-size: 21rpx; color: #76767E; }
+
+.rows { background: #FFFFFF; border-radius: 35rpx; padding: 0 31rpx; }
+.rows-in { padding: 0; }
+.row { display: flex; align-items: center; gap: 19rpx; padding: 26rpx 0; }
+.row + .row { border-top: 2rpx solid #E3E3E8; }
+.row-hover { opacity: .75; }
+.r-text { flex: 1; min-width: 0; font-size: 25rpx; color: #1D1D1F; }
+.r-text.mine { color: #0066CC; font-weight: 600; }
+.rv { flex: none; font-size: 24rpx; color: #76767E; font-variant-numeric: tabular-nums; }
+.r-main { flex: 1; min-width: 0; }
+.r-export { font-size: 27rpx; color: #0066CC; font-weight: 500; }
+.r-meta2 { font-size: 23rpx; color: #76767E; flex: none; }
+.ric { flex: none; width: 38rpx; height: 38rpx; }
+
+.tag {
+  flex: none; font-size: 19rpx; line-height: 1.5;
+  padding: 8rpx 13rpx; border-radius: 13rpx; white-space: nowrap;
+}
+.tag.warn { background: #FDF3DC; color: #B26A00; }
+.tag.done { background: #EAF7EF; color: #1E8E4E; }
+.tag.no   { background: #FDECEA; color: #C0392B; }
+
+/* ── 班表管理：操作区与四行 ── */
+.pl-ops { display: flex; flex-direction: column; gap: 16rpx; }
+.ts-bar-h { font-size: 21rpx; color: #76767E; line-height: 1.7; text-align: center; padding: 0 10rpx; }
+.ts-bar {
+  background: #FFFFFF; border-radius: 26rpx; padding: 22rpx 28rpx;
+}
+
+.sc-wrap { background: #FFFFFF; border-radius: 35rpx; padding: 0 31rpx; }
+.sc-row { display: flex; align-items: center; gap: 23rpx; min-height: 119rpx; padding: 25rpx 0; }
+.sc-row + .sc-row { border-top: 2rpx solid #E3E3E8; }
+.sc-tx { flex: none; font-size: 27rpx; color: #1D1D1F; }
+.sc-st { flex: 1; min-width: 0; text-align: right; font-size: 21rpx; color: #76767E; }
+.sc-ar { flex: none; font-size: 29rpx; color: #C7C7CC; }
+
+/* 按钮 */
+button.btn {
+  height: 88rpx;          /* 46px */
+  border-radius: 25rpx;   /* 13px —— 原型 .btn 最终生效的圆角，不是药丸 */
+  padding: 0 35rpx;       /* 12px 18px 的横向内边距 */
+  font-size: 27rpx;
+  font-weight: 500;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0; margin: 0; border: 0;
+  box-sizing: border-box;
+}
+button.btn::after { border: 0; }
+button.btn.ghost { background: #FFFFFF; color: #0066CC; box-shadow: inset 0 0 0 2rpx #E2E2E7; }
+button.btn.primary { background: #0066CC; color: #FFFFFF; }
+
+.hint-note { text-align: center; font-size: 23rpx; color: #76767E; padding: 30rpx 0; }
+.pressed { opacity: .72; }
+.personal-actions{display:flex;gap:16rpx}.personal-actions button.btn{flex:1;min-width:0;font-size:25rpx}
+.pl-state.published{background:#EAF3FD;color:#0066CC}
+button.btn{width:100%}
+
+/* 横带里的胶囊：单行、只有名字（照原型 .wk-sp .ps b：pad 3px 9px / radius 8px / fs 11.5px） */
+/* 横带胶囊（原型 .wk-sp .ps b）：8px 圆角、pad 3px 9px、**line-height 1.6**（不是 1，丢了整条带会矮 7px） */
+.pp.one { padding: 6rpx 17rpx; border-radius: 15rpx; font-size: 22rpx; line-height: 1.6; display: inline-block; }
+.pp.one.empty { box-shadow: none; padding: 0; }

@@ -1,113 +1,161 @@
-<!-- 伙伴端 · 值班时段配置（P1）
-     编辑态（超管）：周一到周五各自增删时段 → 存草稿 → 发布
-     只读态（社干）：同一套布局，输入全部置灰、没有底部操作
-     ⚠️ 置灰只是体验，真正的拦截在云函数（PUT/POST 都是仅超管） -->
+<!-- 伙伴端 · 值班时段配置 v2.1（2026-10-29 照原型重做）
+     卡片 = 一个「场次」：名称 + 起止 + 哪几天 + 部门×人数。
+     ⚠️ WXML 没有 <b>/<i>/<span> 标签！上一版写了导致布局炸裂（标题竖排、按钮出框），
+        全部改用 <text class="…">。原句照抄原型，见 partner-design-spec-v1.md -->
 <view class="page">
 
-  <!-- 头部 -->
   <view class="bar" style="padding-top:{{statusBarHeight}}px">
     <view class="bar-in">
-      <view class="bar-l">
-        <text class="bar-t">值班时段</text>
-        <text class="bar-s">{{publishedInfo}}</text>
+      <!-- 返回上一级（原型导航栏左上的 ›，没有它出不去） -->
+      <view class="back" hover-class="back-hover" bindtap="goBack">
+        <text class="back-ic">‹</text>
       </view>
-      <text class="badge" wx:if="{{canEdit && pendingDraft}}">草稿 v{{draftVersion}} 待发布</text>
-      <text class="badge ro" wx:elif="{{!canEdit}}">只读</text>
+      <text class="bar-t">值班时段</text>
+      <view class="bar-r"></view>
     </view>
   </view>
 
-  <!-- 社干只读提示 -->
-  <view class="tip" wx:if="{{!canEdit}}">
-    <text class="tip-t">值班时段由超管维护</text>
-    <text class="tip-s">你可以在这里查看当前生效的时段；需要调整请找老师或超管。</text>
-  </view>
-
-  <!-- 天切换 -->
-  <scroll-view class="tabs" scroll-x enable-flex show-scrollbar="{{false}}">
-    <view class="tab {{dayIndex === index ? 'on' : ''}}"
-          wx:for="{{dayTabs}}"
-          wx:key="day"
-          wx:for-item="tab"
-          wx:for-index="index"
-          data-i="{{index}}"
-          bindtap="onSwitchDay">
-      <text class="tab-n">{{tab.name}}</text>
-      <text class="tab-c">{{tab.count}}</text>
+  <view class="body">
+    <!-- 接口失败：说清楚，不要伪装成没数据 -->
+    <view class="err" wx:if="{{loadError}}">
+      <text class="err-t">数据没拉到</text>
+      <text class="err-d">{{loadError}}</text>
     </view>
-  </scroll-view>
 
-  <!-- 当前天的时段列表 -->
-  <view class="day-rows">
-    <view class="row" wx:for="{{dayRows}}" wx:key="idx" wx:for-item="r">
-      <!-- 第一行：名称 + 删除 -->
-      <view class="row-hd">
-        <input class="in-title"
-               value="{{r.title}}"
-               placeholder="时段名称"
-               placeholder-class="ph"
-               disabled="{{!canEdit}}"
-               data-idx="{{r.idx}}"
-               bindinput="onEditTitle"
-               maxlength="20" />
-        <view class="del" wx:if="{{canEdit}}" data-idx="{{r.idx}}" bindtap="onRemoveRow" hover-class="del-hover">删除</view>
+    <!-- 顶部信息区（原型 ts-top + ts-hint） -->
+    <view class="ts-top">
+      <view class="ts-top-l">
+        <text class="ts-no">{{weekNo}}</text>
+        <text class="ts-range">{{weekRange}}</text>
       </view>
+      <text class="tag {{isPublished ? 'ok' : ''}}">{{pubTag}}</text>
+    </view>
+    
 
-      <!-- 第二行：起止时间 -->
-      <view class="row-times">
-        <picker mode="time" value="{{r.startText}}" disabled="{{!canEdit}}"
-                data-idx="{{r.idx}}" data-field="start" bindchange="onTimeChange">
-          <view class="tm {{canEdit ? '' : 'ro'}}">{{r.startText}}</view>
-        </picker>
-        <text class="tm-sep">—</text>
-        <picker mode="time" value="{{r.endText}}" disabled="{{!canEdit}}"
-                data-idx="{{r.idx}}" data-field="end" bindchange="onTimeChange">
-          <view class="tm {{canEdit ? '' : 'ro'}}">{{r.endText}}</view>
-        </picker>
-      </view>
+    <!-- ＋ 新增值班时段 -->
+    <button class="btn primary add" wx:if="{{canEdit}}" bindtap="onAdd">＋ 新增值班时段</button>
 
-      <!-- 第三行：部门 / 岗位 / 人数 -->
-      <view class="row-meta">
-        <picker range="{{deptOptions}}" disabled="{{!canEdit}}"
-                data-idx="{{r.idx}}" bindchange="onPickDept">
-          <view class="chip {{canEdit ? '' : 'ro'}}">{{r.deptText}}</view>
-        </picker>
-        <picker range="{{roleOptions}}" disabled="{{!canEdit}}"
-                data-idx="{{r.idx}}" bindchange="onPickRole">
-          <view class="chip {{canEdit ? '' : 'ro'}}">{{r.roleText}}</view>
-        </picker>
-
-        <view class="stepper" wx:if="{{canEdit}}">
-          <view class="st-btn" data-idx="{{r.idx}}" data-delta="-1" bindtap="onStepCount" hover-class="st-hover">−</view>
-          <text class="st-num">{{r.count}} 人</text>
-          <view class="st-btn" data-idx="{{r.idx}}" data-delta="1" bindtap="onStepCount" hover-class="st-hover">+</view>
+    <!-- 场次卡列表（原型 slotCards） -->
+    <view class="cards">
+      <view class="slot-card" wx:for="{{cards}}" wx:key="key">
+        <view class="hd">
+          <text class="sc-name">{{item.name}}</text>
+          <view class="hd-r">
+            <text class="badge-n">{{item.dayCount}} 天</text>
+            <text class="lnk" wx:if="{{canEdit}}" data-key="{{item.key}}" bindtap="onEdit">编辑</text>
+            <text class="lnk" wx:if="{{canEdit}}" data-key="{{item.key}}" bindtap="onDelAsk">删除</text>
+          </view>
         </view>
-        <text class="st-ro" wx:else>需 {{r.count}} 人</text>
+        <view class="dl">{{item.dayText}}</view>
+        <view class="tm">
+          <text class="tm-t">{{item.startText}}</text>
+          <text class="tm-sep">—</text>
+          <text class="tm-t">{{item.endText}}</text>
+        </view>
+        <view class="hr"></view>
+        <view class="sum">{{item.deptCount}} 个部门每场共 {{item.total}} 人</view>
+        <view class="dp" wx:for="{{item.deptLines}}" wx:for-item="d" wx:key="dept">
+          <text class="dp-n">{{d.dept}}-{{d.role}}</text>
+          <text class="dp-c">每场 {{d.count}} 人</text>
+        </view>
+
+        <!-- 删除二步确认（原型 ask） -->
+        <view class="ask" wx:if="{{delKey === item.key}}">
+          <text class="ask-t">删掉「{{item.name}}」这个时段？站员端也会同步消失。</text>
+          <view class="ask-btns">
+            <button class="ask-no" bindtap="onDelNo">取消</button>
+            <button class="ask-yes" bindtap="onDelYes">确认删除</button>
+          </view>
+        </view>
+      </view>
+
+      <view class="empty" wx:if="{{!hasAny && !loading}}">还没有值班时段。点上面「＋ 新增值班时段」加一条。</view>
+    </view>
+
+    <!-- 底部发布条（原型 actbar）
+         ⚠️ 只有存在未发布草稿时才出现「发布」按钮：没草稿时点它会直接报
+            「没有待发布的草稿」，比不给按钮更让人慌。 -->
+    <view class="actbar" wx:if="{{canEdit && pendingDraft}}">
+      <button class="btn primary pub" bindtap="onPublish" disabled="{{publishing}}">发布本周值班时段</button>
+      <view class="act-note">当前这些改动只是草稿，发布后站员端的「可排时间」才会按它显示。</view>
+    </view>
+    <view class="act-note ro-note" wx:elif="{{canEdit}}">改完保存会变成草稿；草稿要点「发布」才算生效，站员端才会跟着变。</view>
+    <view class="act-note ro-note" wx:if="{{!canEdit}}">时段由超管发布；你在这里只能看。</view>
+
+    <!-- 危险区：重置全部时段（回到「从未配置」）
+         有了已发布版本之后，界面上没有任何办法把它清干净（发布拒绝空配置），
+         初始化 / 清理联调数据只能靠这个入口，不用再进云开发控制台。 -->
+    <view class="danger" wx:if="{{canEdit}}">
+      <button class="danger-btn" bindtap="onReset" disabled="{{resetting}}">重置全部值班时段</button>
+      <view class="danger-note">清掉所有版本（含已发布的），回到「从未配置」。日常改时段请直接编辑上面的卡片，别用这里。</view>
+    </view>
+  </view>
+
+  <!-- ⚠️ 次级页面**不挂**底部导航（陛下 2026-10-29 定）：只有四个 tab 页挂 dock -->
+  <!-- ── 加/编辑一个场次（原型 slotNewSheet） ── -->
+  <!-- ⚠️ 弹层用 hidden 常驻，不能用 wx:if：wx:if 每次开合都销毁重建节点，
+     input 里打到一半的字会整个被吞（陛下 2026-10-29 连续打回的吞字根因） -->
+  <view class="sheet" hidden="{{!sheet}}" catchtap="closeSheet">
+    <view class="sheet-mask"></view>
+    <view class="sheet-body sn-body" catchtap="stop">
+      <view class="sheet-grab"></view>
+      <view class="sn-hd">
+        <text class="sn-title">{{shTitle}}</text>
+        <text class="sn-desc">{{shDesc}}</text>
+      </view>
+
+      <view class="sn-sec">
+        <view class="sn-lab">星期几（可多选）</view>
+        <view class="sn-days">
+          <button
+            wx:for="{{shDays}}" wx:key="i"
+            class="sn-day {{item.on ? 'on' : ''}}"
+            data-i="{{item.i}}" bindtap="toggleDay"
+          >{{item.name}}</button>
+        </view>
+      </view>
+
+      <view class="sn-sec">
+        <view class="sn-lab">时段名称</view>
+        <!-- ⚠️⚠️ 输入长度不能卡 6：
+             「最多 6 个字」是**存下来之后的规则**，不是输入框的上限。中文拼音输入时
+             wujian=6 个字母就被 maxlength 截住，汉字根本没法上屏 —— 表现为
+             「字打不进去」+ 保存时提示「写个时段名称」（陛下 2026-10-29 连踩两次）。
+             输入放行到 20（服务端上限也是 20），6 字限制留在 saveSheet 里校验。
+             ⚠️ 同时改用 model:value 双向绑定：value+bindinput+setData 在中文输入法下
+             会跟 composition 抢，setData 回写会把上屏中的拼音打断。 -->
+        <input class="sn-inp" model:value="{{shName}}" maxlength="20" placeholder="比如：午间 / 傍晚 / 例会" />
+      </view>
+
+      <view class="sn-sec">
+        <view class="sn-lab">起止时间</view>
+        <view class="sn-times">
+          <picker mode="time" value="{{shStart}}" bindchange="onStart">
+            <view class="sn-time"><text class="sn-time-t">{{shStart}}</text></view>
+          </picker>
+          <text class="sn-sep">—</text>
+          <picker mode="time" value="{{shEnd}}" bindchange="onEnd">
+            <view class="sn-time"><text class="sn-time-t">{{shEnd}}</text></view>
+          </picker>
+        </view>
+      </view>
+
+      <view class="sn-sec">
+        <view class="sn-lab">部门与人数（0 = 这个部门不参与）</view>
+        <view class="sn-dept" wx:for="{{shDepts}}" wx:key="dept">
+          <text class="nm {{item.count ? '' : 'off'}}">{{item.dept}}</text>
+          <view class="cnt">
+            <button class="cnt-btn l" data-dept="{{item.dept}}" bindtap="deptMinus">−</button>
+            <text class="cnt-v">{{item.count}}</text>
+            <button class="cnt-btn r" data-dept="{{item.dept}}" bindtap="deptPlus">＋</button>
+          </view>
+        </view>
+      </view>
+
+      <view class="sn-foot">
+        <button class="sn-btn" bindtap="closeSheet">取消</button>
+        <button class="sn-btn primary" bindtap="saveSheet">保存时段</button>
       </view>
     </view>
-
-    <!-- 空天 -->
-    <view class="empty" wx:if="{{!dayRows.length}}">
-      <text class="empty-t">{{dayTabs[dayIndex].name}}还没有时段</text>
-      <text class="empty-s" wx:if="{{canEdit}}">点下面的「添加时段」开始配置。</text>
-      <text class="empty-s" wx:else>这一天不排班。</text>
-    </view>
   </view>
-
-  <!-- 添加 -->
-  <view class="add" wx:if="{{canEdit}}" bindtap="onAddRow" hover-class="add-hover">
-    + 添加时段
-  </view>
-
-  <!-- 汇总 -->
-  <view class="sum">
-    <text class="sum-t">共 {{totalCount}} 个时段 · 5 个值班日</text>
-  </view>
-
-  <!-- 底部操作 -->
-  <view class="foot" wx:if="{{canEdit}}">
-    <button class="btn ghost" loading="{{saving}}" bindtap="onSaveDraft">存草稿</button>
-    <button class="btn primary" loading="{{publishing}}" bindtap="onPublish">发布</button>
-  </view>
-
-  <view class="pad"></view>
 </view>

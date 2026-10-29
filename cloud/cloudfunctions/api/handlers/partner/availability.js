@@ -207,6 +207,8 @@ async function save(ctx) {
   const isProxy = rawTarget !== p.id;
   const reason = String(body.reason || '').trim();
   if (isProxy) {
+    // ⚠️ 代录是社干的特权：站员只能填自己的（2026-10-29 加站员角色后必须在这里拦）
+    if (p.isMember) throw new ApiError(Codes.FORBIDDEN, '只能填自己的可排时间');
     if (reason.length < 2) throw new ApiError(Codes.PARAM_ERROR, '代录必须填写原因（至少 2 个字）');
     if (reason.length > 200) throw new ApiError(Codes.PARAM_ERROR, '原因过长（上限 200 字）');
   }

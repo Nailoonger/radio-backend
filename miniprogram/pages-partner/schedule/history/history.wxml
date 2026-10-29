@@ -1,0 +1,40 @@
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" role="button" aria-label="返回班表"><view class="chev"></view></view>
+    <view class="navbar-title">发布与调整记录</view><view class="navbar-spacer"></view>
+  </view>
+  <view class="body">
+    <view class="loading" wx:if="{{loading}}">正在加载记录……</view>
+    <view class="error" wx:elif="{{loadError}}"><text>{{loadError}}</text><button class="retry" bindtap="load">重新加载</button></view>
+    <block wx:elif="{{ready}}">
+      <view class="hero">
+        <text class="hero-title">{{version ? '当前第 ' + version + ' 版' : '本周尚无发布版本'}}</text>
+        <text class="hero-date">{{range}}{{publishedText ? '·' + publishedText : ''}}</text>
+        <text class="hero-desc">保留操作者、原因和变动记录；可查看的历史快照会在记录旁显示入口。</text>
+      </view>
+      <view class="block">
+        <view class="block-head"><text class="block-title">变动记录</text><button class="link" wx:if="{{hasSnapshots}}" bindtap="openLatestSnapshot">快照 ›</button></view>
+        <view class="empty" wx:if="{{!list.length}}">本周还没有发布或调整记录</view>
+        <view class="record" wx:for="{{list}}" wx:key="id">
+          <view class="record-main"><text class="record-title">{{item.actionText}}</text><text class="record-meta">{{item.timeText}}·{{item.actor}}{{item.version ? '·v' + item.version : ''}}</text><text class="record-meta">原因：{{item.reason}}</text><text class="record-summary" wx:if="{{item.summaryText}}">{{item.summaryText}}</text><button wx:if="{{item.snapshot}}" class="snapshot-link" bindtap="openSnapshot" data-index="{{index}}" hover-class="pressed">查看完整快照 ›</button></view>
+          <text class="tag {{item.tagClass}}">{{item.tagText}}</text>
+        </view>
+      </view>
+      <view class="block" wx:if="{{versions.length}}">
+        <view class="block-head"><text class="block-title">发布版本</text><text class="section-meta">{{versions.length}} 个版本</text></view>
+        <view class="record" wx:for="{{versions}}" wx:key="id">
+          <view class="record-main"><text class="record-title">第 {{item.version}} 版·{{item.total}} 个岗位</text><text class="record-meta">{{item.timeText}}·{{item.actor}}</text></view>
+          <button wx:if="{{item.snapshot}}" class="link" bindtap="openSnapshot" data-source="versions" data-index="{{index}}">快照 ›</button>
+        </view>
+      </view>
+      <text class="note">审批或补位改变正式班表后，旧草稿不能覆盖新版本。修订应从最新正式班表建立，重新检查后发布。</text>
+    </block>
+  </view>
+</view>
+<view class="mask" wx:if="{{snapshotOpen}}" bindtap="closeSnapshot" catchtouchmove="swallow">
+  <view class="sheet" catchtap="swallow">
+    <view class="sheet-head"><view class="sheet-title-wrap"><text class="sheet-title">{{snapshotTitle}}</text><text class="sheet-meta">{{snapshotMeta}}</text></view><button class="close" bindtap="closeSnapshot" aria-label="关闭快照">×</button></view>
+    <scroll-view class="snapshot-scroll" scroll-y="{{true}}"><schedule-timetable week="{{snapshot}}" my-id="{{myId}}" visible-people="{{true}}" editable="{{false}}"></schedule-timetable></scroll-view>
+  </view>
+</view>

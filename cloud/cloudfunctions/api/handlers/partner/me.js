@@ -32,17 +32,27 @@ const {
  *    两边不一致就会出现「按钮点了报 40301」，这是最容易被当成 bug 报上来的形态。
  */
 function abilities(p) {
+  // 站员（role=2）只有「做自己的事」：填自己的可排时间、看自己的班/考勤/请假、互评、写稿。
+  // ⚠️ 这里每一位都必须与 handler 的鉴权一一对应：
+  //    为 true 的接口必须只要求 asPartner；为 false 的必须要求 asManager / asSuperPartner。
+  const mgr = p.isSuper || p.isManager;
   return {
-    // 超管：时段配置、排班规则、账号管理（拆解文档 §2.2「超管独有」四项）
+    // 超管：时段配置、排班规则、账号管理
     canEditSlots: p.isSuper,
     canPublishSlots: p.isSuper,
     canEditRules: p.isSuper,
     canManageAccounts: p.isSuper,
-    // 社干：看汇总、代录、生成/调整/发布班表
-    canProxyAvailability: true,
-    canManageSchedule: true,
-    // 站员不进伙伴端，所以这里没有「只填自己」这一档
+    // 社干（含超管）：代录、生成/发布班表、审稿、批假、点名、看汇总
+    canProxyAvailability: mgr,
+    canManageSchedule: mgr,
+    canReview: mgr,
+    canApproveLeave: mgr,
+    canMarkAttendance: mgr,
+    canViewOverview: mgr,
+    // 人人都有：填自己的可排时间、报自己的假、写自己的稿、互评
+    canFillOwn: true,
     isPartner: true,
+    isMember: !!p.isMember,
   };
 }
 
@@ -56,8 +66,8 @@ async function profile(ctx) {
     nickname: a.nickname || '',
     name: a.nickname || a.username || `账号${p.id}`,
     role: Number(a.role),
-    roleKey: p.isSuper ? 'super' : 'manager',
-    roleText: p.isSuper ? '超级管理员' : '社干',
+    roleKey: p.isSuper ? 'super' : (p.isMember ? 'member' : 'manager'),
+    roleText: p.isSuper ? '超级管理员' : (p.isMember ? '站员' : '社干'),
     isSuper: p.isSuper,
     department: p.department,
     dutyRoles: p.dutyRoles,

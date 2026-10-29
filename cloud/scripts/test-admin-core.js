@@ -599,14 +599,17 @@ const PLAIN_ONLY = new Set([
   reset(baseSeed());
 
   r = await H.call(H.req('GET', '/admin/admin/list', {}, SUPER_TOKEN));
-  eq('列表字段集（**绝无 password**）', Object.keys(r.data.list[0]), ['id', 'username', 'nickname', 'role', 'status', 'lastLoginAt', 'createTime']);
+  // 2026-10-29：站员（role=2）进 admin 表后，列表多带三个「伙伴身份」字段（仍绝无 password）
+  eq('列表字段集（**绝无 password**）', Object.keys(r.data.list[0]),
+    ['id', 'username', 'nickname', 'role', 'status', 'lastLoginAt', 'createTime',
+      'userId', 'department', 'dutyRoles']);
   ok('整包不含 password 字段', !/password/i.test(JSON.stringify(r.data)));
   eq('列表 total', r.data.total, 3);
 
   // ⚠️ 校验顺序与源实现一致：**先 role 合法、再查重** —— 所以缺 role 时得到的是
   //    「角色必须为0或1」而**不是**「用户名已存在」。这条顺序也是契约（前端提示不同）。
   r = await H.call(H.req('POST', '/admin/admin/create', { username: 'root', password: 'abcdef' }, SUPER_TOKEN));
-  eq('缺 role → 40001（校验在查重之前）', [r.code, r.message], [40001, '角色必须为0或1']);
+  eq('缺 role → 40001（校验在查重之前）', [r.code, r.message], [40001, '角色必须为 0(超管) / 1(社干) / 2(站员)']);
 
   r = await H.call(H.req('POST', '/admin/admin/create', { username: 'root', password: 'abcdef', role: 1 }, SUPER_TOKEN));
   eq('重复用户名 → 40901', [r.code, r.message], [40901, '用户名已存在']);
@@ -615,7 +618,11 @@ const PLAIN_ONLY = new Set([
   eq('密码过短 → 40001', [r.code, r.message], [40001, '密码长度不能少于6位']);
 
   r = await H.call(H.req('POST', '/admin/admin/create', { username: 'x', password: 'abcdef', role: 9 }, SUPER_TOKEN));
-  eq('role 非 0/1 → 40001', [r.code, r.message], [40001, '角色必须为0或1']);
+  eq('role 非 0/1/2 → 40001', [r.code, r.message], [40001, '角色必须为 0(超管) / 1(社干) / 2(站员)']);
+
+  // 站员（role=2）是可以被建出来的 —— 它是「学生身份的第二角色」，不是第三种人
+  r = await H.call(H.req('POST', '/admin/admin/create', { username: 'member1', password: 'abcdef', role: 2 }, SUPER_TOKEN));
+  eq('role=2 站员可新建', r.code, 0);
 
   r = await H.call(H.req('POST', '/admin/admin/create', { username: 'newbie', password: 'abcdef', role: 1 }, SUPER_TOKEN));
   eq('新建 → 返回四字段', Object.keys(r.data), ['id', 'username', 'nickname', 'role']);

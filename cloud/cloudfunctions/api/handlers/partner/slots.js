@@ -26,12 +26,26 @@
  *    `updateWhere({ _id, state: 'draft' })` 返回 0 来发现并发。
  */
 
-const { C, findOne, findMany, insertOne, updateWhere, updateById } = require('../../lib/db');
+const { C, findOne, findMany, insertOne, updateWhere, updateById, removeWhere } = require('../../lib/db');
 const { ApiError, Codes } = require('../../lib/response');
 const {
   asPartner, asSuperPartner,
   normalizeTemplates, templatesToSlots,
 } = require('./_kit');
+
+/**
+ * 首次配置的默认值班时段。
+ *
+ * 一周只有周一有早会：06:50–07:30，主持部 1 人 + 播音部 2 人 —— 这是**业务规则**，不是演示数据，
+ * 所以库完全为空时直接给这份，省得每次重配都要手打一遍（陛下 2026-10-29 的要求）。
+ * 只在「没有草稿、也没有已发布版本」时使用；用户一旦保存过，就再也不走这里。
+ */
+function defaultTemplates() {
+  return [
+    { day: 0, title: '早会', start: 410, end: 450, dept: '主持部', role: '主持', count: 1 },
+    { day: 0, title: '早会', start: 410, end: 450, dept: '播音部', role: '播音', count: 2 },
+  ];
+}
 
 /** 对外形状：把模板展开成前端直接能渲染的东西 */
 function versionDto(v) {
@@ -95,7 +109,7 @@ async function get(ctx) {
     ? versionDto(draft)
     : (published
       ? Object.assign(versionDto(published), { version: (Number(published.version) || 0) + 1, state: 'draft', id: null })
-      : versionDto({ version: 1, state: 'draft', templates: [] }));
+      : versionDto({ version: 1, state: 'draft', templates: defaultTemplates() }));
 
   return {
     canEdit,
@@ -212,4 +226,39 @@ async function publishedOnly(ctx) {
   };
 }
 
-module.exports = { get, saveDraft, publish, publishedOnly, findPublished, versionDto };
+/**
+ * DELETE /partner/slots   body: { confirm: 'RESET', reason }
+ *
+ * 把时段配置清回「从未配置」：删掉 duty_slot_versions 里的**所有版本**（草稿 + 已发布）。
+ *
+ * 为什么不复用 publish 发一个空版本：
+ *   1) publish 本身就拒绝空模板（防误发空配置把全站可排时间清掉）；
+ *   2) 空版本会在站员端留下「已发布但 0 个时段」的假历史，而真相常常是这条数据
+ *      本来就不该存在（初始化 / 联调时点出来的脏数据）。删记录才是「初始化」。
+ *
+ * 危险动作照项目既有口径（对齐点歌清空 DELETE /admin/submit/songs）：
+ * 仅超管 + confirm 口令 + 必填原因，缺一样都不动库。
+ *
+ * ⚠️ 刻意不写 duty_logs：那是**按周**的事件流（history 页按 weekStart 精确查），
+ *    时段重置是全局配置变更，塞进去会在某周记录里冒出一条无关事件。
+ *    这里留云函数日志即可（含操作者 id、删了几条、原因）。
+ */
+async function reset(ctx) {
+  const p = await asSuperPartner(ctx);
+  const body = ctx.body || {};
+  if (String(body.confirm || '') !== 'RESET') {
+    throw new ApiError(Codes.PARAM_ERROR, '重置需要 confirm="RESET"');
+  }
+  const reason = String(body.reason || '').trim();
+  if (reason.length < 2) throw new ApiError(Codes.PARAM_ERROR, '请填写重置原因（不少于 2 个字）');
+
+  const before = await findMany(C.DUTY_SLOT_VERSION, {}, { limit: 100 });
+  const removed = await removeWhere(C.DUTY_SLOT_VERSION, {});
+  console.log(`[partner.slots] reset by admin#${p.id}: removed=${removed}, reason=${reason}`);
+  return {
+    removed,
+    cleared: before.map((v) => ({ version: Number(v.version) || 0, state: v.state || '' })),
+  };
+}
+
+module.exports = { get, saveDraft, publish, publishedOnly, reset, findPublished, versionDto };

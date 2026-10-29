@@ -1,0 +1,32 @@
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" role="button" aria-label="返回班表"><view class="chev"></view></view>
+    <view class="navbar-title">人员轮值情况</view><view class="navbar-spacer"></view>
+  </view>
+  <view class="body">
+    <view class="loading" wx:if="{{loading}}">正在加载轮值……</view>
+    <view class="error" wx:elif="{{loadError}}">
+      <text>{{loadError}}</text><button class="retry" bindtap="load">重新加载</button>
+    </view>
+    <block wx:elif="{{ready}}">
+      <view class="hero">
+        <text class="hero-title">{{monthLabel}}轮值 {{total}} 场·{{peopleCount}} 人</text>
+        <text class="hero-desc">轮值均衡用来判断是否需要手动调整；人员可用性优先，没有合格人选就保留缺岗。</text>
+      </view>
+      <view class="block">
+        <view class="block-head">
+          <text class="block-title">{{sort === 'recent' ? '按最近值班排' : '按场次排'}}</text>
+          <button class="sort" bindtap="toggleSort" hover-class="pressed">换个排法 ›</button>
+        </view>
+        <view class="empty" wx:if="{{!list.length}}">还没有可参与排班的伙伴</view>
+        <view class="work-row" wx:for="{{list}}" wx:key="personId">
+          <view class="person"><text class="name {{item.mine ? 'mine' : ''}}">{{item.personName}}{{item.mine ? '（我）' : ''}}</text><text class="detail" wx:if="{{sort === 'recent'}}">{{item.recentText}}</text></view>
+          <view class="bar"><view class="bar-fill" style="width: {{item.percent}}%"></view></view>
+          <text class="count">{{item.count}} 场</text>
+        </view>
+      </view>
+      <text class="note">只统计已发布班表，按周一归属月份，包含 0 场成员。轮值情况仅供参考，不计入考核，也不影响互评。</text>
+    </block>
+  </view>
+</view>

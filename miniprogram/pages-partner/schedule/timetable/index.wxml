@@ -1,0 +1,24 @@
+<view class="wk">
+  <view class="hd"><text class="title">本周 {{range}}</text><text class="sub">{{weekLabel}}</text></view>
+  <view class="band" wx:for="{{singles}}" wx:key="key">
+    <text class="band-label">{{item.dayName}}{{item.slot}}<text class="band-time">{{item.timeText}}</text></text>
+    <view class="band-people">
+      <view class="group band-group" wx:for="{{item.groups}}" wx:for-item="group" wx:key="key" bindtap="edit" data-day="{{group.day}}" data-slot="{{group.slot}}" data-slot-key="{{group.slotKey}}" data-department="{{group.department}}" data-role="{{group.role}}" data-count="{{group.count}}">
+        <view class="chip one {{p.cls}} {{editable && p.fixed ? 'fixed' : ''}}" wx:for="{{group.chips}}" wx:for-item="p" wx:key="key">{{p.name}}<text class="pin" wx:if="{{editable && p.fixed}}">·固定</text></view>
+      </view>
+    </view>
+  </view>
+  <view class="grid" wx:if="{{matrix.length}}">
+    <view></view><view class="column" wx:for="{{cols}}" wx:key="day"><text class="day">{{item.name}}</text><text>{{item.dateText}}</text></view>
+    <block wx:for="{{matrix}}" wx:for-item="row" wx:key="key">
+      <view class="row-label"><text class="day">{{row.slot}}</text><text class="tm">{{row.timeText}}</text></view>
+      <view class="cell" wx:for="{{row.cells}}" wx:for-item="cell" wx:key="day">
+        <view class="group" wx:for="{{cell.groups}}" wx:for-item="group" wx:key="key" bindtap="edit" data-day="{{group.day}}" data-slot="{{group.slot}}" data-slot-key="{{group.slotKey}}" data-department="{{group.department}}" data-role="{{group.role}}" data-count="{{group.count}}">
+          <view class="chip {{p.cls}} {{editable && p.fixed ? 'fixed' : ''}}" wx:for="{{group.chips}}" wx:for-item="p" wx:key="key"><text class="person">{{p.name}}</text><text class="dept" wx:if="{{p.department}}">{{p.department}}</text><text class="pin" wx:if="{{editable && p.fixed}}">固定</text></view>
+        </view>
+      </view>
+    </block>
+  </view>
+  <view class="legend"><text><text class="dot me"></text>我</text><text><text class="dot leave"></text>请假待批</text><text><text class="dot ok"></text>已批准</text><text><text class="dot empty"></text>空缺</text><text wx:if="{{editable || showFixed}}"><text class="dot fixed"></text>固定 · 仅排班工作台可见</text></view>
+  <text class="note">行头＝值班时段的名称与起止时间；只在某一天出现的时段（如早会）单独放在上方横带。格子里一人一个胶囊，小字是部门。{{editable ? '浅红＝已固定的人，发布后站员端不显示这个标记。' : ''}}</text>
+</view>

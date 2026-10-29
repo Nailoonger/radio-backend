@@ -1,0 +1,24 @@
+.page { min-height: 100vh; background: #F5F5F7; }
+.chev { width: 18rpx; height: 18rpx; border-left: 4rpx solid #333; border-bottom: 4rpx solid #333; transform: rotate(45deg); margin-left: 6rpx; }
+.body { padding: 19rpx 35rpx calc(50rpx + env(safe-area-inset-bottom)); gap: 23rpx; }
+.hero { display: flex; flex-direction: column; gap: 14rpx; padding: 31rpx; border-radius: 35rpx; background: #FFFFFF; }
+.hero-title { font-size: 33rpx; font-weight: 600; line-height: 1.5; color: #1D1D1F; letter-spacing: -.5rpx; }
+.hero-desc { color: #76767E; font-size: 23rpx; line-height: 1.65; }
+.block { background: #FFFFFF; border-radius: 35rpx; padding: 8rpx 31rpx 17rpx; }
+.block-head { display: flex; align-items: center; justify-content: space-between; gap: 15rpx; min-height: 83rpx; }
+.block-title { font-size: 27rpx; font-weight: 600; color: #1D1D1F; }
+button.sort { background: transparent; color: #0066CC; font-size: 23rpx; line-height: 1.5; padding: 15rpx 0 15rpx 15rpx; margin: 0; border: 0; }
+button.sort::after, button.retry::after { border: 0; }
+.work-row { display: flex; align-items: center; gap: 19rpx; min-height: 89rpx; padding: 14rpx 0; box-sizing: border-box; }
+.work-row + .work-row { border-top: 1rpx solid #F0F0F3; }
+.person { width: 164rpx; flex: none; display: flex; flex-direction: column; gap: 4rpx; min-width: 0; }
+.name { font-size: 25rpx; line-height: 1.5; color: #333333; overflow-wrap: break-word; }
+.name.mine { color: #0066CC; }
+.detail { font-size: 20rpx; color: #76767E; }
+.bar { flex: 1; min-width: 0; height: 11rpx; border-radius: 99rpx; overflow: hidden; background: #F0F1F4; }
+.bar-fill { height: 100%; background: #0066CC; border-radius: 99rpx; }
+.count { flex: none; min-width: 72rpx; text-align: right; font-size: 24rpx; color: #333333; font-variant-numeric: tabular-nums; }
+.note { padding: 0 12rpx; color: #76767E; font-size: 22rpx; line-height: 1.7; }
+.loading, .empty { text-align: center; color: #76767E; font-size: 24rpx; padding: 36rpx 10rpx; }
+.error { display: flex; flex-direction: column; align-items: center; gap: 22rpx; padding: 35rpx 28rpx; background: #FFF; border-radius: 30rpx; color: #76767E; font-size: 25rpx; line-height: 1.6; }
+button.retry { background: #EAF3FD; color: #0066CC; padding: 18rpx 36rpx; margin: 0; font-size: 25rpx; line-height: 1.5; border-radius: 999rpx; }

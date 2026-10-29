@@ -19,7 +19,8 @@ const { ApiError, Codes } = require('../../lib/response');
 const { asSuper, pager, pick, pagedList } = require('./_kit');
 
 /** admin 的对外字段集（**绝无 password**） */
-const LIST_FIELDS = ['id', 'username', 'nickname', 'role', 'status', 'lastLoginAt', 'createTime'];
+const LIST_FIELDS = ['id', 'username', 'nickname', 'role', 'status', 'lastLoginAt', 'createTime',
+  'userId', 'department', 'dutyRoles'];
 
 /** GET /admin/admin/list */
 async function list(ctx) {
@@ -47,8 +48,9 @@ async function create(ctx) {
   if (String(password).length < 6) {
     throw new ApiError(Codes.PARAM_ERROR, '密码长度不能少于6位');
   }
-  if (![0, 1].includes(role)) {
-    throw new ApiError(Codes.PARAM_ERROR, '角色必须为0或1');
+  // 角色：0 超管 / 1 社干 / 2 站员（伙伴端站员）
+  if (![0, 1, 2].includes(Number(role))) {
+    throw new ApiError(Codes.PARAM_ERROR, '角色必须为 0(超管) / 1(社干) / 2(站员)');
   }
 
   const exists = await findOne(C.ADMIN, { username });
@@ -66,7 +68,12 @@ async function create(ctx) {
     username,
     password: await bcrypt.hash(String(password), 10),
     nickname: nickname || username,
-    role,
+    role: Number(role),
+    // ⚠️ userId 指向 user 表（学生档案）。排班/请假/考勤/互评的 personId 一律用 **admin.id**，
+    //    所以这里挂 userId 只是"认得出这是谁的学生档案"，不改任何 duty 数据的键。
+    userId: Number((ctx.body || {}).userId) || null,
+    department: String((ctx.body || {}).department || ''),
+    dutyRoles: Array.isArray((ctx.body || {}).dutyRoles) ? ctx.body.dutyRoles : [],
     status: 1,
     lastLoginAt: null,
     createTime: now,
@@ -88,7 +95,7 @@ async function update(ctx) {
   const patch = { updateTime: new Date() };
   if (body.nickname !== undefined) patch.nickname = body.nickname;
   if (body.status !== undefined) patch.status = body.status ? 1 : 0;
-  if (body.role !== undefined && [0, 1].includes(body.role)) patch.role = body.role;
+  if (body.role !== undefined && [0, 1, 2].includes(Number(body.role))) patch.role = Number(body.role);
   if (body.password) {
     if (String(body.password).length < 6) {
       throw new ApiError(Codes.PARAM_ERROR, '密码长度不能少于6位');

@@ -59,6 +59,12 @@ const C = {
   DUTY_ATTENDANCE: 'duty_attendance',
   DUTY_RULE: 'duty_rules',
   DUTY_LOG: 'duty_logs',
+
+  // 伙伴端 · 站内稿件（可反复改、多版本、提交后能驳回再改）
+  PARTNER_DRAFT: 'partner_draft',
+
+  // 伙伴端 · 互评（匿名聚合，读接口永不返回评价人）
+  PARTNER_FEEDBACK: 'partner_feedback',
 };
 
 const coll = (name) => db.collection(name);

@@ -65,6 +65,13 @@ const REGISTRY = {
   'partner.me': () => require('./partner/me'),
   'partner.slots': () => require('./partner/slots'),
   'partner.availability': () => require('./partner/availability'),
+  'partner.draft': () => require('./partner/draft'),
+  'partner.rule': () => require('./partner/rule'),
+  'partner.leave': () => require('./partner/leave'),
+  'partner.attendance': () => require('./partner/attendance'),
+  'partner.schedule': () => require('./partner/schedule'),
+  'partner.feedback': () => require('./partner/feedback'),
+  'partner.accounts': () => require('./partner/accounts'),
 };
 
 const cache = new Map();
