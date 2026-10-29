@@ -1,0 +1,332 @@
+/* pages-partner/desk/desk.wxss · v5（2026-10-28）
+   ⚠️ 所有数值来自 partner-hub/app.html（v151）的 headless Chrome 实测 getBoundingClientRect
+      + computed style，不是目测、不是估。换算 1px = 1.923rpx（390pt ⇒ 750rpx）。
+   实测基准（原型 .phone 内容宽 376px = 390 设计宽减 7px 黑边，故按 390 换算）：
+     nav 42px 高 / padding 0 52px / 标题 16px·600·ls .3px
+     view padding 10 18 112  ⇒ 内容宽 340px
+     wel 顶距 = 10 + (-14) + 20 = 16px；左右 padding 18px；高 146.9px
+     wel::before 282×160 right -34 bottom 0，图 330px 宽 right 42%，opacity .27
+     carousel margin-top -24px；bigc 340 宽 / radius 20 / padding 18 / 高 123.6px
+     dots margin-top -30px（相对 slides 的 52px 下留白 ⇒ 实际在卡下方 22px）
+     mh padding 0 2 10 / 段间 12px；mods gap 10；mod 165×102 radius 17 padding 12
+   Token：--ink #1D1D1F · --muted #76767E · --soft #B3B3B8 · --accent #0066CC · --parchment #F5F5F7 */
+
+.page {
+  min-height: 100vh;
+  background: #F5F5F7;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+.sb { position: relative; z-index: 2; }
+.pressed { opacity: 0.8; }
+
+/* ── 导航：居中标题（原型 .nav：42px 高、左右 52px、16px/600；无站徽无按钮） ── */
+.nav {
+  min-height: 81rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+  padding: 0 100rpx;
+}
+.nav-t {
+  font-size: 31rpx;
+  font-weight: 600;
+  letter-spacing: 0.6rpx;
+  color: #1D1D1F;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── 欢迎带：通栏（.page 无横向 padding，wel 天然通栏 —— 别再加负 margin）
+       padding-top 31rpx = 原型净 16px：view 10 + wel margin-top -14 + wel padding-top 20 ── */
+.wel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 31rpx 35rpx 92rpx;   /* 16 / 18 / 48 */
+  background: #F5F5F7;
+}
+/* 水印盒 = 原型 .wel::before：282×160、right -34、bottom 0。
+   裁切 + 双向 mask + opacity .27 已全部烘进 campus-faded.png 的 alpha，
+   所以这里不需要 mask-image（小程序不支持）也不依赖 mix-blend-mode。 */
+.wel-bg {
+  position: absolute;
+  right: -65rpx;                /* -34px */
+  bottom: 0;
+  width: 542rpx;                /* 282px，widthFix ⇒ 高 308rpx = 160px */
+  height: auto;
+  pointer-events: none;
+  z-index: 0;
+}
+.wel > .eb, .wel > .big, .wel > .sub { position: relative; z-index: 1; }
+.eb {
+  display: block;
+  font-size: 21rpx;             /* 11px */
+  line-height: 1.6;
+  letter-spacing: 0.6rpx;       /* .3px */
+  color: #76767E;
+  margin: 0 0 10rpx;            /* 5px */
+}
+.big {
+  font-size: 42rpx;             /* 22px */
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.8rpx;      /* -.4px */
+  margin: 0;
+  color: #1D1D1F;
+}
+.sub {
+  display: block;
+  font-size: 24rpx;             /* 12.5px */
+  color: #76767E;
+  margin-top: 15rpx;            /* 8px */
+}
+
+/* ── 大白卡轮播（原型 .carousel margin-top -24px 压接欢迎带） ── */
+.bigwrap {
+  position: relative;
+  z-index: 1;
+  margin: -46rpx 0 0;           /* -24px */
+}
+.slides { width: 100%; }
+.bigc {
+  margin: 0 35rpx;              /* 18px 内缩 ⇒ 卡宽 680rpx */
+  background: #FFFFFF;
+  border-radius: 38rpx;         /* 20px */
+  padding: 35rpx;               /* 18px */
+  box-sizing: border-box;
+  box-shadow: 0 12rpx 27rpx -12rpx rgba(15,28,46,.08), 0 42rpx 85rpx -35rpx rgba(15,28,46,.16);
+}
+.eb2 {
+  display: block;
+  font-size: 22rpx;             /* 11.5px */
+  line-height: 1.6;
+  color: #76767E;
+}
+.b2 {
+  font-size: 40rpx;             /* 21px */
+  font-weight: 600;
+  color: #1D1D1F;
+  letter-spacing: -1rpx;        /* -.5px */
+  line-height: 1.35;
+  margin-top: 19rpx;            /* 10px */
+}
+.d2 {
+  display: block;
+  font-size: 24rpx;             /* 12.5px */
+  color: #76767E;
+  line-height: 1.75;
+  margin-top: 17rpx;            /* 9px */
+}
+/* 圆点：7px 灰点 / 选中 18px 蓝长条。
+   swiper 高度 = 卡高 + 100rpx（52px 投影落地空间，原型 .slides margin-bottom:52px），
+   圆点要落在卡下方 22px ⇒ margin-top = -(100 - 43) = -57rpx 往回提。 */
+.dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4rpx;                    /* 2px */
+  margin-top: -57rpx;
+  position: relative;
+  z-index: 2;
+}
+.dots .d {
+  width: 13rpx;                 /* 7px */
+  height: 13rpx;
+  border-radius: 9999rpx;
+  background: #B3B3B8;
+  margin: 0 10rpx;              /* 原型 button padding 8px 5px 的横向 5px */
+  padding: 15rpx 0;             /* 纵向 8px 撑出点击区 */
+  box-sizing: content-box;
+  background-clip: content-box;
+  transition: all .2s ease-out;
+}
+.dots .d.on {
+  width: 35rpx;                 /* 18px */
+  background: #0066CC;
+}
+
+/* ── 区块头（原型 .mh：padding 0 2 10，段间 12px） ── */
+.mh {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 4rpx 19rpx;
+  margin: 23rpx 35rpx 0;
+}
+.mh .t {
+  font-size: 27rpx;             /* 14px */
+  font-weight: 600;
+  line-height: 1.7;
+  color: #1D1D1F;
+}
+.mh .n {
+  font-size: 19rpx;             /* 10px */
+  line-height: 1.7;
+  color: #76767E;
+}
+
+/* ── 三联模块卡（原型 .mods grid gap 10；.mod 165×102 radius 17 padding 12） ── */
+.mods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;                   /* 10px */
+  margin: 0 35rpx;
+}
+.mod {
+  background: #FFFFFF;
+  border: 1rpx solid #E7E9EE;
+  border-radius: 34rpx;         /* 17px */
+  padding: 24rpx;               /* 12px */
+  min-height: 200rpx;           /* 100px */
+  min-width: 0;
+  width: calc((100% - 20rpx) / 2);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  /* ⚠️⚠️ 卡片要"浮起来"：v151 `.mod` 是「1px 描边定边界 + 几乎看不见的投影」
+     （v82 从 Codex 的 .wb-entry 抄来：`0 4px 14px rgba(29,29,31,.035)`）。
+     漏了这行投影，白卡就贴在灰底上像"镶嵌"进去（陛下 2026-10-29 指出）。 */
+  box-shadow: 0 8rpx 28rpx rgba(29, 29, 31, .035);
+}
+.mod-t {
+  font-size: 27rpx;             /* 14px */
+  font-weight: 550;
+  line-height: 1.5;
+  color: #1D1D1F;
+  overflow-wrap: anywhere;
+}
+.mod-d {
+  font-size: 21rpx;             /* 11px */
+  color: #76767E;
+  line-height: 1.5;
+  margin-top: 8rpx;             /* 4px */
+  overflow-wrap: anywhere;
+}
+.mod-f {
+  margin-top: auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 15rpx;                   /* 8px */
+  padding-top: 13rpx;           /* 7px */
+}
+.mod-n {
+  display: flex;
+  align-items: baseline;
+  font-size: 48rpx;             /* 25px */
+  font-weight: 500;
+  line-height: 1.1;
+  color: #76767E;
+  font-variant-numeric: tabular-nums;
+}
+.mod-n.on { color: #0066CC; }
+.mod-n .u {
+  font-size: 19rpx;             /* 10px */
+  font-weight: 400;
+  color: #76767E;
+  margin-left: 10rpx;           /* 5px */
+  line-height: 1;
+}
+.mod-arrow {
+  font-size: 35rpx;             /* 18px */
+  line-height: 1;
+  color: #999DA6;
+}
+
+/* 超管独有：电脑端说明（原型 .cp-note：mt 10、fs 11、lh 1.7、padding 0 4） */
+.cp-note {
+  display: block;
+  font-size: 21rpx;
+  color: #76767E;
+  line-height: 1.7;
+  margin: 19rpx 35rpx 0;
+  padding: 0 8rpx;
+}
+
+/* ── 站员版：需要你处理（v151 home 屏 .need-h / .td） ── */
+.need-h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 4rpx 19rpx;
+  margin: 23rpx 35rpx 0;
+}
+.need-h .t {
+  font-size: 27rpx;
+  font-weight: 600;
+  color: #1D1D1F;
+}
+.need-h .n {
+  font-size: 19rpx;
+  color: #76767E;
+}
+.td {
+  background: #FFFFFF;
+  border-radius: 35rpx;
+  overflow: hidden;
+  margin: 0 35rpx;
+  /* 与 .mod 同一套 elevation：整页卡片统一"浮起"，别一半浮一半镶 */
+  box-shadow: 0 8rpx 28rpx rgba(29, 29, 31, .035);
+}
+.td-i {
+  display: flex;
+  gap: 21rpx;
+  padding: 29rpx 33rpx;
+}
+.td-i + .td-i { border-top: 1rpx solid #E3E3E8; }
+.td-i .no {
+  font-size: 22rpx;
+  color: #B4B8C0;
+  font-variant-numeric: tabular-nums;
+  line-height: 2.1;
+}
+.td-i .bd { flex: 1; min-width: 0; }
+.td-i .lb {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  font-size: 22rpx;
+}
+.td-i .lb .dot {
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+}
+.td-i .lb.blue { color: #0066CC; }
+.td-i .lb.blue .dot { background: #0066CC; }
+.td-i .lb.amber { color: #B26A00; }
+.td-i .lb.amber .dot { background: #C97A00; }
+.td-i .t {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15rpx;
+  font-size: 29rpx;
+  font-weight: 500;
+  margin-top: 13rpx;
+  color: #1D1D1F;
+}
+.td-i .t .ch {
+  color: #B4B8C0;
+  font-weight: 400;
+}
+.td-i .m {
+  display: block;
+  font-size: 22rpx;
+  color: #76767E;
+  margin-top: 12rpx;
+  line-height: 1.65;
+}
+.td-none {
+  padding: 46rpx 33rpx;
+  font-size: 23rpx;
+  color: #76767E;
+  text-align: center;
+}
+
+/* 浮动 dock 让位（dock 高约 123rpx + bottom 38rpx） */
+.dock-gap { height: 220rpx; }
