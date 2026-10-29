@@ -1,113 +1,110 @@
-# 菁悠广播站 · 项目长期备忘
+# 菁悠广播站 · 项目长期备忘（精简版）
 
-> 只留铁律 + 固定顺序 + 反复踩的坑。细则见 `docs/`、`cloud/docs/final-cutover.md`、
-> `.workbuddy/memory/PROJECT-NOTES.md`、各 skill。**本文件必须精简，超限会被截断。**
+> **细则按需读，别都塞这里**：
+> `MEMORY-sports-meet.md`（运动会四端 UI 全口径 + 大屏 5 版面 + 四个坑）·
+> `MEMORY-partner-hub.md`（伙伴端手机原型口径：模块/角标/Codex 基准/审计脚本）·
+> `MEMORY-archive-2026-10-14.md`（更早的完整版）· `PROJECT-NOTES.md`（云开发细则、点歌体系、管理端小程序、登录页系列）·
+> `docs/` · `cloud/docs/final-cutover.md` · 各 skill。
+
+## ⚠️⚠️ 四个端，别搞混（2026-10-22 被当面纠正过）
+1. 学生端小程序 `miniprogram/pages/*` 14 页 —— 保留。
+2. **小程序管理端 `pages-admin/`（分包 5 页：login/todo/review/review-detail/message，走 admin 表账号）—— 决定退役**，
+   由伙伴端接位、改**学号登录**。
+3. 伙伴端（66 屏原型）—— 新端，取代第 2 条。
+4. **管理端 web `admin-web/`（Vue3，13 页）—— 保留，只管电脑端**（导入/导出/开关/设置/看板）。
+⚠️ 曾把第 2 条和第 4 条当成一个东西、以为要下线 admin-web → 被纠正「不是一个东西」。
+⚠️ 退役连带：app.json subpackages · app.js adminToken/adminInfo/adminLogin/adminLogout/isAdminLoggedIn · `utils/request.js#adminRequest` ·
+`pages/login/login.js:142` · `login.wxml:87-91`「管理员登录」。**云函数 `/admin/login` 不能删**（admin-web 还在用）。
+⚠️ 登录要合并：人统一到 `user`（学号/工号都当 username）+ `admin.user_id` 绑定，老师加 `user.kind=teacher`。
+
 
 ## 铁律
-- **只做加法**：`src/` + `admin-web/` + Docker 一行不删，保留 `requestMode: 'direct'|'cloud'`。
-  **绝不用 `git checkout --`**（工作树全是未提交成果）。
-- UI/视觉**先出静态预览并标版本号（v1/v2…），点头前不写业务代码**；版本只增不删。被否 → 先问清形态，别自行捡回。
-- ⚠️⚠️ **设计不许用通用范式**（"换给别的 App 也成立"＝没做）→ 要**从业务隐喻长出来**
-  （已用：调频刻度、录音电平、收听证钢印、骑缝孔、点唱机唱针）。
-- ✅ **登录页是唯一获批突破配色的页面**；其余守设计系统。
-- ⚠️⚠️ **学生登录页不再有微信登录**（2026-10-02 拍板）：按钮彻底删掉，**以后不要再做微信登录入口/接口**。
-- ✅ **站徽「菁悠」双色 = 浅 `#2497D5` / 深 `#093592`**（源：`站标/菁悠水印.png`、`preview/assets/station-badge.png`）。
-  电平表/进度/声波这类"仪器感"元件用这组渐变，别用 `#0066CC` 或警示红（`--live` 只留给 ON AIR）。
-- ⚠️⚠️ **不锈钢一律不要拉丝**（被点名两次）＝**不做拉丝纹理**。抛光＝冷中性灰底 + 宽而柔斜向扫光，平滑无纹理；
-  反光带窄而硬＝褶皱（小尺寸过渡要宽 22→48→74、亮度 ≤ .30；站徽投影 ≤ .30，暗晕也是"皱"的来源）。
-- ⚠️⚠️ **「现有 X」唯一事实源 = 真机截图 + `miniprogram/` 源码**；`preview/*` 只是二手还原（连标「原样」的也有错）。
-  提案稿未落业务代码一律不算现有。判据：这个版本落过业务代码吗。
-- ⚠️⚠️ **隐私口径文案不对外**（"不收集头像/头像由姓名生成"这类不写进 UI）。
-- ⚠️⚠️ **源码/文档/提交信息不写明文凭据**；**默认密码不设默认值**（留空则随机生成 + 只首次日志打印一次）。
-  ⚠️ **写死 bcrypt hash 等同写死密码**。
-- ✅ `JWT_SECRET` 线上公开值已修（`src/config/index.js` 有护栏）。⚠️ `${X:-兜底}` 把**空串当未设置** ⇒
-  写空会静默回落；**判据是"全部未命中"**。
-- ✅ **MySQL `root123` 确认不改**（陛下拍板）。**别再去清它。**
+- **只做加法**：`src/`+`admin-web/`+Docker 一行不删，保留 `requestMode:'direct'|'cloud'`。**绝不用 `git checkout --`**。
+- ⚠️⚠️ **给 `<button>` 写样式一律用 `button.xxx`（元素+类），不能只写 `.xxx`**：
+  `app.wxss` 有 `button.btn{display:block;width:auto}` = 特异性 (0,1,1)，会**静默压掉**单类 `.btn`(0,1,0) 的 `display:flex`
+  ⇒ 按钮退化成「块级 + line-height」单行行盒，**文字贴上沿、底下空一大截，不报错只是"看着有点歪"**
+  （2026-10-29 slots 页两个蓝胶囊文字距顶 2px/距底 51px 就是这么来的；index/planning 本来写对所以没事）。
+- ⚠️⚠️ **input 的 `maxlength` 只能是"存储上限"，绝不能当业务字数限制用**：
+  中文拼音字母数远大于汉字数，「午间」= wujian = 6 个字母 —— maxlength=6 会**在第 6 个字母截断，汉字永远上不了屏**
+  （2026-10-29 时段名称"打不进去"连踩两次的真凶）。业务限制写在校验里。
+  同一坑的连带解：**input 用 `model:value` 双向绑定，别手写 `value`+`bindinput`+`setData`**（会跟输入法 composition 抢）。
+- UI/视觉**先出带版本号的静态预览，点头前不写业务代码**；版本只增不删；被否先问清形态，别偷偷捡回。
+  ⚠️⚠️ **复制目录做新版本后第一件事：改"页面上给人看的版本号"**（title + 页内文案），否则陛下判定"没更新"。
+  判据 `grep -o "v<N-1>" 新目录/*.html` = 0（⚠️ SVG path 里的 `v14` 画线指令会误报，要人工看一眼）。
+- ⚠️⚠️ **被否掉的稿子＝不存在**。重做时**不许参考已删稿，连备份也不许翻出来看**（2026-10-15 被当面退回：「删除就算了你还备份还拿出来看，如果能用的话我为什么叫你删除」）。
+  新版本的依据只能是：**方案文档本身 + 项目 token 源**。被否的形态（如运动会「看台横幅拼贴风」）当作从没出现过。
+- ⚠️⚠️ **不许通用范式**（"换给别的 App 也成立"＝没做）→ 从业务隐喻长出来（已用：调频刻度、录音电平、收证钢印、骑缝孔、唱针、校园校舍、秩序册／检录牌／跑道分道线）。
+- ⚠️⚠️ **不要深色——任何形式**（点名三次）❌深色药丸/卡/面板/横幅/浮层。✅白卡 + 深色字 + 羊皮纸底；选中态 `--accent-tint` 底/`--accent` 字；主按钮 `--accent`。
+  判据 `grep -c "var(--tile)" 页面` = 0（**既有设计系统的深色件不在此列**：小程序 `.tile`、后台 `theme.css` 里 `v8` 的 `.tile` 与 **`.dark-strip`** —— 沿用合规，别自造第三种深色件）。改浅色最易漏：站徽白底、`rgba(255,255,255,x)` 文字、SVG 硬编码刻度色、**文案自称"深色卡"**。
+- **手机里不要装饰性描边框**；留=有状态含义（已选/focus/`.slot.mine`），演示标注一律加在手机外。
+- **圆角胶囊**：单行元素 9999px；内容卡片 18px（Codex 层）／28px（旧口径）；卡片上 9999px 会变橄榄球（实测）。
+- ⚠️⚠️⚠️ **发布 = 覆盖同一个应用**：本 sandbox 里 deploy **任何目录**都会覆盖 `jingyou-partner-hub` 链接（`domainPrefix` 无效）。**侧边方案/试验稿只本地 present_files，禁止 deploy**（2026-10-18 差点把线上 v42 换成运动会预览）。
+- ⚠️⚠️ **线上站点目录 = `preview/partner-hub-gounucai-v5/`**（分享链接绑死这个目录）⇒ 新版本成果**先 cp 回 v5 再发布**，否则会新建 app 给新链接。工作副本已到 `v76`。
+- 学生登录页**不再有微信登录**（2026-10-02 拍板），以后不做相关入口/接口。
+- 站徽「菁悠」双色 浅 `#2497D5` / 深 `#093592`（仪器感元件用这组，别用 `#0066CC`）；`--live` 只给 ON AIR。
+- **不锈钢禁拉丝**（点名两次）；抛光＝冷中性灰底 + 宽而柔斜向扫光，反光带窄硬＝褶皱。
+- ⚠️⚠️ **「现有 X」唯一事实源 = 真机截图 + `miniprogram/` 源码**（`preview/*` 是二手还原，标"原样"的也有错）。判据：这版落过业务代码吗。
+- 隐私口径文案不对外；源码/文档/提交信息**不写明文凭据**；默认密码不设默认值（留空随机 + 首次日志打印一次）；写死 bcrypt hash＝写死密码。
+- `JWT_SECRET` 线上公开值已修（`src/config/index.js` 有护栏）；`${X:-兜底}` 把空串当未设置 ⇒ 写空会静默回落。MySQL `root123` 确认不改。
 
-## ⚠️⚠️ 动 UI / 编内容之前
-- **必须先读 `PROJECT-NOTES.md` 的「动 UI / 编内容之前，先读这三处源」**（设计 token 源 / 真实内容源 / 结构事实源）。
-- 两条底线：**别自起私有配色**（守 `theme.css` 三硬规则）；**别编业务事实**（站里没有 FM 频率——"87.6MHz"是编的，被点过）。
+## ⚠️ 动 UI / 编内容之前
+先读 `PROJECT-NOTES.md`「先读这三处源」（设计 token / 真实内容 / 结构事实）。底线：**别自起私有配色**、**别编业务事实**（站里没有 FM 频率）。
+token 源：`miniprogram/app.wxss` → `admin-web/src/styles/theme.css`。`--accent #0066CC` 唯一强调色、无装饰渐变、无彩色投影。
 
-## 管理端小程序（分包 `pages-admin/`）
-- 一期＝登录/待办台/投稿&点歌审核/处理台/留言审核；排期、批量、学生账号、系统设置仍在电脑端。细则见 `PROJECT-NOTES.md`。
-- ⚠️⚠️ **token 分键**（`admin_token` + `globalData.adminToken`），请求**只能用 `adminRequest()`**；共用 `token` key 会互相顶掉登录态。
-- ⚠️ **驳回理由服务端必填** ⇒ 列表「驳回」跳处理台；留言「屏蔽」用 editable modal。
-- ❌ 处理台四段（投稿人/内容/驳回/记录）**不合并**（陛下看过 v10/v11 说"先维持现状"）。
-  待办台 = L1 + C 案「主浮次平」；**顶栏右侧一律留空**（微信胶囊）；标题「导播台」+「指导老师」在下面；
-  ⚠️ 顶栏用 `min-height` **不能写死 `height`**。
-- ⚠️⚠️ **站徽 PNG 是透明底** ⇒ 当图标用**必须自己给 `background`**，否则镂空处透出底色。徽章卡片形态（v13 方块/v14 正圆）**还没定**。
-- 改管理端 wxss 必跑 `node preview/_check-admin-mp.cjs`（判据 `未定义 CSS 变量: 0`）。
-- ⚠️⚠️ **`<text>` 保留换行** ⇒ 文案一律在 js `decorate()` 里拼好（`tagClass`/`tagText`）、**wxml 一行写完**。细则见 skill `wxml-render-traps`。
-- ⚠️⚠️ **投影档位名 ≠ 可见度**：`--sh-card` 叠在 `#F5F5F7` 上**归零**；要浮必须 `--sh-lift` 或 `0 4px 12px -4px rgba(0,0,0,.10)`。
-  **交付说明别照档位名写，采样像素**（差 <6 灰阶＝没差别）。
+## 伙伴端（手机原型，工作副本 v76）
+细则 → `MEMORY-partner-hub.md`；逐版记录 → 当日日志；**后台对齐方案 → `preview/admin-sync-v1`（缺口）+ `v2`（更正与补充）**。
+速记：**66 屏**（站员 12 / 社干 25 / 超管 29），三身份 `member/manager/super`；底部角标唯一数据源 `TODO`（同一件事只归一处、归零即隐、超 99 显示 99+）；
+⚠️ **伙伴＝学生身份的第二种角色**（`user.username` 就是学号），不是第三种人 ⇒ 账号要 `partner_profile(user_id)` 挂 user，一人一套密码；超管走 admin。
+⚠️ **互评是匿名聚合**（「只看得到内容，看不到人」）⇒ 后台永不做"谁评谁"的明细。
+不深色；分段胶囊 `flex:1` 填满轨道；对齐基准 `.view` 22px / 卡内 16px / 纵向 12px；
+审计 `node _opfit/{audit,overflow,vars}.cjs <版本目录>` 必跑；截图脚本 `_shots.sh`（`cygpath -m` 转路径，`--user-data-dir` 每次独立）。
+屏幕清单在 `index.html` 的 `GROUPS`（⚠️ 里面残留 `review` 屏，v73 已删页面、渲染函数不存在，点开空白）。
 
-## 云开发（`cloud/`）阶段 0–9 完成，回归 3115 项 / 0 失败
-- 源 `cloud/cloudfunctions/api/`，运行目录 `miniprogram/cloudfunctions/api/`。
-  ⚠️ **Windows CLI 传子目录必坏** → `sync.js` 打成**单文件 index.js**；⇒ `handlers/index.js` 必须**静态注册表**。
-- 部署：`node cloud/scripts/deploy-cloud.js` → 手动 cli.bat → **等 1~2 分钟**。
-- 口径：业务查询一律**数字 `id`**；4 张表用业务键当 `_id`（`setting:`/`switch:`/`ack:`/`week:`）；字段**驼峰**；
-  ⚠️ `insertOne` 后改这行要用**返回的 `_id`**。
-- ⚠️⚠️ **切云弄坏上传类接口**：信封是 JSON ⇒ `FormData` 一 stringify 变 `{}`（40001）；契约 `{ filename, fileBase64 }`。
-  **前端凡 `FormData`/`Blob` 切云后都要单验**。
-- ⚠️⚠️ **学生初始密码 = `user` + 学号**（唯一出口 `studentAccountService.initPasswordFor()`；初始 cost 8、改密后 10）。
-  ⚠️ 管理端学生 DTO 字段是 **`activated`**（不是 `isDefaultPwd`）。
+## 运动会模块 UI
+全口径已移到 **`MEMORY-sports-meet.md`**（v5 现行：四端 29 屏、大屏 5 版面、浅色无例外、线稿底必须透、`.wl-pnl gap:0`、四个坑）。目录 `preview/sports-meet-v5`。
+
+## 云开发（`cloud/` 阶段 0–9，回归 3115 项 0 失败）
+源 `cloud/cloudfunctions/api/`，运行目录 `miniprogram/cloudfunctions/api/`。⚠️ Windows CLI 传子目录必坏 ⇒ 打**单文件**，`handlers/index.js` **静态注册表**。
+部署 `node cloud/scripts/deploy-cloud.js` → 手动 cli.bat → 等 1~2 分钟。
+口径：业务查询用数字 `id`；4 张表业务键当 `_id`（`setting:`/`switch:`/`ack:`/`week:`）；字段驼峰；`insertOne` 后改这行用返回的 `_id`。
+⚠️⚠️ 切云弄坏上传类接口（信封 JSON ⇒ `FormData` 变 `{}`，40001）：契约 `{filename,fileBase64}`，凡 FormData/Blob 切云后必须单验。
+⚠️⚠️ **HTTP 访问服务请求体上限 ≈100KB**（base64 再 +33%）⇒ 头像先压、名册导入大表会 413。小程序侧 `callFunction` ≈1MB 不受限。
+⚠️⚠️ 学生初始密码＝`user`+学号（唯一出口 `studentAccountService.initPasswordFor()`；初始 cost 8、改密后 10）；管理端 DTO 字段是 `activated`。
+⚠️⚠️⚠️ **名册逻辑有三份副本，改一处不算改完**：① `src/services/studentRosterService.js`（直连模式）
+② **`cloud/cloudfunctions/api/services/roster.js`（云端副本＝线上真正跑的，函数同名行号不同）**
+③ `miniprogram/cloudfunctions/api/index.js`（471K 单文件产物，`node cloud/scripts/sync.js` 打出，`--check` 校验）。
+只改 `src/` ⇒ 切云后不生效；改完 cloud 侧不 `sync.js` ⇒ 部署的还是旧产物。**"改完没生效"先问改的哪一份、打包了没。**
+⚠️ 云端唯一性**不是索引**，是 `unique_keys` 集合（`lib/db.js:170` `reserveUnique` → `_id="scope:key"`）；
+运行时只用 `user_name` scope，`tables.js:33` 那个 `user_seat` 没人读（学号唯一即座位唯一）。
 
 ## 发布 & 真机收尾
-- ✅✅ **发布只看一条：`git push` master 即自动发布**（`.github/workflows/cloud-release.yml` + `scripts/release/*`）：
-  verify → publish（**只发变更的那一端**）。⚠️⚠️ **别再手动上传静态托管 / 别再手动部署云函数**。
-  分类器 `scripts/release/policy.js`；预检 `node scripts/release/verify.js --scope mini`（full 在本机撞垫片）。
-- **线上网页** = `https://admin-web-jy-radio-d1gdwmptl816ee6a9.webapps.tcloudbase.com`
-  （少写 `-1491709115` 的那串返 **418**）。API 网关 `…-1491709115.ap-shanghai.app.tcloudbase.com`。
-- 管理后台线上 = 静态托管（**不是**服务器 Docker）。**手搓**才用 `_hosting`：本机 `.env.local` 被 gitignore
-  ⇒ 裸 `vite build` 出的是 **direct 包（无 `jy-radio-`）接口必废**；判据 `grep -oh jy-radio- _hosting/assets/*.js` 必须命中。
-- ✅ 静态托管两个必配已完成：① SPA fallback ＝ 静态网站托管 →「基础配置」→「**路由配置**」→「错误码 404 → 替换 `/index.html`」
-  （⚠️ 官方 recipes 那套已过时；是**内部重写 200** 不是 302）。② 域名进 **HTTP 网关 → 跨域设置**。
-- ⚠️⚠️ **首次打开弹「风险提醒」中间页**（404 + `<title>风险提醒</title>`）**不是部署坏了**：点「确定访问」即进（8h 不再弹）。
-  ⇒ 探测必须带**浏览器同款请求头（含同域 Referer）、只用 Node `https`**（用 curl 会得出反向结论）。细则 `cloud/docs/final-cutover.md` §②-b-1。
-- ⚠️⚠️ **⑧ 的卡点是开关**：`requestMode` 已改 `'cloud'`；**只改代码不重新上传＝没生效**，**必须用微信客户端验**。
-  ⇒ **学生走小程序（免备案）/ 老师走 admin-web ＝两条独立的线，别混谈。**
-- ⚠️ `miniprogram/app.js:65-69` 有 `debug_requestMode` localStorage 覆盖 —— 排查"通道不对"先查它。切云后学生侧**无兜底**。
-- ⚠️⚠️ **`jyradio.online` 未备案**（TLS 被 RST；**证书 ≠ 备案**）。云开发备案 3 准入：套餐≥个人版 + 剩余 > 6 个月 + 已开云托管固定 IP。
-- ✅ **服务器上那份 admin-web 已下线**（`5805b6d`）：compose 去掉 admin-web 服务、nginx `location /` 301 跳静态托管地址。
-  ⇒ **管理后台只有静态托管一份**；"改完看不到"**先问地址栏**。
+✅✅ **发布只看一条：`git push` master 自动发布**（`.github/workflows/cloud-release.yml`）：verify → 只发变更那端。**别再手动上传静态托管/部署云函数**。预检 `node scripts/release/verify.js --scope mini`。
+线上网页 `https://admin-web-jy-radio-d1gdwmptl816ee6a9.webapps.tcloudbase.com`（少 `-1491709115` 返 418）；API 网关 `…-1491709115.ap-shanghai.app.tcloudbase.com`。
+管理后台线上＝静态托管（**不是**服务器 Docker）。手搓才用 `_hosting`（裸 `vite build` 出 direct 包必废，判据 `grep -oh jy-radio- _hosting/assets/*.js` 要命中）。
+⚠️⚠️ 首次打开弹「风险提醒」中间页**不是部署坏了**；**探测必须带浏览器同款请求头 + Node `https`**（curl 会得反向结论），细则 `cloud/docs/final-cutover.md` §②-b-1。
+⚠️⚠️ ⑧ 卡点是开关：`requestMode` 已 `'cloud'`，**只改代码不重新上传＝没生效，必须用微信客户端验**；学生走小程序（免备案）/老师走 admin-web 两条独立线。
+⚠️ `miniprogram/app.js:65-69` 有 `debug_requestMode` localStorage 覆盖。`jyradio.online` **未备案**（证书 ≠ 备案）。✅ 服务器上那份 admin-web 已下线 ⇒ "改完看不到"**先问地址栏**。
 
 ## 部署（服务器 `~/radio`）
-- `build <svc>` + `up -d --force-recreate <svc>`（restart 不换镜像）。
-  ⚠️ **`git pull` 不影响运行中的容器** → 一次性脚本用 `docker cp cloud/. radio-backend:/app/cloud`（`-u root`，结尾 `/.`）。
-- 加列/加索引顺序与坑见 skill `sequelize-schema-rollout`：备份 → build → `scripts/db-repair.js` → up → 回填 → `queue/sweep`。
-- radio-nginx 会莫名自退（Exited 0）→ 80 全拒，排障先看它。
+`build <svc>` + `up -d --force-recreate <svc>`（restart 不换镜像）；**`git pull` 不影响运行中的容器** ⇒ 一次性脚本用 `docker cp cloud/. radio-backend:/app/cloud`（`-u root`，结尾 `/.`）。
+加列/索引见 skill `sequelize-schema-rollout`：备份 → build → `db-repair.js` → up → 回填 → `queue/sweep`。radio-nginx 会莫名自退（Exited 0）⇒ 80 全拒时先看它。
 
 ## 本机坑
-- ⚠️⚠️ **给陛下的命令分两台机器写**：本机 PowerShell → `C:\` 路径、**无 `&&`**、无 `tail`；
-  服务器 bash → `cd ~/radio`、`&&`、管道随便用。**两段必须是两个独立代码块**。
-  ⚠️ **不给需要交互输入的命令**；**必须给判据行**。
-- ⚠️ **同一文件多处改动必须串行 Edit**（并发静默吞前一个）。PowerShell stdout 不回显 → 落盘再 Read。
-- **改前端先跑**：`scripts/check-vue-bindings.js`、`scripts/check-wxml-classes.js`（前者判据＝ missing 有没有列名字）。
-- ⚠️ 深色卡尾部提示被 flex-shrink 压扁 → 改文案没用，要 `.parent{flex-wrap:wrap;row-gap:8px}` + `.hint{flex:none}`，判据量 height。
-- ⚠️⚠️ **vite 构建到"已存在"目录会被 safe-delete 垫片拦**（是拦删不是代码错）⇒ 构建到**不存在的新目录**（`--outDir _hosting`）。
-- ⚠️ `admin-web/package.json` 有 `"type": "module"` ⇒ 临时脚本用 **`.cjs`** 后缀。
-- 不开 Docker 整链路：`DB_STORAGE=./data/_shot.db` + `db:init` + `seed` + `node src/app.js`；admin-web 走 vite dev（`/submit/settings`）。
-  ⚠️ 复用服务**会跨会话掉线** → 截图前探活；**`_shot.db` schema 变过要先 `rm`**。
-- jest 基线：56 条里 15 条失败全是已删 member 模块，别当新回归。
-- ⚠️⚠️ **push 本机做不了（别再试）**：GCM 取不到凭据、`gh` 未装 ⇒ commit 我负责，**push 陛下自己敲**。判据 `git status -sb` 里**没有 `ahead N`**。
-- ⚠️⚠️ **部署云函数本机做不了**（沙箱拦 `reg.exe`）⇒ **陛下自己跑**。CLI `D:\dev\wx-devtools\cli.bat`。
-- ⚠️ PowerShell `Add-Type` 被拦 → 图像处理走 Python venv `~/.workbuddy/binaries/python/envs/default/Scripts/python.exe`。
-- 截图见 skill `web-ui-screenshot-verify`：⚠️ 会话跑久 / `location.href` 导航必出空白页（截图恒 3680 字节）→ 换 `--session <独立名>`。
-  ⚠️ agent-browser 可能 EBUSY → 改用 Chrome 无头。⚠️⚠️ `--virtual-time-budget` 不推进 CSS 动画 ⇒ 验中间帧要让页面自己定格。
+⚠️⚠️ **给陛下的命令**：本机 PowerShell（`C:\` 路径、无 `&&`、无 `tail`）与服务器 bash 必须**两个独立代码块**；**不给需要交互输入的命令**；**必须给判据**。
+同一文件多处改动**串行 Edit**（并发静默吞前一个）。vite 构建到"已存在"目录会被 safe-delete 垫片拦 ⇒ 构建到新目录。`admin-web/package.json` 有 `type:module` ⇒ 临时脚本用 `.cjs`。
+不开 Docker 整链路：`DB_STORAGE=./data/_shot.db` + `db:init` + `seed` + `node src/app.js`；`_shot.db` schema 变过要先 `rm`。
+jest 基线：56 条里 15 条失败全是已删 member 模块，别当新回归。
+⚠️⚠️ **push 本机做不了**（GCM 取不到凭据）⇒ commit 我负责、**push 陛下自己敲**（判据 `git status -sb` 无 `ahead N`）；**部署云函数本机也做不了**（沙箱拦 `reg.exe`），CLI `D:\dev\wx-devtools\cli.bat`。
+PowerShell `Add-Type` 被拦 ⇒ 图像处理走 Python（`~/.workbuddy/binaries/python/versions/3.13.12/python.exe`，PIL 装这里）。
 
 ## 后端约定
-- 容器 UTC、MySQL 北京时间；按天/周逻辑禁裸 `dayjs()`，统一 `src/utils/bjTime.js`。
-- 路由顺序：字面量段（`/submit/quota`）在参数路由（`/submit/:id`）之前。
-- ⚠️ `toast.push({icon:X})` 图标必须已 import。
-- **三维状态保持数字**；数字↔常量名只许在 `songStatusService` 定义。
-- **新开关不进 `seed.js`**（switch.test 断言恰好 4 条）→ 走 `switchService.KNOWN_SWITCHES`；缺行视为 on。
-- `/admin/submit/list` 排序＝**先提交先审**（`create_time ASC, id ASC`）。
-- ⚠️ **老服务器 ↔ 云库会分叉**：一边改的密码另一边不知道。
+容器 UTC、MySQL 北京时间；按天/周**禁裸 `dayjs()`**，统一走北京时间工具（AGENTS.md 写作 `services/bjTime.js`，实际 `src/utils/bjTime.js`）。路由顺序：字面量段在参数路由之前。
+`toast.push({icon:X})` 图标必须已 import。三维状态保持数字；数字↔常量名只在 `songStatusService`。
+新开关不进 `seed.js`（switch.test 断言恰好 4 条）⇒ 走 `switchService.KNOWN_SWITCHES`（缺行视为 on）。
+`/admin/submit/list` 排序＝先提交先审（`create_time ASC, id ASC`）。⚠️ 老服务器 ↔ 云库会分叉。
+⚠️ **新增 `/admin/**` 路由后 4 处硬编码计数会红**（`cloud/scripts/` 的 test-admin-core / test-admin-routes / selfcheck）——见 `PROJECT-NOTES.md`。
 
 ## 启动动画素材（v4 零件，等点头）
-- 站徽底稿 1410×1410，**圆心 = 图心 (704.5, 704.5)**；深蓝 `#093592` / 浅蓝 `#2497D5`。
-  环字：中文 5 字顺时针走**顶**、英文 18 字母逆时针走**底**，两行都西起东收。
-- 零件在 `preview/launch-v4/assets/`（80 PNG + `parts.json`/`arcs.json`/`sprite.png`+坐标表）。
-  ⚠️ 切图统一 **`alpha > 0`**（`alpha>100` 会丢抗锯齿边 → 外环少 6.6%）；⚠️ 校验要按清单 `(x,y)` **平移回绝对坐标**。
-  细则见 skill `bitmap-logo-split-animate`。
-- ✅ 线上 `miniprogram/components/launch-mask/` **仍是 v1，一个字没动**。等陛下在 `preview/launch-v4/index.html` 点头。
+站徽底稿 1410×1410，圆心＝图心 (704.5,704.5)；环字中文 5 字顺时针走顶、英文 18 字母逆时针走底，两行西起东收。
+零件在 `preview/launch-v4/assets/`（80 PNG + parts/arcs/sprite）。切图统一 **`alpha > 0`**（>100 会丢抗锯齿边），校验要按清单 `(x,y)` 平移回绝对坐标。
+✅ 线上 `miniprogram/components/launch-mask/` 仍是 v1 一个字没动，等陛下点头。

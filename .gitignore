@@ -93,3 +93,19 @@ __pycache__/
 # =============== Node ===============
 jspm_packages/
 .pnpm-store/
+
+# =============== 本机调试垃圾（2026-10-29 清理时补）===============
+# 调试日志目录：36M 的 adminweb.log / auto-cli.log / 一堆临时 py 脚本，不是代码
+/manual/
+# WorkBuddy 应用注册信息（含本机绝对路径 localDir），换机器就没意义
+.wbapp_*.genie
+# 记忆导出备份（源在 .workbuddy/memory/，这份是给人看的副本）
+memory-export-*
+# 伙伴端后台预览的构建产物（源码在 admin-web/src/preview/）
+admin-web/dist-partner-preview/
+# 临时验证目录
+.tmp-*/
+
+# ⚠️ preview/ 与 shots/ 刻意**不忽略**：里面已有 336 个文件被 git 跟踪（设计稿存档）。
+#    给它们加 ignore 会让「老的还在库里、新的进不去」，新旧分裂比现在更乱。
+#    要整体移出仓库得单独做一次 git rm --cached，属于策略决定，不在随手清理里做。
