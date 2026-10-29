@@ -91,8 +91,9 @@ const SUPER_ONLY = new Set([
   'admin.showcase.list', 'admin.showcase.toggle',
   // 头像上传（2026-10-08 补挂）：src/routes/admin.js 挂的是 requireSuperAdmin
   'admin.upload.avatar',
-  // 管理员账号
+  // 管理员账号（批量重置是伙伴端「批量重置」抽屉的落地接口）
   'admin.adminMgr.list', 'admin.adminMgr.create', 'admin.adminMgr.update', 'admin.adminMgr.remove',
+  'admin.adminMgr.resetPasswordBatch',
   // 学生账号：**19 条全是超管**（src/routes/admin.js 逐条 requireSuperAdmin）
   // 具体行为断言在 test-admin-student.js，这里只声明权限归属，纳入同一张矩阵
   'admin.student.importPreview', 'admin.student.importCommit', 'admin.student.template',
@@ -132,7 +133,7 @@ const PLAIN_ONLY = new Set([
   section('A. 权限矩阵（全量管理端路由）');
   reset(baseSeed());
 
-  eq('管理端路由总数', ADMIN_ROUTES.length, 112);   // 111 → 112：2026-10-09 加 PUT /admin/submit/slot-dates（关闭接收日期）
+  eq('管理端路由总数', ADMIN_ROUTES.length, 113);   // 112 → 113：+ POST /admin/admin/reset-password/batch
 
   const anonBad = [];
   const plainBad = [];
@@ -169,9 +170,9 @@ const PLAIN_ONLY = new Set([
   ok('匿名调全部路由（除登录）均为 40101', anonBad.length === 0, anonBad.slice(0, 8).join(' | '));
   ok('普管对超管专属路由全部 40301、对其它路由不被误拦', plainBad.length === 0, plainBad.slice(0, 8).join(' | '));
   ok('超管调全部路由均过鉴权', anonLeak.length === 0, anonLeak.slice(0, 8).join(' | '));
-  eq('超管专属 handlerKey 条数', SUPER_ONLY.size, 66);   // 65 → 66：+ admin.submit.saveSlotDates
+  eq('超管专属 handlerKey 条数', SUPER_ONLY.size, 67);   // 66 → 67：+ admin.adminMgr.resetPasswordBatch
   // sweepQueue 一个 key 对应两条路由（/quota/sweep 与 /queue/sweep）→ 66 > 65
-  eq('落在超管专属 handlerKey 上的**路由**条数', ADMIN_ROUTES.filter(([, hk]) => SUPER_ONLY.has(hk)).length, 67);   // 66 → 67
+  eq('落在超管专属 handlerKey 上的**路由**条数', ADMIN_ROUTES.filter(([, hk]) => SUPER_ONLY.has(hk)).length, 68);   // 67 → 68
 
   // 权限规范必须**恰好覆盖**路由表。只声明「超管」是不够的 ——
   // 另一半（普管即可）如果只靠「不在 SUPER_ONLY 里」隐式推出，那么
@@ -660,6 +661,80 @@ const PLAIN_ONLY = new Set([
   eq('删掉另一个超管（系统仍有 1 个）', (await H.call(H.req('DELETE', `/admin/admin/${super2.id}`, {}, SUPER_TOKEN))).code, 0);
 
   eq('普管调 adminMgr.list → 40301', (await H.call(H.req('GET', '/admin/admin/list', {}, PLAIN_TOKEN))).code, 40301);
+
+  /* ══════════════════ K. 批量重置（伙伴端「批量重置」抽屉的落地接口） ══════════════════
+   * ⚠️ 这条接口的价值全在「范围算得对」：范围算宽了会把已改过密码的老账号打回初始密码，
+   *    算窄了就是「界面说重置 3 个、实际只动了 1 个」。所以四种范围逐个钉死。 */
+  section('K. 批量重置密码（admin/admin/reset-password/batch）');
+
+  const mkAdm = (id, username, nickname, role, status, lastLoginAt) => ({
+    _id: `k${id}`, id, username, password: HASH, nickname, role, status,
+    lastLoginAt: lastLoginAt || null,
+    createTime: new Date('2026-01-0' + id + 'T00:00:00+08:00'),
+    updateTime: new Date('2026-01-0' + id + 'T00:00:00+08:00'),
+  });
+  const seedK = () => ({
+    admin: [
+      mkAdm(1, 'root', '超管', 0, 1, null),                    // 待激活（启用 + 没登录过）
+      mkAdm(2, 'school20240101', '社干甲', 1, 1, null),         // 待激活
+      mkAdm(3, 'school20240102', '社干乙', 1, 1, new Date()),   // 已激活（登录过）
+      mkAdm(4, 'school20240103', '站员丙', 2, 1, null),         // 待激活 + 站员
+      mkAdm(5, 'school20240104', '停用丁', 1, 0, null),         // 停用（不算待激活）
+    ],
+  });
+
+  // ① 仅待激活（默认）：root + 社干甲 + 站员丙 = 3；已登录的不动、停用的不动
+  reset(seedK());
+  r = await H.call(H.req('POST', '/admin/admin/reset-password/batch', {}, SUPER_TOKEN));
+  eq('range 缺省 = todo', r.data.range, 'todo');
+  eq('仅待激活 → 命中 3 个', r.data.resetCount, 3);
+  eq('仅待激活 → 名单正好是 1/2/4', r.data.list.map((x) => x.id), [1, 2, 4]);
+  // ⚠️ 判据不能用 `/password/i` 扫整包 —— `passwordRule` 这个**键名**就带 password，
+  //    会假报。要看的是「有没有密码字段 / 有没有 bcrypt 哈希」。
+  eq('返回里有密码规则、**绝无明文/哈希**',
+    [r.data.passwordRule, /"password"\s*:/.test(JSON.stringify(r.data)), /\$2[aby]\$/.test(JSON.stringify(r.data))],
+    ['初始密码 = user + 学号', false, false]);
+  ok('命中的人 initPwd 置回 true', (H.dump().admin || []).filter((a) => [1, 2, 4].includes(a.id))
+    .every((a) => a.initPwd === true));
+  eq('重置后能用 user+学号 登录', (await H.call(H.req('POST', '/admin/login',
+    { username: 'school20240101', password: 'userschool20240101' }))).code, 0);
+  eq('已激活的人密码没被动（旧密码仍可登录）', (await H.call(H.req('POST', '/admin/login',
+    { username: 'school20240102', password: 'password123' }))).code, 0);
+  eq('停用的人没被算进「待激活」', (H.dump().admin || []).find((a) => a.id === 5).initPwd, undefined);
+
+  // ② 社干：role=1 的 2/3/5 = 3（含停用的 —— 恢复启用时密码也是新的）
+  reset(seedK());
+  r = await H.call(H.req('POST', '/admin/admin/reset-password/batch', { range: 'cadre' }, SUPER_TOKEN));
+  eq('社干 → 命中 3 个', r.data.list.map((x) => x.id), [2, 3, 5]);
+  eq('社干重置后：社干乙（已登录过）也回到初始密码',
+    (await H.call(H.req('POST', '/admin/login', { username: 'school20240102', password: 'userschool20240102' }))).code, 0);
+
+  // ③ 站员：只有 4
+  reset(seedK());
+  r = await H.call(H.req('POST', '/admin/admin/reset-password/batch', { range: 'staff' }, SUPER_TOKEN));
+  eq('站员 → 只命中 1 个', r.data.list.map((x) => x.id), [4]);
+  eq('站员重置后可登录', (await H.call(H.req('POST', '/admin/login',
+    { username: 'school20240103', password: 'userschool20240103' }))).code, 0);
+
+  // ④ 全部：5 个
+  reset(seedK());
+  r = await H.call(H.req('POST', '/admin/admin/reset-password/batch', { range: 'all' }, SUPER_TOKEN));
+  eq('全部 → 命中 5 个', r.data.resetCount, 5);
+
+  // ⑤ 乱填的 range 一律回落 todo（不让错误值变成「全部」这种更大范围）
+  reset(seedK());
+  r = await H.call(H.req('POST', '/admin/admin/reset-password/batch', { range: 'whatever' }, SUPER_TOKEN));
+  eq('非法 range → 回落 todo（不是 all）', [r.data.range, r.data.resetCount], ['todo', 3]);
+
+  // ⑥ 空库不炸
+  reset({ admin: [mkAdm(1, 'root', '超管', 0, 1, new Date())] });
+  r = await H.call(H.req('POST', '/admin/admin/reset-password/batch', { range: 'todo' }, SUPER_TOKEN));
+  eq('没有待激活 → 0 个也不报错', [r.code, r.data.resetCount], [0, 0]);
+
+  // ⑦ 普管不能调（与其它 admin 路由一致）
+  reset(seedK());
+  eq('普管批量重置 → 40301',
+    (await H.call(H.req('POST', '/admin/admin/reset-password/batch', { range: 'all' }, PLAIN_TOKEN))).code, 40301);
 
   /* ══════════════════ 输出 ══════════════════ */
   const checked = lines.filter((l) => /^(OK|FAIL) /.test(l)).length;

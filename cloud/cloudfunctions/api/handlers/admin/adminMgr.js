@@ -14,9 +14,12 @@
  */
 
 const bcrypt = require('bcryptjs');
-const { C, _, findOne, insertOne, updateById, removeWhere, count, nextId, parseId, reserveUnique, releaseUnique } = require('../../lib/db');
+const { C, _, findOne, findAllPaged, insertOne, updateById, removeWhere, count, nextId, parseId, reserveUnique, releaseUnique } = require('../../lib/db');
 const { ApiError, Codes } = require('../../lib/response');
 const { asSuper, pager, pick, pagedList } = require('./_kit');
+
+/** 初始口令的 bcrypt 成本（与 partner/accounts.import 同口径，见 resetPasswordBatch 注释） */
+const BCRYPT_COST = 8;
 
 /** admin 的对外字段集（**绝无 password**） */
 const LIST_FIELDS = ['id', 'username', 'nickname', 'role', 'status', 'lastLoginAt', 'createTime',
@@ -138,4 +141,63 @@ async function remove(ctx) {
   return null;
 }
 
-module.exports = { list, create, update, remove };
+/**
+ * POST /admin/admin/reset-password/batch   body: { range: 'all'|'cadre'|'staff'|'todo' }
+ *
+ * 批量把伙伴账号的密码重置回「user + 学号」——伙伴端「批量重置」抽屉的落地接口。
+ *
+ * ⚠️ 为什么不在前端循环 PUT：
+ *    每次 PUT 都是一次网络往返 + 一次 bcrypt，几十人就是几十次串行请求，小程序上必卡；
+ *    这里一轮取全量、只发一次请求，且**失败即整条报错**，不会中途静默断在某一半。
+ *
+ * ⚠️ cost 用 8（与 partner/accounts.import 同口径）：重置就是回到初始状态，
+ *    初始口令形态本来就是可预测的「user+学号」，不是永久口令；
+ *    用户自己改密后由 update 接口升到 10。cost 10 × 200 人会撞云函数执行时长。
+ *
+ * ⚠️ 不排除调用者自己：JWT 不会因为改密码而失效，所以不会把人立刻踢出去；
+ *    真踢出去的是「下次登录」，前端在确认文案里已说明。
+ */
+async function resetPasswordBatch(ctx) {
+  asSuper(ctx);
+  const b = ctx.body || {};
+  const RANGES = ['all', 'cadre', 'staff', 'todo'];
+  const range = RANGES.includes(String(b.range)) ? String(b.range) : 'todo';
+
+  const all = await findAllPaged(C.ADMIN, {});
+  const target = all.filter((a) => {
+    if (!a || !a.username) return false;
+    if (range === 'cadre') return Number(a.role) === 1;   // 社干
+    if (range === 'staff') return Number(a.role) === 2;   // 站员
+    // 待激活：账号启用着、但从来没登录过（发了账号人还没进来）
+    if (range === 'todo') return Number(a.status) === 1 && !a.lastLoginAt;
+    return true;
+  });
+
+  // 一次最多 200（与 import 同上限）；超出的部分不静默吞掉，回 truncated 让前端提示
+  const BATCH_MAX = 200;
+  const hits = target.slice(0, BATCH_MAX);
+  const now = new Date();
+  const done = [];
+
+  for (const a of hits) {
+    const plain = `user${String(a.username).trim()}`;
+    await updateById(C.ADMIN, a._id, {
+      password: await bcrypt.hash(plain, BCRYPT_COST),
+      initPwd: true,
+      updateTime: now,
+    });
+    done.push({ id: a.id, username: a.username, name: a.nickname || a.username });
+  }
+
+  return {
+    range,
+    resetCount: done.length,
+    total: target.length,
+    truncated: target.length > BATCH_MAX,
+    list: done,
+    // ⚠️ 不回明文：所有账号都是同一条规则，界面直接说规则即可
+    passwordRule: '初始密码 = user + 学号',
+  };
+}
+
+module.exports = { list, create, update, remove, resetPasswordBatch };

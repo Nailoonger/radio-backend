@@ -143,7 +143,7 @@ const modKeyToFile = (key) => key.replace(/\./g, '/') + '.js';
   const systemRoutes = RAW_ROUTES.filter(([, hk]) => hk.startsWith('system.'));
   // ⚠️ 2026-10-29 起有第四种前缀：/partner/**（伙伴端小程序 + admin-web 共用）
   const partnerRoutes = RAW_ROUTES.filter(([k]) => pathOf(k).startsWith('/partner/'));
-  eq('★ admin 路由 112 条（含招新）', adminRoutes.length, 112);   // 111 → 112：+ PUT /admin/submit/slot-dates
+  eq('★ admin 路由 113 条（含招新）', adminRoutes.length, 113);   // 112 → 113：+ POST /admin/admin/reset-password/batch
   eq('user 路由 38 条（含招新）', userRoutes.length, 38);
   eq('system 路由 2 条（/health + /system/init-collections）',
     systemRoutes.map(([k]) => k), ['GET /health', 'POST /system/init-collections']);

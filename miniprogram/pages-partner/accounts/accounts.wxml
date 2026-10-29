@@ -1,0 +1,133 @@
+<!-- pages-partner/accounts/accounts.wxml · v2（2026-10-30 逐条对齐 v151 的 v139 账号屏）
+     sec1 统计 + 搜索 + 三 tab ／ sec2 白卡列表 ／ sec3 底部「批量重置」
+     点行开单账号抽屉：复制账号密码 · 重置密码 · 停用/恢复 · 删除账号
+     ⚠️ 导入名册（建站员账号）不在这一屏 —— 站员账号归管理端 web 后续的「站员表」，
+        后端 POST /partner/accounts/import 保留不动。
+     接口：GET /admin/admin/list · PUT /admin/admin/:id · DELETE /admin/admin/:id
+          POST /admin/admin/reset-password/batch -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">账号</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <!-- ───── sec1 统计 / 搜索 / 筛选 ───── -->
+    <view class="acc-stat">
+      <text class="acc-num">{{listAll.length}}</text>
+      <text class="acc-unit">个账号</text>
+      <text class="acc-stat-s">已激活 {{cnt.ok}} · 待激活 {{cnt.todo}}{{cnt.off ? ' · 停用 ' + cnt.off : ''}}</text>
+    </view>
+
+    <view class="acc-search">
+      <input class="inp" value="{{kw}}" bindinput="onKw" placeholder="搜姓名 / 学号 / 部门"
+             placeholder-class="ph" confirm-type="search" />
+    </view>
+
+    <view class="stabs">
+      <view class="stab {{tab === item.k ? 'on' : ''}}"
+            wx:for="{{tabs}}" wx:key="k"
+            data-k="{{item.k}}" bindtap="onTab">
+        <text>{{item.t}}</text>
+        <text class="n">{{item.n}}</text>
+      </view>
+    </view>
+
+    <!-- ───── sec2 列表 ───── -->
+    <view class="acc-list" wx:if="{{vis.length}}">
+      <view class="acc-line" wx:for="{{vis}}" wx:key="id"
+            hover-class="line-hover" data-idx="{{index}}" bindtap="onOpenWho">
+        <view class="acc-line-t">
+          <text class="acc-line-b">{{item.name}}</text>
+          <text class="acc-line-i">{{item.sub}}</text>
+        </view>
+        <text class="acc-bd {{item.stCls}}">{{item.stText}}</text>
+        <text class="ar">›</text>
+      </view>
+    </view>
+    <view class="empty" wx:elif="{{loading}}">正在加载……</view>
+    <view class="empty" wx:else>没有匹配的账号。换个关键词，或切回「全部」。</view>
+
+    <!-- ───── sec3 批量动作 ───── -->
+    <view class="btnrow">
+      <button class="btn ghost" hover-class="pressed" bindtap="onOpenReset">批量重置</button>
+    </view>
+  </view>
+
+  <!-- ═════════ 单账号抽屉 ═════════ -->
+  <view class="overlay" wx:if="{{who}}" bindtap="onCloseWho">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-grab"></view>
+      <view class="aw-hd">
+        <text class="aw-nm">{{who.name}}</text>
+        <text class="acc-bd {{who.stCls}}">{{who.stText}}</text>
+      </view>
+      <view class="aw-sub">{{who.sub}}</view>
+
+      <view class="aw-pw" wx:if="{{who.initPwd}}">
+        <text class="aw-pw-lb">初始密码</text>
+        <text class="aw-pw-v">{{who.initPwd}}</text>
+      </view>
+      <!-- 登录过的人密码大概率已经改过：别让超管拿这个明文去发给人 -->
+      <view class="aw-pw-tip" wx:if="{{who.initPwd && who.stKey === 'ok'}}">
+        这个账号登录过，密码可能已经改过。要给他一个能用的密码，先「重置密码」。
+      </view>
+
+      <view class="aw-acts">
+        <button class="aw-btn" hover-class="pressed" bindtap="onCopy">复制账号密码</button>
+        <button class="aw-btn" hover-class="pressed" bindtap="onResetOne">重置密码</button>
+        <button class="aw-btn" hover-class="pressed" bindtap="onToggleStatus">
+          {{who.stKey === 'off' ? '恢复启用' : '停用账号'}}
+        </button>
+        <button class="aw-btn danger" hover-class="pressed" bindtap="onRemove">删除账号</button>
+      </view>
+
+      <view class="sw-foot">
+        <button class="btn ghost" hover-class="pressed" bindtap="onCloseWho">关闭</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- ═════════ 批量重置抽屉 ═════════ -->
+  <view class="overlay" wx:if="{{resetOpen}}" bindtap="onCloseReset">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-grab"></view>
+
+      <view class="sw-hd">
+        <view class="sw-hd-l">
+          <text class="sw-hd-t">批量重置密码</text>
+          <text class="sw-hd-p">重置后密码回到 user+学号，旧密码立即失效。</text>
+        </view>
+      </view>
+
+      <view class="sn-sec">
+        <text class="sn-lab">重置范围</text>
+        <view class="range">
+          <view class="seg {{range === item.k ? 'on' : ''}}"
+                wx:for="{{ranges}}" wx:key="k"
+                data-k="{{item.k}}" bindtap="onRange">{{item.t}}</view>
+        </view>
+      </view>
+
+      <view class="pre">
+        <view class="acc-row" wx:for="{{preview}}" wx:key="id">
+          <text class="acc-nm">{{item.name}}</text>
+          <text class="acc-no">{{item.username}}</text>
+        </view>
+        <view class="acc-row" wx:if="{{!preview.length}}">
+          <text class="acc-nm">没有匹配的账号</text>
+        </view>
+      </view>
+
+      <view class="sw-foot row2">
+        <button class="btn ghost" hover-class="pressed" bindtap="onCloseReset">取消</button>
+        <button class="btn primary" hover-class="pressed" bindtap="onDoReset"
+                disabled="{{!preview.length || resetting}}">重置这 {{preview.length}} 个</button>
+      </view>
+    </view>
+  </view>
+</view>

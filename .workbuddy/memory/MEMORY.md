@@ -20,6 +20,12 @@
 
 ## 铁律
 - **只做加法**：`src/`+`admin-web/`+Docker 一行不删，保留 `requestMode:'direct'|'cloud'`。**绝不用 `git checkout --`**。
+- ⚠️⚠️ **本地绿 ≠ CI 绿**：`.gitignore` 有条 `_*`，会吃掉下划线开头的**正式源码**
+  （`handlers/partner/_kit.js`、`_published.js` 就这样从没进过仓库 ⇒ CI 里每个 partner handler
+  `require('./_kit')` 直接崩 ⇒ #16/#17/#18 三连红、`publish` 从未执行过一次）。
+  **碰了 `.gitignore`、或新增了文件，必须用 `git worktree add <干净树> <sha>` + `npm ci`（根 + admin-web）
+  跑一遍 `cloud/scripts/regression.js --source` 再 push**。判据：干净树 `git ls-files` 能列出
+  所有被 require 的文件；`sync.js` 打包模块数（61→70）就是"CI 跑的是不是这份代码"的硬指标。
 - ⚠️⚠️ **给 `<button>` 写样式一律用 `button.xxx`（元素+类），不能只写 `.xxx`**：
   `app.wxss` 有 `button.btn{display:block;width:auto}` = 特异性 (0,1,1)，会**静默压掉**单类 `.btn`(0,1,0) 的 `display:flex`
   ⇒ 按钮退化成「块级 + line-height」单行行盒，**文字贴上沿、底下空一大截，不报错只是"看着有点歪"**

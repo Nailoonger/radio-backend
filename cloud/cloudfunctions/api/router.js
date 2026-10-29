@@ -172,6 +172,8 @@ const ADMIN_ROUTES = [
 
   ['GET /admin/admin/list', 'admin.adminMgr.list'],
   ['POST /admin/admin/create', 'admin.adminMgr.create'],
+  // ⚠️ 字面量段必须排在 `/admin/admin/:id` 之前（同方法不会被吃掉，但按全站规矩一律如此）
+  ['POST /admin/admin/reset-password/batch', 'admin.adminMgr.resetPasswordBatch'],
   ['PUT /admin/admin/:id', 'admin.adminMgr.update'],
   ['DELETE /admin/admin/:id', 'admin.adminMgr.remove'],
 
