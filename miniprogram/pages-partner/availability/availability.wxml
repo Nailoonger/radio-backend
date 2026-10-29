@@ -6,19 +6,21 @@
 
 <view class="page">
 
-  <!-- 顶部：返回 + 周标签 + 翻周 -->
+  <!-- 顶部：返回 + 标题（2026-10-30 起顶部**不再写日期**，日期下移到周切换卡里） -->
   <view class="bar" style="padding-top:{{statusBarHeight}}px">
     <view class="bar-in">
       <view class="back" bindtap="goBack" hover-class="nav-hover">‹</view>
-      <view class="wk">
-        <text class="wk-label">{{weekLabel || '加载中'}}</text>
-        <text class="wk-sub">{{isMember ? '我的可排时间' : '值班时间代录'}}</text>
-      </view>
-      <view class="wk-nav">
-        <view class="nav" bindtap="onPrevWeek" hover-class="nav-hover">‹</view>
-        <view class="nav" bindtap="onNextWeek" hover-class="nav-hover">›</view>
-      </view>
+      <text class="bar-title">{{isMember ? '我的可排时间' : '值班时间代录'}}</text>
+      <!-- 与返回键等宽的占位：没有它标题会被返回键推得偏右，不是真居中 -->
+      <view class="bar-hold"></view>
     </view>
+  </view>
+
+  <!-- 周切换卡：整卡水平居中，按钮贴卡片左右两端，中间是当周的月和日 -->
+  <view class="wkcard">
+    <view class="wkc-btn" bindtap="onPrevWeek" hover-class="wkc-hover" aria-label="上一周">‹</view>
+    <text class="wkc-md">{{weekLabel || '加载中'}}</text>
+    <view class="wkc-btn" bindtap="onNextWeek" hover-class="wkc-hover" aria-label="下一周">›</view>
   </view>
 
   <!-- ══════ 站员：就地填报 ══════ -->
@@ -68,9 +70,28 @@
 
   <!-- ══════ 社干 / 超管 ══════ -->
   <block wx:else>
+    <!-- 原来的 50rpx 大粗体「值班时间代录」已删（顶部标题栏已经写了），这里只留一句操作口径 -->
     <view class="pl-head">
-      <text class="pl-title">值班时间代录</text>
       <text class="pl-sub">管理人员也参与值班。勾选伙伴不能参加的场次；没勾的视为可排，保存必须写原因。</text>
+    </view>
+
+    <!-- 我的值班角色：社干 / 超管自己配（2026-10-30 新规则）
+         ⚠️ 只放播音 / 主持 / 编辑 三项（陛下点名这三个）；库里已有的记者 / 技术**原样保留**，
+            保存时一起带上，不因为这里没列出来就被清掉。 -->
+    <view class="rolecard">
+      <view class="rc-hd">
+        <text class="rc-t">我的值班角色</text>
+        <text class="rc-bd {{rolePicked > 0 ? 'on' : ''}}">{{roleText}}</text>
+      </view>
+      <view class="rc-chips">
+        <view class="rc-chip {{item.on ? 'on' : ''}}"
+              wx:for="{{roleChips}}" wx:key="label"
+              data-l="{{item.label}}" bindtap="onToggleRole" hover-class="rc-hover">{{item.label}}</view>
+      </view>
+      <view class="rc-foot">
+        <text class="rc-hint">{{roleHint}}</text>
+        <view class="rc-save {{roleDirty ? '' : 'off'}}" bindtap="onSaveRoles">{{roleSaving ? '保存中…' : '保存'}}</view>
+      </view>
     </view>
 
     <view class="bulk" wx:if="{{isSuper}}" bindtap="openBulk" hover-class="bulk-hover">

@@ -10,7 +10,7 @@
   box-sizing: border-box;
 }
 
-/* ── 周切换条 ── */
+/* ── 顶部标题栏（吸顶；只放返回 + 标题，日期在下面的 .wkcard 里） ── */
 .bar {
   position: sticky;
   top: 0;
@@ -26,36 +26,8 @@
   justify-content: space-between;
   padding: 20rpx 0 16rpx;
 }
-.nav {
-  width: 68rpx;
-  height: 68rpx;
-  border-radius: 9999rpx;
-  background: var(--canvas, #FFF);
-  border: 1rpx solid var(--hairline, #E0E0E0);
-  color: var(--ink, #1D1D1F);
-  font-size: 40rpx;
-  line-height: 62rpx;
-  text-align: center;
-  box-sizing: border-box;
-}
-.nav-hover { background: var(--divider, #F0F0F0); }
-.wk {
-  flex: 1;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-}
-.wk-label {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--ink, #1D1D1F);
-  letter-spacing: -.4rpx;
-}
-.wk-sub {
-  margin-top: 4rpx;
-  font-size: 22rpx;
-  color: var(--muted, #7A7A7A);
-}
+/* 旧的 .nav / .wk / .wk-label / .wk-sub 已随「周标签挪进卡片」一起删掉（2026-10-30）。
+   翻周按钮现在叫 .wkc-btn，写在文件末尾的顶部条那一段。 */
 
 /* ── 通用白卡 ── */
 .card {
@@ -444,9 +416,9 @@
 
 .ts-note { padding: 26rpx 8rpx 0; font-size: 20rpx; line-height: 1.7; color: var(--muted, #76767E); }
 
-/* 方案顶部的页面标题（左图：「值班时间代录」26px + 一行说明） */
-.pl-head { display: flex; flex-direction: column; gap: 10rpx; padding: 6rpx 6rpx 20rpx; }
-.pl-title { font-size: 50rpx; font-weight: 600; letter-spacing: -1.2rpx; line-height: 1.35; color: var(--ink, #1D1D1F); }
+/* 方案顶部的页面标题：只剩一行操作口径（50rpx 的「值班时间代录」大字已删，
+   顶部标题栏已经写了这四个字，重复一遍就是两个标题） */
+.pl-head { display: flex; flex-direction: column; gap: 10rpx; padding: 22rpx 6rpx 18rpx; }
 .pl-sub { font-size: 23rpx; line-height: 1.6; color: var(--muted, #76767E); }
 
 /* 说明区：站员页在灰底上，需要白卡；弹层里本身就是白底，再套卡片就成了「卡片套卡片」 */
@@ -535,14 +507,97 @@
 .av-head-t { font-size: 29rpx; font-weight: 600; color: var(--ink, #1D1D1F); }
 .av-head-a { font-size: 22rpx; font-weight: 400; }
 
-/* 顶部条：返回键 + 中间周标签 + 右侧翻周（原来只有翻周，没有返回） */
-.bar-in { display: flex; align-items: center; gap: 8rpx; }
+/* 顶部条：返回 + 标题（2026-10-30 起顶部不再写日期，日期下移到周切换卡） */
+.bar-in { display: flex; align-items: center; }
 .back {
   width: 56rpx; height: 56rpx; flex: none;
   display: flex; align-items: center; justify-content: center;
   font-size: 44rpx; line-height: 1; color: var(--ink, #1D1D1F);
-  margin-left: -12rpx;
 }
-.wk { flex: 1; min-width: 0; text-align: center; }
-.wk-nav { display: flex; align-items: center; gap: 4rpx; flex: none; }
-.wk-nav .nav { width: 56rpx; height: 56rpx; font-size: 36rpx; }
+.bar-title {
+  flex: 1; min-width: 0;
+  text-align: center;
+  font-size: 34rpx; font-weight: 600; letter-spacing: -.4rpx;
+  color: var(--ink, #1D1D1F);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* 与返回键等宽的占位。⚠️ 少了它，标题会被左侧返回键推得偏右 —— flex 三栏才是真居中 */
+.bar-hold { width: 56rpx; flex: none; }
+
+/* ══════════ 周切换卡 ══════════
+   整卡水平居中，两个切换按钮贴卡片左右两端，中间是当周的「月/日 — 月/日」。
+   ⚠️ 卡宽固定 560rpx 不铺满：铺满时两个按钮会飞到屏幕两边，就不像「一个卡」了。 */
+.wkcard {
+  display: flex; align-items: center;
+  width: 560rpx;
+  margin: 12rpx auto 0;              /* 水平居中 */
+  padding: 10rpx;
+  box-sizing: border-box;
+  background: var(--canvas, #FFF);
+  border-radius: 9999rpx;            /* 单行元素 → 胶囊 */
+  box-shadow: inset 0 0 0 2rpx #E3E3E8, 0 8rpx 24rpx -18rpx rgba(0, 0, 0, .22);
+}
+.wkc-btn {
+  width: 68rpx; height: 68rpx; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 9999rpx;
+  background: var(--paper, #F5F5F7);
+  color: var(--ink, #1D1D1F);
+  font-size: 38rpx; line-height: 1;
+  box-sizing: border-box;
+}
+.wkc-hover { background: #E7E7EC; }
+.wkc-md {
+  flex: 1; min-width: 0;
+  text-align: center;
+  font-size: 30rpx; font-weight: 600;
+  color: var(--ink, #1D1D1F);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .6rpx;
+}
+
+/* ══════════ 我的值班角色（社干 / 超管自助，2026-10-30 新规则） ══════════ */
+.rolecard {
+  background: var(--canvas, #FFF);
+  border-radius: 34rpx;
+  padding: 26rpx 28rpx 22rpx;
+  margin-bottom: 18rpx;
+  box-sizing: border-box;
+  box-shadow: 0 8rpx 30rpx -22rpx rgba(0, 0, 0, .2);
+}
+.rc-hd { display: flex; align-items: center; gap: 14rpx; }
+.rc-t { flex: 1; min-width: 0; font-size: 27rpx; font-weight: 600; color: var(--ink, #1D1D1F); }
+.rc-bd {
+  flex: none; font-size: 19rpx; line-height: 1.5;
+  padding: 5rpx 14rpx; border-radius: 9999rpx;
+  background: #F1F1F4; color: var(--muted, #76767E);
+}
+.rc-bd.on { background: var(--accent-tint, #EAF3FD); color: var(--accent, #0066CC); }
+.rc-chips { display: flex; gap: 14rpx; margin-top: 18rpx; }
+/* 三格等宽（flex:1 1 0），圆角与本页其他小控件一致（20rpx），不做药丸 */
+.rc-chip {
+  flex: 1 1 0; min-width: 0; min-height: 76rpx;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 20rpx;
+  border: 2rpx solid var(--hairline, #E2E2E7);
+  background: #FFF;
+  font-size: 25rpx; color: var(--ink, #1D1D1F);
+  box-sizing: border-box;
+}
+.rc-chip.on {
+  background: var(--accent-tint, #EAF3FD);
+  border-color: var(--accent, #0066CC);
+  color: var(--accent, #0066CC); font-weight: 600;
+}
+.rc-hover { opacity: .78; }
+.rc-foot { display: flex; align-items: center; gap: 16rpx; margin-top: 16rpx; }
+.rc-hint { flex: 1; min-width: 0; font-size: 20rpx; line-height: 1.5; color: var(--muted, #76767E); }
+.rc-save {
+  flex: none; min-height: 64rpx; padding: 0 26rpx;
+  display: inline-flex; align-items: center;
+  border-radius: 19rpx;
+  background: var(--accent, #0066CC);
+  color: #FFF; font-size: 23rpx; font-weight: 500;
+  box-sizing: border-box;
+}
+.rc-save.off { background: #EDEDF0; color: #A6A6AE; }

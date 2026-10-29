@@ -2,9 +2,13 @@
 //
 // 伙伴端 · 可排时间填报（P1）
 //
-// 这一页吃两件事：
-//   ① 自己填：按天分组的方块，点一下在「能来 / 不能来 / 未选」之间切换
+// 这一页吃三件事：
+//   ① 自己填：按天分组的方块，点一下在「能来 / 不能来」之间切换（两态，没有第三态）
 //   ② 代录（社干）：顶部选人，替某个成员填，必须写原因
+//   ③ 我的值班角色（社干 / 超管）：自己勾「播音 / 主持 / 编辑」，可多选（2026-10-30 新规则）
+//
+// ⚠️ 顶部标题栏只写「值班时间代录」，**不写日期**；当周的月和日放在下面的周切换卡里居中显示
+//    （2026-10-30 陛下定：大粗体标题删掉，换成「10/26 — 10/30」+ 左右翻周按钮装进一张卡）。
 //
 // ⚠️ 周锚点不从手机算。首次加载**不传 week**，由云函数按北京时间返回本周周一，
 //    之后翻页才 ±7 天。小程序端自己 `new Date().getDay()` 算周一，
@@ -16,6 +20,15 @@ const { adminRequest } = require('../../utils/request.js');
 
 const DAY_NAMES = ['周一', '周二', '周三', '周四', '周五'];
 const MAX_REASON = 200;
+
+/**
+ * 代录页「我的值班角色」可选项（2026-10-30 新规则：超管 / 社干自己配，可多选）
+ *
+ * ⚠️⚠️ 后端 DUTY_ROLES 是 5 项（播音 / 主持 / 编辑 / 记者 / 技术），这里**只放前 3 项**
+ *    —— 陛下点名的就是这三个。凡是库里已有的「记者 / 技术」**照原样带回**（见 _extraRoles），
+ *    不能因为界面上没列出来，保存一次就被悄悄清掉。
+ */
+const ROLE_OPTIONS = ['播音', '主持', '编辑'];
 
 /** '2026-11-02' ± n 天（纯日期运算，走 UTC 避免夏令时/时区干扰） */
 function addDays(ymd, n) {
@@ -143,12 +156,23 @@ Page({
     bulkEventCount: 0,
     bulkReason: '',
     bulkSaving: false,
+    // ── 我的值班角色（社干 / 超管自助，2026-10-30 新规则） ──
+    roleChips: [],         // [{ label: '播音', on: false }, ...]
+    rolePicked: 0,         // 已选个数（含界面没列出的记者 / 技术）
+    roleText: '未选',
+    roleHint: '',
+    roleDirty: false,
+    roleSaving: false,
   },
 
   /** 内部状态：slotKey → 0/1，不直接放 setData 以外的地方 */
   _pickMap: {},
   /** 当前查看/代录的对象（0 = 自己） */
   _targetId: 0,
+  /** 库里已有、但界面没列出来的岗位（记者 / 技术）—— 保存时原样带回，不许丢 */
+  _extraRoles: [],
+  /** /partner/me 是否真的拉到了。没拉到不许保存，否则会把别人的岗位写成空 */
+  _meLoaded: false,
 
   onLoad() {
     const app = getApp();
@@ -163,6 +187,8 @@ Page({
       isMember: role === 2,
       isSuper: role === 0,
     });
+    // 站员没有「我的值班角色」这一块，不用多打一次接口
+    if (role !== 2) this.loadMe();
     this.fetch({});
   },
 
@@ -173,7 +199,10 @@ Page({
   },
 
   onPullDownRefresh() {
-    this.fetch({ week: this.data.weekStart || undefined })
+    const jobs = [this.fetch({ week: this.data.weekStart || undefined })];
+    // 角色卡也要跟着刷新，否则「拉不到就算了」会一直卡在拉不到的状态
+    if (!this.data.isMember) jobs.push(this.loadMe());
+    Promise.all(jobs)
       .then(() => wx.stopPullDownRefresh())
       .catch(() => wx.stopPullDownRefresh());
   },
@@ -287,6 +316,86 @@ Page({
     const a = shortDate(weekStart);
     const b = shortDate((dates && dates[4]) || addDays(weekStart, 4));
     return `${a} — ${b}`;
+  },
+
+  /* ══════════ 我的值班角色（社干 / 超管自助） ══════════
+     走现成的 PUT /partner/me/duty（handlers/partner/me.js#saveDuty），只改 dutyRoles，
+     department 不传 → 后端保留原值。没有为这件事新开接口。 */
+
+  /** 拉自己的部门 / 岗位 */
+  loadMe() {
+    return adminRequest('/partner/me', 'GET')
+      .then((d) => this.applyRoles((d && d.dutyRoles) || []))
+      .catch(() => {
+        // 拉不到就空着渲染，但 _meLoaded 保持 false → 不许保存（见 onSaveRoles）
+        this._meLoaded = false;
+        this.setData({
+          roleChips: ROLE_OPTIONS.map((r) => ({ label: r, on: false })),
+          rolePicked: 0, roleText: '未选', roleDirty: false,
+          roleHint: '角色没拉到，下拉刷新再试。',
+        });
+      });
+  },
+
+  /** 把后端的 dutyRoles 翻成三个胶囊 + 保留界面没列出的岗位 */
+  applyRoles(dutyRoles) {
+    const list = (Array.isArray(dutyRoles) ? dutyRoles : [])
+      .map((r) => String(r).trim()).filter(Boolean);
+    const chips = ROLE_OPTIONS.map((r) => ({ label: r, on: list.indexOf(r) >= 0 }));
+    // ⚠️ 记者 / 技术 不在界面上，但已经在库里 —— 存起来，保存时一起交回去
+    this._extraRoles = list.filter((r) => ROLE_OPTIONS.indexOf(r) < 0);
+    this._meLoaded = true;
+    this.setData(Object.assign({ roleChips: chips, roleDirty: false }, this._roleStat(chips, false)));
+  },
+
+  /** 由胶囊状态算出「已选几项 / 徽章文案 / 底部提示」—— 模板只渲染，不判断 */
+  _roleStat(chips, dirty) {
+    const picked = (chips || []).filter((c) => c.on).length + (this._extraRoles || []).length;
+    let hint;
+    if (dirty) hint = '改动还没保存。';
+    else if (picked > 0) hint = '已保存。排班时按这些角色判断你能不能上某个时段。';
+    else hint = '一个都没选，排班时不会把你排上岗。';
+    return {
+      rolePicked: picked,
+      roleText: picked > 0 ? `已选 ${picked} 项` : '未选',
+      roleHint: hint,
+    };
+  },
+
+  /** 点胶囊：多选，点一下切一下（不做单选互斥） */
+  onToggleRole(e) {
+    const label = String((e.currentTarget.dataset || {}).l || '');
+    if (ROLE_OPTIONS.indexOf(label) < 0) return;
+    const chips = (this.data.roleChips || []).map((c) => (
+      c.label === label ? Object.assign({}, c, { on: !c.on }) : c
+    ));
+    this.setData(Object.assign({ roleChips: chips, roleDirty: true }, this._roleStat(chips, true)));
+  },
+
+  onSaveRoles() {
+    if (this.data.roleSaving) return;
+    // ⚠️ 没拉到就保存 = 把人家已有的岗位写成空。宁可让他刷新，也不许静默清库
+    if (!this._meLoaded) {
+      return wx.showToast({ title: '角色还没加载出来，下拉刷新再试', icon: 'none' });
+    }
+    if (!this.data.roleDirty) return;   // 没改就不发请求
+
+    const chips = this.data.roleChips || [];
+    const dutyRoles = chips.filter((c) => c.on).map((c) => c.label)
+      .concat(this._extraRoles || []);
+
+    this.setData({ roleSaving: true });
+    adminRequest('/partner/me/duty', 'PUT', { dutyRoles })
+      .then(() => {
+        this.setData(Object.assign({ roleSaving: false, roleDirty: false }, this._roleStat(chips, false)));
+        wx.showToast({ title: '角色已保存', icon: 'success' });
+        // 人员卡片的副标题是「部门 · 第一个岗位」，改了角色要跟着变
+        this.fetch({ week: this.data.weekStart, personId: this.data.targetId || undefined });
+      })
+      .catch((err) => {
+        this.setData({ roleSaving: false });
+        wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' });
+      });
   },
 
   /** 重算已选 / 能来 / 不能来 */
