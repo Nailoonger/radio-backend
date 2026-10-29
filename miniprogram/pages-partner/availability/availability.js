@@ -40,9 +40,32 @@ function addDays(ymd, n) {
   return `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}`;
 }
 
-/** '2026-11-02' → '11-02' */
+/** '2026-11-02' → '11/02'（顶部周标签与天头日期共用，全页统一斜杠） */
 function shortDate(ymd) {
-  return String(ymd || '').slice(5);
+  const s = String(ymd || '');
+  if (s.length < 10) return s;
+  return `${s.slice(5, 7)}/${s.slice(8, 10)}`;
+}
+
+/**
+ * 两个周锚点相差几周（纯日期运算走 UTC，与 addDays 同口径）
+ * 用来判断「现在看的是本周还是前后某一周」—— 顶部文字链的「本周 / 上一周 / 下一周」靠它。
+ */
+function weeksBetween(base, ymd) {
+  const a = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(base || ''));
+  const b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ''));
+  if (!a || !b) return 0;
+  const ta = Date.UTC(Number(a[1]), Number(a[2]) - 1, Number(a[3]));
+  const tb = Date.UTC(Number(b[1]), Number(b[2]) - 1, Number(b[3]));
+  return Math.round((tb - ta) / 604800000);
+}
+
+/** 周前缀：0=本周，±1=上一周/下一周，再远用「N 周前 / N 周后」 */
+function weekPrefix(offset) {
+  if (offset === 0) return '本周';
+  if (offset === -1) return '上一周';
+  if (offset === 1) return '下一周';
+  return offset < 0 ? `${-offset} 周前` : `${offset} 周后`;
 }
 
 /**
@@ -117,7 +140,8 @@ Page({
     loading: true,
     ready: false,          // 本周时段是否已发布
     weekStart: '',
-    weekLabel: '',
+    weekText: '',          // 「本周 10/26 – 10/30」
+    isThisWeek: true,      // 本周时右边「下一周」置灰（仍可点，与请假 / 考勤页同口径）
     days: [],
     reason: '',
     reasonLen: 0,
@@ -169,6 +193,8 @@ Page({
   _pickMap: {},
   /** 当前查看/代录的对象（0 = 自己） */
   _targetId: 0,
+  /** 本周周一（首次不带 week 请求时由云函数给出），用来算「本周 / 上一周」 */
+  _baseWeek: '',
   /** 库里已有、但界面没列出来的岗位（记者 / 技术）—— 保存时原样带回，不许丢 */
   _extraRoles: [],
   /** /partner/me 是否真的拉到了。没拉到不许保存，否则会把别人的岗位写成空 */
@@ -272,11 +298,19 @@ Page({
         //    （陛下 2026-10-29：「我从来没填过这个原因为什么每次点开都有自带的」）。
         //    旧原因仍留在库里，只是不再出现在界面上。
 
+        // ── 顶部周标签：本周 / 上一周 / 下一周 + 月日 ──
+        // ⚠️ 基准周只在**首次加载**时记：第一次调用不带 week，云函数按北京时间回本周周一，
+        //    之后都拿它做比较。前端自己 new Date() 算周一在跨时区手机会和后端差一周。
+        const ws = data.weekStart || '';
+        if (!this._baseWeek && ws) this._baseWeek = ws;
+        const weekOffset = weeksBetween(this._baseWeek || ws, ws);
+
         this.setData({
           loading: false,
           ready: !!data.ready,
-          weekStart: data.weekStart || '',
-          weekLabel: this.labelOf(data.weekStart, data.weekDates),
+          weekStart: ws,
+          weekText: this.labelOf(ws, data.weekDates, weekOffset),
+          isThisWeek: weekOffset === 0,
           days,
           cards,
           people,
@@ -311,11 +345,12 @@ Page({
     return Number(info.id) || 0;
   },
 
-  labelOf(weekStart, dates) {
+  labelOf(weekStart, dates, offset) {
     if (!weekStart) return '';
     const a = shortDate(weekStart);
     const b = shortDate((dates && dates[4]) || addDays(weekStart, 4));
-    return `${a} — ${b}`;
+    // 例：本周 10/26 – 10/30
+    return `${weekPrefix(Number(offset) || 0)} ${a} – ${b}`;
   },
 
   /* ══════════ 我的值班角色（社干 / 超管自助） ══════════

@@ -10,7 +10,7 @@
   box-sizing: border-box;
 }
 
-/* ── 顶部标题栏（吸顶；只放返回 + 标题，日期在下面的 .wkcard 里） ── */
+/* ── 顶部标题栏（吸顶；只放返回 + 标题，日期在下面的 .wk-nav 里） ── */
 .bar {
   position: sticky;
   top: 0;
@@ -26,8 +26,8 @@
   justify-content: space-between;
   padding: 20rpx 0 16rpx;
 }
-/* 旧的 .nav / .wk / .wk-label / .wk-sub 已随「周标签挪进卡片」一起删掉（2026-10-30）。
-   翻周按钮现在叫 .wkc-btn，写在文件末尾的顶部条那一段。 */
+/* 旧的 .nav / .wk / .wk-label / .wk-sub 已随「周标签挪到独立一行」一起删掉（2026-10-30）。
+   翻周现在是左右两条文字链 .wk-b + 中间的 .wk-c，样式写在文件末尾。 */
 
 /* ── 通用白卡 ── */
 .card {
@@ -416,10 +416,9 @@
 
 .ts-note { padding: 26rpx 8rpx 0; font-size: 20rpx; line-height: 1.7; color: var(--muted, #76767E); }
 
-/* 方案顶部的页面标题：只剩一行操作口径（50rpx 的「值班时间代录」大字已删，
-   顶部标题栏已经写了这四个字，重复一遍就是两个标题） */
-.pl-head { display: flex; flex-direction: column; gap: 10rpx; padding: 22rpx 6rpx 18rpx; }
-.pl-sub { font-size: 23rpx; line-height: 1.6; color: var(--muted, #76767E); }
+/* 原来这里还有 .pl-head / .pl-title / .pl-sub：
+   50rpx 大粗体「值班时间代录」和下面那句「管理人员也参与值班……」都已按陛下要求删掉
+   （2026-10-30：标题栏已写四个字；那句说明也一并去掉）。样式一起清掉，别留死代码。 */
 
 /* 说明区：站员页在灰底上，需要白卡；弹层里本身就是白底，再套卡片就成了「卡片套卡片」 */
 .note {
@@ -524,36 +523,25 @@
 /* 与返回键等宽的占位。⚠️ 少了它，标题会被左侧返回键推得偏右 —— flex 三栏才是真居中 */
 .bar-hold { width: 56rpx; flex: none; }
 
-/* ══════════ 周切换卡 ══════════
-   整卡水平居中，两个切换按钮贴卡片左右两端，中间是当周的「月/日 — 月/日」。
-   ⚠️ 卡宽固定 560rpx 不铺满：铺满时两个按钮会飞到屏幕两边，就不像「一个卡」了。 */
-.wkcard {
+/* ══════════ 周切换条 ══════════
+   左「‹ 上一周」蓝字 / 中「本周 10/26 – 10/30」/ 右「下一周 ›」灰字（本周时）。
+   与请假、考勤页同一套写法（.wk-nav / .wk-b / .wk-c），三页保持一致。
+   ⚠️ 2026-10-30 之前是「白胶囊装两个圆钮」，陛下拿参考图否掉，改成这条文字链。 */
+.wk-nav {
   display: flex; align-items: center;
-  width: 560rpx;
-  margin: 12rpx auto 0;              /* 水平居中 */
-  padding: 10rpx;
-  box-sizing: border-box;
-  background: var(--canvas, #FFF);
-  border-radius: 9999rpx;            /* 单行元素 → 胶囊 */
-  box-shadow: inset 0 0 0 2rpx #E3E3E8, 0 8rpx 24rpx -18rpx rgba(0, 0, 0, .22);
+  padding: 12rpx 6rpx 16rpx;
 }
-.wkc-btn {
-  width: 68rpx; height: 68rpx; flex: none;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 9999rpx;
-  background: var(--paper, #F5F5F7);
-  color: var(--ink, #1D1D1F);
-  font-size: 38rpx; line-height: 1;
-  box-sizing: border-box;
-}
-.wkc-hover { background: #E7E7EC; }
-.wkc-md {
-  flex: 1; min-width: 0;
-  text-align: center;
+/* 左右两条文字链各占 flex:1、中间 flex:none —— 这样中间那行是**屏幕正中**，
+   不会因为「‹ 上一周」比「下一周 ›」宽一点就被推偏 */
+.wk-b { flex: 1; font-size: 25rpx; color: var(--accent, #0066CC); }
+.wk-b.r { text-align: right; }
+/* 本周时「下一周」置灰（仍可点，和请假 / 考勤页同口径） */
+.wk-b.off { color: #B3B3B8; }
+.wk-c {
+  flex: none;
   font-size: 30rpx; font-weight: 600;
   color: var(--ink, #1D1D1F);
   font-variant-numeric: tabular-nums;
-  letter-spacing: .6rpx;
 }
 
 /* ══════════ 我的值班角色（社干 / 超管自助，2026-10-30 新规则） ══════════ */

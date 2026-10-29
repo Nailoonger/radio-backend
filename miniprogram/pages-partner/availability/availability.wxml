@@ -16,11 +16,11 @@
     </view>
   </view>
 
-  <!-- 周切换卡：整卡水平居中，按钮贴卡片左右两端，中间是当周的月和日 -->
-  <view class="wkcard">
-    <view class="wkc-btn" bindtap="onPrevWeek" hover-class="wkc-hover" aria-label="上一周">‹</view>
-    <text class="wkc-md">{{weekLabel || '加载中'}}</text>
-    <view class="wkc-btn" bindtap="onNextWeek" hover-class="wkc-hover" aria-label="下一周">›</view>
+  <!-- 周切换：左右文字链 + 中间「本周 10/26 – 10/30」（与请假 / 考勤页同一套，2026-10-30 定） -->
+  <view class="wk-nav">
+    <text class="wk-b" bindtap="onPrevWeek">‹ 上一周</text>
+    <text class="wk-c">{{weekText || '加载中'}}</text>
+    <text class="wk-b r {{isThisWeek ? 'off' : ''}}" bindtap="onNextWeek">下一周 ›</text>
   </view>
 
   <!-- ══════ 站员：就地填报 ══════ -->
@@ -70,11 +70,6 @@
 
   <!-- ══════ 社干 / 超管 ══════ -->
   <block wx:else>
-    <!-- 原来的 50rpx 大粗体「值班时间代录」已删（顶部标题栏已经写了），这里只留一句操作口径 -->
-    <view class="pl-head">
-      <text class="pl-sub">管理人员也参与值班。勾选伙伴不能参加的场次；没勾的视为可排，保存必须写原因。</text>
-    </view>
-
     <!-- 我的值班角色：社干 / 超管自己配（2026-10-30 新规则）
          ⚠️ 只放播音 / 主持 / 编辑 三项（陛下点名这三个）；库里已有的记者 / 技术**原样保留**，
             保存时一起带上，不因为这里没列出来就被清掉。 -->
