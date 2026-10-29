@@ -120,9 +120,10 @@
         <view class="pc-foot">
           <text class="pc-stat">{{item.statText}}</text>
           <view class="pc-right">
-            <!-- 超管替别人配值班岗位（2026-10-30）。⚠️ 必须 catchtap：
-                 不然会冒泡到卡片的 bindtap，点「配岗位」变成打开代录弹层 -->
-            <text class="pc-role" wx:if="{{isSuper && !item.isMe}}"
+            <!-- 超管替别人配值班资格（2026-10-30）。⚠️ 必须 catchtap：
+                 不然会冒泡到卡片的 bindtap，点「配岗位」变成打开代录弹层。
+                 ⚠️ 自己的卡片也保留这一项 —— 超管自己没部门时同样选不上，得能自己补 -->
+            <text class="pc-role" wx:if="{{isSuper}}"
                   data-id="{{item.personId}}" catchtap="openRoleSheet">配岗位</text>
             <text class="pc-go">{{item.isMe ? '填写我的时间' : '查看／代录'}} ›</text>
           </view>
@@ -237,23 +238,36 @@
   </view>
 </view>
 
-<!-- ══════ 超管配伙伴值班角色（2026-10-30 新增）
-     入口在人员卡片底部的「配岗位」。⚠️ 走 PUT /partner/people/:id/duty（仅超管），
-     只改 dutyRoles —— 部门不在这里改。 -->
+<!-- ══════ 超管配伙伴值班资格（2026-10-30 新增）
+     入口在人员卡片底部的「配岗位」。⚠️ 走 PUT /partner/people/:id/duty（仅超管）。
+     ⚠️ 部门和岗位是**两条独立的硬条件**，必须一起配 ——
+       只配岗位、部门空着，换人弹层照样报「尚未配置部门 / 部门不匹配」（陛下 2026-10-30 卡在这）。 -->
 <view class="overlay" hidden="{{!roleSheetOpen}}" catchtap="closeRoleSheet">
   <view class="sheet sheet-role" catchtap="stop">
     <view class="sheet-hd">
       <view class="sheet-hd-l">
-        <text class="sheet-t">{{roleTargetName}} · 值班角色</text>
-        <text class="sheet-sub">部门：{{roleTargetDept || '未设置'}}。勾选他能上的岗位，可多选；一个都不选＝不参与排班。</text>
+        <text class="sheet-t">{{roleTargetName}} · 值班资格</text>
+        <text class="sheet-sub">部门决定他会被排进哪个部门的时段，岗位决定能不能上这个岗。两个都配齐才选得上。</text>
       </view>
       <text class="sheet-x" bindtap="closeRoleSheet">关闭</text>
     </view>
 
-    <view class="rc-chips rc-chips-sheet">
-      <view class="rc-chip {{item.on ? 'on' : ''}}"
-            wx:for="{{roleTargetChips}}" wx:key="label"
-            data-l="{{item.label}}" bindtap="onToggleTargetRole" hover-class="rc-hover">{{item.label}}</view>
+    <view class="rc-sec">
+      <text class="rc-sec-t">部门（单选，再点一下取消）</text>
+      <view class="rc-chips">
+        <view class="rc-chip {{item.on ? 'on' : ''}}"
+              wx:for="{{roleTargetDepts}}" wx:key="label"
+              data-d="{{item.label}}" bindtap="onPickTargetDept" hover-class="rc-hover">{{item.label}}</view>
+      </view>
+    </view>
+
+    <view class="rc-sec">
+      <text class="rc-sec-t">值班岗位（可多选）</text>
+      <view class="rc-chips">
+        <view class="rc-chip {{item.on ? 'on' : ''}}"
+              wx:for="{{roleTargetChips}}" wx:key="label"
+              data-l="{{item.label}}" bindtap="onToggleTargetRole" hover-class="rc-hover">{{item.label}}</view>
+      </view>
     </view>
 
     <view class="sheet-foot">

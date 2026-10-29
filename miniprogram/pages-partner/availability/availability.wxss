@@ -612,7 +612,8 @@
   font-size: 24rpx; color: var(--ink-2, #333);
 }
 
-/* 配岗位弹层：内容只有三个胶囊 + 一行说明，用高度自适应的白卡，不占满 88vh */
+/* 配岗位弹层：两组单选/多选胶囊 + 一行说明，用高度自适应的白卡，不占满 88vh */
 .sheet-role { height: auto; padding-bottom: calc(24rpx + env(safe-area-inset-bottom)); }
-.rc-chips-sheet { padding: 4rpx 32rpx 24rpx; }
+.sheet-role .rc-sec { padding: 0 32rpx 24rpx; }
+.rc-sec-t { display: block; margin-bottom: 12rpx; font-size: 22rpx; color: var(--muted, #76767E); }
 

@@ -115,9 +115,20 @@ function reasonsFor(person, def, rows, c) {
   const reasons = [];
   if (!person) return ['账号已停用或不在人员池'];
   const id = Number(person.personId); const day = c.dates[def.day];
-  if (!person.department || !person.dutyRoles.length) reasons.push('尚未配置部门与岗位资格');
-  if (def.dept && person.department !== def.dept) reasons.push('部门不匹配');
-  if (def.role && !person.dutyRoles.includes(def.role)) reasons.push('岗位资格不匹配');
+  /**
+   * ⚠️ 部门与岗位要**分开报**（2026-10-30 陛下被合并提示坑过）：
+   *    原来一句「尚未配置部门与岗位资格」把两件事糊在一起 ——
+   *    他只配了岗位、没配部门，看到这句完全不知道该去补哪一样。
+   *    现在分开说，并且「不匹配」时把双方的值打出来，一眼能看出差在哪。
+   */
+  if (!person.department) reasons.push('尚未配置部门');
+  if (!person.dutyRoles.length) reasons.push('尚未配置值班岗位');
+  if (def.dept && person.department !== def.dept) {
+    reasons.push(`部门不匹配（当前：${person.department || '未配置'}，这个时段要：${def.dept}）`);
+  }
+  if (def.role && person.dutyRoles.length && !person.dutyRoles.includes(def.role)) {
+    reasons.push(`岗位资格不匹配（当前：${person.dutyRoles.join('/')}，这个时段要：${def.role}）`);
+  }
   if (!c.canMap[id] || !c.canMap[id].has(def.slotKey)) reasons.push('未确认该时段可排时间或填报已过期');
   if (c.leaveSet[`${day}|${def.title}|${id}`]) reasons.push('该场次已批准请假');
   const own = rows.filter((r) => Number(r.personId) === id);

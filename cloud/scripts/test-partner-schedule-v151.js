@@ -80,7 +80,7 @@ function shape(value, expected, at='response') {
     equal('member forbidden '+route,(await mutate(method,route,body,3)).code,40301);
   }
   const candidate=await call('GET',`/partner/schedule/candidates?week=${WEEK}&day=${DATES[0]}&slotKey=0-2`,{},2);
-  equal('candidate read',candidate.code,0); yes('wrong department reason',candidate.data.list.find((x)=>x.personId===3).reasons.includes('部门不匹配'));
+  equal('candidate read',candidate.code,0); yes('wrong department reason',candidate.data.list.find((x)=>x.personId===3).reasons.some((x)=>/^部门不匹配（当前：主持部，这个时段要：播音部）$/.test(x)));
   yes('unconfirmed reason',candidate.data.list.find((x)=>x.personId===6).reasons.some((x)=>/可排/.test(x)));
   yes('stale reason',candidate.data.list.find((x)=>x.personId===7).reasons.some((x)=>/过期/.test(x)));
   equal('candidate excludes disabled',candidate.data.list.some((x)=>x.personId===9),false);

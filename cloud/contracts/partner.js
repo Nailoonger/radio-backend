@@ -173,8 +173,8 @@ const contract = {
     method: 'PUT',
     path: '/partner/people/:id/duty',
     auth: 'admin',
-    desc: '超管替别人配值班岗位（只动 dutyRoles，不动 department）。',
-    req: { dutyRoles: 'string[]' },
+    desc: '超管替别人配值班资格（部门 + 岗位）；部门不传＝保持原值。',
+    req: { department: 'string?', dutyRoles: 'string[]' },
     resp: {
       personId: 'number',
       name: 'string',

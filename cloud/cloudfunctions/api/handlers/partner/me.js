@@ -124,13 +124,14 @@ async function saveDuty(ctx) {
 }
 
 /**
- * PUT /partner/people/:id/duty   body: { dutyRoles: [] }
+ * PUT /partner/people/:id/duty   body: { department?, dutyRoles: [] }
  *
- * 超管**替别人**配值班岗位（2026-10-30 新增：陛下要求「代录页超管可以为社干配置值班角色」）。
+ * 超管**替别人**配值班资格（2026-10-30 新增：陛下要求「代录页超管可以为社干配置值班角色」）。
  *
- * ⚠️ 只动 dutyRoles，**不动 department**：
- *    部门是人事归属，改它会连带影响「部门不匹配」这条排班硬条件；
- *    这里要解决的只是「这个人能不能上播音 / 主持 / 编辑」。
+ * ⚠️ 部门必须一起能配，否则这个接口没用：
+ *    排班硬条件里「部门」和「岗位」是**两条独立的门槛**（见 schedule.js#reasonsFor），
+ *    只配岗位、部门空着，换人弹层照样报「尚未配置部门 / 部门不匹配」。
+ *    陛下 2026-10-30 就是这么被卡住的（配了角色还是选不上人）。
  * ⚠️ 与 PUT /partner/me/duty 的分工：
  *    那条是**自助**（谁调都是改自己，锁死 p.admin._id）；
  *    这条必须显式给 :id，且只有超管能调 —— 别把两条合成一条，合并后
@@ -145,6 +146,16 @@ async function saveDutyFor(ctx) {
   if (!target) throw new ApiError(Codes.NOT_FOUND, '该成员不存在');
 
   const body = ctx.body || {};
+
+  // 部门：不传＝保持原值；传空串＝清空（清空后这个人排班时永远过不了硬条件，前端要拦一下）
+  let department = target.department || '';
+  if (body.department !== undefined) {
+    department = String(body.department || '').trim();
+    if (department && DEPARTMENTS.indexOf(department) < 0) {
+      throw new ApiError(Codes.PARAM_ERROR, `部门必须是：${DEPARTMENTS.join(' / ')}`);
+    }
+  }
+
   let dutyRoles = body.dutyRoles;
   if (!Array.isArray(dutyRoles)) throw new ApiError(Codes.PARAM_ERROR, 'dutyRoles 必须是数组');
   dutyRoles = dutyRoles.map((r) => String(r).trim()).filter(Boolean);
@@ -154,9 +165,8 @@ async function saveDutyFor(ctx) {
     throw new ApiError(Codes.PARAM_ERROR, `岗位「${bad[0]}」不在可选范围内（${DUTY_ROLES.join(' / ')}）`);
   }
 
-  await updateById(C.ADMIN, target._id, { dutyRoles, updateTime: new Date() });
+  await updateById(C.ADMIN, target._id, { department, dutyRoles, updateTime: new Date() });
 
-  const department = target.department || '';
   return {
     personId: id,
     name: target.nickname || target.username || `账号${id}`,

@@ -451,6 +451,22 @@ const TPL = [
     eq('清空可保存', r.code, 0);
     eq('清空后 qualified = false', r.data.qualified, false);
 
+    /* 部门也要能配 —— 2026-10-30 陛下「配了角色还是选不上」的真因：
+       排班里「部门」和「岗位」是两条独立的硬条件，只配岗位、部门空着，
+       换人弹层照样报「尚未配置部门 / 部门不匹配」。 */
+    r = await call('PUT', '/partner/people/4/duty', { department: '播音部', dutyRoles: ['播音'] }, SUPER_TOKEN);
+    eq('改部门 → code 0', r.code, 0);
+    eq('返回新部门', r.data.department, '播音部');
+    eq('部门 + 岗位齐全 → qualified', r.data.qualified, true);
+    r = await call('GET', '/partner/people/4', {}, SUPER_TOKEN);
+    eq('库里部门已改', r.data.department, '播音部');
+    r = await call('PUT', '/partner/people/4/duty', { department: '火星部', dutyRoles: ['播音'] }, SUPER_TOKEN);
+    eq('非法部门 → 40001', r.code, 40001);
+    r = await call('PUT', '/partner/people/4/duty', { department: '', dutyRoles: ['播音'] }, SUPER_TOKEN);
+    eq('清空部门可保存', r.code, 0);
+    eq('有岗位但没部门 → qualified false', r.data.qualified, false);
+    eq('岗位没被部门清空连带删掉', r.data.dutyRoles, ['播音']);
+
     // 越权：社干 / 停用 / 未登录
     r = await call('PUT', '/partner/people/4/duty', { dutyRoles: ['播音'] }, MGR_TOKEN);
     eq('社干不能配别人的岗位 → 40301', r.code, 40301);

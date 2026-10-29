@@ -29,6 +29,8 @@ const MAX_REASON = 200;
  *    不能因为界面上没列出来，保存一次就被悄悄清掉。
  */
 const ROLE_OPTIONS = ['播音', '主持', '编辑'];
+/** 部门白名单 —— 与后端 DEPARTMENTS 一致；换人弹层里「部门不匹配」就是拿它比的 */
+const DEPARTMENTS = ['播音部', '主持部', '编辑部'];
 
 /** '2026-11-02' ± n 天（纯日期运算，走 UTC 避免夏令时/时区干扰） */
 function addDays(ymd, n) {
@@ -172,6 +174,7 @@ Page({
     roleTargetName: '',
     roleTargetDept: '',
     roleTargetChips: [],
+    roleTargetDepts: [],
     roleTargetSaving: false,
   },
 
@@ -186,7 +189,10 @@ Page({
   /** 库里已有、但界面没列出来的岗位（记者 / 技术）—— 保存时原样带回，不许丢 */
   _extraRoles: [],
   /** 同上，但针对「超管给别人配岗位」那个弹层的目标人 */
-  _targetRoleExtra: [],  /** /partner/me 是否真的拉到了。没拉到不许保存，否则会把别人的岗位写成空 */
+  _targetRoleExtra: [],
+  /** 自己的部门（/partner/me 带回）。空 → 排班永远过不了「部门」这条门槛 */
+  _myDept: '',
+  /** /partner/me 是否真的拉到了。没拉到不许保存，否则会把别人的岗位写成空 */
   _meLoaded: false,
 
   onLoad(options) {
@@ -359,10 +365,18 @@ Page({
      走现成的 PUT /partner/me/duty（handlers/partner/me.js#saveDuty），只改 dutyRoles，
      department 不传 → 后端保留原值。没有为这件事新开接口。 */
 
-  /** 拉自己的部门 / 岗位 */
+  /**
+   * 拉自己的部门 / 岗位
+   *
+   * ⚠️ 部门一定要一起拿：排班硬条件里「部门」和「岗位」是两条独立的门槛，
+   *    只配岗位不配部门，换人弹层照样选不上人（陛下 2026-10-30 就卡在这）。
+   */
   loadMe() {
     return adminRequest('/partner/me', 'GET')
-      .then((d) => this.applyRoles((d && d.dutyRoles) || []))
+      .then((d) => {
+        this._myDept = String((d && d.department) || '');
+        this.applyRoles((d && d.dutyRoles) || []);
+      })
       .catch(() => {
         // 拉不到就空着渲染，但 _meLoaded 保持 false → 不许保存（见 onSaveRoles）
         this._meLoaded = false;
@@ -389,8 +403,11 @@ Page({
   _roleStat(chips, dirty) {
     const picked = (chips || []).filter((c) => c.on).length + (this._extraRoles || []).length;
     let hint;
-    if (dirty) hint = '改动还没保存。';
-    else if (picked > 0) hint = '已保存。排班时按这些角色判断你能不能上某个时段。';
+    if (!this._myDept) {
+      // 岗位齐了但没部门，排班时照样过不了硬条件 —— 这句必须说出来，不然就是"配了也没用"
+      hint = '还没配部门，排班时过不了硬性条件（部门由超管在代录页「配岗位」里设）。';
+    } else if (dirty) hint = '改动还没保存。';
+    else if (picked > 0) hint = `已保存（${this._myDept}）。排班时按这些角色判断你能不能上某个时段。`;
     else hint = '一个都没选，排班时不会把你排上岗。';
     return {
       rolePicked: picked,
@@ -631,13 +648,16 @@ Page({
     const card = (this.data.cards || []).find((c) => Number(c.personId) === id);
     if (!card) return;
     const roles = card.roles || [];
+    const dept = card.dept || '';
     this._targetRoleExtra = roles.filter((r) => ROLE_OPTIONS.indexOf(r) < 0);
     this.setData({
       roleSheetOpen: true,
       roleTargetId: id,
       roleTargetName: card.name || '该成员',
-      roleTargetDept: card.dept || '',
+      roleTargetDept: dept,
       roleTargetChips: ROLE_OPTIONS.map((r) => ({ label: r, on: roles.indexOf(r) >= 0 })),
+      // 部门是单选；当前没配就三个都不亮
+      roleTargetDepts: DEPARTMENTS.map((d) => ({ label: d, on: d === dept })),
       roleTargetSaving: false,
     });
   },
@@ -645,6 +665,18 @@ Page({
   closeRoleSheet() {
     if (this.data.roleTargetSaving) return;
     this.setData({ roleSheetOpen: false });
+  },
+
+  /** 部门单选：再点一下同一个 = 清空（清空后这人排班时过不了硬条件，弹层里会提示） */
+  onPickTargetDept(e) {
+    const label = String((e.currentTarget.dataset || {}).d || '');
+    if (DEPARTMENTS.indexOf(label) < 0) return;
+    const wasOn = (this.data.roleTargetDepts || []).some((d) => d.label === label && d.on);
+    const next = wasOn ? '' : label;
+    this.setData({
+      roleTargetDept: next,
+      roleTargetDepts: DEPARTMENTS.map((d) => ({ label: d, on: d === next })),
+    });
   },
 
   onToggleTargetRole(e) {
@@ -664,12 +696,28 @@ Page({
     // 界面上没列出的记者 / 技术原样带回，别因为这里没勾就清掉
     const dutyRoles = (this.data.roleTargetChips || []).filter((c) => c.on).map((c) => c.label)
       .concat(this._targetRoleExtra || []);
+    // 部门一定要一起发：只发岗位的话，部门还是空的，换人弹层照样「尚未配置部门」
+    const department = this.data.roleTargetDept || '';
 
+    // 两边都没配就别拦，但空部门 + 有岗位 = 配了也选不上，先提醒一句
+    if (!department && dutyRoles.length) {
+      wx.showModal({
+        title: '还没选部门',
+        content: '没配部门的人，排班时过不了「部门」这条硬性条件，照样选不上。要一起配部门吗？',
+        cancelText: '就这样存', confirmText: '回去选',
+        success: (r) => { if (r.confirm) return; this._doSaveTargetRoles(id, '', dutyRoles); },
+      });
+      return;
+    }
+    this._doSaveTargetRoles(id, department, dutyRoles);
+  },
+
+  _doSaveTargetRoles(id, department, dutyRoles) {
     this.setData({ roleTargetSaving: true });
-    adminRequest(`/partner/people/${id}/duty`, 'PUT', { dutyRoles })
+    adminRequest(`/partner/people/${id}/duty`, 'PUT', { department, dutyRoles })
       .then(() => {
         this.setData({ roleTargetSaving: false, roleSheetOpen: false });
-        wx.showToast({ title: '岗位已更新', icon: 'success' });
+        wx.showToast({ title: '值班资格已更新', icon: 'success' });
         // 卡片副标题（部门 · 首个岗位）和排班资格都依赖它
         this.fetch({ week: this.data.weekStart, personId: this.data.targetId || undefined });
       })
