@@ -16,10 +16,10 @@
  * 后端推错至少还有 handler 里的 asSuperPartner 兜底。所以能力位一律后端给。
  */
 
-const { C, updateById } = require('../../lib/db');
+const { C, findOne, updateById } = require('../../lib/db');
 const { ApiError, Codes } = require('../../lib/response');
 const {
-  asPartner, listPeople, resolvePerson,
+  asPartner, asSuperPartner, listPeople, resolvePerson,
   DUTY_ROLES, DEPARTMENTS,
 } = require('./_kit');
 
@@ -123,6 +123,51 @@ async function saveDuty(ctx) {
   };
 }
 
+/**
+ * PUT /partner/people/:id/duty   body: { dutyRoles: [] }
+ *
+ * 超管**替别人**配值班岗位（2026-10-30 新增：陛下要求「代录页超管可以为社干配置值班角色」）。
+ *
+ * ⚠️ 只动 dutyRoles，**不动 department**：
+ *    部门是人事归属，改它会连带影响「部门不匹配」这条排班硬条件；
+ *    这里要解决的只是「这个人能不能上播音 / 主持 / 编辑」。
+ * ⚠️ 与 PUT /partner/me/duty 的分工：
+ *    那条是**自助**（谁调都是改自己，锁死 p.admin._id）；
+ *    这条必须显式给 :id，且只有超管能调 —— 别把两条合成一条，合并后
+ *    「传了别人的 id」和「改自己」就分不清了。
+ */
+async function saveDutyFor(ctx) {
+  const p = await asSuperPartner(ctx);
+  const id = Number((ctx.params && ctx.params.id) || 0);
+  if (!Number.isInteger(id) || id <= 0) throw new ApiError(Codes.PARAM_ERROR, '人员编号不合法');
+
+  const target = await findOne(C.ADMIN, { id });
+  if (!target) throw new ApiError(Codes.NOT_FOUND, '该成员不存在');
+
+  const body = ctx.body || {};
+  let dutyRoles = body.dutyRoles;
+  if (!Array.isArray(dutyRoles)) throw new ApiError(Codes.PARAM_ERROR, 'dutyRoles 必须是数组');
+  dutyRoles = dutyRoles.map((r) => String(r).trim()).filter(Boolean);
+  dutyRoles = dutyRoles.filter((r, i) => dutyRoles.indexOf(r) === i);
+  const bad = dutyRoles.filter((r) => DUTY_ROLES.indexOf(r) < 0);
+  if (bad.length) {
+    throw new ApiError(Codes.PARAM_ERROR, `岗位「${bad[0]}」不在可选范围内（${DUTY_ROLES.join(' / ')}）`);
+  }
+
+  await updateById(C.ADMIN, target._id, { dutyRoles, updateTime: new Date() });
+
+  const department = target.department || '';
+  return {
+    personId: id,
+    name: target.nickname || target.username || `账号${id}`,
+    department,
+    dutyRoles,
+    // 资格完整 ＝ 有部门且至少一个岗位；没资格的人排班时永远过不了硬条件
+    qualified: !!(department && dutyRoles.length),
+    by: p.id,
+  };
+}
+
 /** GET /partner/people —— 人员池（排班选人、代录选人都走这里） */
 async function people(ctx) {
   await asPartner(ctx);
@@ -143,4 +188,4 @@ async function abilityOf(ctx) {
   return abilities(p);
 }
 
-module.exports = { profile, saveDuty, people, personDetail, abilities, abilityOf };
+module.exports = { profile, saveDuty, saveDutyFor, people, personDetail, abilities, abilityOf };

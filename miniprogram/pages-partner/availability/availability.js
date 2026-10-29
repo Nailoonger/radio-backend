@@ -48,27 +48,6 @@ function shortDate(ymd) {
 }
 
 /**
- * 两个周锚点相差几周（纯日期运算走 UTC，与 addDays 同口径）
- * 用来判断「现在看的是本周还是前后某一周」—— 顶部文字链的「本周 / 上一周 / 下一周」靠它。
- */
-function weeksBetween(base, ymd) {
-  const a = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(base || ''));
-  const b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ''));
-  if (!a || !b) return 0;
-  const ta = Date.UTC(Number(a[1]), Number(a[2]) - 1, Number(a[3]));
-  const tb = Date.UTC(Number(b[1]), Number(b[2]) - 1, Number(b[3]));
-  return Math.round((tb - ta) / 604800000);
-}
-
-/** 周前缀：0=本周，±1=上一周/下一周，再远用「N 周前 / N 周后」 */
-function weekPrefix(offset) {
-  if (offset === 0) return '本周';
-  if (offset === -1) return '上一周';
-  if (offset === 1) return '下一周';
-  return offset < 0 ? `${-offset} 周前` : `${offset} 周后`;
-}
-
-/**
  * 两态 → 展示文案与样式类（对齐 v151 `S.av.picks[k] ? 0 : 1`）
  *
  * ⚠️⚠️ 只有两态：蓝＝能来，灰＝不能来。**没有「待选」**（陛下 2026-10-29 打回：
@@ -187,20 +166,30 @@ Page({
     roleHint: '',
     roleDirty: false,
     roleSaving: false,
+    // ── 超管替别人配岗位（2026-10-30） ──
+    roleSheetOpen: false,
+    roleTargetId: 0,
+    roleTargetName: '',
+    roleTargetDept: '',
+    roleTargetChips: [],
+    roleTargetSaving: false,
   },
 
   /** 内部状态：slotKey → 0/1，不直接放 setData 以外的地方 */
   _pickMap: {},
   /** 当前查看/代录的对象（0 = 自己） */
   _targetId: 0,
-  /** 本周周一（首次不带 week 请求时由云函数给出），用来算「本周 / 上一周」 */
+  /** 本周周一（首次不带 week 请求时由云函数给出），用来算「本周 / 非本周」 */
   _baseWeek: '',
+  /** 最近一次请求带的 week（空 = 本周）。基准周只在不带 week 的请求里认 */
+  _fetchWeek: '',
   /** 库里已有、但界面没列出来的岗位（记者 / 技术）—— 保存时原样带回，不许丢 */
   _extraRoles: [],
-  /** /partner/me 是否真的拉到了。没拉到不许保存，否则会把别人的岗位写成空 */
+  /** 同上，但针对「超管给别人配岗位」那个弹层的目标人 */
+  _targetRoleExtra: [],  /** /partner/me 是否真的拉到了。没拉到不许保存，否则会把别人的岗位写成空 */
   _meLoaded: false,
 
-  onLoad() {
+  onLoad(options) {
     const app = getApp();
     if (!app || !app.isAdminLoggedIn || !app.isAdminLoggedIn()) {
       wx.reLaunch({ url: '/pages-partner/login/login' });
@@ -215,7 +204,17 @@ Page({
     });
     // 站员没有「我的值班角色」这一块，不用多打一次接口
     if (role !== 2) this.loadMe();
-    this.fetch({});
+
+    /**
+     * 从排班工作台翻到某一周再点「值班时间代录」进来的情况（2026-10-30）。
+     * 不带这两个参数的话，这页永远打开本周 —— 在下一周代录完，回工作台点「再次生成」
+     * 当然一点变化都没有（两边不是同一周），这就是陛下报的「没有效果」。
+     *   week = 要看哪一周；base = 本周是哪一周（只为标「本周 / 非本周」那颗胶囊）
+     */
+    const o = options || {};
+    this._fetchWeek = String(o.week || '');
+    if (o.base) this._baseWeek = String(o.base);
+    this.fetch(this._fetchWeek ? { week: this._fetchWeek } : {});
   },
 
   /** 返回上一级（之前这页没有返回键，只能靠手势，陛下 2026-10-29 指出） */
@@ -279,6 +278,8 @@ Page({
           return {
             personId: r.personId,
             name: r.name || '伙伴',
+            dept: r.department || '',
+            roles: Array.isArray(r.dutyRoles) ? r.dutyRoles : [],
             cap: [r.department, ((r.dutyRoles || [])[0] || '')].filter(Boolean).join(' · '),
             initial: String(r.name || '伙').slice(0, 1),
             isMe: Number(r.personId) === meIdNow,
@@ -298,19 +299,20 @@ Page({
         //    （陛下 2026-10-29：「我从来没填过这个原因为什么每次点开都有自带的」）。
         //    旧原因仍留在库里，只是不再出现在界面上。
 
-        // ── 顶部周标签：本周 / 上一周 / 下一周 + 月日 ──
-        // ⚠️ 基准周只在**首次加载**时记：第一次调用不带 week，云函数按北京时间回本周周一，
-        //    之后都拿它做比较。前端自己 new Date() 算周一在跨时区手机会和后端差一周。
+        // ── 顶部周标签：本周 / 非本周 + 月日 ──
+        // ⚠️ 基准周只在**不带 week 的请求**里记：带了 week 说明用户要的是某一周，
+        //    拿它当「本周」会把下一周标成「本周」（从工作台深链进来就是这么错的）。
         const ws = data.weekStart || '';
-        if (!this._baseWeek && ws) this._baseWeek = ws;
-        const weekOffset = weeksBetween(this._baseWeek || ws, ws);
+        if (!this._baseWeek && ws && !o.week) this._baseWeek = ws;
+        const isThis = this._baseWeek ? ws === this._baseWeek : !o.week;
+        this._fetchWeek = o.week || '';
 
         this.setData({
           loading: false,
           ready: !!data.ready,
           weekStart: ws,
-          weekText: this.labelOf(ws, data.weekDates, weekOffset),
-          isThisWeek: weekOffset === 0,
+          weekText: this.labelOf(ws, data.weekDates),
+          isThisWeek: isThis,
           days,
           cards,
           people,
@@ -345,12 +347,12 @@ Page({
     return Number(info.id) || 0;
   },
 
-  labelOf(weekStart, dates, offset) {
+  labelOf(weekStart, dates) {
     if (!weekStart) return '';
     const a = shortDate(weekStart);
     const b = shortDate((dates && dates[4]) || addDays(weekStart, 4));
-    // 例：本周 10/26 – 10/30
-    return `${weekPrefix(Number(offset) || 0)} ${a} – ${b}`;
+    // 例：10/26 – 10/30（「本周 / 非本周」是模板里另一个红/灰胶囊，不拼进这行）
+    return `${a} – ${b}`;
   },
 
   /* ══════════ 我的值班角色（社干 / 超管自助） ══════════
@@ -616,6 +618,65 @@ Page({
       showCancel: false,
       confirmText: '知道了',
     });
+  },
+
+  /* ══════════ 超管替别人配值班角色（2026-10-30 新增） ══════════
+     入口：人员卡片底部的「配岗位」。走 PUT /partner/people/:id/duty，仅超管可调。
+     ⚠️ 只改岗位，不改部门（部门会牵动「部门不匹配」这条排班硬条件）。
+     ⚠️ 和上面「我的值班角色」是两条路：那条自助（没 :id），这条代配（必须 :id）。 */
+
+  openRoleSheet(e) {
+    if (!this.data.isSuper) return;
+    const id = Number((e.currentTarget.dataset || {}).id || 0);
+    const card = (this.data.cards || []).find((c) => Number(c.personId) === id);
+    if (!card) return;
+    const roles = card.roles || [];
+    this._targetRoleExtra = roles.filter((r) => ROLE_OPTIONS.indexOf(r) < 0);
+    this.setData({
+      roleSheetOpen: true,
+      roleTargetId: id,
+      roleTargetName: card.name || '该成员',
+      roleTargetDept: card.dept || '',
+      roleTargetChips: ROLE_OPTIONS.map((r) => ({ label: r, on: roles.indexOf(r) >= 0 })),
+      roleTargetSaving: false,
+    });
+  },
+
+  closeRoleSheet() {
+    if (this.data.roleTargetSaving) return;
+    this.setData({ roleSheetOpen: false });
+  },
+
+  onToggleTargetRole(e) {
+    const label = String((e.currentTarget.dataset || {}).l || '');
+    if (ROLE_OPTIONS.indexOf(label) < 0) return;
+    this.setData({
+      roleTargetChips: (this.data.roleTargetChips || []).map((c) => (
+        c.label === label ? Object.assign({}, c, { on: !c.on }) : c
+      )),
+    });
+  },
+
+  saveTargetRoles() {
+    if (this.data.roleTargetSaving) return;
+    const id = Number(this.data.roleTargetId || 0);
+    if (!id) return;
+    // 界面上没列出的记者 / 技术原样带回，别因为这里没勾就清掉
+    const dutyRoles = (this.data.roleTargetChips || []).filter((c) => c.on).map((c) => c.label)
+      .concat(this._targetRoleExtra || []);
+
+    this.setData({ roleTargetSaving: true });
+    adminRequest(`/partner/people/${id}/duty`, 'PUT', { dutyRoles })
+      .then(() => {
+        this.setData({ roleTargetSaving: false, roleSheetOpen: false });
+        wx.showToast({ title: '岗位已更新', icon: 'success' });
+        // 卡片副标题（部门 · 首个岗位）和排班资格都依赖它
+        this.fetch({ week: this.data.weekStart, personId: this.data.targetId || undefined });
+      })
+      .catch((err) => {
+        this.setData({ roleTargetSaving: false });
+        wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' });
+      });
   },
 
   /* ══════════ 单人代录弹层（v151 avSheet） ══════════ */

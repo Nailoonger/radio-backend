@@ -416,8 +416,57 @@ const TPL = [
     }
   }
 
+  /* ══════════ 11.5 超管替别人配值班岗位（2026-10-30 新增） ══════════ */
+  section('11.5 超管替别人配岗位 PUT /partner/people/:id/duty');
+  {
+    reset();
+    // 4 号原本是「主持部 + 主持」
+    let r = await call('GET', '/partner/people/4', {}, SUPER_TOKEN);
+    eq('初始 4 号岗位', r.data.dutyRoles, ['主持']);
+
+    r = await call('PUT', '/partner/people/4/duty', { dutyRoles: ['主持', '播音'] }, SUPER_TOKEN);
+    eq('超管改 4 号 → code 0', r.code, 0);
+    eq('返回 dutyRoles', r.data.dutyRoles, ['主持', '播音']);
+    eq('返回带部门', r.data.department, '主持部');
+    eq('qualifed = 有部门且有岗位', r.data.qualified, true);
+    eq('by = 操作人', r.data.by, 1);
+
+    // 部门不许被这条接口顺手改掉
+    r = await call('GET', '/partner/people/4', {}, SUPER_TOKEN);
+    eq('部门没被改', r.data.department, '主持部');
+    eq('库里已生效', r.data.dutyRoles, ['主持', '播音']);
+
+    // 去重 + 非法岗位
+    r = await call('PUT', '/partner/people/4/duty', { dutyRoles: ['播音', '播音', '记者'] }, SUPER_TOKEN);
+    eq('去重后入库', r.data.dutyRoles, ['播音', '记者']);
+    r = await call('PUT', '/partner/people/4/duty', { dutyRoles: ['扫地'] }, SUPER_TOKEN);
+    eq('非法岗位 → 40001', r.code, 40001);
+    r = await call('PUT', '/partner/people/4/duty', {}, SUPER_TOKEN);
+    eq('缺 dutyRoles → 40001', r.code, 40001);
+    r = await call('PUT', '/partner/people/999/duty', { dutyRoles: [] }, SUPER_TOKEN);
+    eq('不存在的人 → 40401', r.code, 40401);
+
+    // 清空 = 不参与排班（资格不完整）
+    r = await call('PUT', '/partner/people/4/duty', { dutyRoles: [] }, SUPER_TOKEN);
+    eq('清空可保存', r.code, 0);
+    eq('清空后 qualified = false', r.data.qualified, false);
+
+    // 越权：社干 / 停用 / 未登录
+    r = await call('PUT', '/partner/people/4/duty', { dutyRoles: ['播音'] }, MGR_TOKEN);
+    eq('社干不能配别人的岗位 → 40301', r.code, 40301);
+    r = await call('PUT', '/partner/people/4/duty', { dutyRoles: ['播音'] }, BANNED_TOKEN);
+    eq('停用账号 → 40301', r.code, 40301);
+    r = await call('PUT', '/partner/people/4/duty', { dutyRoles: ['播音'] }, '');
+    eq('未登录 → 40101', r.code, 40101);
+
+    // 自助那条没被影响：超管改别人不改自己
+    r = await call('GET', '/partner/me', {}, SUPER_TOKEN);
+    eq('超管自己的岗位没被连带改', r.data.dutyRoles, []);
+  }
+
   /* ══════════ 12. 权限矩阵（全量 partner 路由）══════════ */
   section('12. 权限矩阵');
+
   {
     const { PARTNER_ROUTES } = require(path.join(API_DIR, 'router'));
     // ⚠️ 这两个是「改全局配置」的动作，按设计只给超管（asSuperPartner）：
@@ -431,6 +480,8 @@ const TPL = [
       'PUT /partner/rules',
       'GET /partner/accounts/candidates',
       'POST /partner/accounts/import',
+      // 超管替别人配值班岗位（2026-10-30）—— 改的是别人的资格，社干不能碰
+      'PUT /partner/people/:id/duty',
     ]);
 
     for (const [key] of PARTNER_ROUTES) {

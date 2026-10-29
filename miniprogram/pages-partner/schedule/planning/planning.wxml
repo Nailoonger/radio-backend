@@ -2,11 +2,21 @@
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
   <view class="navbar"><view class="navbar-back" bindtap="goBack" aria-label="返回"><view class="chev"></view></view><view class="navbar-title">排班工作台</view><view class="navbar-spacer"></view></view>
   <view class="body">
+    <!-- 周切换（2026-10-30）：工作台原来只能排本周，替下一周代录完再回来「再次生成」
+         永远看不到变化 —— 两边不是同一周。现在左边翻周，右边一切动作都跟着这一周走。 -->
+    <view class="wk-nav">
+      <text class="wk-b" bindtap="onPrevWeek">‹ 上一周</text>
+      <view class="wk-mid">
+        <text class="wk-tag {{isThisWeek ? 'on' : 'off'}}">{{isThisWeek ? '本周' : '非本周'}}</text>
+        <text class="wk-c">{{weekText || '加载中'}}</text>
+      </view>
+      <text class="wk-b r" bindtap="onNextWeek">下一周 ›</text>
+    </view>
     <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
     <view class="error" wx:elif="{{loadError}}"><text>班表未能加载</text><text class="note">{{loadError}}</text><button class="btn ghost" bindtap="load">重试</button></view>
     <block wx:else>
       <view class="state {{stateClass}}"><text class="state-title">{{stateText}}</text><text>{{stateSub}}</text></view>
-      <text class="empty-note" wx:if="{{state !== 'published' && state !== 'draft'}}">本周班表尚未生成</text><duty-timetable wx:else week="{{week}}" my-id="{{myId}}" editable="{{state === 'draft'}}" show-fixed="{{true}}" bind:edit="onEdit"/>
+      <text class="empty-note" wx:if="{{state !== 'published' && state !== 'draft'}}">{{isThisWeek ? '本周' : '该周'}}班表尚未生成</text><duty-timetable wx:else week="{{week}}" my-id="{{myId}}" editable="{{state === 'draft'}}" show-fixed="{{true}}" bind:edit="onEdit"/>
       <view class="ops" wx:if="{{state === 'draft'}}">
         <view class="buttons"><button class="btn ghost" disabled="{{busy}}" bindtap="onGenerate">再次生成</button><button class="btn ghost" disabled="{{busy}}" bindtap="onCheck">检查班表</button><button class="btn primary" disabled="{{busy}}" bindtap="onPublish">确认发布</button></view>
         <button class="mini" disabled="{{busy}}" bindtap="onClear">一键清空班表（清掉所有人员，重新生成）</button>

@@ -169,6 +169,22 @@ const contract = {
     resp: PERSON,
   },
 
+  'PUT /partner/people/:id/duty': {
+    method: 'PUT',
+    path: '/partner/people/:id/duty',
+    auth: 'admin',
+    desc: '超管替别人配值班岗位（只动 dutyRoles，不动 department）。',
+    req: { dutyRoles: 'string[]' },
+    resp: {
+      personId: 'number',
+      name: 'string',
+      department: 'string',
+      dutyRoles: 'string[]',
+      qualified: 'boolean',
+      by: 'number',
+    },
+  },
+
   // ─────────────────────────── 值班时段 ───────────────────────────
 
   'GET /partner/slots': {

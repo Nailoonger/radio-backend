@@ -531,14 +531,23 @@
   display: flex; align-items: center;
   padding: 12rpx 6rpx 16rpx;
 }
-/* 左右两条文字链各占 flex:1、中间 flex:none —— 这样中间那行是**屏幕正中**，
+/* 左右两条文字链各占 flex:1、中间 flex:none —— 这样中间那组是**屏幕正中**，
    不会因为「‹ 上一周」比「下一周 ›」宽一点就被推偏 */
 .wk-b { flex: 1; font-size: 25rpx; color: var(--accent, #0066CC); }
 .wk-b.r { text-align: right; }
 /* 本周时「下一周」置灰（仍可点，和请假 / 考勤页同口径） */
 .wk-b.off { color: #B3B3B8; }
+
+.wk-mid { flex: none; display: flex; align-items: center; gap: 10rpx; }
+/* 「本周」= 红底白字小胶囊；翻到别的周换成灰底灰字的「非本周」（陛下 2026-10-30 定） */
+.wk-tag {
+  flex: none; font-size: 20rpx; line-height: 1.6;
+  padding: 2rpx 12rpx; border-radius: 9999rpx;
+  font-weight: 500;
+}
+.wk-tag.on { background: var(--red-fg, #B42318); color: #FFF; }
+.wk-tag.off { background: #F1F1F4; color: var(--muted, #76767E); }
 .wk-c {
-  flex: none;
   font-size: 30rpx; font-weight: 600;
   color: var(--ink, #1D1D1F);
   font-variant-numeric: tabular-nums;
@@ -589,3 +598,21 @@
   box-sizing: border-box;
 }
 .rc-save.off { background: #EDEDF0; color: #A6A6AE; }
+
+/* ══════════ 超管「配岗位」入口 + 小弹层（2026-10-30） ══════════ */
+/* 卡片底部右侧一组：配岗位 + 查看／代录。用容器统一靠右，
+   ⚠️ 原来的 .pc-go 自带 margin-left:auto，两个都 auto 会把它俩推开，所以在容器里把它清掉 */
+.pc-right { margin-left: auto; display: flex; align-items: center; gap: 14rpx; flex: none; }
+.pc-right .pc-go { margin-left: 0; }
+.pc-role {
+  flex: none; min-height: 69rpx; padding: 0 23rpx;
+  display: inline-flex; align-items: center;
+  border-radius: 19rpx;
+  background: var(--paper, #F5F5F7);
+  font-size: 24rpx; color: var(--ink-2, #333);
+}
+
+/* 配岗位弹层：内容只有三个胶囊 + 一行说明，用高度自适应的白卡，不占满 88vh */
+.sheet-role { height: auto; padding-bottom: calc(24rpx + env(safe-area-inset-bottom)); }
+.rc-chips-sheet { padding: 4rpx 32rpx 24rpx; }
+

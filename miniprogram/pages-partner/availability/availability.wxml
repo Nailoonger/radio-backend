@@ -16,10 +16,14 @@
     </view>
   </view>
 
-  <!-- 周切换：左右文字链 + 中间「本周 10/26 – 10/30」（与请假 / 考勤页同一套，2026-10-30 定） -->
+  <!-- 周切换：左右文字链 + 中间「本周」红胶囊 + 月日（与请假 / 考勤页同一套，2026-10-30 定）
+       ⚠️ 「本周」是红底白字的胶囊标签；翻到别的周就换成灰底的「非本周」（陛下 2026-10-30 定） -->
   <view class="wk-nav">
     <text class="wk-b" bindtap="onPrevWeek">‹ 上一周</text>
-    <text class="wk-c">{{weekText || '加载中'}}</text>
+    <view class="wk-mid">
+      <text class="wk-tag {{isThisWeek ? 'on' : 'off'}}">{{isThisWeek ? '本周' : '非本周'}}</text>
+      <text class="wk-c">{{weekText || '加载中'}}</text>
+    </view>
     <text class="wk-b r {{isThisWeek ? 'off' : ''}}" bindtap="onNextWeek">下一周 ›</text>
   </view>
 
@@ -115,7 +119,13 @@
         <text class="pc-p">{{item.desc}}</text>
         <view class="pc-foot">
           <text class="pc-stat">{{item.statText}}</text>
-          <text class="pc-go">{{item.isMe ? '填写我的时间' : '查看／代录'}} ›</text>
+          <view class="pc-right">
+            <!-- 超管替别人配值班岗位（2026-10-30）。⚠️ 必须 catchtap：
+                 不然会冒泡到卡片的 bindtap，点「配岗位」变成打开代录弹层 -->
+            <text class="pc-role" wx:if="{{isSuper && !item.isMe}}"
+                  data-id="{{item.personId}}" catchtap="openRoleSheet">配岗位</text>
+            <text class="pc-go">{{item.isMe ? '填写我的时间' : '查看／代录'}} ›</text>
+          </view>
         </view>
       </view>
     </view>
@@ -223,6 +233,32 @@
     <view class="sheet-foot">
       <button class="btn ghost" bindtap="closeBulk">取消</button>
       <button class="btn primary" loading="{{bulkSaving}}" bindtap="saveBulk">保存代录</button>
+    </view>
+  </view>
+</view>
+
+<!-- ══════ 超管配伙伴值班角色（2026-10-30 新增）
+     入口在人员卡片底部的「配岗位」。⚠️ 走 PUT /partner/people/:id/duty（仅超管），
+     只改 dutyRoles —— 部门不在这里改。 -->
+<view class="overlay" hidden="{{!roleSheetOpen}}" catchtap="closeRoleSheet">
+  <view class="sheet sheet-role" catchtap="stop">
+    <view class="sheet-hd">
+      <view class="sheet-hd-l">
+        <text class="sheet-t">{{roleTargetName}} · 值班角色</text>
+        <text class="sheet-sub">部门：{{roleTargetDept || '未设置'}}。勾选他能上的岗位，可多选；一个都不选＝不参与排班。</text>
+      </view>
+      <text class="sheet-x" bindtap="closeRoleSheet">关闭</text>
+    </view>
+
+    <view class="rc-chips rc-chips-sheet">
+      <view class="rc-chip {{item.on ? 'on' : ''}}"
+            wx:for="{{roleTargetChips}}" wx:key="label"
+            data-l="{{item.label}}" bindtap="onToggleTargetRole" hover-class="rc-hover">{{item.label}}</view>
+    </view>
+
+    <view class="sheet-foot">
+      <button class="btn ghost" bindtap="closeRoleSheet">取消</button>
+      <button class="btn primary" loading="{{roleTargetSaving}}" bindtap="saveTargetRoles">保存</button>
     </view>
   </view>
 </view>

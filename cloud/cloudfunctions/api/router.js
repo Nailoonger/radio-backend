@@ -210,6 +210,9 @@ const PARTNER_ROUTES = [
 
   ['GET /partner/people', 'partner.me.people'],
   ['GET /partner/people/:id', 'partner.me.personDetail'],
+  // 超管替别人配值班岗位（2026-10-30）。⚠️ 必须排在 GET /partner/people/:id 之后无所谓
+  //   —— 方法不同（PUT vs GET），但路径段同样两段，靠 method + 最后一段区分，不会串。
+  ['PUT /partner/people/:id/duty', 'partner.me.saveDutyFor'],
 
   ['GET /partner/slots', 'partner.slots.get'],
   ['GET /partner/slots/published', 'partner.slots.publishedOnly'],

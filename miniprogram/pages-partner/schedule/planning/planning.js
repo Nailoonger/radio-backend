@@ -4,9 +4,17 @@ Page({
   data: {
     ready: false, statusBarHeight: 20, loading: true, loadError: '', busy: false, isSuper: false, myId: 0,
     week: {}, state: 'empty', stateText: '', stateClass: 'none', slotReady: false, summary: { needed: 0, filled: 0, missing: 0, fixed: 0 },
+    // 周切换（2026-10-30 新增）：工作台原来只能排「本周」，代录页却能翻到下一周，
+    // 结果就是「替下一周代录完，回来点再次生成，一点变化都没有」——两边不是同一周。
+    weekText: '', isThisWeek: true,
     slotHint: '', ruleHint: '', availabilityHint: '', preparationError: '', checked: false, checkText: '', issues: [], missing: [],
     sheetOpen: false, candidateLoading: false, candidateError: '', candidates: [], selectedCount: 0, edit: {}, editTitle: '', editTime: '', curText: '空缺', reason: '', fixed: true,
   },
+
+  /** 正在查看的周（空串 = 本周，由云函数按北京时间决定，前端不自己算） */
+  _week: '',
+  /** 本周周一 —— 用来判断「现在看的是不是本周」 */
+  _baseWeek: '',
   onLoad() {
     const app = getApp();
     if (!app.isAdminLoggedIn()) return wx.reLaunch({ url: '/pages-partner/login/login' });
@@ -29,7 +37,7 @@ Page({
       .then((d) => ({ ready: !!d.ready, published: d.published || null }))
       .catch(() => ({ ready: false, published: null }));
 
-    return Promise.all([adminRequest('/partner/schedule', 'GET', {}), pubReq]).then(([week, pub]) => {
+    return Promise.all([adminRequest('/partner/schedule', 'GET', this._week ? { week: this._week } : {}), pubReq]).then(([week, pub]) => {
       if (this._gone || this._request !== request) return;
       this._slotReady = pub.ready;
       this.applyWeek(week);
@@ -59,20 +67,37 @@ Page({
   },
   applyWeek(week) {
     const sum = week.summary || { needed: 0, filled: 0, missing: 0, fixed: 0 };
+    // 基准周 = 第一次（不带 week）拿到的 weekStart，云函数按北京时间给的周一周
+    const ws = week.weekStart || '';
+    if (!this._baseWeek && ws) this._baseWeek = ws;
+    const isThis = !this._baseWeek || ws === this._baseWeek;
     // 状态条副句：原句照抄（原型 planning stBar 四态）
-    const stateSub = week.state === 'published' ? '站员已能看到本周班表'
+    const stateSub = week.state === 'published' ? (isThis ? '站员已能看到本周班表' : '站员暂时看不到这一周')
       : week.state === 'draft' ? (sum.missing ? `还有 ${sum.missing} 个岗位空缺，补齐并校验后才能发布` : '已排齐，校验后可发布')
       : week.state === 'withdrawn' ? (this.data.isSuper ? '等待重新发布 · 历史版本在「发布与调整记录」里' : '等待重新发布')
       : (this._slotReady ? '时段已发布，可以生成草稿' : '值班时段还没发布');
     this.setData({
       slotReady: !!this._slotReady,
       week, state: week.state,
+      weekText: ws ? vm.weekRange(ws) : '',
+      isThisWeek: isThis,
       stateText: vm.stateLabel(week.state, week.version, false),
       stateClass: week.state === 'published' ? 'published' : (week.state === 'draft' ? 'draft' : (week.state === 'withdrawn' ? 'withdrawn' : 'none')),
       stateSub,
       summary: sum, checked: false, checkText: '', issues: [], missing: [],
     });
   },
+
+  /** 翻周：±1 周，然后整页重拉（草稿/发布/记录全部按 weekStart 走，不用另开通道） */
+  shiftWeek(n) {
+    if (this.data.busy || this.data.loading) return;
+    const from = this._week || this.data.week.weekStart || this._baseWeek;
+    if (!from) return;
+    this._week = vm.addDays(from, n * 7);
+    this.load();
+  },
+  onPrevWeek() { this.shiftWeek(-1); },
+  onNextWeek() { this.shiftWeek(1); },
   onError(e, pageError) {
     if (Number(e.code) === 40101) return wx.reLaunch({ url: '/pages-partner/login/login' });
     const text = e.message || '操作失败，请重试';
@@ -81,7 +106,17 @@ Page({
     if (!pageError && (Number(e.code) === 40901 || Number(e.code) === 40902 || /刷新|版本|修订/.test(text))) this.load();
   },
   mutate(path, method, extra) {
-    if (this.data.busy || this.data.loading || this.data.loadError) return Promise.resolve(null);
+    // ⚠️⚠️ 这里原来是「busy / loading / loadError → 直接 return null」，**一个字都不提示**。
+    //    表现就是「点了再次生成，什么都没发生」：弹窗确认后请求根本没发出去。
+    //    加载中（刚 onShow 回来、两条请求还在飞）时最容易撞上，已被陛下当成 bug 报过。
+    if (this.data.loadError) {
+      wx.showToast({ title: '页面没加载成功，先点「重试」', icon: 'none' });
+      return Promise.resolve(null);
+    }
+    if (this.data.busy || this.data.loading) {
+      wx.showToast({ title: '正在加载，稍等一下再点', icon: 'none' });
+      return Promise.resolve(null);
+    }
     this.setData({ busy: true });
     return adminRequest(path, method, Object.assign({ weekStart: this.data.week.weekStart, revision: this.data.week.revision }, extra || {}))
       .then((r) => { if (r.week) this.applyWeek(r.week); return r; })
@@ -184,7 +219,14 @@ Page({
   // 原型社干按钮「查看时段准备情况」：同一页，进去就是只读
   goSlotsRo() { this.goSlots(); },
   goRules() { wx.navigateTo({ url: '/pages-partner/rules/rules' }); },
-  goProxy() { wx.navigateTo({ url: '/pages-partner/availability/availability' }); },
+  // ⚠️ 把「正在看哪一周」和「本周是哪一周」一起带过去：
+  //    不传的话代录页永远打开本周，在工作台翻到下一周再点进来又对不上了
+  goProxy() {
+    const w = (this.data.week && this.data.week.weekStart) || '';
+    const b = this._baseWeek || '';
+    wx.navigateTo({ url: `/pages-partner/availability/availability?week=${w}&base=${b}` });
+  },
+
   goHistory() { wx.navigateTo({ url: '/pages-partner/schedule/history/history?week=' + this.data.week.weekStart }); },
   goFormal() { wx.reLaunch({ url: '/pages-partner/schedule/index/index' }); },
 });

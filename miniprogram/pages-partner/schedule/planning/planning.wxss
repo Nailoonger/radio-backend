@@ -54,3 +54,15 @@ button.sw-fix::after{border:0}
 .sw-foot button.btn{width:100%;min-height:92rpx}
 .state.withdrawn{background:#FDECEA;color:#B42318}.empty-note{padding:0 6rpx}
 .empty-note{display:block;background:#fff;border:1rpx solid #E8E9EF;border-radius:31rpx;box-shadow:0 10rpx 38rpx rgba(32,36,49,.03);padding:23rpx 27rpx;font-size:24rpx;line-height:1.65;color:#76767E}
+
+/* ══════════ 周切换（2026-10-30）══════════
+   与「值班时间代录」页同一套口径：左右蓝字文字链 + 中间「本周」红胶囊 + 月日。
+   ⚠️ 中间那组 flex:none、左右各 flex:1，中间才是屏幕正中（用 space-between 会偏）。 */
+.wk-nav{display:flex;align-items:center;padding:2rpx 0 4rpx}
+.wk-b{flex:1;font-size:25rpx;color:#0066CC}
+.wk-b.r{text-align:right}
+.wk-mid{flex:none;display:flex;align-items:center;gap:10rpx}
+.wk-tag{flex:none;font-size:20rpx;line-height:1.6;padding:2rpx 12rpx;border-radius:9999rpx;font-weight:500}
+.wk-tag.on{background:#B42318;color:#FFF}
+.wk-tag.off{background:#F1F1F4;color:#76767E}
+.wk-c{font-size:30rpx;font-weight:600;color:#1D1D1F;font-variant-numeric:tabular-nums}
