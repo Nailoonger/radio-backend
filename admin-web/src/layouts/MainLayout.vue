@@ -119,6 +119,7 @@ import {
   IconTrend, IconArticle, IconCalendar, IconMegaphone, IconChat,
   IconStar, IconSwitch, IconUsers, IconSettings, IconMusic, IconUserPlus,
   IconSearch, IconClose, IconChevronDown,
+  IconClock, IconEdit, IconCheck, IconInbox,
 } from '@/components/icons';
 import { pageHeader } from '@/utils/pageHeader';
 
@@ -142,6 +143,21 @@ const NAV_GROUPS = [
       { path: '/notice', title: '公告管理', icon: IconMegaphone },
       { path: '/message', title: '留言审核', icon: IconChat, badgeKey: 'messagePending' },
       { path: '/recruitment', title: '招新管理', icon: IconUserPlus },
+    ],
+  },
+  {
+    title: '伙伴端',
+    items: [
+      { path: '/partner/accounts', title: '伙伴账号', icon: IconUsers },
+      { path: '/partner/slots', title: '值班时段', icon: IconClock },
+      // 排班规则仅超管可改（社干进得去，但保存按钮按权限置灰）
+      { path: '/partner/rules', title: '排班规则', icon: IconSettings },
+      { path: '/partner/schedule', title: '班表', icon: IconCalendar },
+      { path: '/partner/availability', title: '可排时间', icon: IconEdit },
+      { path: '/partner/leave', title: '请假审批', icon: IconInbox },
+      { path: '/partner/attendance', title: '考勤', icon: IconCheck },
+      { path: '/partner/drafts', title: '站内稿件', icon: IconArticle },
+      { path: '/partner/feedback', title: '互评', icon: IconChat },
     ],
   },
   {

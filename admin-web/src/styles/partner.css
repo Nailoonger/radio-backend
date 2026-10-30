@@ -1,0 +1,203 @@
+/* ============================================================
+   伙伴端管理 · 共用样式
+   ------------------------------------------------------------
+   口径：与小程序伙伴端同一套（= v151 方案），不是 Element 表格那套。
+     羊皮纸底 --parchment / 白卡 --canvas / 唯一强调色 --accent
+     卡片圆角 18px；**胶囊圆角按原型各别取值，不是一律药丸**
+   ------------------------------------------------------------
+   ⚠️ 全部收在 .pv 之下：只在伙伴端这一组页面生效，
+      不会污染 admin-web 其它页（.btn / .stabs 这种通用名尤其要收口）。
+   ============================================================ */
+
+.pv { padding: 18px 18px 32px; max-width: 900px; }
+
+/* ── 统计头（原型 .acc-stat：大数字 + 右侧一行小字） ── */
+.pv-stat { display: flex; align-items: baseline; gap: 10px; margin: 0 0 14px; }
+.pv-stat .pv-stat-n { display: flex; align-items: baseline; gap: 6px; }
+.pv-stat b {
+  font-size: 34px; font-weight: 600; letter-spacing: -1px;
+  color: var(--accent); line-height: 1; font-variant-numeric: tabular-nums;
+}
+.pv-stat .pv-stat-n span { font-size: var(--fs-sm); color: var(--muted); }
+.pv-stat-s {
+  margin-left: auto; font-size: 12px; color: var(--muted);
+  text-align: right; line-height: 1.5;
+}
+
+/* ── 页内小标题 ── */
+.pv-h {
+  display: flex; align-items: baseline; gap: 8px;
+  margin: 22px 0 10px; font-size: var(--fs-xl); font-weight: 600;
+  letter-spacing: var(--ls-tight-sm); color: var(--ink);
+}
+.pv-h .pv-h-s { font-size: var(--fs-xs); font-weight: 400; color: var(--muted); letter-spacing: 0; }
+.pv-h .pv-h-r { margin-left: auto; font-size: var(--fs-xs); font-weight: 400; color: var(--muted); }
+
+/* ── 输入 ── */
+.pv-inp {
+  width: 100%; height: 40px; padding: 0 14px; box-sizing: border-box;
+  border: 1px solid var(--hairline); border-radius: var(--r-pill); background: var(--canvas);
+  font-size: var(--fs-md); color: var(--ink); outline: none; font-family: inherit;
+}
+.pv-inp:focus { border-color: var(--accent); }
+.pv-inp.sm { height: 36px; }
+.pv-sel {
+  height: 40px; padding: 0 12px; border: 1px solid var(--hairline); border-radius: var(--r-input);
+  background: var(--canvas); font-size: var(--fs-md); color: var(--ink); font-family: inherit;
+  outline: none;
+}
+.pv-ta {
+  width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--hairline);
+  border-radius: var(--r-input); font-size: var(--fs-md); font-family: inherit;
+  color: var(--ink); outline: none; resize: vertical;
+}
+.pv-ta:focus { border-color: var(--accent); }
+
+/* ── 分段筛选（原型 .stabs：等分 + 方块数字 + 蓝下划线） ── */
+.pv-tabs { display: flex; align-items: stretch; border-bottom: 1px solid var(--hairline); margin: 2px 0 12px; }
+.pv-tabs button {
+  flex: 1; min-width: 0; background: none; border: 0; font-family: inherit; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 11px 4px 13px; font-size: var(--fs-md); color: var(--muted); position: relative;
+}
+.pv-tabs button .n {
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: 6px; background: #e8e8ed;
+  color: var(--muted); font-size: var(--fs-xs); font-weight: 500; line-height: 20px;
+  display: inline-flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums;
+}
+.pv-tabs button.on { color: var(--accent); font-weight: 600; }
+.pv-tabs button.on .n { background: var(--acc-bg); color: var(--accent); }
+.pv-tabs button.on::after {
+  content: ''; position: absolute; left: 50%; transform: translateX(-50%); bottom: -1px;
+  width: calc(100% - 16px); max-width: 86px; height: 2px; border-radius: 2px; background: var(--accent);
+}
+
+/* ── 白卡 ── */
+.pv-card {
+  background: var(--canvas); border-radius: var(--r-card); padding: 0 16px;
+  box-shadow: inset 0 0 0 1px var(--divider);
+}
+.pv-card.pad { padding: 16px; }
+
+/* ── 列表行（原型 .acc-line：可点开抽屉） ── */
+.pv-line {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 62px; padding: 12px 0;
+  background: none; border: 0; border-bottom: 1px solid var(--divider);
+  font-family: inherit; text-align: left; cursor: pointer;
+}
+.pv-line:last-child { border-bottom: 0; }
+.pv-line:hover { background: #fafafb; }
+.pv-line.static { cursor: default; }
+.pv-line.static:hover { background: none; }
+.pv-line-t { flex: 1; min-width: 0; }
+.pv-line-t b { display: block; font-size: var(--fs-lg); font-weight: 500; color: var(--ink); line-height: 1.35; }
+.pv-line-t i {
+  display: block; font-style: normal; font-size: var(--fs-xs); color: var(--muted); margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pv-line .ar { font-size: 16px; color: var(--soft); flex: none; }
+
+/* ── 状态标签（原型 .acc-bd / .tag：药丸只用在标签上） ── */
+.pv-bd {
+  flex: none; font-size: var(--fs-2xs); padding: 3px 8px; border-radius: var(--r-pill); line-height: 1.2;
+}
+.pv-bd.ok { background: var(--green-bg); color: var(--green-fg); }
+.pv-bd.warn { background: var(--amber-bg); color: var(--amber-fg); }
+.pv-bd.off { background: #f0f0f3; color: #8a8a90; }
+.pv-bd.err { background: var(--red-bg); color: var(--red-fg); }
+.pv-bd.acc { background: var(--acc-bg); color: var(--accent); }
+
+/* ── 按钮（原型 .btn：圆角 13px / 高 46px —— **不是药丸**） ── */
+.pv-btn {
+  min-height: 46px; padding: 0 18px; border-radius: 13px; border: 0;
+  font-size: 14px; font-weight: 500; font-family: inherit; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; line-height: 1;
+}
+.pv-btn.ghost { background: var(--canvas); color: var(--accent); box-shadow: inset 0 0 0 1px var(--hairline); }
+.pv-btn.primary { background: var(--accent); color: #fff; }
+.pv-btn.danger { background: var(--canvas); color: var(--red-fg); box-shadow: inset 0 0 0 1px #f0c4c0; }
+.pv-btn.sm { min-height: 36px; font-size: var(--fs-md); padding: 0 14px; }
+.pv-btn:disabled { opacity: .45; cursor: not-allowed; }
+.pv-btnrow { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.pv-btnrow .pv-btn { flex: 1; min-width: 120px; }
+
+/* ── 提示条（拉取失败 / 未发布 / 只读说明） ── */
+.pv-note {
+  margin: 10px 0; padding: 11px 14px; border-radius: var(--r-input);
+  font-size: var(--fs-sm); line-height: 1.6; background: var(--parchment); color: var(--muted);
+}
+.pv-note.warn { background: var(--amber-bg); color: var(--amber-fg); }
+.pv-note.err { background: var(--red-bg); color: var(--red-fg); }
+.pv-note.acc { background: var(--acc-bg); color: var(--accent); }
+.pv-empty { padding: 26px 0; text-align: center; font-size: var(--fs-sm); color: var(--muted); }
+
+/* ── 键值行（原型 .kv / .row） ── */
+.pv-kv {
+  display: flex; align-items: center; gap: 12px; padding: 11px 0;
+  border-bottom: 1px solid var(--divider); font-size: var(--fs-md);
+}
+.pv-kv:last-child { border-bottom: 0; }
+.pv-kv .k { flex: none; width: 96px; color: var(--muted); font-size: var(--fs-sm); }
+.pv-kv .v { flex: 1; min-width: 0; color: var(--ink); }
+.pv-kv .v.mono { font-family: var(--mono); font-size: var(--fs-sm); }
+
+/* ── 抽屉（原型 sheet） ── */
+.pv-sheet {
+  position: fixed; inset: 0; z-index: 3000; display: flex; align-items: flex-end; justify-content: center;
+}
+.pv-mask { position: absolute; inset: 0; background: rgba(0, 0, 0, .3); }
+.pv-sheet-body {
+  position: relative; width: 100%; max-width: 560px; background: var(--canvas);
+  border-radius: 20px 20px 0 0; padding: 14px 20px 22px; max-height: 82vh; overflow-y: auto;
+}
+.pv-sheet-body.tall { max-height: 86vh; }
+.pv-grab { width: 36px; height: 4px; border-radius: 2px; background: var(--hairline); margin: 0 auto 14px; }
+.pv-sh-hd { display: flex; align-items: center; gap: 10px; padding: 6px 0 4px; }
+.pv-sh-hd b { font-size: 22px; font-weight: 600; letter-spacing: var(--ls-tight-sm); color: var(--ink); }
+.pv-sh-sub { margin: 6px 0 14px; font-size: var(--fs-sm); color: var(--muted); line-height: 1.6; }
+.pv-sh-acts { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.pv-sh-acts button {
+  min-height: 46px; border-radius: 13px; border: 1px solid var(--hairline); background: var(--canvas);
+  color: var(--ink); font-size: 14px; font-family: inherit; cursor: pointer;
+}
+.pv-sh-acts button:hover { border-color: var(--accent); color: var(--accent); }
+.pv-sh-acts button.danger { color: var(--red-fg); border-color: #f0c4c0; }
+.pv-micro { font-size: 12px; color: var(--muted); }
+
+/* ── 周切换条 ── */
+.pv-week { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; }
+.pv-week .pv-week-n { flex: 1; font-size: var(--fs-lg); font-weight: 500; color: var(--ink); }
+.pv-week .pv-week-n i { font-style: normal; font-size: var(--fs-xs); color: var(--muted); margin-left: 6px; }
+.pv-week button {
+  min-height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--hairline);
+  background: var(--canvas); color: var(--ink); font-size: var(--fs-sm); font-family: inherit; cursor: pointer;
+}
+.pv-week button:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── 时段／人员胶囊（原型 .wk-c b：圆角 12px，**不是药丸**） ── */
+.pv-pill {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  min-height: 30px; padding: 7px 11px; border-radius: 12px; background: var(--parchment);
+  font-size: var(--fs-sm); font-weight: 500; color: var(--ink); line-height: 1.2;
+}
+.pv-pill.me { background: var(--acc-bg); color: var(--accent); }
+.pv-pill.empty { background: transparent; box-shadow: inset 0 0 0 1px var(--hairline); color: var(--muted); }
+.pv-pill.dim { background: var(--parchment); color: var(--muted); font-weight: 400; }
+.pv-pill.click { cursor: pointer; border: 0; font-family: inherit; }
+.pv-pill.click:hover { box-shadow: inset 0 0 0 1px var(--accent); }
+.pv-pill b { font-weight: 600; }
+.pv-pill i { font-style: normal; font-size: var(--fs-2xs); color: var(--muted); }
+
+/* ── 小开关 ── */
+.pv-sw { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--ink); cursor: pointer; }
+.pv-sw input { width: 16px; height: 16px; accent-color: var(--accent); }
+
+/* ── 表格（班表周视图 / 考勤点名用，白卡内细线分隔，不用 Element 表头） ── */
+.pv-grid { width: 100%; border-collapse: collapse; }
+.pv-grid th {
+  font-size: var(--fs-xs); font-weight: 500; color: var(--muted); text-align: left;
+  padding: 8px 8px; border-bottom: 1px solid var(--hairline); white-space: nowrap;
+}
+.pv-grid td { padding: 10px 8px; border-bottom: 1px solid var(--divider); font-size: var(--fs-md); vertical-align: top; }
+.pv-grid tr:last-child td { border-bottom: 0; }
+.pv-grid td.n { font-variant-numeric: tabular-nums; }

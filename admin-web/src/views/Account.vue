@@ -19,6 +19,10 @@
         <el-button type="primary" @click="openEdit()">
           <IconUserPlus :size="15" class="btn-icon" />新建账号
         </el-button>
+        <!-- 站员是「学生身份的第二角色」，必须从学生名册选人——学号不能手打 -->
+        <el-button @click="openMember">
+          <IconUsers :size="15" class="btn-icon" />新增站员
+        </el-button>
       </div>
     </div>
 
@@ -58,7 +62,7 @@
         <el-table-column label="角色" width="140">
           <template #default="{ row }">
             <span class="tag" :class="row.role === 0 ? 'tag-top' : 'tag-outline'">
-              {{ row.role === 0 ? '超级管理员' : '普通管理员' }}
+              {{ roleLabel(row.role) }}
             </span>
           </template>
         </el-table-column>
@@ -71,14 +75,13 @@
           </template>
         </el-table-column>
 
-        <!-- 状态：正常 / 待激活 / 已停用（v8 浅色胶囊；待激活旁加 ano-new 红标） -->
+        <!-- 状态：正常 / 待激活 / 已停用（v8 浅色胶囊）
+             ⚠️ 原来「待激活」旁边还挂了个「需后端新增」红标——那是给开发看的备注，
+                不该印在界面上（超管看到只会困惑）。说明卡 ② 已交代待激活是前端派生的。 -->
         <el-table-column label="状态" width="150">
           <template #default="{ row }">
-            <span class="state-cell">
-              <span class="tag" :class="row.status === 1 ? (row.lastLoginAt ? 'tag-pass' : 'tag-pending') : 'tag-mute'">
-                {{ row.status === 1 ? (row.lastLoginAt ? '正常' : '待激活') : '已停用' }}
-              </span>
-              <span v-if="row.status === 1 && !row.lastLoginAt" class="ano ano-new">需后端新增</span>
+            <span class="tag" :class="row.status === 1 ? (row.lastLoginAt ? 'tag-pass' : 'tag-pending') : 'tag-mute'">
+              {{ row.status === 1 ? (row.lastLoginAt ? '正常' : '待激活') : '已停用' }}
             </span>
           </template>
         </el-table-column>
@@ -138,9 +141,64 @@
         <code>PUT /admin/admin/:id</code> 传 <code>password</code> 字段即可（已在用）。<br>
         <b>④ 想看真实头像需三处一起改：</b><code>admin</code> 表加 <code>avatar</code> 字段 → 挂载
         <code>POST /admin/upload/avatar</code> 路由（控制器/multer 已写好但未挂）→ <code>admin/list</code> 返回该字段。
-        本版不做——超管自己管自己，几乎没有头像需求。
+        本版不做——超管自己管自己，几乎没有头像需求。<br>
+        <b>⑤ 站员为什么不能在这里手建：</b>站员是「学生身份的第二角色」，
+        真正的身份在 <code>user</code> 表（学号登录）。手打账号会得到一行
+        <code>admin.role=2</code> 但 <code>userId</code> 为空的记录 ——
+        排班、请假、考勤查不到这个人。所以站员统一走右上角「新增站员」：
+        从名册选人 → 学号取自 <code>user</code> → <code>admin.userId</code> 回指档案
+        （接口 <code>POST /partner/accounts/import</code>，后端早已就位，本页只是把入口搬过来）。
       </div>
     </div>
+
+    <!-- ══════════ 新增站员（从学生名册选人，学号 / 档案 / 初始密码都由后端接好） ══════════ -->
+    <el-dialog
+      v-model="memberDialog" title="新增站员" width="560px"
+      :close-on-click-modal="false" @closed="resetMember"
+    >
+      <div class="pm-sub">
+        站员不能手打建号：从学生名册里选一个人，<b>学号自动取、档案挂得上</b>，
+        初始密码统一是 <code>user + 学号</code>，首次登录由伙伴端引导改密。
+      </div>
+
+      <el-input
+        v-model="candKw" placeholder="搜姓名 / 学号" clearable
+        @input="onCandInput"
+      >
+        <template #prefix><IconSearch :size="15" /></template>
+      </el-input>
+
+      <div class="cand-list" v-loading="candLoading">
+        <div
+          class="cand" v-for="c in cands" :key="c.userId"
+          :class="{ on: pickUserId === c.userId }"
+          @click="pickUserId = c.userId"
+        >
+          <span class="cand-dot"></span>
+          <span class="cand-t">
+            <b>{{ c.name }}</b>
+            <i>{{ c.username }}<template v-if="c.grade"> · {{ c.grade }}{{ c.className || '' }}</template></i>
+          </span>
+          <span class="cand-cur" v-if="pickUserId === c.userId">已选</span>
+        </div>
+        <div class="cand-empty" v-if="!cands.length && !candLoading">
+          没有可加的人 —— 名册为空，或者这些人已经在伙伴端了。
+        </div>
+      </div>
+
+      <div class="pm-foot-note" v-if="pickedCand">
+        <span>将建：<b>{{ pickedCand.name }}</b></span>
+        <span>学号 <code>{{ pickedCand.username }}</code></span>
+        <span>初始密码 <code>{{ initPwdOf(pickedCand.username) }}</code></span>
+      </div>
+
+      <template #footer>
+        <el-button @click="memberDialog = false">取消</el-button>
+        <el-button type="primary" :disabled="!pickUserId" :loading="memberSaving" @click="saveMember">
+          建账号
+        </el-button>
+      </template>
+    </el-dialog>
 
     <!-- ══════════ 编辑弹窗（新增 / 编辑共用） ══════════ -->
     <el-dialog
@@ -169,7 +227,13 @@
           <el-radio-group v-model="form.role" :disabled="isSelfEdit">
             <el-radio :value="0">超级管理员</el-radio>
             <el-radio :value="1">普通管理员</el-radio>
+            <!-- 站员 = 学生身份的第二角色（伙伴端用），不进电脑端登录。
+                 新建时禁选：走这里建出来的站员没有 user 档案，学号也是手打的，会变成查不到人的野账号 -->
+            <el-radio :value="2" :disabled="!form.id">站员</el-radio>
           </el-radio-group>
+          <div v-if="!form.id" class="micro form-hint">
+            站员请用右上角「<b>新增站员</b>」—— 从学生名册选人，学号和档案才挂得上。
+          </div>
         </el-form-item>
         <el-form-item label="状态">
           <el-switch
@@ -195,7 +259,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import http from '@/utils/http';
 import dayjs from 'dayjs';
 import { useAuthStore } from '@/stores/auth';
-import { IconSearch, IconUserPlus } from '@/components/icons';
+import { IconSearch, IconUserPlus, IconUsers } from '@/components/icons';
 import EmptyState from '@/components/EmptyState.vue';
 import { setPageHeader, clearPageHeader } from '@/utils/pageHeader';
 
@@ -213,22 +277,102 @@ const filter = reactive({ role: 'all' });   // 全部 / super / normal
 /** 服务端 keyword 命中；role 在前端做二次过滤（避免每次切角色都打接口） */
 const filteredRows = computed(() => {
   if (filter.role === 'all') return rows.value;
-  const want = filter.role === 'super' ? 0 : 1;
+  // 2026-10-29：站员（role=2）进 admin 表后，这里是三档而不是两档
+  const want = filter.role === 'super' ? 0 : (filter.role === 'normal' ? 1 : 2);
   return rows.value.filter((r) => r.role === want);
 });
 
 /* ── 角色分段 + 计数 ── */
 const counts = computed(() => {
-  const c = { super: 0, normal: 0 };
-  rows.value.forEach((r) => { r.role === 0 ? c.super++ : c.normal++; });
+  const c = { super: 0, normal: 0, member: 0 };
+  rows.value.forEach((r) => {
+    if (r.role === 0) c.super++;
+    else if (r.role === 1) c.normal++;
+    else c.member++;
+  });
   return c;
 });
 const roleSegs = computed(() => [
   { v: 'all',    label: '全部',     n: rows.value.length },
   { v: 'super',  label: '超管',     n: counts.value.super },
   { v: 'normal', label: '普通管理员', n: counts.value.normal },
+  { v: 'member', label: '站员',     n: counts.value.member },
 ]);
 function setRole(v) { filter.role = v; }
+
+const ROLE_LABEL = { 0: '超级管理员', 1: '普通管理员', 2: '站员' };
+function roleLabel(r) { return ROLE_LABEL[Number(r)] || '未知'; }
+
+/* ── 新增站员：从学生名册选人建号 ──
+   走 POST /partner/accounts/import（userIds 只传一个），因为云端那一版已经把该做的都做了：
+   学号从 user 表取（不会打错）、已在伙伴端的自动排除（不会建重）、
+   admin.userId 回指 student 档案（查得到是谁）、初始密码 user+学号 + initPwd 标记。
+   在这里自己拼 POST /admin/admin/create 反而会漏掉 userId，落一个查不到人的野账号。 */
+const memberDialog = ref(false);
+const memberSaving = ref(false);
+const cands = ref([]);
+const candLoading = ref(false);
+const candKw = ref('');
+const pickUserId = ref(null);
+let candTimer = null;
+
+const pickedCand = computed(() => cands.value.find((c) => c.userId === pickUserId.value) || null);
+
+/** 初始密码口径：user + 学号（与云端 partner/accounts.js 一致，别在这里改规则） */
+function initPwdOf(no) { return 'user' + String(no || '').trim(); }
+
+function openMember() {
+  pickUserId.value = null;
+  candKw.value = '';
+  memberDialog.value = true;
+  loadCands();
+}
+function resetMember() {
+  pickUserId.value = null;
+  cands.value = [];
+  candKw.value = '';
+}
+async function loadCands() {
+  candLoading.value = true;
+  try {
+    const d = await http.get('/partner/accounts/candidates', {
+      params: { keyword: candKw.value.trim() },
+    });
+    cands.value = Array.isArray(d?.list) ? d.list : [];
+  } catch (e) {
+    cands.value = [];
+    ElMessage.error(e?.message || '学生名册加载失败');
+  } finally { candLoading.value = false; }
+}
+/** 输入防抖：别每敲一个字就打一次名册 */
+function onCandInput() {
+  clearTimeout(candTimer);
+  candTimer = setTimeout(loadCands, 220);
+}
+
+async function saveMember() {
+  if (!pickUserId.value) return ElMessage.warning('请先选一个人');
+  memberSaving.value = true;
+  try {
+    const r = await http.post('/partner/accounts/import', {
+      userIds: [pickUserId.value], role: 2,
+    });
+    const ok = (r?.created || [])[0];
+    const bad = (r?.skipped || [])[0];
+    if (!ok) {
+      // 常见于「刚被别人建过」——后端按 skipped 回报，不整体失败
+      ElMessage.warning(bad?.reason || '没有建成，请刷新后重试');
+      await loadCands();
+      return;
+    }
+    ElMessage.success(`已建站员 ${ok.name}（${ok.username}），初始密码 ${initPwdOf(ok.username)}`);
+    memberDialog.value = false;
+    filter.role = 'member';     // 建完直接切到站员档，看得见刚建的人
+    await fetch();
+  } catch (e) {
+    ElMessage.error(e?.message || '建账号失败');
+  } finally { memberSaving.value = false; }
+}
 
 /* ── 头像 / 角色 / 时间 ── */
 function initialOf(row) {
@@ -283,6 +427,10 @@ async function save() {
   if (!form.username) return ElMessage.warning('请填写账号');
   if (!form.id && !form.password) return ElMessage.warning('请填写密码');
   if (form.password && form.password.length < 6) return ElMessage.warning('密码至少 6 位');
+  // 新建站员必须从名册走，否则建出来的账号没有 user 档案（见新增站员弹窗注释）
+  if (!form.id && Number(form.role) === 2) {
+    return ElMessage.warning('站员请用「新增站员」从学生名册建号');
+  }
 
   saving.value = true;
   try {
@@ -384,16 +532,6 @@ onBeforeUnmount(clearPageHeader);
 }
 .c-time { color: var(--ink-2); font-variant-numeric: tabular-nums; font-size: var(--fs-sm); }
 
-/* v8 状态列：浅色胶囊 + 待激活行附加 ano-new 红标 */
-.state-cell { display: inline-flex; align-items: center; gap: 6px; }
-.ano {
-  display: inline-flex; align-items: center; height: 19px; padding: 0 7px;
-  border-radius: var(--r-pill);
-  font-size: var(--fs-2xs); font-weight: 600; letter-spacing: var(--ls-wide);
-  vertical-align: 1px; white-space: nowrap;
-}
-.ano-new  { background: var(--red-bg); color: var(--red-fg); }
-
 /* 标签体系（v8：浅色胶囊） */
 .tag {
   display: inline-flex; align-items: center; height: 23px; padding: 0 10px;
@@ -479,4 +617,63 @@ onBeforeUnmount(clearPageHeader);
 
 /* 弹窗提示 */
 .form-hint { margin-top: 4px; line-height: 1.55; }
+
+/* ══════════ 新增站员弹窗（从名册选人） ══════════ */
+.pm-sub {
+  font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.75;
+  margin-bottom: 12px;
+}
+.pm-sub b { color: var(--ink); }
+.pm-sub code, .pm-foot-note code {
+  font-family: var(--mono); font-size: 11.5px;
+  background: var(--parchment); padding: 1px 6px; border-radius: 4px; color: var(--ink-2);
+  white-space: nowrap;   /* 「user + 学号」不许断成两行 */
+}
+
+/* 候选人列表：白底描边行，选中一行蓝底蓝边（不用实心蓝，5 行会糊成一片） */
+.cand-list {
+  margin-top: 10px; max-height: 320px; overflow-y: auto;
+  border: 1px solid var(--hairline); border-radius: 12px;
+  background: var(--canvas);
+}
+.cand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; cursor: pointer;
+  border-bottom: 1px solid var(--divider);
+  transition: background 0.14s var(--ease);
+}
+.cand:last-child { border-bottom: none; }
+.cand:hover { background: var(--parchment); }
+.cand.on { background: rgba(0, 102, 204, 0.07); }
+/* 单选圆点：空心 → 选中时内圈填蓝 */
+.cand-dot {
+  width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0;
+  box-shadow: inset 0 0 0 1.5px var(--hairline);
+  transition: box-shadow 0.14s var(--ease);
+}
+.cand.on .cand-dot { box-shadow: inset 0 0 0 5px var(--accent); }
+.cand-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.cand-t b { font-size: var(--fs-md); font-weight: 600; color: var(--ink); }
+.cand-t i {
+  font-style: normal; font-family: var(--mono);
+  font-size: 11.5px; color: var(--muted);
+}
+.cand-cur {
+  flex: none; font-size: var(--fs-2xs); font-weight: 600;
+  color: var(--accent); letter-spacing: var(--ls-wide);
+}
+.cand-empty {
+  padding: 26px 14px; text-align: center;
+  font-size: var(--fs-sm); color: var(--muted);
+}
+
+/* 底部将要建成的账号摘要 */
+.pm-foot-note {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+  margin-top: 12px; padding: 10px 14px;
+  background: var(--parchment); border-radius: 12px;
+  font-size: var(--fs-sm); color: var(--ink-2);
+}
+.pm-foot-note b { color: var(--ink); }
+
 </style>
