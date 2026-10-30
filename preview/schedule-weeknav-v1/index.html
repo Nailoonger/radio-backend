@@ -37,11 +37,11 @@
   .statusbar { height: 44px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font-size: 12px; font-weight: 600; color: #1D1D1F; }
   .navbar { flex: none; height: 44px; display: flex; align-items: center; justify-content: center; position: relative; }
   .navbar-title { font-size: 16px; font-weight: 600; letter-spacing: -.3px; }
-  .scroll { flex: 1; overflow-y: auto; padding: 9.5px 17.5px 40px; display: flex; flex-direction: column; gap: 11.5px; scrollbar-width: none; }
+  .scroll { flex: 1; overflow-y: auto; padding: 0 17.5px 40px; display: flex; flex-direction: column; gap: 11.5px; scrollbar-width: none; }
   .scroll::-webkit-scrollbar { display: none; }
 
-  /* ── 周切换条（照 .wk-nav，四页统一） ── */
-  .wk-nav { display: flex; align-items: center; padding: 6px 3px 8px; }
+  /* ── 周切换条（照 .wk-nav，四页统一；本页上内边距归零，头顶是 navbar） ── */
+  .wk-nav { display: flex; align-items: center; padding: 0 3px 8px; }
   .wk-b { flex: 1; font-size: 12.5px; color: #0066CC; cursor: pointer; user-select: none; }
   .wk-b.r { text-align: right; }
   .wk-b.off { color: #B3B3B8; }

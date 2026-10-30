@@ -10,9 +10,12 @@
       那一行原本还兼着"第 N 周 · 日期"，现在由 .wk-nav 接管，所以周信息没丢。 */
 
 .page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
+/* ⚠️ 2026-10-31 顶边距归零：上面是 88rpx 的 .navbar（标题垂直居中，本身已带半栏留白），
+   原来这里再叠 19rpx + .wk-nav 的 12rpx，导航栏到周切换条之间就空出一条明显的白带
+   （陛下截图：「中间留那么大空白你要干啥贴顶啊」）。顶边距只留 .navbar 自带的那半栏。 */
 .body {
   flex: 1;
-  padding: 19rpx 35rpx 215rpx;
+  padding: 0 35rpx 215rpx;
   display: flex;
   flex-direction: column;
   gap: 23rpx;
@@ -31,10 +34,12 @@
 .err-d { font-size: 20rpx; color: #C0392B; line-height: 1.5; opacity: .9; }
 
 /* ── 周切换条 ──
-   与考勤 / 请假 / 可排时间 / 排班工作台**同一套** .wk-nav（值直接抄 availability.wxss），
+   与考勤 / 请假 / 可排时间 / 排班工作台**同一套** .wk-nav（值抄 availability.wxss），
    四页本该一致，所以别在这里微调字号，要改就四页一起改。
+   ⚠️ 唯一不同的地方：**上内边距归零**。另外三页头顶是吸顶 .bar（自带 padding），
+      本页头顶是 88rpx 的 .navbar，再补 12rpx 就会空一条带（2026-10-31 陛下打回）。
    左「‹ 上一周」蓝字 / 中「本周」红胶囊 + 日期范围 / 右「下一周 ›」（本周时置灰，仍可点） */
-.wk-nav { display: flex; align-items: center; padding: 12rpx 6rpx 16rpx; }
+.wk-nav { display: flex; align-items: center; padding: 0 6rpx 16rpx; }
 .wk-b { flex: 1; font-size: 25rpx; color: #0066CC; }
 .wk-b.r { text-align: right; }
 .wk-b.off { color: #B3B3B8; }
