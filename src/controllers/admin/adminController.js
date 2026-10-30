@@ -11,8 +11,9 @@
  */
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
-const { Admin } = require('../../models');
+const { Admin, User } = require('../../models');
 const { success, ApiError, Codes } = require('../../utils/response');
+const account = require('../../services/accountPasswordService');
 
 exports.list = async (req, res, next) => {
   try {
@@ -58,6 +59,19 @@ exports.create = async (req, res, next) => {
     const exists = await Admin.findOne({ where: { username } });
     if (exists) throw new ApiError(Codes.CONFLICT, '用户名已存在');
 
+    /**
+     * 账号密码统一（2026-10-31）：密码唯一事实源是 user.password，
+     * 所以建后台账号必须先建一条 user 行（kind=teacher，工号当 username）。
+     * 不建的话这个人建出来就登不进去 —— 登录会去找 user 记录。
+     */
+    const user = await account.createUserForAdmin({
+      username,
+      plainPassword: password,
+      nickname,
+      kind: account.KIND_TEACHER,
+    });
+
+    // admin.password 仍然写（NOT NULL + 回滚用），但登录不再读它
     const hash = await bcrypt.hash(password, 10);
     const admin = await Admin.create({
       username,
@@ -65,6 +79,7 @@ exports.create = async (req, res, next) => {
       nickname: nickname || username,
       role,
       status: 1,
+      userId: user.id,
     });
     return success(res, {
       id: admin.id,
@@ -90,7 +105,20 @@ exports.update = async (req, res, next) => {
       if (req.body.password.length < 6) {
         throw new ApiError(Codes.PARAM_ERROR, '密码长度不能少于6位');
       }
-      admin.password = await bcrypt.hash(req.body.password, 10);
+      const hash = await bcrypt.hash(req.body.password, 10);
+      admin.password = hash;
+
+      /**
+       * 真正生效的是 user.password（2026-10-31 账号密码统一）。
+       * ⚠️ 升 pwdChangedAt 会让他三端的旧 token 下一次请求全部 40101 ——
+       *    「管理员重置密码 = 把人踢下线」是刻意的。
+       */
+      const target = await account.findUserOfAdmin(admin);
+      if (target) {
+        target.password = hash;
+        target.pwdChangedAt = new Date();
+        await target.save();
+      }
     }
     await admin.save();
     return success(res, {
@@ -120,6 +148,25 @@ exports.remove = async (req, res, next) => {
       }
     }
     await admin.destroy();
+
+    /**
+     * 老师的 user 记录跟着删（2026-10-31）。
+     * admin 行删了但 user 行留着，那个工号就被永久占住 —— 再建同名会撞「已被占用」，
+     * 而且没有任何界面能清掉它。
+     * ⚠️ 站员（role=2）绝不能删 user 行：他首先是学生，还要用同一学号登学生端。
+     */
+    if (admin.role !== 2 && admin.userId) {
+      try {
+        const u = await User.findByPk(admin.userId);
+        if (u && account.kindOf(u) === account.KIND_TEACHER) {
+          const others = await Admin.count({ where: { userId: admin.userId } });
+          if (others === 0) await u.destroy();
+        }
+      } catch (e) {
+        console.warn('[admin] 删除账号后清理 user 记录失败', admin.id, admin.userId, e && e.message);
+      }
+    }
+
     return success(res, null, '已删除');
   } catch (e) {
     return next(e);

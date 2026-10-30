@@ -190,6 +190,32 @@ exports.main = async (event = {}, context) => {
       cloud,
     };
 
+    /**
+     * ── 统一鉴权前置（2026-10-31 账号密码统一）────────────────────────────
+     *
+     * 改密后「任何角色、任何端」立刻失效，全靠这一段。
+     *
+     * ⚠️ 为什么放在这里，而不是改那 45 处 asAdmin()：
+     *    云函数所有请求都从这一个分发点出去，在这里拦一次就覆盖全部；
+     *    业务 handler 一行都不用动（也就没人会因为漏加 await 而静默失效）。
+     *
+     * ⚠️ 三条边界，一条都不能少：
+     *    ① 没带 token        → 放行。登录、公告列表这类公开接口照常工作
+     *    ② token 无效/已过期 → **不在这里拦**，交给 handler 按原有逻辑返回。
+     *                          入口擅自拦截会改变既有行为（比如过期 token 访问公开接口）
+     *    ③ token 有效但已作废 → 40101（密码已变更 / 账号已停用）
+     */
+    if (token) {
+      let pl = null;
+      try {
+        pl = require('./lib/auth').verify(String(token).replace(/^Bearer\s+/i, ''));
+      } catch (e) {
+        pl = null;   // ② 无效 token：交给后面的 handler
+      }
+      // ③ 有效 token 才强校验。⚠️ 走的是不带缓存的严格版，30 秒窗口不存在
+      if (pl) await require('./services/studentAccount').assertTokenFreshStrict(pl);
+    }
+
     const data = await hit.handler(ctx);
     return { code: 0, message: 'ok', data: data === undefined ? null : data };
   } catch (err) {

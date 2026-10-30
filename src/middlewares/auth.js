@@ -62,21 +62,39 @@ async function userAuth(req, res, next) {
  * 管理员鉴权中间件
  * token 中包含 { id, username, role }
  */
-function adminAuth(req, res, next) {
+/**
+ * 管理端鉴权中间件（2026-10-31：改为异步，加密码版本校验）
+ *
+ * ⚠️ 为什么要异步：改密后要「所有端立刻失效」，必须查一次库比对 pv。
+ *    Express 的 async 中间件不会自动把异常交给 next，所以这里全程 try/catch 自己兜。
+ * ⚠️ 与云端 `index.js` 入口的统一前置校验同一条口径（两处逻辑必须一致，
+ *    否则 direct / cloud 两种模式下「改密即失效」的行为会不一样）。
+ */
+async function adminAuth(req, res, next) {
   const token = extractToken(req);
   if (!token) {
     return fail(res, Codes.UNAUTHORIZED, '请先登录管理后台', 401);
   }
+
+  let payload;
   try {
-    const payload = verify(token);
-    if (!payload.id || !payload.username) {
-      return fail(res, Codes.UNAUTHORIZED, 'token无效', 401);
-    }
-    req.admin = payload;
-    return next();
+    payload = verify(token);
   } catch (e) {
     return fail(res, Codes.UNAUTHORIZED, 'token已过期或无效', 401);
   }
+  if (!payload.id || !payload.username) {
+    return fail(res, Codes.UNAUTHORIZED, 'token无效', 401);
+  }
+
+  try {
+    // 不走缓存：30 秒窗口在「改密即失效」面前是不允许的
+    await accountService.assertTokenFreshStrict(payload);
+  } catch (e) {
+    return fail(res, Codes.UNAUTHORIZED, (e && e.message) || '登录已失效，请重新登录', 401);
+  }
+
+  req.admin = payload;
+  return next();
 }
 
 module.exports = { userAuth, adminAuth, extractToken };

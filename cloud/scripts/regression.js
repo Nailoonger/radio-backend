@@ -48,6 +48,8 @@ const SUITE = [
   ['test-scheduling-cost.js', true],
   ['test-scheduling.js', true],
   ['test-admin-core.js', true],
+  // 账号密码统一（2026-10-31）：一个学号一份密码、改密后三端立刻失效、老师惰性补建
+  ['test-account-unify.js', true],
   ['test-admin-submit.js', true],
   ['test-admin-student.js', true],
   // ⚠️ 标 false：它自己会检测「目标不是源码目录」并打印 [skip] 退出 ——

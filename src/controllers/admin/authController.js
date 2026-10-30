@@ -10,6 +10,8 @@ const { Admin } = require('../../models');
 const { sign } = require('../../utils/jwt');
 const { success, ApiError, Codes } = require('../../utils/response');
 const logger = require('../../utils/logger');
+const account = require('../../services/accountPasswordService');
+const { pwdVersionOf } = require('../../services/studentAccountService');
 
 exports.login = async (req, res, next) => {
   try {
@@ -18,7 +20,7 @@ exports.login = async (req, res, next) => {
       throw new ApiError(Codes.PARAM_ERROR, '请输入用户名和密码');
     }
 
-    const admin = await Admin.findOne({ where: { username } });
+    const admin = await Admin.findOne({ where: { username: String(username).trim() } });
     if (!admin) {
       throw new ApiError(Codes.UNAUTHORIZED, '账号或密码错误');
     }
@@ -26,18 +28,36 @@ exports.login = async (req, res, next) => {
       throw new ApiError(Codes.FORBIDDEN, '账号已禁用');
     }
 
-    const ok = await bcrypt.compare(password, admin.password);
-    if (!ok) {
+    /**
+     * 密码唯一事实源 = user.password（2026-10-31 账号密码统一）。
+     * 与云端 `/admin/login` 完全同一条口径：站员用学号、老师用工号，
+     * 密码都落在 user 表，学生端改一次，伙伴端和后台立刻同密码。
+     *
+     * ⚠️ 先校验、后补建：存量老师还没有 user 记录，
+     *    反过来做的话随便一个错密码都会往 user 表写数据。
+     */
+    let user = await account.findUserOfAdmin(admin);
+    let ok = false;
+    if (user) {
+      ok = await account.passwordMatches(user, password);
+      if (ok) await account.bindAdminUser(admin, user);
+    } else {
+      ok = Boolean(admin.password) && await bcrypt.compare(password, admin.password);
+      if (ok) user = await account.ensureTeacherProfile(admin);
+    }
+    if (!ok || !user) {
       throw new ApiError(Codes.UNAUTHORIZED, '账号或密码错误');
     }
 
     admin.lastLoginAt = new Date();
     await admin.save();
 
+    // token 结构不变，只多带 pv（改密后旧 token 立刻作废）
     const token = sign({
       id: admin.id,
       username: admin.username,
       role: admin.role,
+      pv: pwdVersionOf(user.pwdChangedAt),
     });
 
     return success(res, {
@@ -84,13 +104,35 @@ exports.changePassword = async (req, res, next) => {
 
     const admin = await Admin.findByPk(req.admin.id);
     if (!admin) throw new ApiError(Codes.UNAUTHORIZED, '账号不存在');
-    const ok = await bcrypt.compare(oldPassword, admin.password);
+
+    /**
+     * 改密写的是 **user.password**（密码唯一事实源），不是 admin.password。
+     * admin.password 仍然跟着写（NOT NULL + 回滚用），但不再是事实源。
+     * ⚠️ pwdChangedAt 一变，三端旧 token 下一次请求全部 40101 ——
+     *    所以这里必须把新 token 一起吐回去，否则改密的人自己立刻掉线。
+     */
+    const user = await account.findUserOfAdmin(admin);
+    if (!user) throw new ApiError(Codes.NOT_FOUND, '账号资料缺失，请联系超级管理员');
+
+    const ok = await account.passwordMatches(user, oldPassword);
     if (!ok) throw new ApiError(Codes.PARAM_ERROR, '原密码错误');
 
-    admin.password = await bcrypt.hash(newPassword, 10);
+    const hashed = await bcrypt.hash(newPassword, account.BCRYPT_COST);
+    user.password = hashed;
+    user.pwdChangedAt = new Date();
+    await user.save();
+
+    admin.password = hashed;
     await admin.save();
 
-    return success(res, null, '密码修改成功');
+    return success(res, {
+      token: sign({
+        id: admin.id,
+        username: admin.username,
+        role: admin.role,
+        pv: pwdVersionOf(user.pwdChangedAt),
+      }),
+    }, '密码修改成功');
   } catch (e) {
     return next(e);
   }

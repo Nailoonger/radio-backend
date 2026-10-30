@@ -1,35 +1,80 @@
-<!-- 伙伴端 · 我的（v151 定稿）
-     布局：园林背景层（通栏）→ 透明介绍带 → 液态玻璃卡（上移压住背景）
-     ⚠️ 小程序不支持 backdrop-filter: url()，这里用 blur + 半透明白降级，视觉上等价于"浅玻璃" -->
+<!-- 伙伴端·我的：园林背景延伸到玻璃卡下方，身份与列表沿用现有数据。 -->
 <view class="page">
+  <view class="sb" style="height: {{statusBarHeight}}px"></view>
+  <view class="nav"><text class="nav-t">我的</text></view>
 
-  <!-- 背景层：图 + 白纱布 -->
-  <view class="mebg">
-    <image class="mebg-img" src="/assets/me-bg.jpg" mode="aspectFill"></image>
-    <view class="mebg-veil"></view>
+  <view class="main">
+    <view class="bg" aria-hidden="true">
+      <image class="bg-img" src="/assets/me-bg.jpg" mode="widthFix"></image>
+      <view class="bg-soften"></view>
+      <view class="bg-veil"></view>
+      <view class="bg-fade"></view>
+    </view>
+
+    <view class="wel">
+      <text class="eb">菁悠广播站·{{role.tag}}</text>
+      <view class="nm">{{role.name}}</view>
+      <text class="post">{{role.post}}{{role.grade ? '·' + role.grade : ''}}</text>
+      <view class="ten">已加入广播站 <text class="num">{{days}}</text> 天</view>
+    </view>
+
+    <view class="cards">
+      <view class="row"
+        wx:for="{{rows}}"
+        wx:key="id"
+        hover-class="row-hover"
+        data-id="{{item.id}}"
+        bindtap="onNav"
+        role="button"
+        aria-label="{{item.label}}">
+        <image class="ric" src="/assets/partner/ic-{{item.icon}}.png" mode="aspectFit" aria-hidden="true"></image>
+        <text class="lb">{{item.label}}</text>
+        <text wx:if="{{item.state}}" class="rv">{{item.state}}</text>
+        <image class="chev" src="/assets/partner/ic-chev.png" mode="aspectFit" aria-hidden="true"></image>
+      </view>
+    </view>
+
+    <button class="logout" hover-class="logout-hover" bindtap="onLogout">退出登录</button>
   </view>
+  <view class="dock-gap"></view>
 
-  <!-- 介绍带（透明，让出背景） -->
-  <view class="hero">
-    <text class="eb">菁悠广播站 · {{role.tag}}</text>
-    <text class="nm">{{role.name}}</text>
-    <text class="post">{{role.post}}{{role.grade ? ' · ' + role.grade : ''}}</text>
-    <view class="ten">已加入广播站<text class="num">{{days}}</text>天</view>
-  </view>
+  <!-- ══════════ 修改密码（2026-10-31 账号密码统一）══════════
+       改的是他在学生端用的那个密码 —— 一个学号一份密码，两个入口。
+       所以文案要直接讲明白，否则站员会以为这是「伙伴端专用密码」。 -->
+  <view class="pwd-mask" wx:if="{{pwdOpen}}" bindtap="closePwd" catchtouchmove="true"></view>
+  <view class="pwd-sheet" wx:if="{{pwdOpen}}">
+    <view class="pwd-hd">
+      <text class="pwd-t">修改密码</text>
+      <text class="pwd-sub">这就是你在学生端用的同一个密码，改完两边都生效。</text>
+    </view>
 
-  <!-- 玻璃卡 -->
-  <view class="glass">
-    <view class="row"
-          wx:for="{{rows}}"
-          wx:key="id"
-          data-id="{{item.id}}"
-          hover-class="row-hover"
-          bindtap="onNav">
-      <text class="lb">{{item.label}}</text>
-      <text class="st">{{item.state}}</text>
-      <text class="ar">›</text>
+    <view class="pwd-field">
+      <text class="pwd-lb">当前密码</text>
+      <input class="pwd-inp" type="password" password
+        value="{{pwdOld}}" data-field="pwdOld" bindinput="onPwdInput"
+        placeholder="请输入现在用的密码" placeholder-class="pwd-ph" />
+    </view>
+    <view class="pwd-field">
+      <text class="pwd-lb">新密码</text>
+      <input class="pwd-inp" type="password" password
+        value="{{pwdNew}}" data-field="pwdNew" bindinput="onPwdInput"
+        placeholder="至少 6 位" placeholder-class="pwd-ph" />
+    </view>
+    <view class="pwd-field">
+      <text class="pwd-lb">确认新密码</text>
+      <input class="pwd-inp" type="password" password
+        value="{{pwdNew2}}" data-field="pwdNew2" bindinput="onPwdInput"
+        placeholder="再输一次" placeholder-class="pwd-ph" />
+    </view>
+
+    <text class="pwd-err" wx:if="{{pwdErr}}">{{pwdErr}}</text>
+
+    <view class="pwd-note">改完之后，其他设备上的登录也会一并失效，需要用新密码重新登录。</view>
+
+    <view class="pwd-acts">
+      <button class="pwd-btn ghost" hover-class="pwd-btn-hover" bindtap="closePwd">取消</button>
+      <button class="pwd-btn primary" hover-class="pwd-btn-hover" loading="{{pwdSaving}}" bindtap="submitPwd">确认修改</button>
     </view>
   </view>
-
-  <button class="logout" bindtap="onLogout">退出登录</button>
 </view>
+<partner-tabbar wx:if="{{role.account}}" role="{{roleKey}}" active="me" badges="{{badges}}" bind:switch="onTab"></partner-tabbar>

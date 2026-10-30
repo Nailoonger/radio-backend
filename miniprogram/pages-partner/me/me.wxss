@@ -1,154 +1,313 @@
-/* 伙伴端 · 我的（v151 定稿）
-   尺寸换算：设计稿 390pt → 750rpx，1px ≈ 1.923rpx
-   v151 参数：图 390px 宽（→750rpx，高 434rpx）· 白纱布 1→.72@26%→0@57%
-              · 卡片上移 13px（→25rpx）· 玻璃白 31% */
-
+/* 390px 设计宽；rpx = px × 750/390。
+ * 背景独立铺在介绍带和卡片下，保留首行可见的桥与水池。
+ * 图片底部独立渐隐柔化；卡片仅叠加半透明白，不加磨砂。
+ */
 .page {
+  display: block;
   min-height: 100vh;
-  padding: 0 32rpx 40rpx;
-  background: var(--parchment, #F5F5F7);
-  position: relative;
+  background: #F5F5F7;
   box-sizing: border-box;
+  overflow-x: hidden;
 }
+.sb { position: relative; z-index: 3; background: #FFFFFF; }
+.nav {
+  position: relative;
+  z-index: 3;
+  height: 44px;
+  padding: 0 170rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFFFFF;
+}
+.nav-t {
+  font-size: 30rpx;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #1D1D1F;
+}
+.main { position: relative; }
 
-/* ── 背景层：通栏（负边距吃掉页面左右 padding） ── */
-.mebg {
+/* 390 × 226，左上起点，不额外降低图片透明度。 */
+.bg {
   position: absolute;
-  top: 0;
-  left: -32rpx;
-  right: -32rpx;
-  height: 434rpx;          /* = 图高 */
+  top: 0; left: 0; right: 0;
+  height: 434.6154rpx;
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
 }
-.mebg-img {
-  width: 750rpx;
-  height: 434rpx;
-  display: block;
-  /* 底部渐隐：46% → 92%（图在卡片第一行开始变淡） */
-  -webkit-mask-image: linear-gradient(180deg, #000 46%, rgba(0,0,0,.42) 70%, rgba(0,0,0,0) 92%);
-          mask-image: linear-gradient(180deg, #000 46%, rgba(0,0,0,.42) 70%, rgba(0,0,0,0) 92%);
-}
-/* 白纱布：横向提亮左侧文字区；纵向淡出，只在介绍带生效（否则卡片左下会白成一团） */
-.mebg-veil {
+.bg-img {
   position: absolute;
-  left: 0; right: 0; top: 0; bottom: 0;
-  background: linear-gradient(90deg,
-    rgba(255,255,255,1) 0%,
-    rgba(255,255,255,.72) 26%,
-    rgba(255,255,255,0) 57%);
-  -webkit-mask-image: linear-gradient(180deg, #000 0%, rgba(0,0,0,.85) 42%, rgba(0,0,0,.25) 62%, rgba(0,0,0,0) 76%);
-          mask-image: linear-gradient(180deg, #000 0%, rgba(0,0,0,.85) 42%, rgba(0,0,0,.25) 62%, rgba(0,0,0,0) 76%);
+  top: 0; left: 0;
+  width: 750rpx;
+  height: auto;
+  display: block;
+  opacity: 1;
 }
-
-/* ── 介绍带 ── */
-.hero {
+.bg-veil {
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  background: linear-gradient(90deg,
+    rgba(255,255,255,.82) 0%,
+    rgba(255,255,255,.5) 26%,
+    rgba(255,255,255,.18) 42%,
+    rgba(255,255,255,0) 62%);
+}
+/* 柔化只作用于图片下半段，由透明遮罩逐渐增强。 */
+.bg-soften {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 30%;
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000000 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000000 100%);
+  pointer-events: none;
+}
+/* 与页面同色收尾，避免图片底边直接截断。 */
+.bg-fade {
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  background: linear-gradient(180deg,
+    rgba(245,245,247,0) 64%,
+    rgba(245,245,247,.14) 78%,
+    rgba(245,245,247,.62) 91%,
+    #F5F5F7 100%);
+  pointer-events: none;
+}
+.wel {
   position: relative;
   z-index: 2;
-  padding: 36rpx 4rpx 28rpx;
-  min-height: 192rpx;      /* v151：介绍带最小高 168px≈323rpx，这里含上下 padding 取整 */
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  overflow: hidden;
+  border-radius: 0;
+  /* 介绍带 186px：卡片比原来下移 18px，让出完整拱桥。 */
+  min-height: 357.6923rpx;
+  padding: 34.6154rpx 34.6154rpx 28rpx;
   box-sizing: border-box;
 }
 .eb {
-  font-size: 22rpx;
-  color: #8A8A90;
-  letter-spacing: .4rpx;
+  display: block;
+  margin-bottom: 14rpx;
+  font-size: 23rpx;
+  line-height: 1.5;
+  color: #76767E;
+  letter-spacing: .5rpx;
 }
 .nm {
-  display: block;
-  margin-top: 10rpx;
-  font-size: 58rpx;        /* 30px */
+  max-width: 420rpx;
+  font-size: 54rpx;
   font-weight: 600;
-  letter-spacing: -1.6rpx;
-  line-height: 1.15;
-  color: var(--ink, #1D1D1F);
+  line-height: 1.3;
+  letter-spacing: -1rpx;
+  color: #1D1D1F;
+  word-break: break-all;
 }
 .post {
   display: block;
-  margin-top: 10rpx;
-  font-size: 23rpx;
-  color: #6E6E76;
+  max-width: 440rpx;
+  margin-top: 8rpx;
+  color: #76767E;
+  font-size: 25rpx;
+  line-height: 1.5;
 }
 .ten {
-  margin-top: 18rpx;
-  font-size: 22rpx;
-  color: #8A8A90;
+  margin-top: 26rpx;
+  color: #76767E;
+  font-size: 24rpx;
+  line-height: 1.5;
 }
 .ten .num {
-  margin: 0 4rpx;
   font-size: 28rpx;
   font-weight: 600;
-  color: var(--ink, #1D1D1F);
+  color: #1D1D1F;
+  font-variant-numeric: tabular-nums;
 }
 
-/* ── 液态玻璃卡 ──
-   小程序没有 backdrop-filter: url(#filter)，用 blur + 半透明白降级：
-   不支持的机型会自动忽略 blur，只剩半透明白底，仍然可读 */
-.glass {
+/* 白卡上移 13px；白 .31、圆角 20px、三层中性阴影。 */
+.cards {
   position: relative;
-  z-index: 1;
-  margin-top: -25rpx;      /* 上移 13px 压住背景 */
-  border-radius: 38rpx;    /* 20px */
+  z-index: 3;
+  margin: -25rpx 34.6154rpx 0;
   overflow: hidden;
-  background: rgba(255, 255, 255, .31);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
-          backdrop-filter: blur(18px) saturate(160%);
+  border-radius: 38.4615rpx;
+  background: rgba(255,255,255,.31);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   box-shadow:
-    0 24rpx 68rpx -28rpx rgba(0, 0, 0, .22),
-    inset 0 2rpx 0 rgba(255, 255, 255, .75),
-    0 0 0 2rpx rgba(255, 255, 255, .55);
+    0 23.0769rpx 65.3846rpx -26.9231rpx rgba(0,0,0,.22),
+    inset 0 1.9231rpx 0 rgba(255,255,255,.75),
+    0 0 0 1.9231rpx rgba(255,255,255,.55);
 }
-
 .row {
+  position: relative;
   display: flex;
   align-items: center;
-  min-height: 100rpx;      /* 52px */
-  padding: 22rpx 30rpx;
-  border-bottom: 2rpx solid rgba(0, 0, 0, .055);
+  gap: 18rpx;
+  min-height: 110rpx;
+  padding: 18rpx 30.7692rpx;
   box-sizing: border-box;
+  color: #1D1D1F;
 }
-.row:last-child { border-bottom: 0; }
-.row-hover { background: rgba(0, 0, 0, .035); }
-
+.row + .row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 30.7692rpx;
+  right: 30.7692rpx;
+  height: 1rpx;
+  background: #E3E3E8;
+}
+.row-hover { background: rgba(0,0,0,.035); }
+.ric {
+  flex: none;
+  width: 38rpx;
+  height: 38rpx;
+}
 .lb {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   font-size: 29rpx;
-  color: var(--ink, #1D1D1F);
+  line-height: 1.5;
 }
-.st {
-  flex: none;
-  max-width: 300rpx;
-  font-size: 24rpx;
-  color: var(--muted, #7A7A7A);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+.rv {
+  flex: 1;
+  min-width: 0;
+  margin-left: auto;
+  font-size: 25rpx;
+  line-height: 1.5;
+  text-align: right;
+  color: #B3B3B8;
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
 }
-.ar {
+.chev {
   flex: none;
-  margin-left: 12rpx;
-  font-size: 30rpx;
-  color: #C7C7CC;
+  width: 26rpx;
+  height: 26rpx;
+  margin-left: auto;
+}
+.rv + .chev { margin-left: 0; }
+
+button.logout {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(100% - 69.2308rpx);
+  min-height: 100rpx;
+  margin: 25rpx auto 0;
+  padding: 18rpx 26rpx;
+  border: 1rpx solid #E2E2E7;
+  border-radius: 9999rpx;
+  box-sizing: border-box;
+  background: #FFFFFF;
+  color: #FF3B30;
+  font-size: 28rpx;
+  font-weight: 400;
+  line-height: 1.5;
+}
+button.logout::after { border: 0; }
+.logout-hover { opacity: .8; }
+.dock-gap {
+  height: 210rpx;
+  height: calc(210rpx + env(safe-area-inset-bottom));
 }
 
-/* ── 退出登录 ── */
-.logout {
-  position: relative;
-  z-index: 1;
-  margin-top: 32rpx;
-  width: 100%;
-  height: 96rpx;           /* 50px */
-  line-height: 96rpx;
-  border-radius: 9999rpx;
+/* ══════════ 修改密码弹窗（2026-10-31 账号密码统一） ══════════
+   白色面板 + 墨字，不引入任何一种新的深色件 —— 与这一页既有的
+   白卡（.cards / button.logout）同一套口径。
+   ⚠️ button 的样式一律写成 `button.pwd-btn`（元素+类）：app.wxss 里有
+      `button.btn{display:block;width:auto}` = 特异性 (0,1,1)，单类会被静默压掉。 */
+.pwd-mask {
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  z-index: 90;
+  background: rgba(0, 0, 0, .45);
+}
+.pwd-sheet {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 91;
+  padding: 36rpx 34.6154rpx 34rpx;
+  padding-bottom: calc(34rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
   background: #FFFFFF;
-  color: var(--live, #FF453A);
+  border-radius: 38.4615rpx 38.4615rpx 0 0;
+  box-shadow: 0 -8rpx 40rpx rgba(0, 0, 0, .12);
+}
+.pwd-hd { margin-bottom: 26rpx; }
+.pwd-t {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #1D1D1F;
+}
+.pwd-sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #76767E;
+}
+.pwd-field { margin-bottom: 18rpx; }
+.pwd-lb {
+  display: block;
+  margin-bottom: 8rpx;
+  font-size: 25rpx;
+  color: #76767E;
+}
+.pwd-inp {
+  width: 100%;
+  height: 88rpx;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+  background: #F5F5F7;
+  border-radius: 16rpx;
+  font-size: 29rpx;
+  color: #1D1D1F;
+}
+.pwd-ph { color: #B3B3B8; }
+.pwd-err {
+  display: block;
+  margin: 4rpx 0 10rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: #FF3B30;
+}
+.pwd-note {
+  margin: 12rpx 0 24rpx;
+  font-size: 23rpx;
+  line-height: 1.7;
+  color: #76767E;
+}
+.pwd-acts { display: flex; }
+button.pwd-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 92rpx;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 9999rpx;
   font-size: 29rpx;
   font-weight: 500;
-  border: 0;
+  line-height: 1;
+  box-sizing: border-box;
 }
-.logout::after { border: 0; }
+button.pwd-btn::after { border: 0; }
+button.pwd-btn.ghost {
+  margin-right: 18rpx;
+  background: #F5F5F7;
+  color: #1D1D1F;
+  border: 1rpx solid #E3E3E8;
+}
+button.pwd-btn.primary {
+  background: #0066CC;
+  color: #FFFFFF;
+}
+.pwd-btn-hover { opacity: .86; }

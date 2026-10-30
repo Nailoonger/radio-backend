@@ -226,12 +226,16 @@ const PLAIN_ONLY = new Set([
   eq('新密码过短 → 40001', [r.code, r.message], [40001, '新密码长度不能少于6位']);
 
   r = await H.call(H.req('PUT', '/admin/change-password', { oldPassword: 'password123', newPassword: 'newpass123' }, superToken));
-  eq('改密成功 → code 0 / data null', [r.code, r.data], [0, null]);
+  eq('改密成功 → code 0 且返回新 token', [r.code, typeof r.data.token], [0, 'string']);
+  const afterPwdToken = r.data.token;
   eq('新密码可登录', (await H.call(H.req('POST', '/admin/login', { username: 'root', password: 'newpass123' }))).code, 0);
   eq('旧密码已失效', (await H.call(H.req('POST', '/admin/login', { username: 'root', password: 'password123' }))).code, 40101);
 
-  r = await H.call(H.req('POST', '/admin/logout', {}, superToken));
-  eq('登出 → code 0', [r.code, r.data], [0, null]);
+  // 2026-10-31 账号密码统一：改密 = 换 pv = 三端旧 token 立刻作废。这里验后台这一端
+  eq('改密后旧 token 立刻 40101', (await H.call(H.req('GET', '/admin/profile', {}, superToken))).code, 40101);
+
+  r = await H.call(H.req('POST', '/admin/logout', {}, afterPwdToken));
+  eq('登出（用改密返回的新 token）→ code 0', [r.code, r.data], [0, null]);
 
   /* ══════════════════ C. setting（KV） ══════════════════ */
   section('C. 系统设置 KV（仅超管）');
@@ -621,9 +625,10 @@ const PLAIN_ONLY = new Set([
   r = await H.call(H.req('POST', '/admin/admin/create', { username: 'x', password: 'abcdef', role: 9 }, SUPER_TOKEN));
   eq('role 非 0/1/2 → 40001', [r.code, r.message], [40001, '角色必须为 0(超管) / 1(社干) / 2(站员)']);
 
-  // 站员（role=2）是可以被建出来的 —— 它是「学生身份的第二角色」，不是第三种人
+  // 站员（role=2）是「学生身份的第二角色」，必须挂在学生档案上。
+  // 2026-10-31：不接受手打建号 —— 手建出来 userId 为空，排班/考勤都查不到这个人。
   r = await H.call(H.req('POST', '/admin/admin/create', { username: 'member1', password: 'abcdef', role: 2 }, SUPER_TOKEN));
-  eq('role=2 站员可新建', r.code, 0);
+  eq('role=2 缺 userId → 40001', [r.code, r.message], [40001, '站员请从学生名册导入（账号管理 › 新增站员）']);
 
   r = await H.call(H.req('POST', '/admin/admin/create', { username: 'newbie', password: 'abcdef', role: 1 }, SUPER_TOKEN));
   eq('新建 → 返回四字段', Object.keys(r.data), ['id', 'username', 'nickname', 'role']);

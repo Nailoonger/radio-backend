@@ -110,6 +110,36 @@ async function assertTokenFresh(payload) {
 }
 
 /**
+ * 严格版：**不走缓存**，直接查库。供 adminAuth 中间件使用（2026-10-31 账号密码统一）。
+ *
+ * ⚠️ getStatus 带 30 秒缓存，要「改密后所有端立刻失效」就只能直查。
+ * ⚠️ 多进程 / 多实例部署时 invalidate() 只清本进程那份，靠清缓存不可靠 —— 只有查库是准的。
+ * ⚠️ 存量 admin token 的例外：老师那条 user 记录是登录时才惰性补建的，
+ *    这里如果碰到「user 表还没有这条」就直接 401，老师会在还没登录过的时候就被拦住，形成死锁。
+ *    所以 admin token（有 id、无 openid）查不到 user 记录时放行。
+ */
+async function assertTokenFreshStrict(payload) {
+  const username = payload && payload.username;
+  if (!username) return true;
+
+  const st = await getStatus(username, true);
+  if (!st || st.missing) {
+    const isAdminToken = Boolean(payload.id) && !payload.openid;
+    if (isAdminToken) return true;
+    throw new ApiError(Codes.UNAUTHORIZED, '账号不存在，请重新登录', 401);
+  }
+  if (st.status !== 1) {
+    throw new ApiError(Codes.UNAUTHORIZED, '账号已停用，请联系广播站', 401);
+  }
+  // 老 token 无 pv 时按 0 算，与「从没改过密码」一致 → 这些人不会被踢
+  const tokenPv = Number(payload.pv || 0);
+  if (tokenPv !== st.pwdVersion) {
+    throw new ApiError(Codes.UNAUTHORIZED, '密码已变更，请重新登录', 401);
+  }
+  return true;
+}
+
+/**
  * 微信登录守卫：开关打开时禁止微信登录，强制走账号密码。
  *
  * ⚠️ 测试环境（NODE_ENV=test）一律放行：
@@ -136,6 +166,7 @@ module.exports = {
   getStatus,
   invalidate,
   assertTokenFresh,
+  assertTokenFreshStrict,
   isWechatLoginBlocked,
   // 仅测试 / 验证脚本使用
   _clearCache: () => cache.clear(),

@@ -23,7 +23,7 @@
  */
 
 const bcrypt = require('bcryptjs');
-const { C, findOne, findMany, insertOne, findAllPaged, reserveUnique } = require('../../lib/db');
+const { C, findOne, findMany, insertOne, findAllPaged, reserveUnique, updateById } = require('../../lib/db');
 const { ApiError, Codes } = require('../../lib/response');
 const { asSuperPartner } = require('./_kit');
 const { nextId } = require('../../lib/db');
@@ -109,10 +109,29 @@ async function importAccounts(ctx) {
       continue;
     }
     const plain = initPasswordFor(username);
+
+    /**
+     * ── 密码口径（2026-10-31 账号密码统一）──
+     *
+     * 站员的密码**就是他自己的学生密码**，不再单独生成一份。
+     * 事实源是 `user.password`，登录时由 /admin/login 去 user 表比对 ——
+     * 学生在学生端改一次密码，伙伴端立刻同密码，不用同步任何东西。
+     *
+     * ⚠️ admin.password 仍然写，但它只是**镜像**（MySQL 那边是 NOT NULL，必须落值），
+     *    登录不读它。回滚时它就在那儿。
+     * ⚠️ 学生档案还没有密码的情况（老微信用户 / 建号后从没登录过）：
+     *    必须先给他落一个初始密码，否则这个站员建出来永远登不进去。
+     */
+    let pwdHash = user.password || null;
+    if (!pwdHash) {
+      pwdHash = await bcrypt.hash(plain, BCRYPT_COST);
+      await updateById(C.USER, user._id, { password: pwdHash, pwdChangedAt: null, updateTime: now });
+    }
+
     await insertOne(C.ADMIN, {
       id,
       username,
-      password: await bcrypt.hash(plain, BCRYPT_COST),
+      password: pwdHash,
       nickname: user.name || user.nickname || username,
       role,
       userId: Number(user.id),
@@ -132,8 +151,8 @@ async function importAccounts(ctx) {
     created,
     skipped,
     createdCount: created.length,
-    // ⚠️ 不在这里回明文密码：统一是「user + 学号」，界面上直接告诉用户这个规则即可
-    passwordRule: '初始密码 = user + 学号（首次登录会引导改密）',
+    // ⚠️ 不在这里回明文密码：站员用的就是他自己的学生密码，界面直接讲这个规则即可
+    passwordRule: '站员用他自己的学生密码（一个学号一份密码，两个入口）',
     by: (p.admin && (p.admin.nickname || p.admin.username)) || '',
   };
 }

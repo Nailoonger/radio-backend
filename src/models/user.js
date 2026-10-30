@@ -32,7 +32,21 @@ module.exports = (sequelize, DataTypes) => {
       username: {
         type: DataTypes.STRING(32),
         allowNull: true,
-        comment: '登录账号 = 入学年级 + 班级 + 序号，如 20240101',
+        comment: '登录账号 = 入学年级 + 班级 + 序号，如 20240101；老师为工号',
+      },
+      /**
+       * 身份类型（2026-10-31 新增，配合「账号密码统一」）
+       *
+       * ⚠️ 学生和老师**共用 user 表**：密码唯一事实源就在这张表，
+       *    老师不再单独存一份 admin.password。区分靠这个字段，不靠 username 格式。
+       * ⚠️ 存量数据全部是学生，DEFAULT 'student' 保证 ALTER 时自动回填。
+       * ⚠️ 老师的 grade / classNo / seatNo 留空，学生端那条线不受影响。
+       */
+      kind: {
+        type: DataTypes.STRING(16),
+        allowNull: false,
+        defaultValue: 'student',
+        comment: 'student=学生 / teacher=老师',
       },
       password: {
         type: DataTypes.STRING(72),

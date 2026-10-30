@@ -104,6 +104,46 @@ async function assertTokenFresh(payload) {
 }
 
 /**
+ * 严格版 token 新鲜度校验：**不走缓存**，直接查库。
+ *
+ * 用途：云函数入口（index.js）的统一鉴权前置 —— 改密后任何角色、任何端**立刻**失效。
+ *
+ * ⚠️ 为什么不能复用 assertTokenFresh：getStatus 带 30 秒实例内缓存（CACHE_TTL），
+ *    改密后最多 30 秒旧 token 还能用。要「立刻」就只能直查。
+ * ⚠️ 靠 invalidate() 清缓存也不行：多实例部署时它只清本实例那份，别的实例照样是旧的。
+ * ⚠️ 代价：每个请求多一次库查询（约 20–50ms）。全站是几十人的校园广播站，这个量级不用担心。
+ *
+ * ⚠️⚠️ 存量 admin token 的例外（否则会死锁）：
+ *    老师那条 user 记录是**登录时才惰性补建**的（见 services/accountPassword）。
+ *    如果这里碰到「user 表还没有这条」就直接 401，老师会在「还没登录过」的时候就被拦住，
+ *    而他必须先登录才能建出这条 —— 死锁。
+ *    所以：admin token（有 id、无 openid）查不到 user 记录时放行，交给 handler 照原样处理。
+ *    一旦登录过，user 记录就存在了，之后改密就能立刻失效。
+ */
+async function assertTokenFreshStrict(payload) {
+  const username = payload && payload.username;
+  if (!username) return true; // 老微信用户：不参与账号体系
+
+  const st = await getStatus(username, true);
+  if (!st || st.missing) {
+    const isAdminToken = Boolean(payload.id) && !payload.openid;
+    if (isAdminToken) return true;   // 见上方「存量 admin token 的例外」
+    throw new ApiError(Codes.UNAUTHORIZED, '账号不存在，请重新登录');
+  }
+  if (st.status !== 1) {
+    throw new ApiError(Codes.UNAUTHORIZED, '账号已停用，请联系广播站');
+  }
+  // 老 token 没有 pv 字段时按 0 算（改造前签发的 admin token）。
+  // 这与「从没改过密码」的账号（pwdChangedAt=null → pv=0）相等，所以这些人不会被踢；
+  // 只有真正改过密码的人（pv 非 0）才对不上 —— 正是要的效果。
+  const tokenPv = Number(payload.pv || 0);
+  if (tokenPv !== st.pwdVersion) {
+    throw new ApiError(Codes.UNAUTHORIZED, '密码已变更，请重新登录');
+  }
+  return true;
+}
+
+/**
  * 微信登录守卫：开关打开时禁止微信登录，强制走账号密码。
  *
  * ⚠️ 与 source 的差异：原实现是同步读内存缓存（靠启动预热）；
@@ -128,6 +168,7 @@ module.exports = {
   getStatus,
   invalidate,
   assertTokenFresh,
+  assertTokenFreshStrict,
   isWechatLoginBlocked,
   // 仅测试 / 验证脚本使用
   _clearCache: () => cache.clear(),
