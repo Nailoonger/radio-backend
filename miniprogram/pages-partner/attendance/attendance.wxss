@@ -25,10 +25,18 @@
 /* 底部有固定保存条的视角要多留一截，否则最后一张卡被压住 */
 .body.with-bar { padding-bottom: 330rpx; }
 
-.wk-nav { display: flex; align-items: center; justify-content: space-between; padding: 2rpx 4rpx; }
-.wk-b { font-size: 25rpx; color: #0066CC; }
+/* 周切换（2026-10-30 统一口径）：左 / 中 / 右三栏，左右 flex:1 撑开、中间 flex:none 真居中。
+   ⚠️ 不要用 justify-content:space-between —— 「‹ 上一周」比「下一周 ›」窄，中间会偏。
+   与值班时间代录、请假、排班工作台四页保持一致。 */
+.wk-nav { display: flex; align-items: center; padding: 2rpx 4rpx; }
+.wk-b { flex: 1; font-size: 25rpx; color: #0066CC; }
+.wk-b.r { text-align: right; }
 .wk-b.off { color: #B3B3B8; }
-.wk-c { font-size: 25rpx; color: #1D1D1F; font-weight: 500; font-variant-numeric: tabular-nums; }
+.wk-mid { flex: none; display: flex; align-items: center; gap: 10rpx; }
+.wk-tag { flex: none; font-size: 20rpx; line-height: 1.6; padding: 2rpx 12rpx; border-radius: 9999rpx; font-weight: 500; }
+.wk-tag.on { background: #B42318; color: #FFF; }
+.wk-tag.off { background: #F1F1F4; color: #76767E; }
+.wk-c { font-size: 28rpx; font-weight: 600; color: #1D1D1F; font-variant-numeric: tabular-nums; }
 
 /* ══════════ 五个日期方块（v151 .days） ══════════ */
 .days { display: flex; gap: 12rpx; }

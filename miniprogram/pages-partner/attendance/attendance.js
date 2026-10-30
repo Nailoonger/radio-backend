@@ -120,7 +120,9 @@ Page({
       loading: true,
       weekStart,
       isThisWeek: this.data.offset === 0,
-      weekText: `本周 ${md(weekStart)} – ${md(`${end.getFullYear()}-${p(end.getMonth() + 1)}-${p(end.getDate())}`)}`,
+      // ⚠️ 不再拼「本周」两个字：本周 / 非本周由 .wk-tag 胶囊显示（2026-10-30 统一口径），
+      //    这里拼进去就会出现「非本周 11/02 – 11/06 本周」自相矛盾的双重标注。
+      weekText: `${md(weekStart)} – ${md(`${end.getFullYear()}-${p(end.getMonth() + 1)}-${p(end.getDate())}`)}`,
     });
 
     if (!this.data.isManager) {

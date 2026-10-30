@@ -1,0 +1,88 @@
+<!-- pages-partner/leave/leave.wxml · v1（2026-10-28 请假）
+     事实源：partner-hub/app.html V.leave（站员申请）/ V['leave-approve']（社干批）。
+     一个页面按角色分支：
+       站员 —— 我的班次里挑一场 + 写事由 → 提交；下面是我这周的请假
+       社干 —— 待批队列，逐条批 / 驳（驳回必须写理由）
+     接口：GET /partner/leave/mine | /pending · POST /partner/leave · PUT /:id/review · DELETE /:id -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">{{isManager ? '请假审批' : '请假'}}</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <!-- 周切换（2026-10-30 统一）：左右文字链 + 中间「本周 / 非本周」胶囊 + 月日，
+         与值班时间代录、考勤、排班工作台四页同一套写法。 -->
+    <view class="wk-nav">
+      <text class="wk-b" bindtap="prevWeek">‹ 上一周</text>
+      <view class="wk-mid">
+        <text class="wk-tag {{isThisWeek ? 'on' : 'off'}}">{{isThisWeek ? '本周' : '非本周'}}</text>
+        <text class="wk-c">{{weekText || '加载中'}}</text>
+      </view>
+      <text class="wk-b r {{isThisWeek ? 'off' : ''}}" bindtap="nextWeek">下一周 ›</text>
+    </view>
+
+    <!-- ───────── 社干：待批 ───────── -->
+    <block wx:if="{{isManager}}">
+      <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
+      <view class="hint-note" wx:elif="{{pending.length === 0}}">没有待批的请假</view>
+      <view class="rows" wx:else>
+        <view class="row" wx:for="{{pending}}" wx:key="id">
+          <view class="r-main">
+            <view class="r-top">
+              <text class="r-name">{{item.personName}}</text>
+              <text class="tag warn">{{item.statusText}}</text>
+            </view>
+            <text class="r-note">{{item.dayText}} {{item.slot}}</text>
+            <text class="r-reason">事由：{{item.reason}}</text>
+            <text class="r-time">{{item.timeText}}</text>
+          </view>
+          <view class="r-act">
+            <button class="sm2" catchtap="onApprove" data-id="{{item.id}}">批准</button>
+            <button class="sm2 q" catchtap="onReject" data-id="{{item.id}}">驳回</button>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <!-- ───────── 站员：申请 + 我的 ───────── -->
+    <block wx:else>
+      <view class="card">
+        <view class="sec-h"><text class="sec-t">我要请假</text></view>
+        <view class="hint-note" wx:if="{{shifts.length === 0}}">这一周没有你的班次，没什么可请</view>
+        <view class="chips" wx:else>
+          <view class="chip {{pickKey === item.key ? 'on' : ''}}"
+                wx:for="{{shifts}}" wx:key="key"
+                data-key="{{item.key}}" bindtap="pickShift">{{item.label}}</view>
+        </view>
+        <textarea class="ta" wx:if="{{shifts.length}}" value="{{reason}}" bindinput="onReason"
+                  placeholder="写一下事由（社干批的时候要看的）" placeholder-class="ph"
+                  maxlength="200" auto-height show-confirm-bar="{{false}}" />
+        <button class="btn primary" wx:if="{{shifts.length}}" hover-class="pressed"
+                bindtap="onSubmit" disabled="{{submitting}}">提交申请</button>
+        <view class="note">本月已请 {{monthUsed}} 次。批完之后班表上那一格会空出来。</view>
+      </view>
+
+      <view class="sec-h2"><text class="sec-t">我这周的请假</text></view>
+      <view class="hint-note" wx:if="{{mine.length === 0}}">这一周没请过假</view>
+      <view class="rows" wx:else>
+        <view class="row" wx:for="{{mine}}" wx:key="id">
+          <view class="r-main">
+            <text class="r-note">{{item.dayText}} {{item.slot}}</text>
+            <text class="r-reason">{{item.reason}}</text>
+            <text class="r-reject" wx:if="{{item.rejectReason}}">驳回理由：{{item.rejectReason}}</text>
+          </view>
+          <view class="r-right">
+            <text class="tag {{item.tagCls}}">{{item.statusText}}</text>
+            <text class="r-cancel" wx:if="{{item.status === 0}}" catchtap="onCancel" data-id="{{item.id}}">撤回</text>
+          </view>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

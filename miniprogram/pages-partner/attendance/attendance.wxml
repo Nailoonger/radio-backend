@@ -18,10 +18,16 @@
   </view>
 
   <view class="body {{isManager ? 'with-bar' : ''}}">
+    <!-- 周切换（2026-10-30 统一）：左右两条文字链 + 中间「本周 / 非本周」胶囊 + 月日。
+         ⚠️ 与排班工作台、值班时间代录、请假三页**同一套写法**（.wk-nav / .wk-b / .wk-mid / .wk-tag / .wk-c），
+            改样式要四个页面一起改，别只改一个。 -->
     <view class="wk-nav">
       <text class="wk-b" bindtap="prevWeek">‹ 上一周</text>
-      <text class="wk-c">{{weekText}}</text>
-      <text class="wk-b {{isThisWeek ? 'off' : ''}}" bindtap="nextWeek">下一周 ›</text>
+      <view class="wk-mid">
+        <text class="wk-tag {{isThisWeek ? 'on' : 'off'}}">{{isThisWeek ? '本周' : '非本周'}}</text>
+        <text class="wk-c">{{weekText || '加载中'}}</text>
+      </view>
+      <text class="wk-b r {{isThisWeek ? 'off' : ''}}" bindtap="nextWeek">下一周 ›</text>
     </view>
 
     <!-- ───── 社干：日期方块 + 当日点名 ───── -->

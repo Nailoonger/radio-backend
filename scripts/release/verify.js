@@ -103,6 +103,8 @@ function verify(options = {}) {
   const miniFiles = sourceJsFiles(path.join(root, 'miniprogram'));
   if (!miniFiles.length) throw new Error('小程序源码缺失。');
   for (const file of miniFiles) node('小程序语法 ' + path.relative(root, file), ['--check', file]);
+  // 伙伴端「周切换」四页口径统一（2026-10-30 陛下要求）：结构/胶囊/配色/文案一起校验
+  node('伙伴端周切换一致性', [path.join(root, 'scripts/verify-partner-weeknav.js')]);
   if (scope === 'mini') return { scope, miniFiles: miniFiles.length };
 
   const revision = options.revision || env.RELEASE_REVISION;

@@ -27,11 +27,15 @@ Page({
   onUnload() { this._gone = true; this._request = (this._request || 0) + 1; },
   onPullDownRefresh() { return this.load().finally(() => wx.stopPullDownRefresh()); },
   goBack() { if (getCurrentPages().length > 1) wx.navigateBack(); else wx.reLaunch({ url: '/pages-partner/schedule/index/index' }); },
-  load() {
+  load(opts) {
     if (!this.data.ready) return Promise.resolve();
+    // silent = 后台悄悄重拉（发布/撤回之后对齐状态卡用），不把整页切回「正在加载……」
+    const silent = !!(opts && opts.silent);
     const request = (this._request || 0) + 1;
     this._request = request;
-    this.setData({ loading: true, loadError: '', checked: false, checkText: '', issues: [], missing: [], sheetOpen: false });
+    const patch = { loadError: '', checked: false, checkText: '', issues: [], missing: [], sheetOpen: false };
+    if (!silent) patch.loading = true;
+    this.setData(patch);
     // 已发布时段单独拉一份：空态句「时段已发布，可以生成草稿 / 值班时段还没发布」靠它
     const pubReq = adminRequest('/partner/slots/published', 'GET', {})
       .then((d) => ({ ready: !!d.ready, published: d.published || null }))
@@ -72,7 +76,7 @@ Page({
     if (!this._baseWeek && ws) this._baseWeek = ws;
     const isThis = !this._baseWeek || ws === this._baseWeek;
     // 状态条副句：原句照抄（原型 planning stBar 四态）
-    const stateSub = week.state === 'published' ? (isThis ? '站员已能看到本周班表' : '站员暂时看不到这一周')
+    const stateSub = week.state === 'published' ? (isThis ? '站员已能看到本周班表' : '站员也能看到这一周（正式版按周发布）')
       : week.state === 'draft' ? (sum.missing ? `还有 ${sum.missing} 个岗位空缺，补齐并校验后才能发布` : '已排齐，校验后可发布')
       : week.state === 'withdrawn' ? (this.data.isSuper ? '等待重新发布 · 历史版本在「发布与调整记录」里' : '等待重新发布')
       : (this._slotReady ? '时段已发布，可以生成草稿' : '值班时段还没发布');
@@ -151,13 +155,23 @@ Page({
     if (!check || !check.valid) return;
     const hasMissing = (check.missing || []).length > 0;
     wx.showModal({ title: hasMissing ? '确认保留缺岗并发布' : '发布本周班表', content: hasMissing ? `仍有 ${check.missing.length} 处缺岗。发布后伙伴能看到空缺位置，后续需补齐安排。` : '发布后全体伙伴将看到这一版正式安排，修改需由超管先撤回。', confirmText: '确认发布', success: (r) => {
-      if (r.confirm) this.mutate('/partner/schedule/publish', 'POST', { allowMissing: hasMissing, reason: hasMissing ? '已确认保留缺岗发布' : '检查通过，发布本周班表' }).then((result) => { if (result) wx.showToast({ title: '班表已发布', icon: 'success' }); });
+      if (r.confirm) this.mutate('/partner/schedule/publish', 'POST', { allowMissing: hasMissing, reason: hasMissing ? '已确认保留缺岗发布' : '检查通过，发布本周班表' }).then((result) => {
+        if (!result) return;
+        wx.showToast({ title: '班表已发布', icon: 'success' });
+        // ⚠️ 发布是「整周状态」变了：状态卡、值班时段行、可排时间汇总都要跟着变。
+        //    只 applyWeek 可能留下「大白卡还写草稿未发布」这种前后不一致（陛下 2026-10-30 报过）。
+        this.load({ silent: true });
+      });
     } });
   },
   onWithdraw() {
     if (!this.data.isSuper || this.data.busy || this.data.state !== 'published') return;
     wx.showModal({ title: '撤回并保留原安排', content: '伙伴端将显示「本周未发布」。所有人选保留为草稿，可在原基础修改后重新发布；旧版本保留记录。', confirmText: '撤回修改', success: (r) => {
-      if (r.confirm) this.mutate('/partner/schedule/withdraw', 'POST', { reason: '撤回正式班表，在原安排基础修改' }).then((result) => { if (result) wx.showToast({ title: '已转为修改草稿', icon: 'success' }); });
+      if (r.confirm) this.mutate('/partner/schedule/withdraw', 'POST', { reason: '撤回正式班表，在原安排基础修改' }).then((result) => {
+        if (!result) return;
+        wx.showToast({ title: '已转为修改草稿', icon: 'success' });
+        this.load({ silent: true });   // 同上：状态卡与整页其它提示一起对齐
+      });
     } });
   },
   onClear() {

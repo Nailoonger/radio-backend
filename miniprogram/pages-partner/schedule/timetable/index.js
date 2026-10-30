@@ -5,6 +5,8 @@ Component({
     visiblePeople: { type: Boolean, value: true }, editable: Boolean,
     // 已发布时段（班表未生成时用它铺整周空表）；工作台恒显示「固定」图例
     slots: { type: Array, value: [] }, showFixed: { type: Boolean, value: false },
+    // 标题的「本周 / 该周」：工作台能翻周，恒写「本周」会误导（2026-10-30）
+    isThisWeek: { type: Boolean, value: true },
   },
   data: { cols: [], singles: [], matrix: [], range: '', weekLabel: '' },
   observers: { 'week,myId,visiblePeople,slots': function (week, myId, visiblePeople, slots) {
