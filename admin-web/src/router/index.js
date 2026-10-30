@@ -27,16 +27,14 @@ const routes = [
       { path: 'staff', name: 'Staff', component: () => import('@/views/Staff.vue'), meta: { title: '风采展示 - 部门人员', superAdmin: true } },
       { path: 'switch', name: 'Switch', component: () => import('@/views/Switch.vue'), meta: { title: '模块开关', superAdmin: true } },
       { path: 'account', name: 'Account', component: () => import('@/views/Account.vue'), meta: { title: '账号管理', superAdmin: true } },
-      // ── 伙伴端管理（2026-10-29）：与小程序伙伴端共用 /partner/*，仅超管 + 社干可见 ──
-      { path: 'partner/accounts', name: 'PartnerAccounts', component: () => import('@/views/PartnerAccounts.vue'), meta: { title: '伙伴账号' } },
-      { path: 'partner/slots', name: 'PartnerSlots', component: () => import('@/views/PartnerSlots.vue'), meta: { title: '值班时段' } },
-      { path: 'partner/rules', name: 'PartnerRules', component: () => import('@/views/PartnerRules.vue'), meta: { title: '排班规则' } },
-      { path: 'partner/schedule', name: 'PartnerSchedule', component: () => import('@/views/PartnerSchedule.vue'), meta: { title: '班表' } },
-      { path: 'partner/availability', name: 'PartnerAvailability', component: () => import('@/views/PartnerAvailability.vue'), meta: { title: '可排时间' } },
-      { path: 'partner/leave', name: 'PartnerLeave', component: () => import('@/views/PartnerLeave.vue'), meta: { title: '请假审批' } },
-      { path: 'partner/attendance', name: 'PartnerAttendance', component: () => import('@/views/PartnerAttendance.vue'), meta: { title: '考勤' } },
-      { path: 'partner/drafts', name: 'PartnerDrafts', component: () => import('@/views/PartnerDrafts.vue'), meta: { title: '站内稿件' } },
-      { path: 'partner/feedback', name: 'PartnerFeedback', component: () => import('@/views/PartnerFeedback.vue'), meta: { title: '互评' } },
+      /**
+       * ⚠️ 伙伴端那组路由（/partner/*，9 条）已摘掉 —— 2026-10-31 陛下明确要求
+       *    「管理端 web 的伙伴端先删掉，我还没喊你做」。
+       *
+       * 这里只摘路由、**不删文件**（Partner*.vue 全在 src/views/ 里原样保留），
+       * 与小程管端退役时同一处置口径：拿掉入口，不销毁成果。
+       * 要恢复就把这 9 行加回来，页面本身一行都不用改。
+       */
       { path: 'setting', name: 'Setting', component: () => import('@/views/Setting.vue'), meta: { title: '系统设置', superAdmin: true } },
     ],
   },
