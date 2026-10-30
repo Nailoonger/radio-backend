@@ -125,9 +125,9 @@ function pick(path, params) {
   if (p === '/admin/admin/list') {
     const list = [
       { id: 1, username: 'chenlaoshi', nickname: '陈老师', role: 0, status: 1, lastLoginAt: new Date('2026-10-30T08:12:00'), createTime: new Date('2026-02-10T09:00:00'), userId: null, department: '指导教师', dutyRoles: [] },
-      { id: 2, username: 'suwan', nickname: '苏晚笛', role: 0, status: 1, lastLoginAt: new Date('2026-10-29T19:40:00'), createTime: new Date('2026-03-02T09:00:00'), userId: null, department: '', dutyRoles: [] },
-      { id: 3, username: 'zhouyuan', nickname: '周予安', role: 1, status: 1, lastLoginAt: new Date('2026-10-28T12:05:00'), createTime: new Date('2026-09-01T09:00:00'), userId: null, department: '播音部', dutyRoles: ['播音'] },
-      { id: 4, username: 'xutingbai', nickname: '许听白', role: 1, status: 1, lastLoginAt: new Date('2026-10-27T16:20:00'), createTime: new Date('2026-09-01T09:00:00'), userId: null, department: '主持部', dutyRoles: ['主持'] },
+      { id: 2, username: '20240105', nickname: '苏晚笛', role: 0, status: 1, lastLoginAt: new Date('2026-10-29T19:40:00'), createTime: new Date('2026-03-02T09:00:00'), userId: 105, department: '', dutyRoles: [] },
+      { id: 3, username: '20250110', nickname: '周予安', role: 1, status: 1, lastLoginAt: new Date('2026-10-28T12:05:00'), createTime: new Date('2026-09-01T09:00:00'), userId: 110, department: '播音部', dutyRoles: ['播音'] },
+      { id: 4, username: '20250111', nickname: '许听白', role: 1, status: 1, lastLoginAt: new Date('2026-10-27T16:20:00'), createTime: new Date('2026-09-01T09:00:00'), userId: 111, department: '主持部', dutyRoles: ['主持'] },
       { id: 5, username: '20240201', nickname: '沈方', role: 2, status: 1, lastLoginAt: new Date('2026-10-29T12:30:00'), createTime: new Date('2026-09-12T09:00:00'), userId: 201, department: '播音部', dutyRoles: ['播音'] },
       { id: 6, username: '20240202', nickname: '江砚', role: 2, status: 1, lastLoginAt: new Date('2026-10-28T18:10:00'), createTime: new Date('2026-09-12T09:00:00'), userId: 202, department: '编辑部', dutyRoles: ['编辑'] },
       { id: 7, username: '20240203', nickname: '温以宁', role: 2, status: 1, lastLoginAt: null, createTime: new Date('2026-10-26T09:00:00'), userId: 203, department: '', dutyRoles: [] },
@@ -273,10 +273,11 @@ function pick(path, params) {
   }
 
   if (p === '/partner/accounts/candidates') {
+    // hasPwd = 这个学生有没有设过密码（决定弹窗里显示「用他自己的密码」还是初始密码 user+学号）
     return { list: [
-      { userId: 101, name: '顾南乔', username: '20240101', grade: '高一(3)班' },
-      { userId: 102, name: '温言', username: '20240102', grade: '高一(5)班' },
-      { userId: 103, name: '叶知秋', username: '20240103', grade: '高二(1)班' },
+      { userId: 101, name: '顾南乔', username: '20240101', grade: '高一(3)班', hasPwd: true },
+      { userId: 102, name: '温言', username: '20240102', grade: '高一(5)班', hasPwd: true },
+      { userId: 103, name: '叶知秋', username: '20240103', grade: '高二(1)班', hasPwd: false },
     ] };
   }
 
@@ -299,17 +300,22 @@ async function call(method, url, a, b) {
       return { marked: 1, days: pick('/partner/attendance/week', {}).days };
     }
     if (p.indexOf('/partner/availability') === 0) return { removed: 1 };
-    // 账号管理 › 新增站员：预览壳里也走通，好让人看到建完的回报文案
+    // 账号管理 › 新增账号（超管 / 社干 / 站员 都走这条）：预览壳里也走通，好看到回报文案
     if (p === '/partner/accounts/import') {
       const ids = (a && Array.isArray(a.userIds)) ? a.userIds : [];
+      const role = [0, 1, 2].includes(Number(a && a.role)) ? Number(a.role) : 2;
       const pool = (pick('/partner/accounts/candidates', {}) || {}).list || [];
       const created = pool.filter((c) => ids.indexOf(c.userId) >= 0)
-        .map((c, i) => ({ id: 900 + i, userId: c.userId, username: c.username, name: c.name, role: 2 }));
+        .map((c, i) => ({
+          id: 900 + i, userId: c.userId, username: c.username, name: c.name, role,
+          // 学生没设过密码 → 后端会落初始密码并回传，界面要显示出来
+          initPassword: c.hasPwd ? '' : `user${c.username}`,
+        }));
       return {
         created,
         skipped: [],
         createdCount: created.length,
-        passwordRule: '初始密码 = user + 学号（首次登录会引导改密）',
+        passwordRule: '用他自己的学生密码（一个学号一份密码，两个入口）',
         by: '预览',
       };
     }

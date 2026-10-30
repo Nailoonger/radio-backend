@@ -3,39 +3,32 @@
 /**
  * 伙伴端 · 账号管理（超管）
  *
- *   GET  /partner/accounts/candidates?kw=   学生名册里**还没进伙伴端**的人
- *   POST /partner/accounts/import           批量拉人进伙伴端（建 admin 行 role=2）
+ *   GET  /partner/accounts/candidates?kw=   学生名册里**还没进后台**的人
+ *   POST /partner/accounts/import           批量从名册建号（role=0 超管 / 1 社干 / 2 站员）
  *
  * ═══════════ 为什么要有这个 ═══════════
- *   站员在 `user` 表（学号登录），伙伴端的排班/请假/考勤/互评却都按 `admin.id` 记 personId。
- *   两边没有桥 ⇒ 站员根本进不来，member 那 12 屏在真机上看不到。
- *   这里补的就是那座桥：从学生档案里挑人，在 admin 表建一行 `role=2`（站员），
+ *   人在 `user` 表（学号登录），伙伴端的排班/请假/考勤/互评却都按 `admin.id` 记 personId。
+ *   两边没有桥 ⇒ 人根本进不来，member 那 12 屏在真机上看不到。
+ *   这里补的就是那座桥：从学生档案里挑人，在 admin 表建一行，
  *   并用 `admin.userId` 指回 `user.id` —— 人的身份只有一份（user），伙伴身份是它的第二角色。
  *
- * ═══════════ 为什么不用「把学号填进 admin.username」手动建 ═══════════
- *   能建，但容易建重、容易打错学号、也看不出这人是不是还在读。
- *   走这条通道：学号从 user 表取（不会错）、已进伙伴端的会被排除（不会重）、
- *   姓名一次带过来（不用再问）。
+ * ═══════════ 三档都从名册来（2026-10-31 第二版口径）═══════════
+ *   超管 / 社干 / 站员只是**权限不同**，不是三种人。所以三个角色都从这里建，
+ *   账号 = 学号、密码 = 学生自己那份 ⇒「一个账号登录两端」成立。
+ *   手打工号那条线已经撇下（陛下原话），别再往回加。
  *
  * ═══════════ 初始密码 ═══════════
- *   与学生账号同一口径：`user` + 学号（`studentAccountService.initPasswordFor` 的唯一出口，
- *   云函数侧这里直接算，cost 8 保性能）。首次登录由登录页引导改密。
+ *   与学生账号同一口径：`user` + 学号。首次登录由登录页引导改密。
+ *   实现在 `services/adminAccount.createFromStudent()`，本文件不再自己算。
  */
 
-const bcrypt = require('bcryptjs');
-const { C, findOne, findMany, insertOne, findAllPaged, reserveUnique, updateById } = require('../../lib/db');
+const { C, findAllPaged } = require('../../lib/db');
 const { ApiError, Codes } = require('../../lib/response');
 const { asSuperPartner } = require('./_kit');
-const { nextId } = require('../../lib/db');
+/** 建号唯一实现（超管/社干/站员三档同一套），见 services/adminAccount 头注 */
+const appAccount = require('../../services/adminAccount');
 
-const BCRYPT_COST = 8;      // 初始密码用 8；用户改密后由改密接口升到 10
-
-/** 初始密码 = user + 学号（唯一口径，别在这里改规则） */
-function initPasswordFor(username) {
-  return `user${String(username || '').trim()}`;
-}
-
-/** GET /partner/accounts/candidates?kw= —— 学生名册里还没进伙伴端的人 */
+/** GET /partner/accounts/candidates?kw= —— 学生名册里还没进后台的人 */
 async function candidates(ctx) {
   await asSuperPartner(ctx);
   const q = ctx.query || {};
@@ -63,6 +56,11 @@ async function candidates(ctx) {
       grade: u.grade || '',
       className: u.className || u.class_name || '',
       status: Number(u.status) === 0 ? 0 : 1,
+      /**
+       * 是否已有密码 —— 界面据此决定「密码 = 他自己的学生密码」还是
+       * 「会给他落初始密码 user+学号」。**只回布尔，绝不回哈希**。
+       */
+      hasPwd: Boolean(u.password),
     }));
 
   if (kw) {
@@ -74,8 +72,13 @@ async function candidates(ctx) {
 }
 
 /**
- * POST /partner/accounts/import  body: { userIds: [1,2,3], role?: 2 }
- * 批量建伙伴账号（默认 role=2 站员）。已存在的跳过并回报，不整体失败。
+ * POST /partner/accounts/import  body: { userIds: [1,2,3], role?: 0|1|2 }
+ * 批量建后台账号（默认 role=2 站员）。已存在的跳过并回报，不整体失败。
+ *
+ * ⚠️ 2026-10-31 第二版口径：超管(0) / 社干(1) / 站员(2) **三档都走这里**，
+ *    与 `POST /admin/admin/create` 共用 `services/adminAccount.createFromStudent()`，
+ *    字段口径只有一份。原来写在本函数里的建号细节全部搬进那个服务了 ——
+ *    改规则请改服务，别在这里补第二份。
  */
 async function importAccounts(ctx) {
   const p = await asSuperPartner(ctx);
@@ -87,72 +90,31 @@ async function importAccounts(ctx) {
 
   const created = [];
   const skipped = [];
-  const now = new Date();
 
   for (const uid of ids) {
-    const user = await findOne(C.USER, { id: uid });
-    if (!user || !user.username) {
-      skipped.push({ userId: uid, reason: '学生档案不存在' });
-      continue;
+    try {
+      const r = await appAccount.createFromStudent({ userId: uid, role });
+      created.push({
+        id: r.id,
+        userId: r.userId,
+        username: r.username,
+        name: r.name,
+        role: r.role,
+        // 非空 = 刚给他落了初始密码（学生档案原本没有密码），界面要显示
+        initPassword: r.initPlain || '',
+      });
+    } catch (e) {
+      // 单人失败不影响整批：按 skipped 回报，前端逐条提示
+      skipped.push({ userId: uid, reason: (e && e.message) || '建号失败' });
     }
-    const username = String(user.username);
-    const dup = await findOne(C.ADMIN, { username });
-    if (dup) {
-      skipped.push({ userId: uid, username, reason: '这个学号已经是伙伴账号' });
-      continue;
-    }
-
-    const id = await nextId(C.ADMIN);
-    const got = await reserveUnique('admin', username, id);
-    if (!got) {
-      skipped.push({ userId: uid, username, reason: '学号被占用（并发）' });
-      continue;
-    }
-    const plain = initPasswordFor(username);
-
-    /**
-     * ── 密码口径（2026-10-31 账号密码统一）──
-     *
-     * 站员的密码**就是他自己的学生密码**，不再单独生成一份。
-     * 事实源是 `user.password`，登录时由 /admin/login 去 user 表比对 ——
-     * 学生在学生端改一次密码，伙伴端立刻同密码，不用同步任何东西。
-     *
-     * ⚠️ admin.password 仍然写，但它只是**镜像**（MySQL 那边是 NOT NULL，必须落值），
-     *    登录不读它。回滚时它就在那儿。
-     * ⚠️ 学生档案还没有密码的情况（老微信用户 / 建号后从没登录过）：
-     *    必须先给他落一个初始密码，否则这个站员建出来永远登不进去。
-     */
-    let pwdHash = user.password || null;
-    if (!pwdHash) {
-      pwdHash = await bcrypt.hash(plain, BCRYPT_COST);
-      await updateById(C.USER, user._id, { password: pwdHash, pwdChangedAt: null, updateTime: now });
-    }
-
-    await insertOne(C.ADMIN, {
-      id,
-      username,
-      password: pwdHash,
-      nickname: user.name || user.nickname || username,
-      role,
-      userId: Number(user.id),
-      department: '',
-      dutyRoles: [],
-      status: 1,
-      lastLoginAt: null,
-      // 标记初始密码，登录页可以据此引导改密
-      initPwd: true,
-      createTime: now,
-      updateTime: now,
-    });
-    created.push({ id, userId: uid, username, name: user.name || username, role });
   }
 
   return {
     created,
     skipped,
     createdCount: created.length,
-    // ⚠️ 不在这里回明文密码：站员用的就是他自己的学生密码，界面直接讲这个规则即可
-    passwordRule: '站员用他自己的学生密码（一个学号一份密码，两个入口）',
+    // ⚠️ 不在这里回明文密码：账号用的就是他自己的学生密码，界面直接讲这个规则即可
+    passwordRule: '用他自己的学生密码（一个学号一份密码，两个入口）',
     by: (p.admin && (p.admin.nickname || p.admin.username)) || '',
   };
 }

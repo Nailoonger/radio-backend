@@ -46,46 +46,35 @@ exports.list = async (req, res, next) => {
 
 exports.create = async (req, res, next) => {
   try {
-    const { username, password, nickname, role } = req.body || {};
-    if (!username || !password) {
-      throw new ApiError(Codes.PARAM_ERROR, '请输入用户名和密码');
-    }
-    if (password.length < 6) {
-      throw new ApiError(Codes.PARAM_ERROR, '密码长度不能少于6位');
-    }
-    if (![0, 1].includes(role)) {
-      throw new ApiError(Codes.PARAM_ERROR, '角色必须为0或1');
-    }
-    const exists = await Admin.findOne({ where: { username } });
-    if (exists) throw new ApiError(Codes.CONFLICT, '用户名已存在');
+    const { userId, role, nickname } = req.body || {};
 
     /**
-     * 账号密码统一（2026-10-31）：密码唯一事实源是 user.password，
-     * 所以建后台账号必须先建一条 user 行（kind=teacher，工号当 username）。
-     * 不建的话这个人建出来就登不进去 —— 登录会去找 user 记录。
+     * ── 2026-10-31 第二版口径（陛下定）──
+     *   超管 / 社干 / 站员 **三档一律从学生名册选人建号**，不再接受手打的工号 + 密码。
+     *   账号 = 学号、密码 = 学生自己那份 ⇒「一个账号登录两端」才成立。
+     *   ⚠️ 老的 `{username, password}` 形态故意报错、不静默忽略 ——
+     *      否则前端以为建成了，实际建了一条没人认识的账号。
+     *   实现在 `services/accountPasswordService.createAdminFromStudent()`，
+     *   与云端 `services/adminAccount.createFromStudent()` 逐函数对齐。
      */
-    const user = await account.createUserForAdmin({
-      username,
-      plainPassword: password,
-      nickname,
-      kind: account.KIND_TEACHER,
-    });
+    const uid = Number(userId) || 0;
+    if (!uid) {
+      throw new ApiError(Codes.PARAM_ERROR,
+        '超管 / 社干 / 站员都要从学生名册选人（传 userId），不再支持手打账号密码');
+    }
+    if (![0, 1, 2].includes(Number(role))) {
+      throw new ApiError(Codes.PARAM_ERROR, '角色必须为 0(超管) / 1(社干) / 2(站员)');
+    }
 
-    // admin.password 仍然写（NOT NULL + 回滚用），但登录不再读它
-    const hash = await bcrypt.hash(password, 10);
-    const admin = await Admin.create({
-      username,
-      password: hash,
-      nickname: nickname || username,
-      role,
-      status: 1,
-      userId: user.id,
-    });
+    const r = await account.createAdminFromStudent({ userId: uid, role, nickname });
     return success(res, {
-      id: admin.id,
-      username: admin.username,
-      nickname: admin.nickname,
-      role: admin.role,
+      id: r.admin.id,
+      username: r.admin.username,
+      nickname: r.admin.nickname,
+      role: r.admin.role,
+      userId: r.admin.userId,
+      // 空 = 用的是学生自己的密码；非空 = 刚给他落的初始密码，界面必须显示出来
+      initPassword: r.initPlain || '',
     }, '创建成功');
   } catch (e) {
     return next(e);

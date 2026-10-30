@@ -14,10 +14,12 @@
  */
 
 const bcrypt = require('bcryptjs');
-const { C, _, findOne, findAllPaged, insertOne, updateById, removeWhere, count, nextId, parseId, reserveUnique, releaseUnique } = require('../../lib/db');
+const { C, _, findOne, findAllPaged, updateById, removeWhere, count, parseId, reserveUnique, releaseUnique } = require('../../lib/db');
 const { ApiError, Codes } = require('../../lib/response');
 const { asSuper, pager, pick, pagedList } = require('./_kit');
 const account = require('../../services/accountPassword');
+/** 建号唯一实现（超管/社干/站员都从学生名册来），见 services/adminAccount 头注 */
+const appAccount = require('../../services/adminAccount');
 
 /** 初始口令的 bcrypt 成本（与 partner/accounts.import 同口径，见 resetPasswordBatch 注释） */
 const BCRYPT_COST = 8;
@@ -42,108 +44,49 @@ async function list(ctx) {
   return { ...r, list: r.list.map((x) => pick(x, LIST_FIELDS)) };
 }
 
-/** POST /admin/admin/create   body: { username, password, nickname, role, userId? } */
+/**
+ * POST /admin/admin/create   body: { userId, role, nickname? }
+ *
+ * ── 2026-10-31 第二版口径（陛下定）──
+ *   **超管 / 社干 / 站员 三档一律从学生名册选人建号**，不再接受手打的工号 + 密码。
+ *   理由：① 三档都是同一个人，账号就该是学号，密码就该是学生自己那份 →
+ *        「一个账号登录两端」才成立；② 手打会打错学号、会建重、会落一个查不到人的野账号。
+ *
+ *   ⇒ 真正的实现只有一处：`services/adminAccount.createFromStudent()`。
+ *     本接口和伙伴端的「批量拉人」(partner/accounts.import) 都调它，字段口径不可能分叉。
+ *
+ *   ⚠️ 老接口形态 `{username, password}` 不再可用 —— 这里**故意报错而不是静默忽略**，
+ *      否则前端还以为建成了，实际建了一条没人认识的账号。
+ */
 async function create(ctx) {
   asSuper(ctx);
   const body = ctx.body || {};
-  const { username, password, nickname } = body;
-  const roleNum = Number(body.role);
 
-  if (!username || !password) {
-    throw new ApiError(Codes.PARAM_ERROR, '请输入用户名和密码');
+  const userId = Number(body.userId) || 0;
+  if (!userId) {
+    throw new ApiError(Codes.PARAM_ERROR,
+      '超管 / 社干 / 站员都要从学生名册选人（传 userId），不再支持手打账号密码');
   }
-  if (String(password).length < 6) {
-    throw new ApiError(Codes.PARAM_ERROR, '密码长度不能少于6位');
-  }
-  // 角色：0 超管 / 1 社干 / 2 站员（伙伴端站员）
-  if (![0, 1, 2].includes(roleNum)) {
+  const roleNum = Number(body.role);
+  if (!appAccount.ROLES.includes(roleNum)) {
     throw new ApiError(Codes.PARAM_ERROR, '角色必须为 0(超管) / 1(社干) / 2(站员)');
   }
 
-  const exists = await findOne(C.ADMIN, { username });
-  if (exists) throw new ApiError(Codes.CONFLICT, '用户名已存在');
-
-  const now = new Date();
-  const id = await nextId(C.ADMIN);
-  // 唯一索引等价物（并发下 findOne 可能双双落空，这一步才是真兜底）。
-  // ⚠️ scope 必须用 'admin'（= 映射文档 §三 的 `admin:` 前缀），不要另起名字。
-  const got = await reserveUnique('admin', username, id);
-  if (!got) throw new ApiError(Codes.CONFLICT, '用户名已存在');
-
-  /**
-   * ── 账号密码统一（2026-10-31）──
-   * 密码的唯一事实源是 user.password。所以建后台账号这一步必须连带处理 user 行：
-   *
-   *   · 超管 / 社干（老师）：**先建一条 user 行**（kind=teacher，工号当 username），
-   *     admin.userId 指向它。不建的话这个人建出来就登不进去 ——
-   *     登录会去找 user 记录，找不到才退回旧字段校验，而旧字段马上就不再是事实源了。
-   *
-   *   · 站员（role=2）：**必须已经有学生档案**，不接受手打建号。
-   *     手建出来的站员 `userId` 为空，排班 / 请假 / 考勤都查不到这个人。
-   *     正规通道是「账号管理 › 新增站员」（走 POST /partner/accounts/import）。
-   */
-  let userId = Number(body.userId) || null;
-  let createdUserId = null;
-  try {
-    if (roleNum === 2) {
-      if (!userId) {
-        throw new ApiError(Codes.PARAM_ERROR, '站员请从学生名册导入（账号管理 › 新增站员）');
-      }
-      const u = await findOne(C.USER, { id: userId });
-      if (!u) throw new ApiError(Codes.NOT_FOUND, '关联的学生档案不存在');
-    } else {
-      const u = await account.createUserForAdmin({
-        username,
-        plainPassword: password,
-        nickname,
-        kind: account.KIND_TEACHER,
-      });
-      userId = Number(u.id);
-      createdUserId = Number(u.id);
-    }
-  } catch (e) {
-    // 建 user 失败就把刚抢到的 admin 唯一键放掉，否则这个用户名从此建不了号
-    await releaseUnique('admin', username);
-    throw e;
-  }
-
-  const doc = {
-    id,
-    username,
-    /**
-     * ⚠️ admin.password 仍然写入，但**登录不再读它**（事实源已改为 user.password）。
-     *    保留写入的理由有两条，都很实际：
-     *      ① MySQL 的 admin.password 是 NOT NULL，写 null 直接报错；
-     *      ② 万一要回滚登录逻辑，旧密码还在，不用让所有人重设密码。
-     */
-    password: await bcrypt.hash(String(password), 10),
-    nickname: nickname || username,
-    role: roleNum,
-    // ⚠️ userId 指向 user 表（学生档案）。排班/请假/考勤/互评的 personId 一律用 **admin.id**，
-    //    所以这里挂 userId 只是"认得出这是谁"，不改任何 duty 数据的键。
+  const r = await appAccount.createFromStudent({
     userId,
-    department: String(body.department || ''),
-    dutyRoles: Array.isArray(body.dutyRoles) ? body.dutyRoles : [],
-    status: 1,
-    lastLoginAt: null,
-    createTime: now,
-    updateTime: now,
+    role: roleNum,
+    nickname: body.nickname,
+  });
+
+  return {
+    id: r.id,
+    username: r.username,
+    nickname: body.nickname || r.name,
+    role: r.role,
+    userId: r.userId,
+    // 空 = 用的是学生自己的密码；非空 = 刚给他落的初始密码，界面必须显示出来
+    initPassword: r.initPlain || '',
   };
-
-  try {
-    await insertOne(C.ADMIN, doc);
-  } catch (e) {
-    await releaseUnique('admin', username);
-    if (createdUserId) {
-      try {
-        await removeWhere(C.USER, { id: createdUserId });
-        await releaseUnique('user_name', username);
-      } catch (_) { /* 回滚 user 行失败不掩盖原始错误 */ }
-    }
-    throw e;
-  }
-
-  return { id: doc.id, username: doc.username, nickname: doc.nickname, role: doc.role };
 }
 
 /** PUT /admin/admin/:id   body: { nickname?, status?, role?, password? } */
@@ -291,11 +234,33 @@ async function resetPasswordBatch(ctx) {
 
   for (const a of hits) {
     const plain = `user${String(a.username).trim()}`;
+    const hashed = await bcrypt.hash(plain, BCRYPT_COST);
     await updateById(C.ADMIN, a._id, {
-      password: await bcrypt.hash(plain, BCRYPT_COST),
+      password: hashed,
       initPwd: true,
       updateTime: now,
     });
+    /**
+     * ⚠️ 账号统一之后**必须同时写 user.password**，否则这个接口是空转的：
+     *    登录只读 user.password，只改 admin.password 等于「重置了但密码没变」，
+     *    而且不报错 —— 这是最难查的一类 bug。
+     * ⚠️ 同时升 pwdChangedAt：被重置的人三端的旧 token 下次请求直接 40101。
+     *    批量重置本来就是为了「把他的号收回来」，踢下线是目的不是副作用。
+     */
+    const target = await account.findUserOfAdmin(a);
+    if (target) {
+      await updateById(C.USER, target._id, { password: hashed, pwdChangedAt: now, updateTime: now });
+      try { await require('../../services/studentAccount').invalidate(target.username); }
+      catch (e) { /* 清缓存失败不影响重置结果，入口直查会兜住 */ }
+    } else {
+      // 存量老师没有 user 行：顺手补建一条，否则重置在他身上同样不生效
+      const made = await account.ensureTeacherProfile(a);
+      if (made) {
+        await updateById(C.USER, made._id, { password: hashed, pwdChangedAt: now, updateTime: now });
+        try { await require('../../services/studentAccount').invalidate(made.username); }
+        catch (e) { /* 同上 */ }
+      }
+    }
     done.push({ id: a.id, username: a.username, name: a.nickname || a.username });
   }
 

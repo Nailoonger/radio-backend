@@ -16,12 +16,11 @@
         >
           <template #prefix><IconSearch :size="15" /></template>
         </el-input>
-        <el-button type="primary" @click="openEdit()">
-          <IconUserPlus :size="15" class="btn-icon" />新建账号
-        </el-button>
-        <!-- 站员是「学生身份的第二角色」，必须从学生名册选人——学号不能手打 -->
-        <el-button @click="openMember">
-          <IconUsers :size="15" class="btn-icon" />新增站员
+        <!-- 新建账号只有一个入口：从学生名册选人（超管 / 社干 / 站员 三档同一套逻辑）
+             ⚠️ 2026-10-31 第二版：手打账号密码那条线已撤掉 ——
+                账号就是学号、密码就是学生自己那份，这样才「一个账号登录两端」。 -->
+        <el-button type="primary" @click="openMember">
+          <IconUserPlus :size="15" class="btn-icon" />新增账号
         </el-button>
       </div>
     </div>
@@ -105,7 +104,7 @@
         </el-table-column>
 
         <template #empty>
-          <EmptyState variant="content" title="暂无账号" description="点击右上角「新建账号」创建第一个管理员" />
+          <EmptyState variant="content" title="暂无账号" description="点击右上角「新增账号」从学生名册选人" />
         </template>
       </el-table>
     </div>
@@ -118,7 +117,7 @@
       </div>
       <div class="micro explain-body">
         超级管理员可见「系统管理」整组菜单（学生账号、风采展示、模块开关、账号管理、系统设置）；<br>
-        普通管理员仅可见「内容运营」组（数据概览、投稿审核、栏目管理、公告管理、留言审核）。<br>
+        社干仅可见「内容运营」组（数据概览、投稿审核、栏目管理、公告管理、留言审核）。<br>
         超管账号有自保护逻辑——<b>不能删除自己</b>，系统也会确保至少保留一位超管。
       </div>
     </div>
@@ -132,7 +131,7 @@
       <div class="micro explain-body">
         <b>① 头像机制（不需要后端）：</b>表格里那个「林 / 苏 / 周」圆圈，取的是
         <code>nickname || username</code> 的<b>第一个字</b>，放进 32px 圆形里，底色只用两种——
-        超管墨黑实底、普通管理员羊皮纸底，靠底色区分层级。<b>纯 CSS 渲染，无图片请求，不占后端字段</b>；
+        超管墨黑实底、社干羊皮纸底，靠底色区分层级。<b>纯 CSS 渲染，无图片请求，不占后端字段</b>；
         复姓或首字符是英文时只显示该字符，不会撑破圆形。<br>
         <b>② 「待激活」状态当前由前端派生：</b><code>admin.status</code> 只有 0 禁用 / 1 启用，
         暂无第三种值。这里用 <code>lastLoginAt == null</code> 渲染「待激活」标签——
@@ -142,23 +141,36 @@
         <b>④ 想看真实头像需三处一起改：</b><code>admin</code> 表加 <code>avatar</code> 字段 → 挂载
         <code>POST /admin/upload/avatar</code> 路由（控制器/multer 已写好但未挂）→ <code>admin/list</code> 返回该字段。
         本版不做——超管自己管自己，几乎没有头像需求。<br>
-        <b>⑤ 站员为什么不能在这里手建：</b>站员是「学生身份的第二角色」，
-        真正的身份在 <code>user</code> 表（学号登录）。手打账号会得到一行
-        <code>admin.role=2</code> 但 <code>userId</code> 为空的记录 ——
-        排班、请假、考勤查不到这个人。所以站员统一走右上角「新增站员」：
-        从名册选人 → 学号取自 <code>user</code> → <code>admin.userId</code> 回指档案
-        （接口 <code>POST /partner/accounts/import</code>，后端早已就位，本页只是把入口搬过来）。
+        <b>⑤ 为什么三档都只能从名册选人：</b>超管、社干、站员只是<b>权限不同</b>，
+        不是三种人 —— 真正的身份都在 <code>user</code> 表（学号登录）。
+        手打账号会得到一行 <code>userId</code> 为空的记录，排班、请假、考勤查不到这个人；
+        更麻烦的是密码会和学生的对不上，"一个账号登录两端"就不成立了。
+        所以统一走右上角「<b>新增账号</b>」：从名册选人 → 学号取自 <code>user</code> →
+        <code>admin.userId</code> 回指档案 → 密码就是学生自己那份
+        （接口 <code>POST /partner/accounts/import</code>）。
       </div>
     </div>
 
-    <!-- ══════════ 新增站员（从学生名册选人，学号 / 档案 / 初始密码都由后端接好） ══════════ -->
+    <!-- ══════════ 新增账号（超管 / 社干 / 站员 都从学生名册选人） ══════════ -->
     <el-dialog
-      v-model="memberDialog" title="新增站员" width="560px"
+      v-model="memberDialog" title="新增账号" width="560px"
       :close-on-click-modal="false" @closed="resetMember"
     >
       <div class="pm-sub">
-        站员不能手打建号：从学生名册里选一个人，<b>学号自动取、档案挂得上</b>，
-        初始密码统一是 <code>user + 学号</code>，首次登录由伙伴端引导改密。
+        从学生名册里选一个人，<b>学号就是登录账号、密码就是他自己的学生密码</b>——
+        学生端和伙伴端用同一套凭据，不用记两份。<br>
+        学生还没设过密码的，这里给他落初始密码 <code>user + 学号</code>，首次登录会引导改密。
+      </div>
+
+      <!-- 三档角色：只决定「能做什么」，不决定「是谁」 -->
+      <div class="pm-role">
+        <div class="pm-role-lab">这个账号的身份</div>
+        <el-radio-group v-model="memberRole">
+          <el-radio :value="2">站员</el-radio>
+          <el-radio :value="1">社干</el-radio>
+          <el-radio :value="0">超级管理员</el-radio>
+        </el-radio-group>
+        <div class="micro pm-role-hint">{{ ROLE_HINT[memberRole] }}</div>
       </div>
 
       <el-input
@@ -182,14 +194,14 @@
           <span class="cand-cur" v-if="pickUserId === c.userId">已选</span>
         </div>
         <div class="cand-empty" v-if="!cands.length && !candLoading">
-          没有可加的人 —— 名册为空，或者这些人已经在伙伴端了。
+          没有可加的人 —— 名册为空，或者这些人已经有后台账号了。
         </div>
       </div>
 
       <div class="pm-foot-note" v-if="pickedCand">
-        <span>将建：<b>{{ pickedCand.name }}</b></span>
-        <span>学号 <code>{{ pickedCand.username }}</code></span>
-        <span>初始密码 <code>{{ initPwdOf(pickedCand.username) }}</code></span>
+        <span>将建：<b>{{ ROLE_LABEL[memberRole] }}</b></span>
+        <span>{{ pickedCand.name }} <code>{{ pickedCand.username }}</code></span>
+        <span>密码 <code>{{ pickedCand.hasPwd ? '他自己的学生密码' : initPwdOf(pickedCand.username) }}</code></span>
       </div>
 
       <template #footer>
@@ -200,39 +212,40 @@
       </template>
     </el-dialog>
 
-    <!-- ══════════ 编辑弹窗（新增 / 编辑共用） ══════════ -->
+    <!-- ══════════ 编辑弹窗（只用于编辑已有账号；新建统一走「新增账号」从名册选人） ══════════ -->
     <el-dialog
-      v-model="dialog" :title="form.id ? '编辑账号' : '新建账号'" width="480px"
+      v-model="dialog" title="编辑账号" width="480px"
       :close-on-click-modal="false"
     >
       <el-form :model="form" label-width="100px" :rules="rules" ref="formRef">
         <el-form-item label="账号" prop="username">
-          <el-input v-model="form.username" :disabled="!!form.id" placeholder="登录用户名" />
+          <el-input v-model="form.username" disabled placeholder="登录用户名" />
+          <div class="micro form-hint">
+            账号 = 学号，建号时就定死了，这里不能改。
+          </div>
         </el-form-item>
         <el-form-item label="昵称">
           <el-input v-model="form.nickname" placeholder="显示在管理后台与小程序里的名字" />
         </el-form-item>
-        <el-form-item :label="form.id ? '重置密码' : '密码'" :prop="form.id ? '' : 'password'">
+        <el-form-item label="重置密码">
           <el-input
             v-model="form.password" type="password" show-password
-            :placeholder="form.id ? '留空表示不修改' : '至少 6 位'"
+            placeholder="留空表示不修改"
           />
-          <div v-if="form.id" class="micro form-hint">
-            留空 = 不修改；填了就是新密码（至少 6 位）。注意：<b>改自己的密码需要旧密码</b>，
-            请在「我的资料」里操作。
+          <div class="micro form-hint">
+            留空 = 不修改；填了就是新密码（至少 6 位），学生端那边也同时生效。<br>
+            注意：<b>改自己的密码需要旧密码</b>，请在「我的资料」里操作。
           </div>
         </el-form-item>
         <!-- v8 屏 21：本人不能改自己的角色 / 状态（自保护） -->
         <el-form-item label="角色">
           <el-radio-group v-model="form.role" :disabled="isSelfEdit">
             <el-radio :value="0">超级管理员</el-radio>
-            <el-radio :value="1">普通管理员</el-radio>
-            <!-- 站员 = 学生身份的第二角色（伙伴端用），不进电脑端登录。
-                 新建时禁选：走这里建出来的站员没有 user 档案，学号也是手打的，会变成查不到人的野账号 -->
-            <el-radio :value="2" :disabled="!form.id">站员</el-radio>
+            <el-radio :value="1">社干</el-radio>
+            <el-radio :value="2">站员</el-radio>
           </el-radio-group>
-          <div v-if="!form.id" class="micro form-hint">
-            站员请用右上角「<b>新增站员</b>」—— 从学生名册选人，学号和档案才挂得上。
+          <div class="micro form-hint">
+            三档只是权限不同，人还是同一个人：账号是学号，密码是学生自己那份。
           </div>
         </el-form-item>
         <el-form-item label="状态">
@@ -259,7 +272,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import http from '@/utils/http';
 import dayjs from 'dayjs';
 import { useAuthStore } from '@/stores/auth';
-import { IconSearch, IconUserPlus, IconUsers } from '@/components/icons';
+import { IconSearch, IconUserPlus } from '@/components/icons';
 import EmptyState from '@/components/EmptyState.vue';
 import { setPageHeader, clearPageHeader } from '@/utils/pageHeader';
 
@@ -295,18 +308,18 @@ const counts = computed(() => {
 const roleSegs = computed(() => [
   { v: 'all',    label: '全部',     n: rows.value.length },
   { v: 'super',  label: '超管',     n: counts.value.super },
-  { v: 'normal', label: '普通管理员', n: counts.value.normal },
+  { v: 'normal', label: '社干', n: counts.value.normal },
   { v: 'member', label: '站员',     n: counts.value.member },
 ]);
 function setRole(v) { filter.role = v; }
 
-const ROLE_LABEL = { 0: '超级管理员', 1: '普通管理员', 2: '站员' };
+const ROLE_LABEL = { 0: '超级管理员', 1: '社干', 2: '站员' };
 function roleLabel(r) { return ROLE_LABEL[Number(r)] || '未知'; }
 
-/* ── 新增站员：从学生名册选人建号 ──
+/* ── 新增账号：从学生名册选人建号（超管 / 社干 / 站员 三档同一套） ──
    走 POST /partner/accounts/import（userIds 只传一个），因为云端那一版已经把该做的都做了：
-   学号从 user 表取（不会打错）、已在伙伴端的自动排除（不会建重）、
-   admin.userId 回指 student 档案（查得到是谁）、初始密码 user+学号 + initPwd 标记。
+   学号从 user 表取（不会打错）、已有后台账号的自动排除（不会建重）、
+   admin.userId 回指学生档案（查得到是谁）、密码复用学生自己那份。
    在这里自己拼 POST /admin/admin/create 反而会漏掉 userId，落一个查不到人的野账号。 */
 const memberDialog = ref(false);
 const memberSaving = ref(false);
@@ -314,16 +327,26 @@ const cands = ref([]);
 const candLoading = ref(false);
 const candKw = ref('');
 const pickUserId = ref(null);
+/** 这个账号的身份：2 站员 / 1 社干 / 0 超管。默认站员——误建超管代价最大，别给默认高权限 */
+const memberRole = ref(2);
 let candTimer = null;
+
+/** 三档角色各自意味着什么（只在弹窗里给人看，权限真闸在后端） */
+const ROLE_HINT = {
+  2: '站员：能看班表、填可排时间、请假、投稿互动，不能审稿批假。',
+  1: '社干：内容运营那一组菜单都能用（审稿、公告、留言、栏目、招新）。',
+  0: '超级管理员：多一整个「系统管理」组，能管账号、开关、系统设置。',
+};
 
 const pickedCand = computed(() => cands.value.find((c) => c.userId === pickUserId.value) || null);
 
-/** 初始密码口径：user + 学号（与云端 partner/accounts.js 一致，别在这里改规则） */
+/** 初始密码口径：user + 学号（与云端 services/adminAccount 一致，别在这里改规则） */
 function initPwdOf(no) { return 'user' + String(no || '').trim(); }
 
 function openMember() {
   pickUserId.value = null;
   candKw.value = '';
+  memberRole.value = 2;       // 每次打开都回到最小权限，不记住上次的选择
   memberDialog.value = true;
   loadCands();
 }
@@ -350,12 +373,15 @@ function onCandInput() {
   candTimer = setTimeout(loadCands, 220);
 }
 
+/** 建完之后切到对应的角色档，让人立刻看得见刚建的人 */
+const TAB_OF_ROLE = { 0: 'super', 1: 'normal', 2: 'member' };
+
 async function saveMember() {
   if (!pickUserId.value) return ElMessage.warning('请先选一个人');
   memberSaving.value = true;
   try {
     const r = await http.post('/partner/accounts/import', {
-      userIds: [pickUserId.value], role: 2,
+      userIds: [pickUserId.value], role: memberRole.value,
     });
     const ok = (r?.created || [])[0];
     const bad = (r?.skipped || [])[0];
@@ -365,9 +391,13 @@ async function saveMember() {
       await loadCands();
       return;
     }
-    ElMessage.success(`已建站员 ${ok.name}（${ok.username}），初始密码 ${initPwdOf(ok.username)}`);
+    // 后端只在学生原本没有密码时才落初始密码；有的话就是他自己那份，不显示也不该显示
+    const pwdTip = ok.initPassword
+      ? `初始密码 ${ok.initPassword}（首次登录会引导改密）`
+      : '密码就是他的学生密码';
+    ElMessage.success(`已建${ROLE_LABEL[ok.role] || ''} ${ok.name}（${ok.username}），${pwdTip}`);
     memberDialog.value = false;
-    filter.role = 'member';     // 建完直接切到站员档，看得见刚建的人
+    filter.role = TAB_OF_ROLE[Number(ok.role)] || 'all';
     await fetch();
   } catch (e) {
     ElMessage.error(e?.message || '建账号失败');
@@ -399,7 +429,7 @@ async function fetch() {
 }
 function search() { query.page = 1; fetch(); }
 
-/* ── 编辑弹窗 ── */
+/* ── 编辑弹窗（只编辑已有账号；新建走 openMember 从名册选人） ── */
 const dialog = ref(false);
 const formRef = ref(null);
 const form = reactive({ id: null, username: '', nickname: '', password: '', role: 1, status: 1 });
@@ -410,46 +440,29 @@ const rules = {
 };
 
 function openEdit(row) {
-  if (row) {
-    Object.assign(form, {
-      id: row.id, username: row.username, nickname: row.nickname || '',
-      password: '', role: row.role, status: row.status,
-    });
-  } else {
-    Object.assign(form, { id: null, username: '', nickname: '', password: '', role: 1, status: 1 });
-  }
+  // ⚠️ 没有 row = 想新建 → 一律走名册，不再有手打表单
+  if (!row) return openMember();
+  Object.assign(form, {
+    id: row.id, username: row.username, nickname: row.nickname || '',
+    password: '', role: row.role, status: row.status,
+  });
   dialog.value = true;
 }
 
 async function save() {
-  // 表单校验（新增时强制要求密码）
+  // 表单校验（密码留空 = 不改，所以只在填了的时候校验长度）
   await formRef.value?.validate().catch(() => {});
   if (!form.username) return ElMessage.warning('请填写账号');
-  if (!form.id && !form.password) return ElMessage.warning('请填写密码');
   if (form.password && form.password.length < 6) return ElMessage.warning('密码至少 6 位');
-  // 新建站员必须从名册走，否则建出来的账号没有 user 档案（见新增站员弹窗注释）
-  if (!form.id && Number(form.role) === 2) {
-    return ElMessage.warning('站员请用「新增站员」从学生名册建号');
-  }
 
   saving.value = true;
   try {
-    if (form.id) {
-      await http.put(`/admin/admin/${form.id}`, {
-        nickname: form.nickname,
-        password: form.password || undefined,    // 留空 = 不改
-        role: form.role,
-        status: form.status,
-      });
-    } else {
-      await http.post('/admin/admin/create', {
-        username: form.username,
-        password: form.password,
-        nickname: form.nickname || undefined,
-        role: form.role,
-        status: form.status,                     // 新建直接落启用
-      });
-    }
+    await http.put(`/admin/admin/${form.id}`, {
+      nickname: form.nickname,
+      password: form.password || undefined,    // 留空 = 不改
+      role: form.role,
+      status: form.status,
+    });
     ElMessage.success('已保存');
     dialog.value = false;
     await fetch();
@@ -628,6 +641,22 @@ onBeforeUnmount(clearPageHeader);
   font-family: var(--mono); font-size: 11.5px;
   background: var(--parchment); padding: 1px 6px; border-radius: 4px; color: var(--ink-2);
   white-space: nowrap;   /* 「user + 学号」不许断成两行 */
+}
+
+/* 角色选择：一行说明 + 三档单选。
+   ⚠️ 不另起配色，选中态仍然交给 Element 的 --accent；这里只管留白与分隔 */
+.pm-role {
+  margin: 0 0 12px;
+  padding: 10px 14px 8px;
+  background: var(--parchment);
+  border-radius: 12px;
+}
+.pm-role-lab {
+  font-size: var(--fs-2xs); font-weight: 600; letter-spacing: var(--ls-wide);
+  color: var(--muted); margin-bottom: 2px;
+}
+.pm-role-hint {
+  margin-top: 2px; line-height: 1.55; color: var(--ink-2);
 }
 
 /* 候选人列表：白底描边行，选中一行蓝底蓝边（不用实心蓝，5 行会糊成一片） */

@@ -131,7 +131,20 @@ const PLAIN_ONLY = new Set([
 (async () => {
   /* ══════════════════ A. 权限矩阵（全量路由 × 三种身份） ══════════════════ */
   section('A. 权限矩阵（全量管理端路由）');
-  reset(baseSeed());
+  /**
+   * ⚠️ 这一段会**真调每一个接口**（只看鉴权结果，不看业务结果），
+   *    所以种子必须让「有副作用的接口」打不中人。
+   *    2026-10-31 踩到的：`POST /admin/admin/reset-password/batch` 默认 range='todo'
+   *    = 所有「启用且从没登录过」的账号 → 原来 root/reviewer 都命中，
+   *    密码被重置 + pwdChangedAt 抬升 ⇒ 后面每一条请求都 40101「密码已变更」，
+   *    矩阵假报一片红。
+   *    ⇒ 给这两人的 lastLoginAt 填上真时间（= 已登录过），这个探针就成了空转。
+   *      顺带也更真实：真人用过的后台账号本来就有登录时间。
+   */
+  reset({
+    ...baseSeed(),
+    admin: baseSeed().admin.map((a) => ({ ...a, lastLoginAt: new Date('2026-01-05T09:00:00+08:00') })),
+  });
 
   eq('管理端路由总数', ADMIN_ROUTES.length, 113);   // 112 → 113：+ POST /admin/admin/reset-password/batch
 
@@ -601,7 +614,27 @@ const PLAIN_ONLY = new Set([
 
   /* ══════════════════ J. adminMgr ══════════════════ */
   section('J. 管理员账号管理（仅超管）');
-  reset(baseSeed());
+  /**
+   * 2026-10-31 第二版口径：三档角色都只能从学生名册建号，所以这一段必须先有学生档案。
+   * 三个学生分别覆盖：①有密码 ②从没设过密码 ③留给「至少保留一个超管」那条用
+   */
+  const STU_PWD = 'stu12345';
+  const STU_HASH = bcrypt.hashSync(STU_PWD, 4);
+  const mkStu = (id, username, nickname, pwd) => ({
+    _id: `ju${id}`, id, username, password: pwd, kind: 'student', nickname,
+    grade: '2024', classNo: String(id).padStart(2, '0'), seatNo: '01', status: 1,
+    pwdChangedAt: null, loginCount: 0,
+    createTime: new Date('2026-01-01T00:00:00+08:00'),
+    updateTime: new Date('2026-01-01T00:00:00+08:00'),
+  });
+  reset({
+    ...baseSeed(),
+    user: [
+      mkStu(1, '20240101', '沈方', STU_HASH),
+      mkStu(2, '20240202', '李四', null),      // 从没设过密码
+      mkStu(3, '20240303', '王五', STU_HASH),
+    ],
+  });
 
   r = await H.call(H.req('GET', '/admin/admin/list', {}, SUPER_TOKEN));
   // 2026-10-29：站员（role=2）进 admin 表后，列表多带三个「伙伴身份」字段（仍绝无 password）
@@ -611,31 +644,39 @@ const PLAIN_ONLY = new Set([
   ok('整包不含 password 字段', !/password/i.test(JSON.stringify(r.data)));
   eq('列表 total', r.data.total, 3);
 
-  // ⚠️ 校验顺序与源实现一致：**先 role 合法、再查重** —— 所以缺 role 时得到的是
-  //    「角色必须为0或1」而**不是**「用户名已存在」。这条顺序也是契约（前端提示不同）。
+  // ⚠️ 校验顺序（2026-10-31 第二版）：**先看「有没有从名册选人」，再看角色合法**。
+  //    手打账号密码已经不支持了，所以缺 userId 得到的是「从名册选人」而不是角色错。
   r = await H.call(H.req('POST', '/admin/admin/create', { username: 'root', password: 'abcdef' }, SUPER_TOKEN));
-  eq('缺 role → 40001（校验在查重之前）', [r.code, r.message], [40001, '角色必须为 0(超管) / 1(社干) / 2(站员)']);
+  eq('手打账号（缺 userId）→ 40001', [r.code, r.message],
+    [40001, '超管 / 社干 / 站员都要从学生名册选人（传 userId），不再支持手打账号密码']);
+  ok('没有偷偷建出一条 root 之外的手打账号', (H.dump().admin || []).filter((a) => a.username === 'abcdef').length === 0);
 
-  r = await H.call(H.req('POST', '/admin/admin/create', { username: 'root', password: 'abcdef', role: 1 }, SUPER_TOKEN));
-  eq('重复用户名 → 40901', [r.code, r.message], [40901, '用户名已存在']);
-
-  r = await H.call(H.req('POST', '/admin/admin/create', { username: 'x', password: '123' }, SUPER_TOKEN));
-  eq('密码过短 → 40001', [r.code, r.message], [40001, '密码长度不能少于6位']);
-
-  r = await H.call(H.req('POST', '/admin/admin/create', { username: 'x', password: 'abcdef', role: 9 }, SUPER_TOKEN));
+  r = await H.call(H.req('POST', '/admin/admin/create', { userId: 1, role: 9 }, SUPER_TOKEN));
   eq('role 非 0/1/2 → 40001', [r.code, r.message], [40001, '角色必须为 0(超管) / 1(社干) / 2(站员)']);
 
-  // 站员（role=2）是「学生身份的第二角色」，必须挂在学生档案上。
-  // 2026-10-31：不接受手打建号 —— 手建出来 userId 为空，排班/考勤都查不到这个人。
-  r = await H.call(H.req('POST', '/admin/admin/create', { username: 'member1', password: 'abcdef', role: 2 }, SUPER_TOKEN));
-  eq('role=2 缺 userId → 40001', [r.code, r.message], [40001, '站员请从学生名册导入（账号管理 › 新增站员）']);
+  r = await H.call(H.req('POST', '/admin/admin/create', { userId: 999, role: 0 }, SUPER_TOKEN));
+  eq('学生档案不存在 → 40401', [r.code, r.message], [40401, '关联的学生档案不存在']);
 
-  r = await H.call(H.req('POST', '/admin/admin/create', { username: 'newbie', password: 'abcdef', role: 1 }, SUPER_TOKEN));
-  eq('新建 → 返回四字段', Object.keys(r.data), ['id', 'username', 'nickname', 'role']);
-  eq('nickname 缺省 = username', r.data.nickname, 'newbie');
+  // 从名册建社干：账号自动取学号、密码用学生自己那份、userId 回指档案
+  r = await H.call(H.req('POST', '/admin/admin/create', { userId: 1, role: 1 }, SUPER_TOKEN));
+  eq('从名册建 → 六字段', Object.keys(r.data),
+    ['id', 'username', 'nickname', 'role', 'userId', 'initPassword']);
+  eq('账号自动取学号（不接受手打）', r.data.username, '20240101');
+  eq('admin.userId 回指学生档案', r.data.userId, 1);
+  eq('学生本来就有密码 → 不回初始密码', r.data.initPassword, '');
   const newId = r.data.id;
-  ok('唯一键已登记 admin:newbie', (H.dump().unique_keys || []).some((k) => k._id === 'admin:newbie'));
-  eq('新账号可登录', (await H.call(H.req('POST', '/admin/login', { username: 'newbie', password: 'abcdef' }))).code, 0);
+  ok('唯一键已登记 admin:20240101', (H.dump().unique_keys || []).some((k) => k._id === 'admin:20240101'));
+  eq('新账号可登录（用他自己的学生密码）',
+    (await H.call(H.req('POST', '/admin/login', { username: '20240101', password: STU_PWD }))).code, 0);
+
+  r = await H.call(H.req('POST', '/admin/admin/create', { userId: 1, role: 0 }, SUPER_TOKEN));
+  eq('同一学号再建 → 40901（要改角色请走编辑）', r.code, 40901);
+
+  // 学生从没设过密码 → 建号时必须落初始密码并回传，否则建出来登不进去
+  r = await H.call(H.req('POST', '/admin/admin/create', { userId: 2, role: 2 }, SUPER_TOKEN));
+  eq('学生没密码 → 回传初始密码', r.data.initPassword, 'user20240202');
+  eq('这个号能用初始密码登录',
+    (await H.call(H.req('POST', '/admin/login', { username: '20240202', password: 'user20240202' }))).code, 0);
 
   r = await H.call(H.req('PUT', `/admin/admin/${newId}`, { nickname: '新人', role: 0 }, SUPER_TOKEN));
   eq('update 返回五字段', Object.keys(r.data), ['id', 'username', 'nickname', 'role', 'status']);
@@ -644,15 +685,19 @@ const PLAIN_ONLY = new Set([
   r = await H.call(H.req('PUT', `/admin/admin/${newId}`, { password: '123' }, SUPER_TOKEN));
   eq('改密过短 → 40001', r.code, 40001);
   await H.call(H.req('PUT', `/admin/admin/${newId}`, { password: 'zzzzzz1' }, SUPER_TOKEN));
-  eq('改密后可登录新密码', (await H.call(H.req('POST', '/admin/login', { username: 'newbie', password: 'zzzzzz1' }))).code, 0);
+  eq('改密后可登录新密码', (await H.call(H.req('POST', '/admin/login', { username: '20240101', password: 'zzzzzz1' }))).code, 0);
+  // ⚠️ 账号统一的判据：改的是 user.password 那一份，学生端立刻同密码
+  eq('学生端也用这个新密码', (await H.call(H.req('POST', '/user/login/account', { username: '20240101', password: 'zzzzzz1' }))).code, 0);
 
   r = await H.call(H.req('DELETE', '/admin/admin/1', {}, SUPER_TOKEN));
   eq('删除自己 → 40301', [r.code, r.message], [40301, '不能删除自己']);
 
   r = await H.call(H.req('DELETE', `/admin/admin/${newId}`, {}, SUPER_TOKEN));
   eq('删除非超管成功', [r.code, r.data], [0, null]);
-  ok('唯一键已释放', !(H.dump().unique_keys || []).some((k) => k._id === 'admin:newbie'));
-  eq('释放后可重建同名', (await H.call(H.req('POST', '/admin/admin/create', { username: 'newbie', password: 'abcdef', role: 1 }, SUPER_TOKEN))).code, 0);
+  ok('唯一键已释放', !(H.dump().unique_keys || []).some((k) => k._id === 'admin:20240101'));
+  ok('学生档案没被一起删掉（他还要用同一个学号登学生端）',
+    (H.dump().user || []).some((u) => u.username === '20240101'));
+  eq('释放后可重建同名', (await H.call(H.req('POST', '/admin/admin/create', { userId: 1, role: 1 }, SUPER_TOKEN))).code, 0);
 
   // 超管降级后只剩 0 个超管 → 不允许
   const superDoc = (H.dump().admin || []).find((a) => a.id === 1);
@@ -661,8 +706,9 @@ const PLAIN_ONLY = new Set([
   ok('此时无超管（用超管 token 直连，绕过 role 校验）', onlySuper === undefined);
   superDoc.role = 0;
   // 让「另一个超管」出现，再试图删掉它 → 应保留至少一个
-  await H.call(H.req('POST', '/admin/admin/create', { username: 'super2', password: 'abcdef', role: 0 }, SUPER_TOKEN));
-  const super2 = (H.dump().admin || []).find((a) => a.username === 'super2');
+  // 让「另一个超管」出现，再试图删掉它 → 应保留至少一个
+  await H.call(H.req('POST', '/admin/admin/create', { userId: 3, role: 0 }, SUPER_TOKEN));
+  const super2 = (H.dump().admin || []).find((a) => a.username === '20240303');
   eq('删掉另一个超管（系统仍有 1 个）', (await H.call(H.req('DELETE', `/admin/admin/${super2.id}`, {}, SUPER_TOKEN))).code, 0);
 
   eq('普管调 adminMgr.list → 40301', (await H.call(H.req('GET', '/admin/admin/list', {}, PLAIN_TOKEN))).code, 40301);

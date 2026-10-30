@@ -105,7 +105,9 @@ async function ensureTeacherProfile(admin) {
     createTime: now,
     updateTime: now,
   };
-  await insertOne(C.USER, doc);
+  // ⚠️ 把 `_id` 带回返回值：调用方几乎紧接着就要改这一行（比如重置密码要写 password），
+  //    没有 `_id` 就只能再查一次，或者踩「document does not exist」（2026-10-31 实测踩到）。
+  doc._id = await insertOne(C.USER, doc);
   await bindAdminUser(admin, doc);
   return doc;
 }

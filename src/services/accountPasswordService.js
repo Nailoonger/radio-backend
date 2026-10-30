@@ -124,6 +124,58 @@ async function passwordMatches(user, plain) {
   return bcrypt.compare(String(plain == null ? '' : plain), user.password);
 }
 
+/**
+ * 从学生档案建一条后台账号 —— 直连侧实现，对应云端
+ * `cloud/cloudfunctions/api/services/adminAccount.createFromStudent()`。
+ *
+ * ═══════════ 2026-10-31 第二版口径（陛下定）═══════════
+ *   超管(0) / 社干(1) / 站员(2) **三档一律从学生名册选人**，不再支持手打账号密码。
+ *   账号 = 学号、密码 = 学生自己那份 ⇒「一个账号登录两端」成立。
+ *   手打工号那条线已经撇下，别再往回加（`createUserForAdmin` 只剩存量迁移在用）。
+ *
+ * ⚠️ 学生档案还没有密码时落初始密码 `user + 学号`，`pwdChangedAt` 保持 null
+ *    （pv = 0，与学生端现有 token 对得上，不会平白踢人）。
+ */
+async function createAdminFromStudent({ userId, role, nickname }) {
+  const uid = Number(userId) || 0;
+  const roleNum = Number(role);
+  if (!uid) {
+    throw new ApiError(Codes.PARAM_ERROR, '请从学生名册选人（超管 / 社干 / 站员都要挂学生档案）');
+  }
+  if (![0, 1, 2].includes(roleNum)) {
+    throw new ApiError(Codes.PARAM_ERROR, '角色必须为 0(超管) / 1(社干) / 2(站员)');
+  }
+
+  const user = await User.scope('withPassword').findByPk(uid);
+  if (!user || !user.username) throw new ApiError(Codes.NOT_FOUND, '关联的学生档案不存在');
+
+  const username = String(user.username);
+  const dup = await Admin.findOne({ where: { username } });
+  if (dup) {
+    throw new ApiError(Codes.CONFLICT, `${username} 已经是后台账号，要改角色请直接编辑`);
+  }
+
+  let initPlain = null;
+  if (!user.password) {
+    initPlain = `user${username.trim()}`;
+    user.password = await bcrypt.hash(initPlain, BCRYPT_COST);
+    user.pwdChangedAt = null;
+    await user.save();
+  }
+
+  const admin = await Admin.create({
+    username,
+    // 只是镜像：MySQL 是 NOT NULL，且回滚登录逻辑时用得上；登录不读它
+    password: user.password,
+    nickname: String(nickname || user.nickname || user.remark || username),
+    role: roleNum,
+    userId: Number(user.id),
+    status: 1,
+  });
+
+  return { admin, user, initPlain };
+}
+
 module.exports = {
   KIND_STUDENT,
   KIND_TEACHER,
@@ -134,5 +186,6 @@ module.exports = {
   findUserOfAdmin,
   ensureTeacherProfile,
   createUserForAdmin,
+  createAdminFromStudent,
   passwordMatches,
 };
