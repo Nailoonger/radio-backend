@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>可排时间 · 时段方块对比度修复 v1</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 28px 72px; background: #F5F5F7; color: #1D1D1F;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { margin: 0 0 8px; font-size: 20px; font-weight: 600; letter-spacing: -.2px; }
+  .lead { margin: 0 0 26px; font-size: 13px; line-height: 1.75; color: #76767E; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: #0066CC; }
+
+  .case { background: #fff; border-radius: 16px; padding: 18px 20px 22px; margin-bottom: 20px; }
+  .case h2 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+  .case .sub { margin: 0 0 14px; font-size: 12.5px; color: #76767E; line-height: 1.7; }
+  .case .sub b { color: #B42318; font-weight: 600; }
+  .case.after .sub b { color: #067647; }
+  .shot { width: 100%; max-width: 375px; display: block; border-radius: 10px; border: 1px solid #E0E0E0; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #F0F0F0; }
+  th { color: #76767E; font-weight: 600; }
+  td.num { font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .bad { color: #B42318; font-weight: 600; }
+  .good { color: #067647; font-weight: 600; }
+
+  .why { background: #fff; border-radius: 16px; padding: 18px 20px; }
+  .why h2 { margin: 0 0 10px; font-size: 13px; }
+  .why ul { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.95; color: #76767E; }
+  .why b { color: #1D1D1F; font-weight: 600; }
+  .why .tag { display: inline-block; margin-top: 12px; font-size: 12px; color: #76767E; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>可排时间 · 时段方块对比度修复 v1</h1>
+  <p class="lead">两张图都是 headless Chrome 按 <code>availability.wxss</code> 真实规则（1rpx = 0.5px）渲染后截的，2x 像素、同一视口，不是示意图。</p>
+
+  <div class="case">
+    <h2>改之前</h2>
+    <p class="sub">未点亮的方块 <b>完全没有边界</b>：那块灰和页面底色是同一个色值，描边又是透明的，
+      看起来就是页面上飘着两行灰字。</p>
+    <img class="shot" src="./before.png" alt="改之前：未选中方块与背景融为一体">
+  </div>
+
+  <div class="case after">
+    <h2>改之后</h2>
+    <p class="sub">未点亮是 <b>白底 + 灰描边</b>（原型 v151 的原始形态），方块边界一眼看得见；点亮仍是蓝底蓝框。</p>
+    <img class="shot" src="./after.png" alt="改之后：白底 + 可见描边">
+  </div>
+
+  <div class="case">
+    <h2>量出来的数</h2>
+    <table>
+      <tr><th>量的是什么</th><th>改之前</th><th>改之后</th></tr>
+      <tr><td>未选中方块填充色</td><td class="num bad">#F5F5F7</td><td class="num good">#FFFFFF</td></tr>
+      <tr><td>页面底色</td><td class="num">#F5F5F7</td><td class="num">#F5F5F7</td></tr>
+      <tr><td>填充 vs 页面底色</td><td class="num bad">1.000 : 1　← 同色</td><td class="num good">1.089 : 1</td></tr>
+      <tr><td>描边</td><td class="num bad">transparent（无）</td><td class="num good">1px #E2E2E7（1.186 : 1）</td></tr>
+      <tr><td>整张图里的纯白像素</td><td class="num bad">0 个</td><td class="num good">91,637 个</td></tr>
+    </table>
+    <p class="sub" style="margin:12px 0 0">「纯白像素 0 个」是最硬的判据：改之前整张图里<b>一个白点都没有</b>，
+      方块确实是不存在的；改之后方块是实打实的白色面。</p>
+  </div>
+
+  <div class="why">
+    <h2>为什么会长成这样</h2>
+    <ul>
+      <li>错的那条规则是我自己加的：<code>.avslot.off { background:#F5F5F7; border-color:transparent; }</code>，
+          照「灰色 = 不可选」的通用直觉写，没对过色值。</li>
+      <li>本页 <code>.page</code> 的底色就是 <code>var(--parchment) = #F5F5F7</code> ——
+          和方块填充<b>是同一个色值</b>，再叠一个透明描边，边界两头都没了。</li>
+      <li>原型 v151 里<b>根本没有 <code>.off</code> 这条规则</b>：未选中就是最基础的 <code>.avslot</code>
+          （<code>#FFF</code> 底 + <code>1px #E1E3EA</code> 描边 + 深色字）。也就是说「白卡浮在灰底上」
+          本来就是这页的区分方式，我多写了一条反而把区分抹掉了。</li>
+      <li>修法是直接删掉那条覆盖，让未选中回到基础态 —— 没有新增任何色值。</li>
+      <li>顺手加了守卫 <code>scripts/verify-partner-availability-ui.js</code>（14 项）：盯着「未选中必须是白底 + 非透明描边」，
+          并且全站扫一遍伙伴端 wxss，谁再写「羊皮纸色底 + 透明描边」就红。
+          （唯一例外是 review-detail 的 <code>.preset</code>，它嵌在白卡里，灰块配白卡是对的，已在脚本里写明理由。）</li>
+    </ul>
+    <span class="tag">这份预览只是本地静态页，没有部署，没动线上。</span>
+  </div>
+</div>
+</body>
+</html>

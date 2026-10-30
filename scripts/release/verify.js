@@ -107,6 +107,8 @@ function verify(options = {}) {
   node('伙伴端周切换一致性', [path.join(root, 'scripts/verify-partner-weeknav.js')]);
   // 工作台大白卡必须跟着本周班表四态走（发布完回首页还是「未发布」就红）
   node('伙伴端工作台大白卡', [path.join(root, 'scripts/verify-partner-home-cards.js')]);
+  // 可排时间页时段方块：未选中必须是「白底 + 可见描边」，不许和羊皮纸页面底色同色（2026-11-01 陛下打回）
+  node('伙伴端可排时间时段方块', [path.join(root, 'scripts/verify-partner-availability-ui.js')]);
   if (scope === 'mini') return { scope, miniFiles: miniFiles.length };
 
   const revision = options.revision || env.RELEASE_REVISION;

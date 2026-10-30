@@ -305,7 +305,8 @@
 .pad { height: 60rpx; }
 
 /* ══════════ v151 对齐：时段方块 / 人员卡片 / 弹层 / 批量代录 ══════════
-   换算 1px ≈ 1.923rpx。不引入新色：能来=accent 浅底蓝字，不能来=灰底灰字（只有这两种）。 */
+   换算 1px ≈ 1.923rpx。不引入新色：能来 = accent 浅底蓝字；不能来 = 白底灰描边（只有这两种）。
+   ⚠️ 「不能来」不是灰底 —— 灰底会和页面羊皮纸底同色，方块就没了（见下面 .avslot.off 那段说明）。 */
 
 .days { display: flex; flex-direction: column; gap: 14rpx; }
 .day-cnt { margin-left: auto; font-size: 19rpx; color: var(--muted, #76767E); font-variant-numeric: tabular-nums; }
@@ -325,8 +326,15 @@
 .avslot.on { background: var(--accent-tint, #EAF3FD); border-color: var(--accent, #0066CC); }
 .avslot.on .avslot-t { color: var(--accent, #0066CC); font-weight: 600; }
 .avslot.on .avslot-s { color: var(--accent, #0066CC); opacity: .8; }
-.avslot.off { background: #F5F5F7; border-color: transparent; }
-.avslot.off .avslot-t { color: var(--muted, #76767E); font-weight: 400; }
+/* 未选中（不能来）＝ 基础态本身：白底 + 灰描边 + 深色字。
+   ⚠️⚠️ 这里原来有一条 `.avslot.off{background:#F5F5F7;border-color:transparent}`，
+      是我照「灰色＝不可选」的通用直觉自创的，结果：
+        灰底 #F5F5F7 与页面羊皮纸底 var(--parchment,#F5F5F7) **是同一个色值**，
+        描边又设成 transparent ⇒ 方块的边界整个消失，看起来就是页面上两块空白。
+      （陛下 2026-11 截图打回：「站员端可排时间的页面时间段胶囊未点亮时与背景融合了看不出区别」）
+      v151 原型里**根本没有 .off 这条规则**：未选中就是最基础的 .avslot
+      —— #FFF 底 + 1px #E1E3EA 描边 + ink 字，靠「白卡浮在灰底上」区分，不靠灰底。
+   ⇒ 判据：未选中态的填充色必须 ≠ 页面底色，且描边不许透明。别再给它加深色/灰底。 */
 .avslot-hover { opacity: .78; }
 
 /* 确认勾选 */

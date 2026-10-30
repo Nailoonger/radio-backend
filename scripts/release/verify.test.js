@@ -58,10 +58,12 @@ test('policy 与 mini 范围只执行对应校验，不构建或安装线上产�
   stages.length = 0;
   verify({ root, scope: 'mini', runStage });
   // 1 = 发布控制回归；2 = 小程序语法；3 = 伙伴端周切换一致性；4 = 工作台大白卡（后两条 2026-10-30 新增）
-  assert.equal(stages.length, 4);
+  // 5 = 可排时间时段方块（2026-11-01 新增：未选中态不许和页面底色同色）
+  assert.equal(stages.length, 5);
   assert.ok(stages[1].args.includes('--check'));
   assert.ok(stages[2].args[0].endsWith('verify-partner-weeknav.js'));
   assert.ok(stages[3].args[0].endsWith('verify-partner-home-cards.js'));
+  assert.ok(stages[4].args[0].endsWith('verify-partner-availability-ui.js'));
   assert.throws(() => verify({ root, scope: 'unknown', runStage }), /scope/);
 });
 
