@@ -86,6 +86,16 @@ ok('站内协作右上用合计、缺项回退', /coopKnown\s*\?/.test(js) && /�
 ok('拉不到时仍是 null（不写 0）', /const n = \(v\) => \(v === null \|\| v === undefined \? null/.test(js),
   '取不到计数会被写成 0 —— 那是编数字');
 
+/* ⚠️ 2026-10-31 事故：setData 之前 this.data 还是旧值，算卡必须传合并视图 */
+ok('buildSections 支持传合并视图', /buildSections\(submitPending, messagePending, view\)/.test(js),
+  'buildSections 少了 view 参数');
+ok('fetchModules 先合并再算卡', /const view = Object\.assign\(\{\}, this\.data, \{ mods \}\)[\s\S]{0,300}?this\.buildSections\([^)]*view\)/.test(js),
+  'fetchModules 在 setData 里直接算卡 —— this.data.mods 还是旧值，数字会全空');
+ok('fetchCounts 同样先合并再算卡', /const view = Object\.assign\(\{\}, this\.data, \{ submitPending, messagePending \}\)/.test(js),
+  'fetchCounts 在 setData 里直接算卡，待审数会晚一拍');
+ok('buildSections 内部读 view 而不是 this.data', /const src = view \|\| this\.data;/.test(js) && /src\.roleKey === 'super'/.test(js),
+  'buildSections 里还直接读 this.data.roleKey');
+
 /* 第 2 张「本周点歌排期」：接口早就有（/admin/submit/list type=1），别再写成"接口没落地" */
 ok('点歌排期不拉假数据、走真接口', /adminRequest\('\/admin\/submit\/list',\s*'GET',\s*\{[^}]*type:\s*1[^}]*reviewStatus:\s*1/.test(js),
   '没有按 type=1 & reviewStatus=1 拉已通过的点歌（与 song-schedule 页同一口径）');

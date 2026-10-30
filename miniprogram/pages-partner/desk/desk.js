@@ -394,10 +394,12 @@ Page({
         .then((d) => Number((d && d.total) || 0))
         .catch(() => 0),
     ]).then(([submitPending, messagePending]) => {
+      // 同 fetchModules：算卡前先把这两个数合进视图，别指望 setData 已经生效
+      const view = Object.assign({}, this.data, { submitPending, messagePending });
       this.setData({
         submitPending,
         messagePending,
-        sections: this.buildSections(submitPending, messagePending),
+        sections: this.buildSections(submitPending, messagePending, view),
         badges: this.buildBadges(submitPending, messagePending),
       });
     });
@@ -440,18 +442,28 @@ Page({
         recorded: att ? att.recorded : null,
         unmarked: att ? att.unmarked : null,
       };
+      /**
+       * ⚠️⚠️ 必须先把 mods 合进 view 再算 sections。
+       *    `setData({ mods, sections: this.buildSections(...) })` 里 buildSections 是在
+       *    setData **执行之前**跑的，那时 this.data.mods 还是旧值（全 null）⇒
+       *    卡片一个数字都不显示（2026-10-31 陛下「没看到显示数字啊」就是这个）。
+       *    这个坑和 fetchMe 里 roleKey 那个是同一个：**setData 之前 this.data 是旧值**。
+       */
+      const view = Object.assign({}, this.data, { mods });
       this.setData({
         mods,
-        sections: this.buildSections(this.data.submitPending, this.data.messagePending),
+        sections: this.buildSections(this.data.submitPending, this.data.messagePending, view),
       });
     });
   },
 
   /* 三联卡区块。卡内容 = v151 原型 V.desk() 的模块清单；
      其中「投稿&点歌 / 留言」对齐我们真实页面（一期是合一的审核台）。
-     计数器取不到 ⇒ n=null，左下不渲染数字（不编假数）。 */
-  buildSections(submitPending, messagePending) {
-    const mods = this.data.mods || {};
+     计数器取不到 ⇒ n=null，左下不渲染数字（不编假数）。
+     @param {object} [view] 合并后的状态视图（算卡时要把刚拉到的数一起算进去，见 fetchModules） */
+  buildSections(submitPending, messagePending, view) {
+    const src = view || this.data;
+    const mods = src.mods || {};
     // null 保留成 null（不渲染数字），0 要照常显示 0
     const n = (v) => (v === null || v === undefined ? null : Number(v) || 0);
     const pub = [
@@ -470,7 +482,7 @@ Page({
        班表 tab 落地后在那里给入口；ROUTES 里的 availability / slots 保留着复用。 */
     /* 站员工作台：v151 V.home 只留五个入口 —— 我的稿件 / 考勤 / 请假申请 / 互评 / 站内公告。
        ⚠️ 一条都不能少也不能多：站员不审稿、不排班、不看全站。 */
-    if (this.data.roleKey === 'member') {
+    if (src.roleKey === 'member') {
       return [
         {
           head: '我的手头',
@@ -500,7 +512,7 @@ Page({
       { head: '听众投稿', right: (submitPending + messagePending) + ' 项待审', mods: pub },
       { head: '站内协作', right: coopKnown ? coopTotal + ' 项待处理' : '站内伙伴的事', mods: coop },
     ];
-    if (this.data.roleKey === 'super') {
+    if (src.roleKey === 'super') {
       sections.unshift({
         head: '管理',
         right: '超管独有',
