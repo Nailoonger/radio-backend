@@ -8,6 +8,8 @@
 //   · 留言数 = /admin/message/list?status=0 的 total
 //   · 没有接口的卡（内部稿件 / 请假审批 / 考勤录入 / 账号 / 规则 / 考勤总览）
 //     n=null ⇒ 左下不渲染数字（v151 对 null 的处理：'<span></span>'）——**不编假数字**。
+//     ⚠️ 2026-10-31 更正：这几张卡其实都有接口（见 fetchModules 的注释），
+//        当时写「没有接口」是错的；现在只有真的取不到才留 null。
 //   · 大白卡轮播只放"有真数据"的卡：
 //     第 1 张「正式值班安排」= /partner/schedule 四态；
 //     第 2 张「本周点歌排期」= /admin/submit/list?type=1&reviewStatus=1 的
@@ -93,6 +95,14 @@ Page({
     submitPending: 0,
     messagePending: 0,
 
+    /**
+     * 模块卡左下的小计数器（原型 .mod-n 的「5 个账号 / 12 条规则 / 88 场已录」）。
+     * ⚠️ null = 这个数还没拉到或没有接口 ⇒ wxml 不渲染数字（不编假数字）。
+     *   2026-10-31 之前这里全是 null —— 当时以为是"没有接口"，其实五个接口早就有，
+     *   陛下拿原型的「5 个账号」问了一句才补齐。
+     */
+    mods: { accounts: null, rules: null, recorded: null, unmarked: null, drafts: null, leaves: null },
+
     // 社干 / 超管：三联卡区块（见 buildSections）
     sections: [],
     // 站员：需要你处理（数据接口就绪前显示 v151 空态句）
@@ -100,7 +110,7 @@ Page({
     needCount: 0,
 
     // 大白卡轮播（v151 .carousel）
-    // ⚠️ 只放"有真数据"的卡：点歌排期等排期接口落地后 push 进来，现在不编假数。
+    // 第 1 张「正式值班安排」/ 第 2 张「本周点歌排期」，两张都走真接口（见 buildSlides）。
     current: 0,
     slideH: 340,                // swiper 必须有固定高（含 100rpx 投影空间）；真实高度由 measureSlide() 实测覆盖
     slides: [],
@@ -142,6 +152,7 @@ Page({
     // 大白卡写的是「本周班表」的状态，在排班工作台发布 / 撤回之后回首页必须跟着变，
     // 所以这里和待办数字一起重拉（只拉数字会出现「已发布，首页还写着未发布」）。
     this.fetchCounts();
+    this.fetchModules();
     this.fetchSchedule();
     this.fetchSongs();
   },
@@ -295,7 +306,7 @@ Page({
 
   onPullDownRefresh() {
     // 下拉的转圈必须无条件收掉：任何一条挂掉也 stopPullDownRefresh，否则页面永远在转
-    return Promise.all([this.fetchCounts(), this.fetchSchedule(), this.fetchSongs()])
+    return Promise.all([this.fetchCounts(), this.fetchModules(), this.fetchSchedule(), this.fetchSongs()])
       .catch(() => {})
       .then(() => wx.stopPullDownRefresh());
   },
@@ -358,6 +369,7 @@ Page({
         }, () => this.measureSlide());
         this.fetchSchedule();
         this.fetchSongs();
+        this.fetchModules();
         return this.fetchCounts();
       })
       .catch((err) => {
@@ -368,6 +380,7 @@ Page({
         this.setData({ ready: true, slides: this.buildSlides() }, () => this.measureSlide());
         this.fetchSchedule();
         this.fetchSongs();
+        this.fetchModules();
         this.fetchCounts();
       });
   },
@@ -390,19 +403,67 @@ Page({
     });
   },
 
+  /**
+   * 模块卡左下的小计数器（原型「5 个账号 / 12 条规则 / 88 场已录 / 1 条待批」）。
+   *
+   * ⚠️ 2026-10-31 之前这些数全是 null，注释还写着"没有接口"——其实五个接口早就有了
+   *    （陛下拿原型的「5 个账号」问了一句才补上）。取不到才留 null，绝不编。
+   *
+   * 一个请求都不多开：考勤那两项用同一份 overview 算（已录 = posts - unmarked）。
+   * 站员没有这几张卡 ⇒ 直接跳过，不发请求。
+   */
+  fetchModules() {
+    if (this.data.roleKey === 'member') return Promise.resolve();
+    const isSuper = this.data.roleKey === 'super';
+    // Promise.resolve 包一层：任何一项拿不到（或返回非 Promise）都只是 null，不带崩整页
+    const pick = (p, fn) => Promise.resolve(p).then(fn).catch(() => null);
+    return Promise.all([
+      // 账号：/admin/admin/list 只给超管（asSuper），社干那条直接给 null
+      isSuper
+        ? pick(adminRequest('/admin/admin/list', 'GET', { page: 1, pageSize: 1 }), (d) => Number((d && d.total) || 0))
+        : Promise.resolve(null),
+      pick(adminRequest('/partner/rules', 'GET', {}), (d) => (d && Array.isArray(d.items) ? d.items.length : 0)),
+      pick(adminRequest('/partner/attendance/overview', 'GET', {}), (d) => {
+        const s = d && d.summary;
+        if (!s) return null;
+        const posts = Number(s.posts) || 0;
+        const unmarked = Number(s.unmarked) || 0;
+        return { recorded: Math.max(0, posts - unmarked), unmarked };
+      }),
+      // 内部稿件待审：/partner/draft/review 是全站待审（list 那个只看自己的稿）
+      pick(adminRequest('/partner/draft/review', 'GET', { status: 0, page: 1, pageSize: 1 }), (d) => Number((d && d.total) || 0)),
+      pick(adminRequest('/partner/leave/pending', 'GET', {}), (d) => Number((d && d.counts && d.counts.pending) || 0)),
+    ]).then(([accounts, rules, att, drafts, leaves]) => {
+      if (this._gone) return;
+      const mods = {
+        accounts, rules, drafts, leaves,
+        recorded: att ? att.recorded : null,
+        unmarked: att ? att.unmarked : null,
+      };
+      this.setData({
+        mods,
+        sections: this.buildSections(this.data.submitPending, this.data.messagePending),
+      });
+    });
+  },
+
   /* 三联卡区块。卡内容 = v151 原型 V.desk() 的模块清单；
-     其中「投稿&点歌 / 留言」对齐我们真实页面（一期是合一的审核台），
-     没有数据接口的卡 n=null ⇒ 左下不渲染数字，不编假数。 */
+     其中「投稿&点歌 / 留言」对齐我们真实页面（一期是合一的审核台）。
+     计数器取不到 ⇒ n=null，左下不渲染数字（不编假数）。 */
   buildSections(submitPending, messagePending) {
+    const mods = this.data.mods || {};
+    // null 保留成 null（不渲染数字），0 要照常显示 0
+    const n = (v) => (v === null || v === undefined ? null : Number(v) || 0);
     const pub = [
       { go: 'review', t: '投稿 & 点歌审核', d: '歌曲与祝福 · 听众来稿', n: submitPending, u: '待审' },
       { go: 'message', t: '留言审核', d: '通过展示 / 屏蔽', n: messagePending, u: '待审' },
+      // 原型这张也不给数字（排期是要点进去看的清单，不是待办数）
       { go: 'song-schedule', t: '歌曲排期', d: '播出安排与候补', n: null, u: '' },
     ];
     const coop = [
-      { go: 'work', t: '内部稿件', d: '站内伙伴来稿', n: null, u: '' },
-      { go: 'leave-approve', t: '请假审批', d: '等待你确认', n: null, u: '' },
-      { go: 'attendance', t: '考勤录入', d: '按节目场点名', n: null, u: '' },
+      { go: 'work', t: '内部稿件', d: '站内伙伴来稿', n: n(mods.drafts), u: '待审' },
+      { go: 'leave-approve', t: '请假审批', d: '等待你确认', n: n(mods.leaves), u: '条' },
+      { go: 'attendance', t: '考勤录入', d: '按节目场点名', n: n(mods.unmarked), u: '未录入' },
     ];
     /* ⚠️ 2026-10-28 陛下拍板：第三块「排班协作」（可排时间 / 值班时段）去掉 ——
        v151 社干工作台就只有"听众投稿 / 站内协作"两块，这两项原型挂在「班表」tab。
@@ -431,9 +492,13 @@ Page({
       ];
     }
 
+    // 站内协作右上：原型 = 「内部稿件待审 + 请假待批 + 考勤未录入」三项求和。
+    // 任何一项没拉到就不给数（写「站内伙伴的事」），不能拿残缺的和当总数。
+    const coopKnown = [mods.drafts, mods.leaves, mods.unmarked].every((v) => v !== null && v !== undefined);
+    const coopTotal = coopKnown ? (Number(mods.drafts) || 0) + (Number(mods.leaves) || 0) + (Number(mods.unmarked) || 0) : 0;
     const sections = [
       { head: '听众投稿', right: (submitPending + messagePending) + ' 项待审', mods: pub },
-      { head: '站内协作', right: '站内伙伴的事', mods: coop },
+      { head: '站内协作', right: coopKnown ? coopTotal + ' 项待处理' : '站内伙伴的事', mods: coop },
     ];
     if (this.data.roleKey === 'super') {
       sections.unshift({
@@ -444,9 +509,9 @@ Page({
         //   班表首页/工作台管理区都不重复收）—— 2026-10-29 曾在这里补过一张，
         //   排班工作台对齐后按原型撤掉。
         mods: [
-          { go: 'accounts', t: '账号', d: '分发 · 重置 · 停用', n: null, u: '' },
-          { go: 'rules', t: '排班规则', d: '场次上限与轮值', n: null, u: '' },
-          { go: 'att-overview', t: '考勤总览', d: '全站出勤统计', n: null, u: '' },
+          { go: 'accounts', t: '账号', d: '分发 · 重置 · 停用', n: n(mods.accounts), u: '个账号' },
+          { go: 'rules', t: '排班规则', d: '场次上限与轮值', n: n(mods.rules), u: '条规则' },
+          { go: 'att-overview', t: '考勤总览', d: '全站出勤统计', n: n(mods.recorded), u: '场已录' },
         ],
         note: '模块开关 / 系统设置 / 数据看板 / 批量导出 只在电脑端后台做，手机端不留入口。',
       });

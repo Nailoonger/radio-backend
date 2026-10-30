@@ -68,6 +68,24 @@ ok('选中态只放大内层', /\.dot-i\.on\s*\{[^}]*width:\s*35rpx/.test(wxss),
 ok('不再用 background-clip 画点', !/background-clip/.test(wxss),
   '又用 content-box + background-clip 画圆点 —— 选中态宽度一放大就会渲染成大蓝球');
 
+/* 模块卡计数器：五张卡都有真接口（2026-10-31 陛下拿原型「5 个账号」问出来的） */
+ok('账号计数走 /admin/admin/list', /adminRequest\('\/admin\/admin\/list'/.test(js), '账号卡没有取账号总数');
+ok('账号只给超管请求', /isSuper\s*\n?\s*\?/.test(js) || /isSuper[\s\S]{0,80}admin\/admin\/list/.test(js),
+  '社干也会去请求 /admin/admin/list（只有超管有权限，会 403）');
+ok('规则计数走 /partner/rules', /adminRequest\('\/partner\/rules'/.test(js), '排班规则卡没有取条数');
+ok('考勤两个数用同一份 overview', /adminRequest\('\/partner\/attendance\/overview'/.test(js), '考勤卡没有取 overview');
+ok('考勤总览 = 已录（posts - unmarked）', /posts\s*-\s*unmarked|posts\)\s*-\s*\(Number\(s\.unmarked\)/.test(js),
+  '考勤总览的「场已录」算法不对');
+ok('内部稿件走 review（全站待审）', /adminRequest\('\/partner\/draft\/review'/.test(js),
+  '内部稿件用了 /partner/draft/list —— 那个只看自己的稿子，不是待审总数');
+ok('请假计数走 /partner/leave/pending', /adminRequest\('\/partner\/leave\/pending'/.test(js), '请假卡没有取待批条数');
+ok('三个计数器都有单位', /u: '个账号'/.test(js) && /u: '条规则'/.test(js) && /u: '场已录'/.test(js),
+  '账号/规则/考勤总览缺单位');
+ok('站内协作右上用合计、缺项回退', /coopKnown\s*\?/.test(js) && /项待处理/.test(js),
+  '站内协作右上没按原型写「N 项待处理」');
+ok('拉不到时仍是 null（不写 0）', /const n = \(v\) => \(v === null \|\| v === undefined \? null/.test(js),
+  '取不到计数会被写成 0 —— 那是编数字');
+
 /* 第 2 张「本周点歌排期」：接口早就有（/admin/submit/list type=1），别再写成"接口没落地" */
 ok('点歌排期不拉假数据、走真接口', /adminRequest\('\/admin\/submit\/list',\s*'GET',\s*\{[^}]*type:\s*1[^}]*reviewStatus:\s*1/.test(js),
   '没有按 type=1 & reviewStatus=1 拉已通过的点歌（与 song-schedule 页同一口径）');

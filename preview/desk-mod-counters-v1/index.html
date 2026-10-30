@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工作台模块卡计数器 v1 · 补上左下角的数</title>
+<style>
+  * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body {
+    margin: 0; padding: 40px 28px 72px; background: #F5F5F7; color: #1D1D1F;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 1020px; margin: 0 auto; }
+  h1 { margin: 0 0 8px; font-size: 20px; font-weight: 600; letter-spacing: -.2px; }
+  .lead { margin: 0 0 28px; font-size: 13px; line-height: 1.75; color: #76767E; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: #0066CC; }
+
+  .cols { display: grid; grid-template-columns: 340px 340px; gap: 40px; }
+  .col-hd { font-size: 12px; font-weight: 600; color: #76767E; margin-bottom: 10px; }
+  .col-hd b { color: #B42318; }
+  .col.have .col-hd b { color: #067647; }
+
+  /* 与 desk.wxss 同口径：mh 14px/600 + 右 10px；mods gap 10；mod radius 17 pad 12 min-height 100 */
+  .mh { display: flex; align-items: baseline; justify-content: space-between; padding: 0 2px 10px; margin: 0 0 0; }
+  .mh .t { font-size: 14px; font-weight: 600; line-height: 1.7; color: #1D1D1F; }
+  .mh .n { font-size: 10px; line-height: 1.7; color: #76767E; }
+  .mods { display: flex; flex-wrap: wrap; gap: 10px; }
+  .mod {
+    background: #fff; border: 1px solid #E7E9EE; border-radius: 17px; padding: 12px;
+    min-height: 100px; width: calc((100% - 10px) / 2);
+    display: flex; flex-direction: column;
+  }
+  .mod-t { font-size: 14px; font-weight: 550; line-height: 1.5; color: #1D1D1F; }
+  .mod-d { font-size: 11px; color: #76767E; line-height: 1.5; margin-top: 4px; }
+  .mod-f { margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; padding-top: 7px; }
+  .mod-n {
+    display: flex; align-items: baseline; font-size: 25px; font-weight: 500; line-height: 1.1;
+    color: #76767E; font-variant-numeric: tabular-nums; min-height: 27.5px;
+  }
+  .mod-n.on { color: #0066CC; }
+  .mod-n .u { font-size: 10px; font-weight: 400; color: #76767E; margin-left: 5px; line-height: 1; }
+  .mod-arrow { font-size: 18px; line-height: 1; color: #999DA6; }
+
+  .foot { margin-top: 36px; padding: 16px 18px; background: #fff; border-radius: 14px; }
+  .foot h2 { margin: 0 0 10px; font-size: 13px; font-weight: 600; }
+  .foot ul { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.95; color: #76767E; }
+  .foot b { color: #1D1D1F; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>工作台模块卡计数器 v1</h1>
+  <p class="lead">原型每张卡左下都有数（<code>5 个账号 / 12 条规则 / 88 场已录</code>），我们原来全是空的（<code>n: null</code>）。
+     现在五个接口都接上了，数值全是真取，取不到才留空。</p>
+
+  <div class="cols">
+    <div class="col">
+      <div class="col-hd">改之前 · <b>左下角是空的</b></div>
+
+      <div class="mh"><span class="t">管理</span><span class="n">超管独有</span></div>
+      <div class="mods">
+        <div class="mod">
+          <div class="mod-t">账号</div><div class="mod-d">分发 · 重置 · 停用</div>
+          <div class="mod-f"><div class="mod-n"></div><span class="mod-arrow">›</span></div>
+        </div>
+        <div class="mod">
+          <div class="mod-t">排班规则</div><div class="mod-d">场次上限与轮值</div>
+          <div class="mod-f"><div class="mod-n"></div><span class="mod-arrow">›</span></div>
+        </div>
+        <div class="mod">
+          <div class="mod-t">考勤总览</div><div class="mod-d">全站出勤统计</div>
+          <div class="mod-f"><div class="mod-n"></div><span class="mod-arrow">›</span></div>
+        </div>
+      </div>
+
+      <div class="mh" style="margin-top:22px"><span class="t">站内协作</span><span class="n">站内伙伴的事</span></div>
+      <div class="mods">
+        <div class="mod">
+          <div class="mod-t">内部稿件</div><div class="mod-d">站内伙伴来稿</div>
+          <div class="mod-f"><div class="mod-n"></div><span class="mod-arrow">›</span></div>
+        </div>
+        <div class="mod">
+          <div class="mod-t">请假审批</div><div class="mod-d">等待你确认</div>
+          <div class="mod-f"><div class="mod-n"></div><span class="mod-arrow">›</span></div>
+        </div>
+        <div class="mod">
+          <div class="mod-t">考勤录入</div><div class="mod-d">按节目场点名</div>
+          <div class="mod-f"><div class="mod-n"></div><span class="mod-arrow">›</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col have">
+      <div class="col-hd">改之后 · <b>左下角有真数</b></div>
+
+      <div class="mh"><span class="t">管理</span><span class="n">超管独有</span></div>
+      <div class="mods">
+        <div class="mod">
+          <div class="mod-t">账号</div><div class="mod-d">分发 · 重置 · 停用</div>
+          <div class="mod-f"><div class="mod-n on">5<span class="u">个账号</span></div><span class="mod-arrow">›</span></div>
+        </div>
+        <div class="mod">
+          <div class="mod-t">排班规则</div><div class="mod-d">场次上限与轮值</div>
+          <div class="mod-f"><div class="mod-n on">12<span class="u">条规则</span></div><span class="mod-arrow">›</span></div>
+        </div>
+        <div class="mod">
+          <div class="mod-t">考勤总览</div><div class="mod-d">全站出勤统计</div>
+          <div class="mod-f"><div class="mod-n on">88<span class="u">场已录</span></div><span class="mod-arrow">›</span></div>
+        </div>
+      </div>
+
+      <div class="mh" style="margin-top:22px"><span class="t">站内协作</span><span class="n">12 项待处理</span></div>
+      <div class="mods">
+        <div class="mod">
+          <div class="mod-t">内部稿件</div><div class="mod-d">站内伙伴来稿</div>
+          <div class="mod-f"><div class="mod-n on">3<span class="u">待审</span></div><span class="mod-arrow">›</span></div>
+        </div>
+        <div class="mod">
+          <div class="mod-t">请假审批</div><div class="mod-d">等待你确认</div>
+          <div class="mod-f"><div class="mod-n on">1<span class="u">条</span></div><span class="mod-arrow">›</span></div>
+        </div>
+        <div class="mod">
+          <div class="mod-t">考勤录入</div><div class="mod-d">按节目场点名</div>
+          <div class="mod-f"><div class="mod-n on">8<span class="u">未录入</span></div><span class="mod-arrow">›</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <h2>每个数从哪来（全是现有接口，没有新接口）</h2>
+    <ul>
+      <li><b>账号 · 个账号</b> — <code>GET /admin/admin/list</code> 的 <code>total</code>（只有超管能调，社干这条路不发请求）</li>
+      <li><b>排班规则 · 条规则</b> — <code>GET /partner/rules</code> 的 <code>items.length</code></li>
+      <li><b>考勤总览 · 场已录</b> — <code>GET /partner/attendance/overview</code> 的 <code>posts - unmarked</code></li>
+      <li><b>内部稿件 · 待审</b> — <code>GET /partner/draft/review?status=0</code> 的 <code>total</code>
+          （注意不是 <code>/partner/draft/list</code>，那个只返回自己的稿）</li>
+      <li><b>请假审批 · 条</b> — <code>GET /partner/leave/pending</code> 的 <code>counts.pending</code></li>
+      <li><b>考勤录入 · 未录入</b> — 同一份 overview 的 <code>unmarked</code></li>
+      <li>右上「站内协作」的合计 = 内部稿件 + 请假 + 未录入 三项求和；<b>任何一项没拉到就不给合计</b>（写「站内伙伴的事」），不拿残缺的和冒充总数。</li>
+      <li>计数为 <b>0</b> 时照常显示 <span style="font-family:ui-monospace,Menlo,monospace">0</span>（灰）；取不到才不显示。0 和「不知道」不是一回事。</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>
