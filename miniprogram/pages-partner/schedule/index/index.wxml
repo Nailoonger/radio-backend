@@ -5,9 +5,19 @@
     <view class="hint-note" wx:if="{{loading}}">正在加载班表……</view>
     <view class="err" wx:elif="{{loadError}}"><text class="err-t">班表未能加载</text><text class="err-d">{{loadError}}</text><button class="btn ghost" bindtap="load">重新加载</button></view>
     <block wx:else>
-      <view class="pl-head" wx:if="{{!isMember}}"><text class="pl-title">班表管理</text><text class="pl-sub">{{weekNo}} · {{weekRange}}{{roleSuffix}}</text></view>
+      <!-- 周切换：三端共用这一条，位置在状态条上方（先选看哪一周，再看这一周的状态）
+           写法和考勤 / 请假 / 可排时间 / 排班工作台同一套 .wk-nav，别另造按钮。
+           ⚠️ 这里是「本周」胶囊唯一的出口 —— 原来社干抬头里也写了一遍日期，已删。 -->
+      <view class="wk-nav">
+        <text class="wk-b" bindtap="onPrevWeek">‹ 上一周</text>
+        <view class="wk-mid">
+          <text class="wk-tag {{isThisWeek ? 'on' : 'off'}}">{{isThisWeek ? '本周' : '非本周'}}</text>
+          <text class="wk-c">{{weekText || '加载中'}}</text>
+        </view>
+        <text class="wk-b r {{isThisWeek ? 'off' : ''}}" bindtap="onNextWeek">下一周 ›</text>
+      </view>
       <view class="pl-state {{state === 'published' ? 'pub' : state === 'draft' ? 'draft' : state === 'withdrawn' ? 'wd' : 'none'}}"><text class="ps-b">{{stateText}}</text><text class="ps-s">{{stateSub}}</text></view>
-      <duty-timetable week="{{week}}" my-id="{{myId}}" visible-people="{{!isMember || state === 'published'}}" slots="{{slots}}"/>
+      <duty-timetable week="{{week}}" my-id="{{myId}}" visible-people="{{!isMember || state === 'published'}}" slots="{{slots}}" show-head="{{false}}"/>
       <block wx:if="{{!isMember}}">
         <view class="pl-ops"><button class="btn primary" bindtap="goPlanning">进入排班工作台（可编辑）</button><text class="ts-bar-h">这一页只能看。生成草稿、换人、校验、发布、撤回都在「排班工作台」里做。</text></view>
         <view class="sc-wrap">

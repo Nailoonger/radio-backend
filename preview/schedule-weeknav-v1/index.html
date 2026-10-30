@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>班表页周切换 v1</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 24px 60px; background: #EDEDF1; color: #1D1D1F;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { margin: 0 0 6px; font-size: 19px; font-weight: 600; letter-spacing: -.2px; }
+  .lead { margin: 0 0 20px; font-size: 12.5px; line-height: 1.8; color: #6B6B73; }
+  .lead b { color: #1D1D1F; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; color: #0066CC; }
+
+  /* ── 切屏按钮 ── */
+  .picks { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .pick {
+    border: 1px solid #D9D9E0; background: #fff; color: #3A3A42;
+    border-radius: 9999px; padding: 8px 15px; font-size: 12.5px; cursor: pointer;
+    font-family: inherit; line-height: 1.5;
+  }
+  .pick.on { background: #0066CC; border-color: #0066CC; color: #fff; font-weight: 500; }
+
+  /* ── 手机 ── */
+  .stage { display: flex; gap: 28px; align-items: flex-start; }
+  .phone {
+    width: 375px; height: 780px; flex: none; background: #F5F5F7;
+    border-radius: 38px; border: 1px solid #D6D6DD; overflow: hidden;
+    box-shadow: 0 18px 46px -22px rgba(20, 22, 34, .35);
+    display: flex; flex-direction: column; position: relative;
+  }
+  .statusbar { height: 44px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font-size: 12px; font-weight: 600; color: #1D1D1F; }
+  .navbar { flex: none; height: 44px; display: flex; align-items: center; justify-content: center; position: relative; }
+  .navbar-title { font-size: 16px; font-weight: 600; letter-spacing: -.3px; }
+  .scroll { flex: 1; overflow-y: auto; padding: 9.5px 17.5px 40px; display: flex; flex-direction: column; gap: 11.5px; scrollbar-width: none; }
+  .scroll::-webkit-scrollbar { display: none; }
+
+  /* ── 周切换条（照 .wk-nav，四页统一） ── */
+  .wk-nav { display: flex; align-items: center; padding: 6px 3px 8px; }
+  .wk-b { flex: 1; font-size: 12.5px; color: #0066CC; cursor: pointer; user-select: none; }
+  .wk-b.r { text-align: right; }
+  .wk-b.off { color: #B3B3B8; }
+  .wk-mid { flex: none; display: flex; align-items: center; gap: 5px; }
+  .wk-tag { flex: none; font-size: 10px; line-height: 1.6; padding: 1px 6px; border-radius: 9999px; font-weight: 500; }
+  .wk-tag.on { background: #B42318; color: #fff; }
+  .wk-tag.off { background: #F1F1F4; color: #76767E; }
+  .wk-c { font-size: 15px; font-weight: 600; color: #1D1D1F; font-variant-numeric: tabular-nums; }
+
+  /* ── 状态条 ── */
+  .pl-state { border-radius: 13.5px; padding: 10.5px 13.5px; font-size: 12px; line-height: 1.55; display: flex; flex-direction: column; gap: 2px; }
+  .ps-b { font-weight: 600; }
+  .ps-s { opacity: .78; }
+  .pl-state.pub { background: #272729; color: #fff; }
+  .pl-state.draft { background: #FFF4DD; color: #8A5A12; }
+  .pl-state.none { background: #F0F1F4; color: #5A5A5F; }
+  .pl-state.wd { background: #FDECEA; color: #B42318; }
+
+  /* ── 班表白卡 ── */
+  .wk { background: #fff; border-radius: 17.5px; padding: 17.5px 15.5px 15.5px; }
+  .hd { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin-bottom: 15.5px; }
+  .hd .title { font-size: 16px; font-weight: 600; letter-spacing: -.4px; font-variant-numeric: tabular-nums; }
+  .hd .sub { font-size: 10.5px; color: #76767E; flex: none; }
+
+  .band { display: flex; align-items: center; gap: 8px; background: #F5F5F7; border-radius: 11.5px; padding: 8.5px 11.5px; margin: 2px 0 11.5px; box-shadow: inset 0 0 0 1px #E3E3E8; }
+  .band-label { font-size: 11px; color: #76767E; flex: none; }
+  .band-time { display: block; font-size: 9.5px; }
+  .band-people { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+  .band-group { display: flex; gap: 4px; flex-wrap: wrap; }
+
+  .grid { display: grid; grid-template-columns: 56px repeat(5, minmax(0, 1fr)); gap: 6px; align-items: center; }
+  .column { text-align: center; font-size: 10.5px; color: #76767E; line-height: 1.35; }
+  .column .day, .row-label .day { display: block; font-size: 11.5px; font-weight: 500; color: #1D1D1F; }
+  .row-label { font-size: 10px; color: #76767E; line-height: 1.4; }
+  .row-label .tm { display: block; font-size: 8.5px; letter-spacing: -.15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .cell { min-height: 54px; display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 0; }
+  .chip {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 500; font-size: 10.5px; line-height: 1.2; padding: 7.5px 1.5px;
+    border-radius: 11.5px; background: #F5F5F7; text-align: center; min-width: 0; word-break: break-all;
+  }
+  .chip + .chip { margin-top: 4px; }
+  .chip.one { padding: 3px 8.5px; border-radius: 7.5px; line-height: 1.6; display: inline-block; }
+  .band-group .chip + .chip { margin-top: 0; }
+  .person { display: block; }
+  .dept { font-size: 8.5px; font-weight: 400; line-height: 1.3; color: #76767E; }
+  .me { background: #EAF3FD; color: #0066CC; }
+  .empty { background: transparent; color: #B3B3B8; box-shadow: inset 0 0 0 1.5px #E3E3E8; }
+  .empty .dept { color: #B3B3B8; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 9.5px 11px; padding-top: 13.5px; border-top: 1px solid #E3E3E8; margin-top: 15.5px; }
+  .legend > span { display: flex; align-items: center; gap: 4px; font-size: 10px; color: #76767E; }
+  .dot { display: inline-block; width: 9.5px; height: 9.5px; border-radius: 3.5px; box-shadow: inset 0 0 0 1px currentColor; }
+  .note { display: block; font-size: 10px; color: #999DA6; line-height: 1.6; margin-top: 9.5px; }
+
+  /* ── 未发布：站员看到的是空态卡，不是满屏「空缺」 ── */
+  .blank { background: #fff; border-radius: 17.5px; padding: 30px 20px; text-align: center; }
+  .blank-t { display: block; font-size: 13px; font-weight: 600; color: #1D1D1F; }
+  .blank-s { display: block; margin-top: 6px; font-size: 11.5px; color: #76767E; line-height: 1.7; }
+
+  /* ── 操作区四行 ── */
+  .sc-wrap { background: #fff; border-radius: 18px; overflow: hidden; }
+  .sc-row { display: flex; align-items: center; gap: 12px; min-height: 62px; padding: 13px 16px; border-bottom: 1px solid #F1F1F4; }
+  .sc-row:last-child { border-bottom: 0; }
+  .sc-tx { flex: 1; min-width: 0; font-size: 15px; letter-spacing: -.1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sc-st { flex: none; font-size: 13px; color: #9A9AA0; white-space: nowrap; }
+  .sc-ar { flex: none; font-size: 15px; color: #C7C7CC; }
+  .btn { display: flex; align-items: center; justify-content: center; height: 44px; border-radius: 12.5px; font-size: 13.5px; font-weight: 500; }
+  .btn.primary { background: #0066CC; color: #fff; }
+  .ts-bar-h { font-size: 11px; color: #76767E; line-height: 1.7; text-align: center; padding: 0 5px; }
+
+  /* ── 可排时间（周日只读） ── */
+  .avpage { padding: 0; }
+  .avdays { display: flex; flex-direction: column; gap: 7px; }
+  .avday-hd { display: flex; align-items: baseline; padding: 0 3px 7px; }
+  .avdn { font-size: 14px; font-weight: 600; }
+  .avdd { margin-left: 6px; font-size: 11.5px; color: #76767E; }
+  .avc { margin-left: auto; font-size: 9.5px; color: #76767E; font-variant-numeric: tabular-nums; }
+  .avrow { display: flex; gap: 6px; }
+  .avslot { flex: 1 1 0; min-width: 0; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 6px 3px; border-radius: 10px; border: 1px solid #E2E2E7; background: #fff; }
+  .avslot.on { background: #EAF3FD; border-color: #0066CC; }
+  .avslot-t { font-size: 11.5px; font-weight: 500; }
+  .avslot-s { font-size: 9.5px; color: #76767E; font-variant-numeric: tabular-nums; }
+  .avslot.on .avslot-t { color: #0066CC; font-weight: 600; }
+  .avslot.on .avslot-s { color: #0066CC; opacity: .8; }
+  .avslot.lock { opacity: .55; }
+
+  .lockbar { background: #FFF4DD; border-radius: 13.5px; padding: 10.5px 13.5px; display: flex; flex-direction: column; gap: 2px; }
+  .lockbar b { font-size: 12px; font-weight: 600; color: #8A5A12; }
+  .lockbar span { font-size: 11px; color: #8A5A12; opacity: .88; line-height: 1.55; }
+
+  /* ── 右侧说明 ── */
+  .ref { flex: 1; min-width: 300px; background: #fff; border-radius: 16px; padding: 18px 20px; }
+  .ref h2 { margin: 0 0 10px; font-size: 13px; }
+  .ref h3 { margin: 18px 0 8px; font-size: 12.5px; color: #1D1D1F; }
+  .ref p { margin: 0 0 8px; font-size: 12px; line-height: 1.85; color: #6B6B73; }
+  .ref table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-top: 6px; }
+  .ref th, .ref td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #F0F0F0; vertical-align: top; }
+  .ref th { color: #76767E; font-weight: 600; }
+  .ref td.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+  .ref .hot { background: #FFF8E8; }
+  .ref ul { margin: 6px 0 0; padding-left: 17px; font-size: 12px; line-height: 1.9; color: #6B6B73; }
+  .ref b { color: #1D1D1F; }
+
+  @media (max-width: 900px) { .stage { flex-direction: column; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>班表页周切换 v1</h1>
+  <p class="lead">
+    真实尺寸（375×780，1rpx = 0.5px），样式全部照 <code>availability.wxss</code> 的 <code>.wk-nav</code>
+    和 <code>timetable/index.wxss</code> 抄，不新增色值。<b>周切换条可以点</b>：左右箭头能真翻周，
+    日期、"本周/非本周"胶囊会跟着变。
+  </p>
+
+  <div class="picks" id="picks"></div>
+
+  <div class="stage">
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+      <div class="navbar"><span class="navbar-title" id="navTitle">我的班表</span></div>
+      <div class="scroll" id="screen"></div>
+    </div>
+    <div class="ref" id="ref"></div>
+  </div>
+</div>
+
+<script>
+/* ══════════ 周数据（mock，日期是真的） ══════════ */
+const DAYS = ['周一', '周二', '周三', '周四', '周五'];
+
+function addDays(ymd, n) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const t = Date.UTC(y, m - 1, d) + n * 86400000;
+  const dd = new Date(t);
+  const p = (x) => String(x).padStart(2, '0');
+  return `${dd.getUTCFullYear()}-${p(dd.getUTCMonth() + 1)}-${p(dd.getUTCDate())}`;
+}
+const shortDate = (s) => s.slice(5, 7) + '/' + s.slice(8, 10);
+
+/* 本周 = 2026-10-26（周一）。上一周 10/19、下一周 11/02 */
+const BASE = '2026-10-26';
+
+/* 每份班表：早会（周一单日）+ 午间(2 人) + 傍晚(1 人)，照真实时段与人数 */
+const SLOTS = [
+  { key: 'noon', slot: '午间', timeText: '12:00-12:30', count: 2 },
+  { key: 'eve', slot: '傍晚', timeText: '17:00-17:30', count: 1 },
+];
+/* 周一~周五，每个时段每天排谁（空数组/不足 count 的位置画「空缺」） */
+const TABLE = {
+  noon: [
+    [['林小满', '播音'], ['周予安', '播音']],
+    [['林小满', '播音'], ['许听白', '播音']],
+    [['周予安', '播音'], ['沈亦声', '播音']],
+    [['苏晚笛', '播音'], ['陈知遥', '播音']],
+    [['林小满', '播音'], ['周予安', '播音']],
+  ],
+  eve: [
+    [['许听白', '主持']], [['沈亦声', '主持']], [], [['陈知遥', '主持']], [['许听白', '主持']],
+  ],
+};
+const ME = '林小满'; // 站员视角的「我」
+
+const WEEK_STATE = {
+  '-1': { state: 'published', version: 2 },
+  '0': { state: 'published', version: 3 },
+  '1': { state: 'empty', version: 0 },
+};
+
+/* ══════════ 三屏 + 周日只读屏 ══════════ */
+const SCREENS = [
+  {
+    id: 'm0', label: '站员 · 本周（已发布）', role: 'member', offset: 0,
+    refTitle: '站员 · 本周',
+    refBody: [
+      '站员看到的「我的班表」：周切换条在状态条上方，默认落在<b>本周</b>——周日 0 点之前，本周就是正在值班的那一周。',
+      '顶部红色「本周」胶囊 + 第 N 周 + 日期范围；往右点是下一周，往左点是上一周。',
+      '已发布时格子里的名字是实名的，<b>自己那一格是蓝底</b>。',
+    ],
+  },
+  {
+    id: 'm1', label: '站员 · 翻到上一周', role: 'member', offset: -1,
+    refTitle: '站员 · 非本周',
+    refBody: [
+      '翻到别的周，红胶囊变成灰的<b>「非本周」</b>，日期跟着变，其余布局一动不动。',
+      '已发布的旧周照样能看（第 2 版），便于对"上周谁值了什么班"。',
+      '⚠️ 原来状态条在没班时会写「<b>本周</b>未排班」——翻到上周还写"本周"就是错的，所以这次把空态文案改成不说周次的「班表未发布」。',
+    ],
+  },
+  {
+    id: 'm2', label: '站员 · 下一周（未发布）', role: 'member', offset: 1,
+    refTitle: '站员 · 未发布',
+    refBody: [
+      '⚠️ 这是<b>现在最糟的一屏</b>：班表没发布时，表格照样按已发布时段铺出来，而站员拿不到人名 ⇒ 满屏都是「空缺」胶囊，像全站都没人来。',
+      '改成一块空态卡：「<b>班表未发布</b> · 这一周超管还没有发布班表，发布后这里自动出现」。这才是陛下要的「未发布就显示班表未发布」。',
+      '社干 / 超管不走这块空态——他们在草稿阶段就要看表。',
+    ],
+  },
+  {
+    id: 'g0', label: '社干 · 本周（管理）', role: 'manager', offset: 0,
+    refTitle: '社干 · 本周',
+    refBody: [
+      '社干 / 超管的「班表管理」：导航栏标题 → 周切换条 → 状态条 → 表格。',
+      '⚠️ 顶部原来还有一块 50rpx 大标题「班表管理」+ 一行角色副行，<b>已整块删掉</b>：导航栏本来就写着同一个词，等于同一句话说两遍。',
+      '那块副行原本兼着「第 N 周 · 10/26 – 10/30」，删掉后由周切换条接管 —— <b>周信息没丢，只是不再重复</b>。',
+      '「这一页只能看」那句提示仍在操作区下方，角色分工没有失去说明。',
+    ],
+  },
+  {
+    id: 'g1', label: '超管 · 本周（含操作区）', role: 'super', offset: 0,
+    refTitle: '超管 · 本周',
+    refBody: [
+      '超管多了四行操作：排班工作台 / 人员轮值 / 发布记录 / 导出本周班表。',
+      '「导出本周班表」和「发布与调整记录」原来都写死"本周"，翻到别的周就不对了——改成跟着当前查看的周走（非本周时叫「导出该周班表」）。',
+    ],
+  },
+  {
+    id: 'av', label: '站员 · 可排时间（周日只读）', role: 'member', offset: 0, mode: 'avail',
+    base: '2026-11-02', // 周日视角：这时"本周"已经是 11/02 那一周
+    refTitle: '可排时间 · 周日只读',
+    refBody: [
+      '⚠️ 这一屏是<b>周日视角</b>：按新口径"本周"已经是 11/02 – 11/06，所以顶部标的是「本周」而不是「非本周」。',
+      '口径：可排时间只能在<b>周一 0 点 ~ 周六 24 点</b>填，周日整页只读。',
+      '周日进来看到的就是这一周已截止的那份，能回顾自己点过什么，但点不动、也不能提交。',
+      '顶部黄条写清「已截止 + 没填的由社干代录」，不要让人以为是页面坏了。<b>超管不受这条限制，随时可以代录</b>（不走只读）。',
+    ],
+  },
+];
+
+/* ══════════ 渲染 ══════════ */
+const $ = (id) => document.getElementById(id);
+let cur = 0;
+
+function rangeText(start) {
+  return `${shortDate(start)} – ${shortDate(addDays(start, 4))}`;
+}
+function weekNoText(start) {
+  const d = new Date(start + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + 3 - ((d.getUTCDay() + 6) % 7));
+  const first = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  first.setUTCDate(first.getUTCDate() + 3 - ((first.getUTCDay() + 6) % 7));
+  return `第 ${1 + Math.round((d - first) / 604800000)} 周`;
+}
+
+function navHtml(start, isThis) {
+  return `<div class="wk-nav">
+    <span class="wk-b" data-shift="-1">‹ 上一周</span>
+    <span class="wk-mid">
+      <span class="wk-tag ${isThis ? 'on' : 'off'}">${isThis ? '本周' : '非本周'}</span>
+      <span class="wk-c">${rangeText(start)}</span>
+    </span>
+    <span class="wk-b r ${isThis ? 'off' : ''}" data-shift="1">下一周 ›</span>
+  </div>`;
+}
+
+function chipHtml(name, dept, cls) {
+  return `<div class="chip ${cls}"><span class="person">${name}</span>${dept ? `<span class="dept">${dept}</span>` : ''}</div>`;
+}
+
+function tableHtml(start, state, role) {
+  // 站员 + 未发布 → 空态卡（不画表）。⚠️ 状态条此时不再重复说一遍，交给这块卡说
+  if (role === 'member' && state !== 'published') {
+    const withdrawn = state === 'withdrawn';
+    return `<div class="blank">
+      <span class="blank-t">${withdrawn ? '班表已撤回' : '班表未发布'}</span>
+      <span class="blank-s">${withdrawn
+        ? '超管撤回后正在重排。<br>重新发布后这里会自动出现。'
+        : '这一周超管还没有发布班表。<br>发布后这里会自动出现，不用重新进页面。'}</span>
+    </div>`;
+  }
+  const cols = DAYS.map((n, i) => `<div class="column"><span class="day">${n}</span>${shortDate(addDays(start, i))}</div>`).join('');
+  const rows = SLOTS.map((s) => {
+    const cells = DAYS.map((_, i) => {
+      const def = TABLE[s.key][i] || [];
+      const chips = [];
+      for (let k = 0; k < s.count; k++) {
+        const p = def[k];
+        chips.push(p ? chipHtml(p[0], p[1], (role === 'member' && p[0] === ME) ? 'me' : '') : chipHtml('空缺', '', 'empty'));
+      }
+      return `<div class="cell">${chips.join('')}</div>`;
+    }).join('');
+    return `<div class="row-label"><span class="day">${s.slot}</span><span class="tm">${s.timeText}</span></div>${cells}`;
+  }).join('');
+
+  const bandChips = [['许听白', '主持'], ['林小满', '播音'], ['周予安', '播音']].map(([n]) => {
+    return `<div class="chip one ${role === 'member' && n === ME ? 'me' : ''}">${n}</div>`;
+  }).join('');
+
+  return `<div class="wk">
+    <div class="band">
+      <span class="band-label">周一 早会<span class="band-time">07:30-07:50</span></span>
+      <div class="band-people"><div class="band-group">${bandChips}</div></div>
+    </div>
+    <div class="grid">${'<div></div>'}${cols}${rows}</div>
+    <div class="legend">
+      <span><i class="dot" style="color:#0066CC;background:#EAF3FD"></i>我</span>
+      <span><i class="dot" style="color:#D99A00;background:#FDF3DC"></i>请假待批</span>
+      <span><i class="dot" style="color:#1E8E4E;background:#EAF7EF"></i>已批准</span>
+      <span><i class="dot" style="color:#E3E3E8;background:#F7F8FA"></i>空缺</span>
+    </div>
+    <span class="note">行头＝值班时段的名称与起止时间；只在某一天出现的时段（如早会）单独放在上方横带。</span>
+  </div>`;
+}
+
+function stateHtml(state, version, isThis, role) {
+  // 站员看不到草稿，也不该看到「未排班」这种内部说法 —— 未发布的情况由空态卡说，状态条让位
+  if (role === 'member' && state !== 'published' && state !== 'withdrawn') return '';
+  if (state === 'published') {
+    return `<div class="pl-state pub"><span class="ps-b">已发布 v${version}</span><span class="ps-s">${isThis ? '本周' : '该周'}安排以此为准</span></div>`;
+  }
+  if (state === 'draft') {
+    return `<div class="pl-state draft"><span class="ps-b">草稿未发布</span><span class="ps-s"> · 检查通过后才能发布</span></div>`;
+  }
+  if (state === 'withdrawn') {
+    return `<div class="pl-state wd"><span class="ps-b">已撤回</span><span class="ps-s"> · 待重发</span></div>`;
+  }
+  return `<div class="pl-state none"><span class="ps-b">班表未发布</span><span class="ps-s"> · ${isThis ? '这一周' : '该周'}超管还没有发布班表</span></div>`;
+}
+
+function opsHtml(isThis) {
+  return `<div class="sc-wrap">
+    <div class="sc-row"><span class="sc-tx">排班工作台</span><span class="sc-st">已发布 v3 · 12/12 人</span><span class="sc-ar">›</span></div>
+    <div class="sc-row"><span class="sc-tx">人员轮值情况</span><span class="sc-st">本月 88 场</span><span class="sc-ar">›</span></div>
+    <div class="sc-row"><span class="sc-tx">发布与调整记录</span><span class="sc-st">当前第 3 版</span><span class="sc-ar">›</span></div>
+    <div class="sc-row"><span class="sc-tx">导出${isThis ? '本周' : '该周'}班表</span><span class="sc-st">复制文本</span><span class="sc-ar">›</span></div>
+  </div>`;
+}
+
+function availHtml(offset, base) {
+  const start = addDays(base, offset * 7);
+  const days = DAYS.map((n, i) => {
+    const cells = [
+      { t: '早会', s: '07:30-07:50', on: i === 1 },
+      { t: '午间', s: '12:00-12:30', on: i === 2 },
+      { t: '傍晚', s: '17:00-17:30', on: false },
+    ].map((c) => `<div class="avslot lock ${c.on ? 'on' : ''}"><span class="avslot-t">${c.t}</span><span class="avslot-s">${c.s}</span></div>`).join('');
+    return `<div><div class="avday-hd"><span class="avdn">${n}</span><span class="avdd">${shortDate(addDays(start, i))}</span><span class="avc">${i === 1 ? 1 : i === 2 ? 1 : 0} / 3 个时段</span></div><div class="avrow">${cells}</div></div>`;
+  }).join('');
+  return `<div class="lockbar">
+      <b>本周可排时间填写已截止</b>
+      <span>填写时间到周六 24 点。没填的时段已由社干代录，这里现在只能查看。</span>
+    </div>
+    <div class="avdays">${days}</div>`;
+}
+
+function render() {
+  const s = SCREENS[cur];
+  const base = s.base || BASE;
+  const start = addDays(base, s.offset * 7);
+  const isThis = s.offset === 0;
+  const meta = WEEK_STATE[String(s.offset)] || WEEK_STATE['0'];
+
+  $('navTitle').textContent = s.mode === 'avail' ? '我的可排时间' : (s.role === 'member' ? '我的班表' : '班表管理');
+
+  if (s.mode === 'avail') {
+    $('screen').innerHTML = navHtml(start, isThis) + availHtml(s.offset, base);
+  } else {
+    $('screen').innerHTML = navHtml(start, isThis)
+      + stateHtml(meta.state, meta.version, isThis, s.role)
+      + tableHtml(start, meta.state, s.role)
+      + (s.role === 'member' ? '' : opsHtml(isThis));
+  }
+
+  // 点箭头真翻周
+  $('screen').querySelectorAll('[data-shift]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const d = Number(el.dataset.shift);
+      const next = Math.max(-1, Math.min(1, s.offset + d));
+      s.offset = next;
+      SCREENS[cur] = s;
+      render();
+    });
+  });
+
+  $('ref').innerHTML = `<h2>${s.refTitle}</h2>`
+    + s.refBody.map((p) => `<p>${p.replace('<section>', '<b>').replace('</section>', '</b>')}</p>`).join('')
+    + `<h3>三端同一页</h3>
+       <p>站员 / 社干 / 超管进的都是 <code>schedule/index/index</code>，只是标题和下半部分不同。
+          周切换条加在<b>状态条上方</b>，一处改动三端同时生效。</p>
+       <h3>顺手去掉的两处重复</h3>
+       <ul>
+         <li><b>社干 / 超管页面的大标题「班表管理」+ 角色副行整块删掉</b>——导航栏标题本来就是「班表管理」，下面再来一个 50rpx 大标题是同一句话说两遍。那一行原本兼着「第 N 周 · 日期」，现在归周切换条。</li>
+         <li>白卡自己的抬头原来又写一遍「本周 10/26 – 10/30」，跟周切换条一模一样 ⇒ <b>去掉</b>，白卡直接从早会横带开始。</li>
+       </ul>
+       <h3>「本周」到底指哪一周</h3>
+       <table>
+         <tr><th>时刻</th><th>班表页默认</th><th>可排时间页</th></tr>
+         <tr><td>周一 0 点 → 周六 24 点</td><td class="mono">本周（正在值班）</td><td class="mono">下周（填写中）</td></tr>
+         <tr class="hot"><td>周日 0 点 → 周日 24 点</td><td class="mono">下周（新班表）</td><td class="mono">下周（已截止·只读）</td></tr>
+       </table>
+       <h3>这一步只解决「看得见哪一周」</h3>
+       <ul>
+         <li>翻周走现成的 <code>GET /partner/schedule?week=</code>，后端早就支持，不用改云函数。</li>
+         <li>「周日 0 点切下周」要改 <code>_kit.js#currentWeekStart()</code>，会连带请假 / 考勤 / 工作台的"本周"口径，需单独一轮验证。</li>
+         <li>预览里没画底部 tabbar，跟这次改动无关，别当漏了。</li>
+       </ul>`;
+}
+
+/* 切屏按钮 */
+const h = Number((location.hash || '').replace('#', ''));
+if (Number.isInteger(h) && h >= 0 && h < SCREENS.length) cur = h;
+$('picks').innerHTML = SCREENS.map((s, i) => `<button class="pick${i === cur ? ' on' : ''}" data-i="${i}">${s.label}</button>`).join('');
+$('picks').addEventListener('click', (e) => {
+  const b = e.target.closest('.pick');
+  if (!b) return;
+  cur = Number(b.dataset.i);
+  $('picks').querySelectorAll('.pick').forEach((x) => x.classList.toggle('on', Number(x.dataset.i) === cur));
+  render();
+});
+
+render();
+</script>
+</body>
+</html>

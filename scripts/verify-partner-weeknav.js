@@ -3,8 +3,8 @@
  * 周切换一致性校验（2026-10-30）
  *
  * 陛下要求：「把所有可以切换周的页面都做上本周和非本周的标记统一一下」。
- * 四个页面必须同一套结构，否则某天只改一个页面就会走形：
- *   考勤 attendance · 请假 leave · 值班时间代录 availability · 排班工作台 planning
+ * 页面必须同一套结构，否则某天只改一个页面就会走形：
+ *   考勤 attendance · 请假 leave · 值班时间代录 availability · 排班工作台 planning · 我的班表 schedule/index
  *
  * 判据（任一不满足即退出码 1）：
  *   ① wxml 里同时出现 .wk-nav / .wk-mid / .wk-tag / .wk-c，且胶囊文案是「本周 / 非本周」
@@ -20,6 +20,7 @@ const PAGES = [
   ['请假', 'miniprogram/pages-partner/leave/leave'],
   ['值班时间代录', 'miniprogram/pages-partner/availability/availability'],
   ['排班工作台', 'miniprogram/pages-partner/schedule/planning/planning'],
+  ['我的班表', 'miniprogram/pages-partner/schedule/index/index'],
 ];
 
 let failed = 0;

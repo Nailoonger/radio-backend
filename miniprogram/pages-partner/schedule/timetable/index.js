@@ -7,6 +7,10 @@ Component({
     slots: { type: Array, value: [] }, showFixed: { type: Boolean, value: false },
     // 标题的「本周 / 该周」：工作台能翻周，恒写「本周」会误导（2026-10-30）
     isThisWeek: { type: Boolean, value: true },
+    // 白卡自己的抬头（「本周 10/26 – 10/30」+ 第 N 周）。
+    // ⚠️ 页面里已经有 .wk-nav 周切换条时传 false —— 否则同一句日期在上下两块里各说一遍
+    //    （2026-10-31 陛下打回「班表管理」大标题时同一个毛病，班表页先关掉；工作台暂不动，默认 true）
+    showHead: { type: Boolean, value: true },
   },
   data: { cols: [], singles: [], matrix: [], range: '', weekLabel: '' },
   observers: { 'week,myId,visiblePeople,slots': function (week, myId, visiblePeople, slots) {

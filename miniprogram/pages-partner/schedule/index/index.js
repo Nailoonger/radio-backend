@@ -1,7 +1,13 @@
 const { adminRequest } = require('../../../utils/request');
 const vm = require('../view-model');
 Page({
-  data: { statusBarHeight: 20, ready: false, loading: true, loadError: '', roleKey: 'member', isMember: true, tabId: 'schedule', myId: 0, badges: {}, week: {}, state: 'empty', stateText: '', stateSub: '', roleSuffix: '', needText: '', weekRange: '', weekNo: '', monthLabel: '', monthList: [], monthTotal: 0, myLeaves: [], leavePending: 0 },
+  /** 正在查看的周（空串 = 本周，由云函数按北京时间决定，前端不自己算）
+   *  ⚠️ 别和下面 load 里的 `this._week` 混：那一个是整个 week 对象（导出、判断状态用），
+   *     这个名字是「要看哪一周」的字符串。两个都叫 _week 会互相覆盖（翻周后导出就错行）。 */
+  _viewWeek: '',
+  /** 本周周一 —— 用来判断「现在看的是不是本周」 */
+  _baseWeek: '',
+  data: { statusBarHeight: 20, ready: false, loading: true, loadError: '', roleKey: 'member', isMember: true, tabId: 'schedule', myId: 0, badges: {}, week: {}, state: 'empty', stateText: '', stateSub: '', needText: '', weekStart: '', weekText: '', isThisWeek: true, monthLabel: '', monthList: [], monthTotal: 0, myLeaves: [], leavePending: 0 },
   onLoad() {
     const app = getApp();
     if (!app.isAdminLoggedIn()) return wx.reLaunch({ url: '/pages-partner/login/login' });
@@ -31,9 +37,13 @@ Page({
       })
       .catch(() => ({ ready: false, needTotal: 0 }));
 
-    return Promise.all([adminRequest('/partner/schedule', 'GET', {}), slotsReq]).then(([week, sl]) => {
+    return Promise.all([adminRequest('/partner/schedule', 'GET', this._viewWeek ? { week: this._viewWeek } : {}), slotsReq]).then(([week, sl]) => {
       if (this._gone || this._request !== request) return;
       this._week = week;
+      // 基准周 = 第一次（不带 week）拿到的 weekStart，云函数按北京时间给的周一周
+      const ws = week.weekStart || '';
+      if (!this._baseWeek && ws) this._baseWeek = ws;
+      const isThisWeek = !this._baseWeek || ws === this._baseWeek;
       this.setData({
         week, state: week.state,
         stateText: vm.stateLabel(week.state, week.version, true),
@@ -43,8 +53,8 @@ Page({
             : '',
         needText: ` · ${week.total || 0}/${sl.needTotal || 0} 人`,
         slots: sl.slots || [],
-        roleSuffix: this.data.roleKey === 'super' ? ' · 你是超管，时段与规则都可以改' : ' · 时段与规则由超管发布，你只能查看',
-        weekRange: vm.weekRange(week.weekStart), weekNo: vm.weekNo(week.weekStart), loading: false,
+        weekStart: ws, weekText: ws ? vm.weekRange(ws) : '', isThisWeek,
+        loading: false,
       });
       return Promise.allSettled([
         adminRequest('/partner/leave/mine', 'GET', { week: week.weekStart }),
@@ -70,6 +80,17 @@ Page({
       if (Number(e.code) === 40101) wx.reLaunch({ url: '/pages-partner/login/login' });
     }).finally(() => { if (!this._gone && this._request === request) this._loadedOnce = true; });
   },
+  /** 翻周：±1 周，整页重拉（班表 / 请假 / 本月场次全部按 weekStart 走，不用另开通道）。
+   *  与排班工作台 planning.shiftWeek 同一套写法，别自己另发明一套。 */
+  shiftWeek(n) {
+    if (this.data.loading) return;
+    const from = this._viewWeek || this.data.week.weekStart || this._baseWeek;
+    if (!from) return;
+    this._viewWeek = vm.addDays(from, n * 7);
+    this.load();
+  },
+  onPrevWeek() { this.shiftWeek(-1); },
+  onNextWeek() { this.shiftWeek(1); },
   goLeave() { wx.navigateTo({ url: '/pages-partner/leave/leave' }); },
   goAvailability() { wx.navigateTo({ url: '/pages-partner/availability/availability' }); },
   goPlanning() { if (!this.data.isMember) wx.navigateTo({ url: '/pages-partner/schedule/planning/planning' }); },

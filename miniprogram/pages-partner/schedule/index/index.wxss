@@ -1,11 +1,13 @@
-/* pages-partner/schedule/index/index.wxss · v3（2026-10-29 照 v151 重做）
+/* pages-partner/schedule/index/index.wxss · v4（2026-10-31 加周切换条、删抬头）
    数值全部来自原型实测（1px = 1.923rpx）：
-     .pl-title 26px/600 ls-.7  ·  .pl-sub 12px muted
      .pl-state radius 14 padding 11/14 fs 12.5；pub #272729 白字 / draft #FFF4DD+8A5A12 / none #F0F1F4+5A5A5F
      .wk-sp flex gap10 bg parchment radius 12 padding 9/14 margin 2/0/12 + inset 0 0 0 1 line
             .k 11.5 muted  ·  .ps gap6 wrap margin-left auto  ·  .ps b 11.5/500 ink2 bg#fff radius 8 pad 3/9
      .sc-row min-height 62 padding 13/16 gap 12
-   ⚠️ .pl-state.pub 的深色（#272729）是原型既有件（与 .dark-strip 同类），照搬未改。 */
+   ⚠️ .pl-state.pub 的深色（#272729）是原型既有件（与 .dark-strip 同类），照搬未改。
+   ⚠️ 2026-10-31 删掉了 .pl-head / .pl-title / .pl-sub（大标题「班表管理」+ 角色副行）：
+      导航栏标题本来就是「班表管理」，下面再来一个 50rpx 大标题是同一句话说两遍（陛下截图打回）。
+      那一行原本还兼着"第 N 周 · 日期"，现在由 .wk-nav 接管，所以周信息没丢。 */
 
 .page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
 .body {
@@ -28,10 +30,25 @@
 .err-t { font-size: 22rpx; font-weight: 600; color: #C0392B; }
 .err-d { font-size: 20rpx; color: #C0392B; line-height: 1.5; opacity: .9; }
 
-/* ── 班表管理：抬头 ── */
-.pl-head { padding: 0 6rpx; display: flex; flex-direction: column; gap: 10rpx; }
-.pl-title { font-size: 50rpx; font-weight: 600; letter-spacing: -1.3rpx; line-height: 1.35; color: #1D1D1F; }
-.pl-sub { font-size: 23rpx; color: #76767E; line-height: 1.6; }
+/* ── 周切换条 ──
+   与考勤 / 请假 / 可排时间 / 排班工作台**同一套** .wk-nav（值直接抄 availability.wxss），
+   四页本该一致，所以别在这里微调字号，要改就四页一起改。
+   左「‹ 上一周」蓝字 / 中「本周」红胶囊 + 日期范围 / 右「下一周 ›」（本周时置灰，仍可点） */
+.wk-nav { display: flex; align-items: center; padding: 12rpx 6rpx 16rpx; }
+.wk-b { flex: 1; font-size: 25rpx; color: #0066CC; }
+.wk-b.r { text-align: right; }
+.wk-b.off { color: #B3B3B8; }
+.wk-mid { flex: none; display: flex; align-items: center; gap: 10rpx; }
+.wk-tag {
+  flex: none; font-size: 20rpx; line-height: 1.6;
+  padding: 2rpx 12rpx; border-radius: 9999rpx; font-weight: 500;
+}
+.wk-tag.on { background: #B42318; color: #FFF; }
+.wk-tag.off { background: #F1F1F4; color: #76767E; }
+.wk-c {
+  font-size: 30rpx; font-weight: 600; color: #1D1D1F;
+  font-variant-numeric: tabular-nums;
+}
 
 /* ── 班表管理：状态条 ── */
 .pl-state {

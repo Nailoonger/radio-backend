@@ -1,6 +1,7 @@
 <view class="wk">
-  <!-- 标题不再恒写「本周」：站员/班表页只显示本周，工作台可以翻到别的周（2026-10-30） -->
-  <view class="hd"><text class="title">{{isThisWeek ? '本周' : '该周'}} {{range}}</text><text class="sub">{{weekLabel}}</text></view>
+  <!-- 标题不再恒写「本周」：站员/班表页只显示本周，工作台可以翻到别的周（2026-10-30）
+       ⚠️ 2026-10-31：页面自己有了 .wk-nav 周切换条时（show-head=false）这里不再重复写日期 -->
+  <view class="hd" wx:if="{{showHead}}"><text class="title">{{isThisWeek ? '本周' : '该周'}} {{range}}</text><text class="sub">{{weekLabel}}</text></view>
   <view class="band" wx:for="{{singles}}" wx:key="key">
     <text class="band-label">{{item.dayName}}{{item.slot}}<text class="band-time">{{item.timeText}}</text></text>
     <view class="band-people">
