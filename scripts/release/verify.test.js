@@ -57,10 +57,11 @@ test('policy 与 mini 范围只执行对应校验，不构建或安装线上产�
   assert.equal(stages.length, 1);
   stages.length = 0;
   verify({ root, scope: 'mini', runStage });
-  // 1 = 发布控制回归；2 = 小程序语法；3 = 伙伴端周切换一致性（2026-10-30 新增）
-  assert.equal(stages.length, 3);
+  // 1 = 发布控制回归；2 = 小程序语法；3 = 伙伴端周切换一致性；4 = 工作台大白卡（后两条 2026-10-30 新增）
+  assert.equal(stages.length, 4);
   assert.ok(stages[1].args.includes('--check'));
   assert.ok(stages[2].args[0].endsWith('verify-partner-weeknav.js'));
+  assert.ok(stages[3].args[0].endsWith('verify-partner-home-cards.js'));
   assert.throws(() => verify({ root, scope: 'unknown', runStage }), /scope/);
 });
 

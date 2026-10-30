@@ -1,0 +1,100 @@
+<!-- pages-partner/desk/desk.wxml · v5（2026-10-28 按 v151 实测几何重写）
+     事实源：partner-hub/app.html 的 V.desk / V.home + headless Chrome 实测 getBoundingClientRect。
+     换算：设计 390pt ⇒ 750rpx，1px = 1.923rpx（所有数值都是"原型 px × 1.923"四舍五入）。
+
+     历次被打回（别再犯）：
+     v1 ①导航自加站徽/"退出"（原型只有居中标题）②wel 负 margin 顶进导航 ③轮播画成单卡
+     v2 水印用 aspectFill 放大裁剪、跑位、渐隐失效 ⇒ 改 campus-faded.png（渐隐烘进 alpha）+ widthFix
+     v3 wel 又加负 margin 把欢迎语顶出屏幕左缘；swiper 不给高 ⇒ 整卡塌陷
+     v4 bigwrap 后多写一个 </view> ⇒ .page 提前关闭，整页结构错乱
+     ⚠️ 每次改完必须跑标签配对自检，不能只盯着改的那一行 -->
+<view class="page">
+
+  <view class="sb" style="height: {{statusBarHeight}}px"></view>
+
+  <!-- 导航：居中标题（v151 .nav 实测 h=42px、padding 0 52px、标题 16px/600；无站徽无按钮） -->
+  <view class="nav">
+    <text class="nav-t">菁悠伙伴端</text>
+  </view>
+
+  <!-- 欢迎带：通栏 + 右侧校舍线稿水印
+       实测：wel 顶距 = view 的 10px + wel 的 -14px + wel 的 padding-top 20px = 16px
+             wel 左右 padding 18px ⇒ 文字左缘距屏幕 18px（.page 无横向 padding，别再加负 margin）
+             水印盒 282×160、right:-34px、bottom:0 —— campus-faded.png 已把裁切与双向渐隐烘进 alpha -->
+  <view class="wel">
+    <image class="wel-bg" src="/assets/campus-faded.png" mode="widthFix"/>
+    <text class="eb">菁悠广播站 · {{roleTag}}</text>
+    <view class="big">{{name}}，{{greet}}。</view>
+    <text class="sub">{{care}}</text>
+  </view>
+
+  <!-- 大白卡轮播（v151 .carousel：margin-top -24px 压接欢迎带；卡片左右各内缩 18px）
+       ⚠️ swiper 必须有固定高（v3 教训：height:auto 整卡塌陷）⇒ 高度由 js 按当前卡算好传进来 -->
+  <view class="bigwrap">
+    <swiper class="slides" style="height: {{slideH}}rpx;" bindchange="onSwiper">
+      <swiper-item wx:for="{{slides}}" wx:key="eb">
+        <view class="bigc">
+          <text class="eb2">{{item.eb}}</text>
+          <view class="b2">{{item.b2}}</view>
+          <text class="d2">{{item.d2}}</text>
+        </view>
+      </swiper-item>
+    </swiper>
+    <!-- 圆点：7px 灰点 / 选中 18px 蓝长条；只有一张卡时不显示 -->
+    <view class="dots" wx:if="{{slides.length > 1}}">
+      <view class="d {{index === current ? 'on' : ''}}" wx:for="{{slides}}" wx:key="eb"></view>
+    </view>
+  </view>
+
+  <!-- 站员版：需要你处理（v151 home 屏 .need-h / .td） -->
+  <block wx:if="{{roleKey === 'member'}}">
+    <view class="need-h">
+      <text class="t">需要你处理</text>
+      <text class="n">{{needCount ? needCount + ' 项' : '暂无'}}</text>
+    </view>
+    <view class="td">
+      <block wx:if="{{needs.length}}">
+        <view class="td-i" wx:for="{{needs}}" wx:key="go"
+              hover-class="pressed" data-go="{{item.go}}" bindtap="onNav">
+          <text class="no">0{{index + 1}}</text>
+          <view class="bd">
+            <view class="lb {{item.tone}}"><view class="dot"></view><text>{{item.t}}</text></view>
+            <view class="t"><text class="tx">{{item.x}}</text><text class="ch">›</text></view>
+            <text class="m">{{item.m}}</text>
+          </view>
+        </view>
+      </block>
+      <view wx:else class="td-none">今天没有需要你处理的，歇着。</view>
+    </view>
+  </block>
+
+  <!-- 社干 / 超管版：三联模块卡（v151 .mh / .mods / .mod） -->
+  <block wx:else>
+    <block wx:for="{{sections}}" wx:key="head" wx:for-item="sec">
+      <view class="mh">
+        <text class="t">{{sec.head}}</text>
+        <text class="n">{{sec.right}}</text>
+      </view>
+      <view class="mods">
+        <view class="mod" wx:for="{{sec.mods}}" wx:key="t"
+              hover-class="pressed" data-go="{{item.go}}" bindtap="onNav">
+          <text class="mod-t">{{item.t}}</text>
+          <text class="mod-d">{{item.d}}</text>
+          <view class="mod-f">
+            <view wx:if="{{item.n !== null}}" class="mod-n {{item.n > 0 ? 'on' : ''}}">
+              <text class="num">{{item.n}}</text><text class="u">{{item.u}}</text>
+            </view>
+            <view wx:else class="mod-n none"></view>
+            <text class="mod-arrow">›</text>
+          </view>
+        </view>
+      </view>
+      <text wx:if="{{sec.note}}" class="cp-note">{{sec.note}}</text>
+    </block>
+  </block>
+
+  <!-- 给浮动 dock 让位（dock 是 fixed，盖在内容上） -->
+  <view class="dock-gap"></view>
+</view>
+
+<partner-tabbar wx:if="{{ready}}" role="{{roleKey}}" active="{{tabActive}}" badges="{{badges}}" bind:switch="onTab"/>

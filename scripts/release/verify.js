@@ -105,6 +105,8 @@ function verify(options = {}) {
   for (const file of miniFiles) node('小程序语法 ' + path.relative(root, file), ['--check', file]);
   // 伙伴端「周切换」四页口径统一（2026-10-30 陛下要求）：结构/胶囊/配色/文案一起校验
   node('伙伴端周切换一致性', [path.join(root, 'scripts/verify-partner-weeknav.js')]);
+  // 工作台大白卡必须跟着本周班表四态走（发布完回首页还是「未发布」就红）
+  node('伙伴端工作台大白卡', [path.join(root, 'scripts/verify-partner-home-cards.js')]);
   if (scope === 'mini') return { scope, miniFiles: miniFiles.length };
 
   const revision = options.revision || env.RELEASE_REVISION;

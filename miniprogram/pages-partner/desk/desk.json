@@ -1,0 +1,9 @@
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "partner-tabbar": "../components/partner-tabbar/index"
+  },
+  "enablePullDownRefresh": true,
+  "backgroundColor": "#F5F5F7",
+  "backgroundTextStyle": "dark"
+}
