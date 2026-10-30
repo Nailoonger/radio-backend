@@ -100,6 +100,25 @@
   box-sizing: border-box;
   box-shadow: 0 12rpx 27rpx -12rpx rgba(15,28,46,.08), 0 42rpx 85rpx -35rpx rgba(15,28,46,.16);
 }
+/* 头行（原型 .ebrow：flex + space-between + gap 8px） */
+.ebrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15rpx;
+}
+/* 「已发布 · 第 N 版」胶囊（原型 .tag.ok：--accent-tint 底 / --accent 字 / 10.5px / pad 4 8） */
+.tag-ok {
+  flex: none;
+  margin-top: 4rpx;             /* 2px */
+  padding: 8rpx 15rpx;          /* 4px 8px */
+  border-radius: 9999rpx;
+  background: #EAF3FD;
+  color: #0066CC;
+  font-size: 20rpx;             /* 10.5px */
+  line-height: 1;
+  white-space: nowrap;
+}
 .eb2 {
   display: block;
   font-size: 22rpx;             /* 11.5px */
@@ -120,6 +139,28 @@
   color: #76767E;
   line-height: 1.75;
   margin-top: 17rpx;            /* 9px */
+}
+/* 我这一周的班次（原型 .myslots / .msl：周几 600 + 时段 …… 部门靠右 11px 灰） */
+.myslots { margin-top: 19rpx; }  /* 10px */
+.msl {
+  display: flex;
+  align-items: baseline;
+  gap: 15rpx;                   /* 8px */
+  padding: 10rpx 0;             /* 5px 0 */
+  font-size: 24rpx;             /* 12.5px */
+  line-height: 1.4;
+}
+.msl-d {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #1D1D1F;
+  min-width: 62rpx;             /* 32px */
+}
+.msl-t { color: #1D1D1F; }
+.msl-p {
+  margin-left: auto;
+  font-size: 21rpx;             /* 11px */
+  color: #76767E;
 }
 /* 圆点：7px 灰点 / 选中 18px 蓝长条。
    swiper 高度 = 卡高 + 100rpx（52px 投影落地空间，原型 .slides margin-bottom:52px），

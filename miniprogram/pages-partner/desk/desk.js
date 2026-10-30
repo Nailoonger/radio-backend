@@ -105,8 +105,8 @@ Page({
     // state：published | draft | withdrawn | empty   —— 与班表页同一套四态口径
     weekState: 'empty',
     weekVersion: 0,
-    weekSummary: { needed: 0, filled: 0, missing: 0, fixed: 0 },
-    myShiftCount: 0,            // 站员本周自己被排了几场（/partner/schedule/mine）
+    // 已发布时卡里列「我这一周播什么」（原型 homeTop 的 myslots）：[{ key, day, time, dept }]
+    myShifts: [],
     // 底部导航
     tabActive: 'desk',
     badges: {},
@@ -171,38 +171,40 @@ Page({
    *
    * ⚠️⚠️ 原来这一张是**写死**的「班表还没有发布。」—— 结果是发布完回首页，
    *    三个角色看到的还是那句未发布（陛下 2026-10-30 报的「大白卡都没有变化」）。
-   *    现在按 /partner/schedule 的四态出文案，口径与班表页 / 工作台状态条**同一套**：
-   *      published 已发布 vN / draft 草稿未发布 / withdrawn 已撤回待重发 / empty 本周未排班
    *
-   * 站员（member）看不到别人的人选，服务端只给 state 不给 rows，
-   * 所以他自己那几场单独走 /partner/schedule/mine 取条数（myShiftCount）。
+   * 已发布的形态**照原型 homeTop() 搬**（2026-10-30 第二版，陛下拿原型截图对过）：
+   *   · 右上角胶囊「已发布 · 第 N 版」（.tag.ok：--accent-tint 底 + --accent 字）
+   *   · 主句「本周 N 个班次」，下面逐行「周一　早会 06:50　…………　主持部」
+   *   · 没排到人时主句「本周没有你的班次」+ 一句说明，不留空白
+   *   ⚠️ 三个角色**同一口径 = 我自己的班次**（社干/超管也是人，原型里他们照样看自己的）。
+   *      第一版我写成社干看「已排 x/y 人」的全站汇总，是错的 —— 汇总在「班表」tab 里看。
+   *
+   * 草稿 / 已撤回 两态原型没有（快照），按班表页四态口径补，只在主副句上说清当前进度。
+   *
+   * 站员看不到别人的人选，服务端只给 state 不给 rows ⇒ 自己的班次单独走
+   * /partner/schedule/mine 取（myShifts）。同一接口取三个角色都能用。
    *
    * @param {object} [st] 外部先算好的状态对象（setData 之前调用时 this.data 还是旧值）
    */
   buildSlides(st) {
     const s = st || this.data;
     const member = s.roleKey === 'member';
-    const sum = s.weekSummary || {};
-    const filled = Number(sum.filled) || 0;
-    const needed = Number(sum.needed) || 0;
-    const missing = Number(sum.missing) || 0;
-    const mine = Number(s.myShiftCount) || 0;
+    const mine = Array.isArray(s.myShifts) ? s.myShifts : [];
     const eb = '正式值班安排';
 
     if (s.weekState === 'published') {
+      const ver = Number(s.weekVersion) || 1;
       return [{
         eb,
-        b2: `本周班表已发布 v${Number(s.weekVersion) || 1}。`,
-        d2: member
-          ? (mine ? `你有 ${mine} 场值班，具体时段在「班表」里。` : '本周没有排你的场次，全部安排都在「班表」里。')
-          : (missing
-            ? `站员已能看到本周班次 · 还缺 ${missing} 个岗位。`
-            : `站员已能看到本周班次 · 已排 ${filled}/${needed} 人。`),
+        tag: `已发布 · 第 ${ver} 版`,
+        b2: mine.length ? `本周 ${mine.length} 个班次` : '本周没有你的班次',
+        d2: mine.length ? '' : '班表已发布，这一周还没排到你。可以先确认可排时间，或联系社干调整。',
+        slots: mine,
       }];
     }
     if (s.weekState === 'withdrawn') {
       return [{
-        eb,
+        eb, tag: '', slots: [],
         b2: '本周班表已撤回。',
         d2: member ? '社干在重新调整，重新发布后这里会更新。'
                    : '原安排已转成草稿，改完重新发布即可。',
@@ -210,16 +212,15 @@ Page({
     }
     if (s.weekState === 'draft') {
       return [{
-        eb,
+        eb, tag: '', slots: [],
         b2: '本周班表还是草稿。',
         d2: member ? '社干还在排，发布后你就能看到班次。'
-                   : (missing ? `还有 ${missing} 个岗位空缺，补齐并校验后才能发布。`
-                              : '已经排齐，校验后就能发布。'),
+                   : '还没发布，发布后站员就能看到班次。',
       }];
     }
     /* empty：时段还没发布 / 本周还没生成草稿 —— 与原型原句一致 */
     return [{
-      eb,
+      eb, tag: '', slots: [],
       b2: '班表还没有发布。',
       d2: member ? '可先确认可排时间，社干发布后再查看班次。'
                  : '可先确认可排时间，发布后站员就能看到班次。',
@@ -238,7 +239,8 @@ Page({
    *
    * 口径：
    *   · 不传 week ⇒ 云函数按**北京时间**给本周周一，前端不自己算日历（铁律）
-   *   · 站员那份 /partner/schedule 只返回 state、rows 恒为空 ⇒ 自己几场单独取 mine
+   *   · 自己的班次走 /partner/schedule/mine（三个角色都通用）；
+   *     `/partner/schedule` 那份对站员只给 state、rows 恒为空
    *   · 拿不到就**保持上一次状态**（首屏即 empty，与原句一致），不弹错、不把卡翻回「未发布」
    *     ⚠️ 这一条是必须的：网络抖一下就把「已发布」刷回「还没有发布」，
    *        和陛下报的那个 bug 长得一模一样，会被当成没修。
@@ -260,9 +262,8 @@ Page({
         roleKey: this.data.roleKey,
         weekState,
         weekVersion: Number(w.version) || 0,
-        weekSummary: w.summary || { needed: 0, filled: 0, missing: 0, fixed: 0 },
-        // mine 拉失败时留上一次的数，别一会儿有一会儿 0
-        myShiftCount: mine && Array.isArray(mine.list) ? mine.list.length : (Number(this.data.myShiftCount) || 0),
+        // mine 拉失败时保留上一次的行，别一会儿有一会儿空
+        myShifts: mine && Array.isArray(mine.list) ? mine.list.map(toShiftRow) : this.data.myShifts,
       };
       this.setData(Object.assign({}, st, { slides: this.buildSlides(st) }), () => this.measureSlide());
     });
@@ -447,4 +448,19 @@ function roleTagOf(roleKey) {
   if (roleKey === 'super') return '超管';
   if (roleKey === 'member') return '站员';
   return '社干';
+}
+
+/**
+ * /partner/schedule/mine 的一行 → 原型 `.msl` 的三格：周几 /「时段名 开始时间」/ 部门。
+ * 原型 slotTime() 只取开始时间（早会 06:50），不是 06:50-07:30 的整段 —— 卡片窄，照搬。
+ */
+function toShiftRow(x, i) {
+  const r = x || {};
+  const start = String(r.timeText || '').split('-')[0];
+  return {
+    key: `${r.day || i}-${r.slotKey || i}`,
+    day: r.dayName || '',
+    time: [r.slot || '', start].filter(Boolean).join(' '),
+    dept: r.department || '',
+  };
 }

@@ -34,9 +34,21 @@
     <swiper class="slides" style="height: {{slideH}}rpx;" bindchange="onSwiper">
       <swiper-item wx:for="{{slides}}" wx:key="eb">
         <view class="bigc">
-          <text class="eb2">{{item.eb}}</text>
+          <!-- 头行：左「正式值班安排」，右「已发布 · 第 N 版」胶囊（原型 .ebrow / .tag.ok） -->
+          <view class="ebrow">
+            <text class="eb2">{{item.eb}}</text>
+            <text wx:if="{{item.tag}}" class="tag-ok">{{item.tag}}</text>
+          </view>
           <view class="b2">{{item.b2}}</view>
-          <text class="d2">{{item.d2}}</text>
+          <!-- 已发布且排到我：逐行列出我这一周的班次（原型 .myslots / .msl） -->
+          <view class="myslots" wx:if="{{item.slots.length}}">
+            <view class="msl" wx:for="{{item.slots}}" wx:for-item="s" wx:key="key">
+              <text class="msl-d">{{s.day}}</text>
+              <text class="msl-t">{{s.time}}</text>
+              <text class="msl-p">{{s.dept}}</text>
+            </view>
+          </view>
+          <text wx:else class="d2">{{item.d2}}</text>
         </view>
       </swiper-item>
     </swiper>

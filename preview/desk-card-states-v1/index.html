@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工作台大白卡 · 四态文案 v1</title>
+<style>
+  * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body {
+    margin: 0; padding: 40px 28px 72px;
+    background: #F5F5F7; color: #1D1D1F;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  }
+  .hd { max-width: 1080px; margin: 0 auto 28px; }
+  .hd h1 { margin: 0 0 8px; font-size: 20px; font-weight: 600; letter-spacing: -.2px; }
+  .hd p { margin: 0; font-size: 13px; line-height: 1.75; color: #76767E; }
+  .hd code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: #0066CC; }
+
+  .grid { max-width: 1080px; margin: 0 auto; }
+  .row { display: grid; grid-template-columns: 132px 340px 340px; gap: 26px 30px; align-items: start; }
+  .row + .row { margin-top: 30px; }
+
+  .lab { padding-top: 6px; }
+  .lab .k { font-size: 13px; font-weight: 600; }
+  .lab .v { margin-top: 6px; font-size: 11.5px; line-height: 1.7; color: #76767E; }
+  .lab code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; color: #B3B3B8; }
+
+  .colhead { font-size: 12px; font-weight: 600; color: #76767E; padding: 0 0 2px 2px; }
+
+  /* 与 desk.wxss 的 .bigc 对齐：宽 340 / radius 20 / padding 18 / 双段投影 */
+  .bigc {
+    width: 340px; background: #FFFFFF; border-radius: 20px; padding: 18px;
+    box-shadow: 0 6px 14px -6px rgba(15,28,46,.08), 0 22px 44px -18px rgba(15,28,46,.16);
+  }
+  .eb2 { display: block; font-size: 11.5px; line-height: 1.6; color: #76767E; }
+  .b2 { font-size: 21px; font-weight: 600; color: #1D1D1F; letter-spacing: -.5px; line-height: 1.35; margin-top: 10px; }
+  .d2 { display: block; font-size: 12.5px; color: #76767E; line-height: 1.75; margin-top: 9px; }
+
+  .foot { max-width: 1080px; margin: 44px auto 0; padding: 16px 18px; background: #FFF; border-radius: 14px; }
+  .foot h2 { margin: 0 0 10px; font-size: 13px; font-weight: 600; }
+  .foot ul { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.95; color: #76767E; }
+  .foot b { color: #1D1D1F; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="hd">
+  <h1>工作台大白卡 · 四态文案 v1</h1>
+  <p>内容取自 <code>desk.js#buildSlides()</code>，几何取自 <code>desk.wxss</code> 的 <code>.bigc</code>（宽 340 / radius 20 / padding 18）。
+     四态的判定与班表页同一套：<code>published</code> / <code>draft</code> / <code>withdrawn</code>（库里是 draft+withdrawnAt）/ <code>empty</code>。</p>
+</div>
+
+<div class="grid">
+
+  <div class="row">
+    <div class="lab"></div>
+    <div class="colhead">站员</div>
+    <div class="colhead">社干 · 超管</div>
+  </div>
+
+  <!-- 已发布 -->
+  <div class="row">
+    <div class="lab">
+      <div class="k">已发布</div>
+      <div class="v">v3 · 12 个岗位全排齐<br><code>state=published</code></div>
+    </div>
+    <div class="bigc">
+      <span class="eb2">正式值班安排</span>
+      <div class="b2">本周班表已发布 v3。</div>
+      <span class="d2">你有 3 场值班，具体时段在「班表」里。</span>
+    </div>
+    <div class="bigc">
+      <span class="eb2">正式值班安排</span>
+      <div class="b2">本周班表已发布 v3。</div>
+      <span class="d2">站员已能看到本周班次 · 已排 12/12 人。</span>
+    </div>
+  </div>
+
+  <!-- 草稿 -->
+  <div class="row">
+    <div class="lab">
+      <div class="k">草稿未发布</div>
+      <div class="v">还缺 4 个岗位<br><code>state=draft</code></div>
+    </div>
+    <div class="bigc">
+      <span class="eb2">正式值班安排</span>
+      <div class="b2">本周班表还是草稿。</div>
+      <span class="d2">社干还在排，发布后你就能看到班次。</span>
+    </div>
+    <div class="bigc">
+      <span class="eb2">正式值班安排</span>
+      <div class="b2">本周班表还是草稿。</div>
+      <span class="d2">还有 4 个岗位空缺，补齐并校验后才能发布。</span>
+    </div>
+  </div>
+
+  <!-- 已撤回 -->
+  <div class="row">
+    <div class="lab">
+      <div class="k">已撤回</div>
+      <div class="v">待重发<br><code>draft + withdrawnAt</code></div>
+    </div>
+    <div class="bigc">
+      <span class="eb2">正式值班安排</span>
+      <div class="b2">本周班表已撤回。</div>
+      <span class="d2">社干在重新调整，重新发布后这里会更新。</span>
+    </div>
+    <div class="bigc">
+      <span class="eb2">正式值班安排</span>
+      <div class="b2">本周班表已撤回。</div>
+      <span class="d2">原安排已转成草稿，改完重新发布即可。</span>
+    </div>
+  </div>
+
+  <!-- 未排班 -->
+  <div class="row">
+    <div class="lab">
+      <div class="k">本周未排班</div>
+      <div class="v">原型原句<br><code>state=empty</code></div>
+    </div>
+    <div class="bigc">
+      <span class="eb2">正式值班安排</span>
+      <div class="b2">班表还没有发布。</div>
+      <span class="d2">可先确认可排时间，社干发布后再查看班次。</span>
+    </div>
+    <div class="bigc">
+      <span class="eb2">正式值班安排</span>
+      <div class="b2">班表还没有发布。</div>
+      <span class="d2">可先确认可排时间，发布后站员就能看到班次。</span>
+    </div>
+  </div>
+
+</div>
+
+<div class="foot">
+  <h2>这版的几处判断，请过目</h2>
+  <ul>
+    <li><b>标题不动</b>：<code>正式值班安排</code> 四态都一样，只有主副句跟着状态变。</li>
+    <li><b>社干与超管文案一致</b>：两人看的都是全站汇总（已排 x/y 人、还缺 n 个岗位），没必要分两套。</li>
+    <li><b>站员只报自己的场次</b>：服务端对站员只给状态、不给别人的人选，所以用 /partner/schedule/mine 的条数说「你有 N 场」。</li>
+    <li><b>撤回要单独认</b>：库里撤回落的是 <code>state=draft</code> + <code>withdrawnAt</code>，不认这个字段就会一直显示「草稿」。</li>
+    <li><b>拉不到数据不改字</b>：网络失败时保持上一次文案，不会把「已发布」刷回「还没有发布」。</li>
+  </ul>
+</div>
+
+</body>
+</html>
