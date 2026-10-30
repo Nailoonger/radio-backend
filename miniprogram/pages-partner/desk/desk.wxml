@@ -52,9 +52,15 @@
         </view>
       </swiper-item>
     </swiper>
-    <!-- 圆点：7px 灰点 / 选中 18px 蓝长条；只有一张卡时不显示 -->
+    <!-- 圆点：7px 灰点 / 选中 18px 蓝长条；只有一张卡时不显示。
+         ⚠️⚠️ 尺寸必须落在**内层元素**上（原型 .dots > button > i 就是这个结构）。
+            旧版把点击区（padding）和可见点画在同一个盒子上（content-box + background-clip），
+            灰点时宽高相等没事，选中态 width 一放大内圆角就失效、背景铺满 35×43rpx，
+            渲染成一个大蓝球（2026-10-31 陛下截图「怎么那么大个」）。 -->
     <view class="dots" wx:if="{{slides.length > 1}}">
-      <view class="d {{index === current ? 'on' : ''}}" wx:for="{{slides}}" wx:key="eb"></view>
+      <view class="dot" wx:for="{{slides}}" wx:key="eb">
+        <view class="dot-i {{index === current ? 'on' : ''}}"></view>
+      </view>
     </view>
   </view>
 

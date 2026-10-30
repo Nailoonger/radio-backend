@@ -164,28 +164,31 @@
 }
 /* 圆点：7px 灰点 / 选中 18px 蓝长条。
    swiper 高度 = 卡高 + 100rpx（52px 投影落地空间，原型 .slides margin-bottom:52px），
-   圆点要落在卡下方 22px ⇒ margin-top = -(100 - 43) = -57rpx 往回提。 */
+   圆点要落在卡下方 22px ⇒ margin-top = -(100 - 43) = -57rpx 往回提。
+   ⚠️ 结构照原型：外层 .dot 只管点击区（padding），可见点在内层 .dot-i 上，
+      尺寸/圆角/底色都只作用在 .dot-i —— 不要再往带 padding 的盒子上画背景（见 wxml 注释）。 */
 .dots {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 4rpx;                    /* 2px */
   margin-top: -57rpx;
   position: relative;
   z-index: 2;
 }
-.dots .d {
+.dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 15rpx 10rpx;         /* 原型 button padding 8px 5px */
+}
+.dot-i {
   width: 13rpx;                 /* 7px */
   height: 13rpx;
   border-radius: 9999rpx;
   background: #B3B3B8;
-  margin: 0 10rpx;              /* 原型 button padding 8px 5px 的横向 5px */
-  padding: 15rpx 0;             /* 纵向 8px 撑出点击区 */
-  box-sizing: content-box;
-  background-clip: content-box;
-  transition: all .2s ease-out;
+  transition: width .2s ease-out, background-color .2s ease-out;
 }
-.dots .d.on {
+.dot-i.on {
   width: 35rpx;                 /* 18px */
   background: #0066CC;
 }

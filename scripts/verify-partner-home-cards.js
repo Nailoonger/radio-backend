@@ -60,6 +60,14 @@ ok('wxml 班次行', /class="myslots"/.test(wxml) && /class="msl"/.test(wxml), '
 ok('wxss 胶囊与班次行样式', /\.tag-ok\s*\{/.test(wxss) && /\.msl-p\s*\{/.test(wxss), 'wxss 缺 .tag-ok / .msl-p');
 ok('胶囊是浅色（不深色）', /\.tag-ok\s*\{[^}]*background:\s*#EAF3FD/.test(wxss), '.tag-ok 底色不是 --accent-tint #EAF3FD');
 
+/* 轮播圆点：尺寸只能在内层（2026-10-31 大蓝球事故） */
+ok('圆点是两层结构（外层点击区 / 内层可见点）',
+  /class="dot"/.test(wxml) && /class="dot-i/.test(wxml), 'wxml 圆点不是 .dot > .dot-i 两层');
+ok('可见点尺寸在 .dot-i 上', /\.dot-i\s*\{[^}]*width:\s*13rpx[^}]*height:\s*13rpx/s.test(wxss), '.dot-i 没有 13rpx×13rpx');
+ok('选中态只放大内层', /\.dot-i\.on\s*\{[^}]*width:\s*35rpx/.test(wxss), '.dot-i.on 没把宽度放到 35rpx');
+ok('不再用 background-clip 画点', !/background-clip/.test(wxss),
+  '又用 content-box + background-clip 画圆点 —— 选中态宽度一放大就会渲染成大蓝球');
+
 /* 第 2 张「本周点歌排期」：接口早就有（/admin/submit/list type=1），别再写成"接口没落地" */
 ok('点歌排期不拉假数据、走真接口', /adminRequest\('\/admin\/submit\/list',\s*'GET',\s*\{[^}]*type:\s*1[^}]*reviewStatus:\s*1/.test(js),
   '没有按 type=1 & reviewStatus=1 拉已通过的点歌（与 song-schedule 页同一口径）');

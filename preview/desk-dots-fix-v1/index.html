@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工作台圆点修复 v1 · 大蓝球 → 蓝长条</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 28px 72px; background: #F5F5F7; color: #1D1D1F;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { margin: 0 0 8px; font-size: 20px; font-weight: 600; letter-spacing: -.2px; }
+  .lead { margin: 0 0 26px; font-size: 13px; line-height: 1.75; color: #76767E; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: #0066CC; }
+
+  .case { background: #fff; border-radius: 16px; padding: 18px 20px 22px; margin-bottom: 20px; }
+  .case h2 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+  .case .sub { margin: 0 0 14px; font-size: 12.5px; color: #76767E; line-height: 1.7; }
+  .case .sub b { color: #B42318; font-weight: 600; }
+  .case.after .sub b { color: #067647; }
+  .shot { width: 100%; display: block; border-radius: 10px; border: 1px solid #E0E0E0; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12.5px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #F0F0F0; }
+  th { color: #76767E; font-weight: 600; }
+  td.num { font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .bad { color: #B42318; }
+  .good { color: #067647; }
+
+  .why { background: #fff; border-radius: 16px; padding: 18px 20px; }
+  .why h2 { margin: 0 0 10px; font-size: 13px; }
+  .why ul { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.95; color: #76767E; }
+  .why b { color: #1D1D1F; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>工作台圆点修复 v1：大蓝球 → 蓝长条</h1>
+  <p class="lead">两张图都是 <b>headless Chrome 按 desk.wxss 真实规则渲染</b>后截的，2x 像素、同一视口，不是示意图。</p>
+
+  <div class="case">
+    <h2>改之前</h2>
+    <p class="sub">选中点是一颗 <b>17.5 × 21.5px 的大蓝球</b>，比灰点大 3 倍多。</p>
+    <img class="shot" src="./before.png" alt="改之前：大蓝球">
+  </div>
+
+  <div class="case after">
+    <h2>改之后</h2>
+    <p class="sub">选中点是 <b>17.5 × 6.5px 的蓝长条</b>（原型 18×7），灰点 6.5×6.5（原型 7×7）。</p>
+    <img class="shot" src="./after.png" alt="改之后：蓝长条 + 灰点">
+  </div>
+
+  <div class="case">
+    <h2>量出来的数</h2>
+    <table>
+      <tr><th>元素</th><th>改之前</th><th>改之后</th><th>原型</th></tr>
+      <tr><td>选中点</td><td class="num bad">17.5 × 21.5</td><td class="num good">17.5 × 6.5</td><td class="num">18 × 7</td></tr>
+      <tr><td>未选中点</td><td class="num">6.5 × 6.5</td><td class="num good">6.5 × 6.5</td><td class="num">7 × 7</td></tr>
+    </table>
+  </div>
+
+  <div class="why">
+    <h2>为什么会长成球</h2>
+    <ul>
+      <li>旧写法把「点击区」和「可见点」画在同一个盒子上：<code>padding: 15rpx 0</code> +
+          <code>box-sizing: content-box</code> + <code>background-clip: content-box</code>，靠内圆角把背景裁成小点。</li>
+      <li>灰点时宽高相等（13×13rpx），内圆角算得出来，看着没问题 —— <b>所以之前一直没暴露</b>。</li>
+      <li>选中态 <code>width</code> 一放大到 35rpx，内圆角就失效，背景直接铺满整个 border-box（35×43rpx）⇒ 大蓝球。</li>
+      <li>现在照原型改成两层：外层 <code>.dot</code> 只负责点击区（padding 8px 5px），
+          可见点在内层 <code>.dot-i</code> 上，宽高圆角底色都只作用在它身上。</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>
