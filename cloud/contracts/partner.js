@@ -139,7 +139,7 @@ const contract = {
     method: 'PUT',
     path: '/partner/me/duty',
     auth: 'admin',
-    desc: '自助维护部门与值班岗位（白名单校验，岗位自动去重）。',
+    desc: '自助维护值班岗位（多选，白名单校验+自动去重）；部门不传则由岗位反推落库。',
     req: { department: 'string?', dutyRoles: 'string[]?' },
     resp: {
       department: 'string',
@@ -173,7 +173,7 @@ const contract = {
     method: 'PUT',
     path: '/partner/people/:id/duty',
     auth: 'admin',
-    desc: '超管替别人配值班部门；岗位不传则按部门自动推导（记者/技术等额外岗位保留）。',
+    desc: '超管替别人配值班岗位（多选）；部门由岗位反推落库，记者/技术等额外岗位原样保留。',
     req: { department: 'string?', dutyRoles: 'string[]?' },
     resp: {
       personId: 'number',

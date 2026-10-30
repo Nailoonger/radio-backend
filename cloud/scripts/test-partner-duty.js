@@ -416,7 +416,7 @@ const TPL = [
     }
   }
 
-  /* ══════════ 11.5 超管替别人配值班岗位（2026-10-30 新增） ══════════ */
+  /* ══════════ 11.5 超管替别人配值班岗位（2026-10-30；配岗位 + 多选，部门反推） ══════════ */
   section('11.5 超管替别人配岗位 PUT /partner/people/:id/duty');
   {
     reset();
@@ -424,58 +424,59 @@ const TPL = [
     let r = await call('GET', '/partner/people/4', {}, SUPER_TOKEN);
     eq('初始 4 号岗位', r.data.dutyRoles, ['主持']);
 
+    /* 主路径：只发岗位（多选），部门由岗位反推。
+       陛下 2026-10-30 定稿「改成配岗位，而且可以多选」—— 界面上不再有第二个维度，
+       所以常规调用**不带 department**，也不该再让用户选一次部门。 */
     r = await call('PUT', '/partner/people/4/duty', { dutyRoles: ['主持', '播音'] }, SUPER_TOKEN);
-    eq('超管改 4 号 → code 0', r.code, 0);
-    eq('返回 dutyRoles', r.data.dutyRoles, ['主持', '播音']);
-    eq('返回带部门', r.data.department, '主持部');
-    eq('qualifed = 有部门且有岗位', r.data.qualified, true);
+    eq('多选岗位 → code 0', r.code, 0);
+    eq('返回 dutyRoles 保序', r.data.dutyRoles, ['主持', '播音']);
+    eq('部门由岗位反推（播音优先）', r.data.department, '播音部');
+    eq('qualified = 有部门且有岗位', r.data.qualified, true);
     eq('by = 操作人', r.data.by, 1);
 
-    // 部门不许被这条接口顺手改掉
     r = await call('GET', '/partner/people/4', {}, SUPER_TOKEN);
-    eq('部门没被改', r.data.department, '主持部');
-    eq('库里已生效', r.data.dutyRoles, ['主持', '播音']);
+    eq('库里部门跟着岗位改了', r.data.department, '播音部');
+    eq('库里岗位已生效', r.data.dutyRoles, ['主持', '播音']);
+
+    // 主部门按「播音 → 主持 → 编辑」顺序取第一个命中项（顺序飘了部门就会跟着飘）
+    r = await call('PUT', '/partner/people/4/duty', { dutyRoles: ['编辑', '主持'] }, SUPER_TOKEN);
+    eq('编辑+主持 → 主部门取主持部', r.data.department, '主持部');
+    r = await call('PUT', '/partner/people/4/duty', { dutyRoles: ['编辑'] }, SUPER_TOKEN);
+    eq('单岗位编辑 → 编辑部', r.data.department, '编辑部');
 
     // 去重 + 非法岗位
     r = await call('PUT', '/partner/people/4/duty', { dutyRoles: ['播音', '播音', '记者'] }, SUPER_TOKEN);
     eq('去重后入库', r.data.dutyRoles, ['播音', '记者']);
+    eq('带额外岗位也按主岗位归部门', r.data.department, '播音部');
     r = await call('PUT', '/partner/people/4/duty', { dutyRoles: ['扫地'] }, SUPER_TOKEN);
     eq('非法岗位 → 40001', r.code, 40001);
-    // ⚠️ dutyRoles 现在是**可选的**（不传＝按部门自动推导，见下），所以这里改成校验「传了但不合法」
+    // ⚠️ dutyRoles 现在是主参数，传了但不是数组必须拦住
     r = await call('PUT', '/partner/people/4/duty', { dutyRoles: '播音' }, SUPER_TOKEN);
     eq('dutyRoles 不是数组 → 40001', r.code, 40001);
     r = await call('PUT', '/partner/people/999/duty', { dutyRoles: [] }, SUPER_TOKEN);
     eq('不存在的人 → 40401', r.code, 40401);
 
-    // 清空 = 不参与排班（资格不完整）
+    // 清空岗位 = 不参与排班（部门留原值，不做破坏性清空）
     r = await call('PUT', '/partner/people/4/duty', { dutyRoles: [] }, SUPER_TOKEN);
     eq('清空可保存', r.code, 0);
     eq('清空后 qualified = false', r.data.qualified, false);
+    eq('清空岗位不连带砸掉部门', r.data.department, '播音部');
 
-    /* 部门也要能配 —— 2026-10-30 陛下「配了角色还是选不上」的真因：
-       排班里「部门」和「岗位」是两条独立的硬条件，只配岗位、部门空着，
-       换人弹层照样报「尚未配置部门 / 部门不匹配」。 */
-    r = await call('PUT', '/partner/people/4/duty', { department: '播音部', dutyRoles: ['播音'] }, SUPER_TOKEN);
-    eq('改部门 → code 0', r.code, 0);
-    eq('返回新部门', r.data.department, '播音部');
-    eq('部门 + 岗位齐全 → qualified', r.data.qualified, true);
-    r = await call('GET', '/partner/people/4', {}, SUPER_TOKEN);
-    eq('库里部门已改', r.data.department, '播音部');
+    /* 部门仍可显式传（兼容后台手工修数据 / 老调用），显式传时以显式为准 */
+    r = await call('PUT', '/partner/people/4/duty', { department: '编辑部', dutyRoles: ['播音', '编辑'] }, SUPER_TOKEN);
+    eq('显式部门优先', r.data.department, '编辑部');
+    eq('岗位照传', r.data.dutyRoles, ['播音', '编辑']);
     r = await call('PUT', '/partner/people/4/duty', { department: '火星部', dutyRoles: ['播音'] }, SUPER_TOKEN);
     eq('非法部门 → 40001', r.code, 40001);
     r = await call('PUT', '/partner/people/4/duty', { department: '', dutyRoles: ['播音'] }, SUPER_TOKEN);
     eq('清空部门可保存', r.code, 0);
     eq('有岗位但没部门 → qualified false', r.data.qualified, false);
-    eq('岗位没被部门清空连带删掉', r.data.dutyRoles, ['播音']);
 
-    /* 只传部门 → 岗位按部门自动推导（2026-10-30 陛下：只配部门就够了，弹层撤掉岗位那一行） */
+    /* 老调用：只传部门 → 岗位按部门带一个（记者 / 技术那种额外岗位原样保留） */
     r = await call('PUT', '/partner/people/4/duty', { department: '播音部' }, SUPER_TOKEN);
     eq('只传部门 → 岗位自动＝播音', r.data.dutyRoles, ['播音']);
-    eq('只传部门 → qualified', r.data.qualified, true);
-    r = await call('PUT', '/partner/people/4/duty', { department: '编辑部' }, SUPER_TOKEN);
-    eq('换部门 → 岗位跟着换', r.data.dutyRoles, ['编辑']);
     r = await call('PUT', '/partner/people/4/duty', { department: '编辑部', dutyRoles: ['编辑', '记者'] }, SUPER_TOKEN);
-    eq('显式传岗位仍以显式为准', r.data.dutyRoles, ['编辑', '记者']);
+    eq('显式传岗位以显式为准', r.data.dutyRoles, ['编辑', '记者']);
     r = await call('PUT', '/partner/people/4/duty', { department: '主持部' }, SUPER_TOKEN);
     eq('自动推导时额外岗位（记者）保留', r.data.dutyRoles, ['主持', '记者']);
     r = await call('PUT', '/partner/people/4/duty', { department: '' }, SUPER_TOKEN);

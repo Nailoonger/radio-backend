@@ -74,19 +74,19 @@
 
   <!-- ══════ 社干 / 超管 ══════ -->
   <block wx:else>
-    <!-- 我的值班部门：社干 / 超管自己配（2026-10-30）
-         ⚠️⚠️ 只有「部门」一个维度。岗位（播音 / 主持 / 编辑）由后端按部门自动推导 ——
-            和人员卡片上的「配岗位」弹层是同一套口径，两处各选一遍必然对不上。
-            库里已有的记者 / 技术会原样保留，不会因为这里没列出来就被清掉。 -->
+    <!-- 我的值班岗位：社干 / 超管自己配（2026-10-30 定稿：配岗位 + 可多选）
+         ⚠️⚠️ 只配岗位，部门由后端按岗位反推（播音→播音部 / 主持→主持部 / 编辑→编辑部）。
+            别再往这里加一行部门让人选 —— 同一件事选两遍必然对不上，当天就被退回过。
+            库里已有的记者 / 技术不在这三格里，但保存时原样带回，不会被清掉。 -->
     <view class="rolecard">
       <view class="rc-hd">
-        <text class="rc-t">我的值班部门</text>
+        <text class="rc-t">我的值班岗位</text>
         <text class="rc-bd {{roleText !== '未选' ? 'on' : ''}}">{{roleText}}</text>
       </view>
       <view class="rc-chips">
         <view class="rc-chip {{item.on ? 'on' : ''}}"
-              wx:for="{{deptChips}}" wx:key="label"
-              data-d="{{item.label}}" bindtap="onPickMyDept" hover-class="rc-hover">{{item.label}}</view>
+              wx:for="{{roleChips}}" wx:key="label"
+              data-l="{{item.label}}" bindtap="onToggleMyRole" hover-class="rc-hover">{{item.label}}</view>
       </view>
       <view class="rc-foot">
         <text class="rc-hint">{{roleHint}}</text>
@@ -121,11 +121,11 @@
         <view class="pc-foot">
           <text class="pc-stat">{{item.statText}}</text>
           <view class="pc-right">
-            <!-- 超管替别人配值班部门（2026-10-30）。⚠️ 必须 catchtap：
-                 不然会冒泡到卡片的 bindtap，点「配部门」变成打开代录弹层。
-                 ⚠️ 自己的卡片也保留这一项 —— 超管自己没部门时同样选不上，得能自己补 -->
+            <!-- 超管替别人配值班岗位（2026-10-30）。⚠️ 必须 catchtap：
+                 不然会冒泡到卡片的 bindtap，点「配岗位」变成打开代录弹层。
+                 ⚠️ 自己的卡片也保留这一项 —— 超管自己没配岗位时同样选不上，得能自己补 -->
             <text class="pc-role" wx:if="{{isSuper}}"
-                  data-id="{{item.personId}}" catchtap="openRoleSheet">配部门</text>
+                  data-id="{{item.personId}}" catchtap="openRoleSheet">配岗位</text>
             <text class="pc-go">{{item.isMe ? '填写我的时间' : '查看／代录'}} ›</text>
           </view>
         </view>
@@ -239,28 +239,28 @@
   </view>
 </view>
 
-<!-- ══════ 超管配伙伴值班部门（2026-10-30）
-     入口在人员卡片底部的「配部门」。⚠️ 走 PUT /partner/people/:id/duty（仅超管）。
-     ⚠️⚠️ **只有一个维度：部门**。岗位（播音/主持/编辑）由后端按部门自动带
-        （播音部→播音、主持部→主持、编辑部→编辑），记者/技术那种额外岗位原样保留。
-        排班硬条件里部门和岗位是两条门槛，两处让用户各选一遍必然对不上，
-        所以这里只让人选部门（陛下 2026-10-30：「只配部门就够了，其他的不要了」）。 -->
+<!-- ══════ 超管配伙伴值班岗位（2026-10-30）
+     入口在人员卡片底部的「配岗位」。⚠️ 走 PUT /partner/people/:id/duty（仅超管）。
+     ⚠️⚠️ **只有岗位一个维度，可多选**。部门（播音部/主持部/编辑部）由后端按岗位反推落库：
+        播音→播音部、主持→主持部、编辑→编辑部（多选时取第一个命中项当主部门）。
+        排班时岗位对得上就放行部门检查，所以兼两个岗位的人两个部门的时段都能上
+        （陛下 2026-10-30：「改成配岗位，而且可以多选」）。 -->
 <view class="overlay" hidden="{{!roleSheetOpen}}" catchtap="closeRoleSheet">
   <view class="sheet sheet-role" catchtap="stop">
     <view class="sheet-hd">
       <view class="sheet-hd-l">
-        <text class="sheet-t">{{roleTargetName}} · 值班部门</text>
-        <text class="sheet-sub">部门决定他会被排进哪个部门的时段；岗位（播音 / 主持 / 编辑）跟着部门自动定，不用另外选。</text>
+        <text class="sheet-t">{{roleTargetName}} · 值班岗位</text>
+        <text class="sheet-sub">可多选。部门不用另外配，系统按岗位自动归（播音→播音部、主持→主持部、编辑→编辑部）。</text>
       </view>
       <text class="sheet-x" bindtap="closeRoleSheet">关闭</text>
     </view>
 
     <view class="rc-sec">
-      <text class="rc-sec-t">部门（单选，再点一下取消）</text>
+      <text class="rc-sec-t">岗位（可多选，再点一下取消）</text>
       <view class="rc-chips">
         <view class="rc-chip {{item.on ? 'on' : ''}}"
-              wx:for="{{roleTargetDepts}}" wx:key="label"
-              data-d="{{item.label}}" bindtap="onPickTargetDept" hover-class="rc-hover">{{item.label}}</view>
+              wx:for="{{roleTargetChips}}" wx:key="label"
+              data-l="{{item.label}}" bindtap="onToggleTargetRole" hover-class="rc-hover">{{item.label}}</view>
       </view>
     </view>
 

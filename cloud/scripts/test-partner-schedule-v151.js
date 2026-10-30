@@ -147,5 +147,28 @@ function shape(value, expected, at='response') {
   const duplicate=await call('PUT','/partner/slots/draft',{templates:[TPL[0],TPL[0]]},1);equal('duplicate same department rejected',duplicate.code,40001);
   const partial=await call('PUT','/partner/slots/draft',{templates:[TPL[0],{...TPL[1],start:420}]},1);equal('partial overlap rejected',partial.code,40001);
   equal('invalid month rejected',(await call('GET','/partner/schedule/month?month=2026-99',{},1)).code,40001);
+  /* ── 多选岗位：兼「主持 + 播音」的人，两个部门的时段都得能上（2026-10-30「可以多选」）──
+     ⚠️⚠️ person.department 只能存一个（主部门），所以判定必须是「岗位命中就放行部门检查」。
+        否则多选出来的第二个岗位就是摆设 —— 配了、却还是选不上，正是当天被投诉的那件事。 */
+  reset();
+  let d5 = await call('PUT','/partner/people/3/duty',{dutyRoles:['主持','播音']},1);
+  equal('多选岗位落库', d5.data.dutyRoles, ['主持','播音']);
+  equal('主部门按顺序归播音部', d5.data.department, '播音部');
+  let cA = await call('GET',`/partner/schedule/candidates?week=${WEEK}&day=${DATES[0]}&slotKey=0-2`,{},2);
+  let p3a = cA.data.list.find((x)=>x.personId===3);
+  equal('兼两个岗位 → 播音部时段不再报部门不匹配', p3a.reasons.some((x)=>/部门不匹配/.test(x)), false);
+  equal('兼两个岗位 → 播音部时段岗位资格通过', p3a.reasons.some((x)=>/岗位资格不匹配/.test(x)), false);
+  equal('兼两个岗位 → 播音部时段可选', p3a.eligible, true);
+  let cB = await call('GET',`/partner/schedule/candidates?week=${WEEK}&day=${DATES[0]}&slotKey=0-1`,{},2);
+  let p3b = cB.data.list.find((x)=>x.personId===3);
+  equal('主部门换了，原来的主持部时段照样可选', p3b.eligible, true);
+  // 反证：只留播音，主持部时段就该被拦住（说明放行靠的是岗位，不是无脑放开）
+  d5 = await call('PUT','/partner/people/3/duty',{dutyRoles:['播音']},1);
+  equal('只留播音 → 主部门播音部', d5.data.department, '播音部');
+  cB = await call('GET',`/partner/schedule/candidates?week=${WEEK}&day=${DATES[0]}&slotKey=0-1`,{},2);
+  p3b = cB.data.list.find((x)=>x.personId===3);
+  equal('只留播音 → 主持部时段被拦', p3b.eligible, false);
+  equal('只留播音 → 主持部时段报部门不匹配', p3b.reasons.some((x)=>/部门不匹配/.test(x)), true);
+
   console.log(`PASS ${checks} assertions: v151 schedule handler, permissions, revision, parallel departments, formal/draft isolation and publication history.`);
 })().catch((e)=>{console.error(e);process.exitCode=1;});

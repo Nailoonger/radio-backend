@@ -90,19 +90,18 @@ async function saveDuty(ctx) {
   const p = await asPartner(ctx);
   const body = ctx.body || {};
 
-  const department = String(body.department === undefined ? p.department : body.department).trim();
-  if (department && DEPARTMENTS.indexOf(department) < 0) {
-    throw new ApiError(Codes.PARAM_ERROR, `部门必须是：${DEPARTMENTS.join(' / ')}`);
-  }
+  // 岗位（多选）是主维度；不传＝保持原值
+  const dutyRoles = body.dutyRoles === undefined ? (p.dutyRoles || []) : normalizeRoles(body.dutyRoles);
 
-  let dutyRoles = body.dutyRoles === undefined ? p.dutyRoles : body.dutyRoles;
-  if (!Array.isArray(dutyRoles)) throw new ApiError(Codes.PARAM_ERROR, 'dutyRoles 必须是数组');
-  dutyRoles = dutyRoles.map((r) => String(r).trim()).filter(Boolean);
-  // 去重（前端多选组件可能重复传）
-  dutyRoles = dutyRoles.filter((r, i) => dutyRoles.indexOf(r) === i);
-  const bad = dutyRoles.filter((r) => DUTY_ROLES.indexOf(r) < 0);
-  if (bad.length) {
-    throw new ApiError(Codes.PARAM_ERROR, `岗位「${bad[0]}」不在可选范围内（${DUTY_ROLES.join(' / ')}）`);
+  // 部门：显式传优先；否则由岗位推导（改岗位就自动跟着换部门，不用用户再选一次）
+  let department;
+  if (body.department !== undefined) {
+    department = String(body.department || '').trim();
+    if (department && DEPARTMENTS.indexOf(department) < 0) {
+      throw new ApiError(Codes.PARAM_ERROR, `部门必须是：${DEPARTMENTS.join(' / ')}`);
+    }
+  } else {
+    department = deptOfRoles(dutyRoles) || (p.department || '');
   }
 
   await updateById(C.ADMIN, p.admin._id, {
@@ -124,26 +123,54 @@ async function saveDuty(ctx) {
 }
 
 /**
- * 部门 → 默认岗位（2026-10-30 简化：陛下说「只配部门就够了，其他的不要了」）
+ * 岗位 ↔ 部门（2026-10-30 定稿：陛下要「配岗位，而且可以多选」）
  *
- * ⚠️ 为什么是「自动带」而不是「干脆不看岗位」：
- *    排班的硬条件里 `def.role` 与 `person.dutyRoles` 是一条独立的门槛（schedule.js#reasonsFor），
- *    直接把岗位砍掉会让所有人卡在「尚未配置值班岗位」。
- *    所以界面上只让选部门，岗位由这里**推导后落库**，两条硬条件都能过。
- * ⚠️ 记者 / 技术 不挂部门，不在这张表里 —— 更新时**原样保留**，不许被覆盖掉。
+ * ⚠️ 只让人管**一个维度：岗位（多选）**，部门由岗位反推、自动落库。
+ *    - 界面：弹层里三格岗位可多选（播音 / 主持 / 编辑）
+ *    - 落库：`department` 取「播音→主持→编辑」里第一个命中的那个部门（主部门）
+ *    - 判定：排班硬条件里**岗位对得上就放行部门检查**（schedule.js#reasonsFor），
+ *      否则一个人同时兼播音+主持，部门只能存一个，他第二个岗位的时段会全被「部门不匹配」封死，
+ *      多选就成了摆设。
+ * ⚠️ 记者 / 技术 不挂部门，不在这两张表里 —— 更新时**原样保留**，不许被覆盖掉。
+ * ⚠️ 历史坑（别再来一次）：上一版改成「只配部门」，界面上部门单选、岗位由部门推 ——
+ *    陛下当天就退回来了。他要的是配岗位。**部门和岗位只能有一个能被用户看见，谁是主谁就被点。**
  */
+const DEPT_BY_ROLE = { 播音: '播音部', 主持: '主持部', 编辑: '编辑部' };
+const MAPPED_ROLES = Object.keys(DEPT_BY_ROLE);
 const ROLE_BY_DEPT = { 播音部: '播音', 主持部: '主持', 编辑部: '编辑' };
-const MAPPED_ROLES = Object.keys(ROLE_BY_DEPT).map((d) => ROLE_BY_DEPT[d]);
+
+/** 多选岗位 → 主部门（按 播音→主持→编辑 的顺序取第一个命中的；一个都没命中返回空串） */
+function deptOfRoles(roles) {
+  const list = Array.isArray(roles) ? roles : [];
+  for (let i = 0; i < MAPPED_ROLES.length; i++) {
+    if (list.indexOf(MAPPED_ROLES[i]) >= 0) return DEPT_BY_ROLE[MAPPED_ROLES[i]];
+  }
+  return '';
+}
+
+/** 岗位数组校验 + 去重 + 白名单（saveDuty / saveDutyFor 共用，别再各写一遍） */
+function normalizeRoles(list) {
+  if (!Array.isArray(list)) throw new ApiError(Codes.PARAM_ERROR, 'dutyRoles 必须是数组');
+  let roles = list.map((r) => String(r).trim()).filter(Boolean);
+  // 去重（前端多选组件可能重复传）
+  roles = roles.filter((r, i) => roles.indexOf(r) === i);
+  const bad = roles.filter((r) => DUTY_ROLES.indexOf(r) < 0);
+  if (bad.length) {
+    throw new ApiError(Codes.PARAM_ERROR, `岗位「${bad[0]}」不在可选范围内（${DUTY_ROLES.join(' / ')}）`);
+  }
+  return roles;
+}
 
 /**
- * PUT /partner/people/:id/duty   body: { department?, dutyRoles?: [] }
+ * PUT /partner/people/:id/duty   body: { dutyRoles?: [], department? }
  *
- * 超管**替别人**配值班资格（2026-10-30 新增：陛下要求「代录页超管可以为社干配置值班角色」）。
+ * 超管**替别人**配值班岗位（2026-10-30；陛下定稿：配岗位、可多选）。
  *
- * ⚠️ 部门必须是能配的：排班硬条件里「部门」和「岗位」是两条独立的门槛，
- *    只配岗位、部门空着，换人弹层照样报「尚未配置部门 / 部门不匹配」。
- * ⚠️ dutyRoles **可以不传**：不传就按部门自动推导（同时保留记者/技术那种额外岗位）。
- *    前端弹层现在只发 department，简化成一个维度 —— 别再在界面上让用户选两遍。
+ * ⚠️ 主维度是 `dutyRoles`（多选）。`department` 由岗位反推、自动落库（见 deptOfRoles），
+ *    前端不再让用户额外选一次部门 —— 两个地方各选一遍必然对不上。
+ * ⚠️ `department` 仍可显式传（兼容老调用 / 后台手工修数据）：显式传时以显式为准，
+ *    且 `dutyRoles` 不传就按部门带一个岗位，记者/技术那种额外岗位原样保留。
+ * ⚠️ 只选「记者 / 技术」时反推不出部门 → **保留原部门不清空**，别把历史数据砸掉。
  * ⚠️ 与 PUT /partner/me/duty 的分工：
  *    那条是**自助**（谁调都是改自己，锁死 p.admin._id）；
  *    这条必须显式给 :id，且只有超管能调 —— 别把两条合成一条，合并后
@@ -159,31 +186,32 @@ async function saveDutyFor(ctx) {
 
   const body = ctx.body || {};
 
-  // 部门：不传＝保持原值；传空串＝清空（清空后这个人排班时永远过不了硬条件）
-  let department = target.department || '';
+  // 显式部门（可选）：传空串＝清空（清空后这个人排班时永远过不了部门门槛）
+  let explicitDept;
   if (body.department !== undefined) {
-    department = String(body.department || '').trim();
-    if (department && DEPARTMENTS.indexOf(department) < 0) {
+    explicitDept = String(body.department || '').trim();
+    if (explicitDept && DEPARTMENTS.indexOf(explicitDept) < 0) {
       throw new ApiError(Codes.PARAM_ERROR, `部门必须是：${DEPARTMENTS.join(' / ')}`);
     }
   }
 
+  const currentRoles = Array.isArray(target.dutyRoles) ? target.dutyRoles : [];
   let dutyRoles;
-  if (body.dutyRoles === undefined) {
-    // 只给了部门 → 岗位跟着部门走，额外岗位（记者 / 技术）原样留着
-    const mapped = ROLE_BY_DEPT[department] ? [ROLE_BY_DEPT[department]] : [];
-    const keep = (Array.isArray(target.dutyRoles) ? target.dutyRoles : [])
-      .filter((r) => MAPPED_ROLES.indexOf(r) < 0);
-    dutyRoles = mapped.concat(keep);
+  if (body.dutyRoles !== undefined) {
+    // 正常路径：界面多选，直接以它为准
+    dutyRoles = normalizeRoles(body.dutyRoles);
+  } else if (explicitDept !== undefined) {
+    // 老调用：只给部门 → 岗位跟着部门带，额外岗位（记者 / 技术）原样留着
+    const mapped = ROLE_BY_DEPT[explicitDept] ? [ROLE_BY_DEPT[explicitDept]] : [];
+    dutyRoles = mapped.concat(currentRoles.filter((r) => MAPPED_ROLES.indexOf(r) < 0));
   } else {
-    if (!Array.isArray(body.dutyRoles)) throw new ApiError(Codes.PARAM_ERROR, 'dutyRoles 必须是数组');
-    dutyRoles = body.dutyRoles.map((r) => String(r).trim()).filter(Boolean);
-    dutyRoles = dutyRoles.filter((r, i) => dutyRoles.indexOf(r) === i);
+    dutyRoles = currentRoles.slice();
   }
-  const bad = dutyRoles.filter((r) => DUTY_ROLES.indexOf(r) < 0);
-  if (bad.length) {
-    throw new ApiError(Codes.PARAM_ERROR, `岗位「${bad[0]}」不在可选范围内（${DUTY_ROLES.join(' / ')}）`);
-  }
+
+  // 部门：显式传优先，否则由岗位反推（推不出来就保留原值，不做破坏性清空）
+  const department = explicitDept !== undefined
+    ? explicitDept
+    : (deptOfRoles(dutyRoles) || (target.department || ''));
 
   await updateById(C.ADMIN, target._id, { department, dutyRoles, updateTime: new Date() });
 
@@ -192,7 +220,7 @@ async function saveDutyFor(ctx) {
     name: target.nickname || target.username || `账号${id}`,
     department,
     dutyRoles,
-    // 资格完整 ＝ 有部门且至少一个岗位；没资格的人排班时永远过不了硬条件
+    // 资格完整 ＝ 至少一个岗位；部门由岗位反推，所以有岗位就一定有部门
     qualified: !!(department && dutyRoles.length),
     by: p.id,
   };

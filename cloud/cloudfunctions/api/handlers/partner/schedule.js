@@ -120,13 +120,20 @@ function reasonsFor(person, def, rows, c) {
    *    原来一句「尚未配置部门与岗位资格」把两件事糊在一起 ——
    *    他只配了岗位、没配部门，看到这句完全不知道该去补哪一样。
    *    现在分开说，并且「不匹配」时把双方的值打出来，一眼能看出差在哪。
+   *
+   * ⚠️⚠️ 部门这一条**岗位对得上就放行**（2026-10-30 第二版）：
+   *    岗位改成多选后，一个人可以既是播音又是主持，但 `person.department` 只能存一个（主部门）。
+   *    要是还按部门硬拦，他第二个岗位的所有时段都会被判「部门不匹配」——多选就等于白选，
+   *    而且报错文案还会误导人（明明岗位配了）。
+   *    所以：**岗位命中就别再拿部门说事**，部门只在「时段没写岗位」时当兜底。
    */
+  const roleHit = !!(def.role && person.dutyRoles.indexOf(def.role) >= 0);
   if (!person.department) reasons.push('尚未配置部门');
   if (!person.dutyRoles.length) reasons.push('尚未配置值班岗位');
-  if (def.dept && person.department !== def.dept) {
+  if (def.dept && person.department !== def.dept && !roleHit) {
     reasons.push(`部门不匹配（当前：${person.department || '未配置'}，这个时段要：${def.dept}）`);
   }
-  if (def.role && person.dutyRoles.length && !person.dutyRoles.includes(def.role)) {
+  if (def.role && person.dutyRoles.length && !roleHit) {
     reasons.push(`岗位资格不匹配（当前：${person.dutyRoles.join('/')}，这个时段要：${def.role}）`);
   }
   if (!c.canMap[id] || !c.canMap[id].has(def.slotKey)) reasons.push('未确认该时段可排时间或填报已过期');
