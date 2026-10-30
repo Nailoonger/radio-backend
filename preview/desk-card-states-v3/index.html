@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工作台大白卡 v3 · 班表 + 点歌排期 两张</title>
+<style>
+  * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body {
+    margin: 0; padding: 40px 28px 72px;
+    background: #F5F5F7; color: #1D1D1F;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { margin: 0 0 8px; font-size: 20px; font-weight: 600; letter-spacing: -.2px; }
+  .lead { margin: 0 0 30px; font-size: 13px; line-height: 1.75; color: #76767E; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: #0066CC; }
+  h2 { margin: 38px 0 16px; font-size: 14px; font-weight: 600; }
+  h2 span { font-weight: 400; color: #76767E; font-size: 12.5px; margin-left: 8px; }
+
+  .row { display: grid; grid-template-columns: 128px 340px 340px; gap: 24px 28px; align-items: start; }
+  .row.two { grid-template-columns: 128px 340px 340px; }
+  .row + .row { margin-top: 26px; }
+  .lab { padding-top: 6px; }
+  .lab .k { font-size: 13px; font-weight: 600; }
+  .lab .v { margin-top: 6px; font-size: 11.5px; line-height: 1.7; color: #76767E; }
+  .colhead { font-size: 12px; font-weight: 600; color: #76767E; padding-left: 2px; }
+
+  .bigc {
+    width: 340px; background: #FFFFFF; border-radius: 19px; padding: 17.5px;
+    box-shadow: 0 6px 13px -6px rgba(15,28,46,.08), 0 21px 42px -17px rgba(15,28,46,.16);
+  }
+  .ebrow { display: flex; align-items: center; justify-content: space-between; gap: 7.5px; }
+  .eb2 { font-size: 11.5px; line-height: 1.6; color: #76767E; }
+  .tag-ok {
+    flex: none; margin-top: 2px; padding: 4px 8px; border-radius: 9999px;
+    background: #EAF3FD; color: #0066CC; font-size: 10.5px; line-height: 1; white-space: nowrap;
+  }
+  .b2 { font-size: 21px; font-weight: 600; color: #1D1D1F; letter-spacing: -.5px; line-height: 1.35; margin-top: 10px; }
+  .d2 { display: block; font-size: 12.5px; color: #76767E; line-height: 1.75; margin-top: 8.5px; }
+  .myslots { margin-top: 10px; }
+  .msl { display: flex; align-items: baseline; gap: 8px; padding: 5px 0; font-size: 12.5px; line-height: 1.4; }
+  .msl b { font-size: 12.5px; font-weight: 600; color: #1D1D1F; min-width: 32px; }
+  .msl span { color: #1D1D1F; }
+  .msl i { font-style: normal; margin-left: auto; font-size: 11px; color: #76767E; }
+
+  .dots { display: flex; justify-content: center; gap: 6px; margin-top: 18px; }
+  .dots .d { width: 7px; height: 7px; border-radius: 9999px; background: #C7C7CC; }
+  .dots .d.on { width: 18px; background: #0066CC; }
+
+  .foot { margin-top: 40px; padding: 16px 18px; background: #FFF; border-radius: 14px; }
+  .foot h2 { margin: 0 0 10px; font-size: 13px; }
+  .foot ul { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.95; color: #76767E; }
+  .foot b { color: #1D1D1F; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>工作台大白卡 v3 · 班表 + 点歌排期 两张</h1>
+  <p class="lead">第 2 张「本周点歌排期」用真数据：<code>GET /admin/submit/list?type=1&amp;reviewStatus=1</code>，
+     按 <code>scheduleStatus</code> 分档（1 已排 / 2 候补；0 未排、3 自动驳回都不算）。与「歌曲排期」页同一个接口、同一套口径。</p>
+
+  <h2>轮播一共两张 <span>圆点只有 2 个；点歌那张拉不到就不画，不编数字</span></h2>
+  <div class="row two">
+    <div class="lab"><div class="k">正常态</div><div class="v">第 1 张已发布、有我的班次；第 2 张已排 4 首 · 候补 1 首</div></div>
+    <div class="bigc">
+      <div class="ebrow"><span class="eb2">正式值班安排</span><span class="tag-ok">已发布 · 第 2 版</span></div>
+      <div class="b2">本周 3 个班次</div>
+      <div class="myslots">
+        <div class="msl"><b>周一</b><span>早会 06:50</span><i>主持部</i></div>
+        <div class="msl"><b>周三</b><span>午间播音 12:10</span><i>播音部</i></div>
+        <div class="msl"><b>周五</b><span>晚间节目 18:00</span><i>编辑部</i></div>
+      </div>
+    </div>
+    <div class="bigc">
+      <div class="ebrow"><span class="eb2">本周点歌排期</span></div>
+      <div class="b2">已排 4 首 · 候补 1 首</div>
+      <span class="d2">周三午间《夜空中最亮的星》 · 周四午间《起风了》 · 周五下午《海阔天空》</span>
+    </div>
+  </div>
+  <div class="dots"><span class="d on"></span><span class="d"></span></div>
+
+  <h2>第 2 张的两种情态</h2>
+  <div class="row two">
+    <div class="lab"><div class="k">还没排到<br>任何一首</div><div class="v">左：一首都没有<br>右：只有候补</div></div>
+    <div class="bigc">
+      <div class="ebrow"><span class="eb2">本周点歌排期</span></div>
+      <div class="b2">本周还没排歌</div>
+      <span class="d2">点歌通过审核后，在电脑端排进节目单。</span>
+    </div>
+    <div class="bigc">
+      <div class="ebrow"><span class="eb2">本周点歌排期</span></div>
+      <div class="b2">已排 0 首 · 候补 1 首</div>
+      <span class="d2">排好的歌都在「歌曲排期」里。</span>
+    </div>
+  </div>
+
+  <h2>第 1 张四态 <span>已发布三角色同一口径（都是我的班次）；草稿/撤回/未排班只分「站员」与「社干·超管」</span></h2>
+  <div class="row">
+    <div class="lab"></div><div class="colhead">站员</div><div class="colhead">社干 · 超管</div>
+  </div>
+
+  <div class="row">
+    <div class="lab"><div class="k">已发布<br>没排到我</div><div class="v">胶囊照样有</div></div>
+    <div class="bigc">
+      <div class="ebrow"><span class="eb2">正式值班安排</span><span class="tag-ok">已发布 · 第 1 版</span></div>
+      <div class="b2">本周没有你的班次</div>
+      <span class="d2">班表已发布，这一周还没排到你。可以先确认可排时间，或联系社干调整。</span>
+    </div>
+    <div class="bigc">
+      <div class="ebrow"><span class="eb2">正式值班安排</span><span class="tag-ok">已发布 · 第 1 版</span></div>
+      <div class="b2">本周没有你的班次</div>
+      <span class="d2">班表已发布，这一周还没排到你。可以先确认可排时间，或联系社干调整。</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="lab"><div class="k">草稿未发布</div><div class="v"><code>state=draft</code></div></div>
+    <div class="bigc">
+      <div class="ebrow"><span class="eb2">正式值班安排</span></div>
+      <div class="b2">本周班表还是草稿。</div>
+      <span class="d2">社干还在排，发布后你就能看到班次。</span>
+    </div>
+    <div class="bigc">
+      <div class="ebrow"><span class="eb2">正式值班安排</span></div>
+      <div class="b2">本周班表还是草稿。</div>
+      <span class="d2">还没发布，发布后站员就能看到班次。</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="lab"><div class="k">已撤回</div><div class="v"><code>draft + withdrawnAt</code></div></div>
+    <div class="bigc">
+      <div class="ebrow"><span class="eb2">正式值班安排</span></div>
+      <div class="b2">本周班表已撤回。</div>
+      <span class="d2">社干在重新调整，重新发布后这里会更新。</span>
+    </div>
+    <div class="bigc">
+      <div class="ebrow"><span class="eb2">正式值班安排</span></div>
+      <div class="b2">本周班表已撤回。</div>
+      <span class="d2">原安排已转成草稿，改完重新发布即可。</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="lab"><div class="k">本周未排班</div><div class="v">原型原句</div></div>
+    <div class="bigc">
+      <div class="ebrow"><span class="eb2">正式值班安排</span></div>
+      <div class="b2">班表还没有发布。</div>
+      <span class="d2">可先确认可排时间，社干发布后再查看班次。</span>
+    </div>
+    <div class="bigc">
+      <div class="ebrow"><span class="eb2">正式值班安排</span></div>
+      <div class="b2">班表还没有发布。</div>
+      <span class="d2">可先确认可排时间，发布后站员就能看到班次。</span>
+    </div>
+  </div>
+
+  <div class="foot">
+    <h2>这版的三处判断</h2>
+    <ul>
+      <li><b>时段只显示开始时间</b>：早会 06:50（不是 06:50-07:30）—— 照原型 <code>slotTime()</code>，卡窄放不下整段。</li>
+      <li><b>点歌那张只取头 3 首</b>：卡里就一行，多了压成三行会把轮播高度撑跳；完整清单点「歌曲排期」。</li>
+      <li><b>拉不到就不画</b>：点歌接口失败时只剩班表一张（圆点也变 1 个），不会先闪一个「已排 0 首」。</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

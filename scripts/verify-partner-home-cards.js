@@ -60,6 +60,17 @@ ok('wxml 班次行', /class="myslots"/.test(wxml) && /class="msl"/.test(wxml), '
 ok('wxss 胶囊与班次行样式', /\.tag-ok\s*\{/.test(wxss) && /\.msl-p\s*\{/.test(wxss), 'wxss 缺 .tag-ok / .msl-p');
 ok('胶囊是浅色（不深色）', /\.tag-ok\s*\{[^}]*background:\s*#EAF3FD/.test(wxss), '.tag-ok 底色不是 --accent-tint #EAF3FD');
 
+/* 第 2 张「本周点歌排期」：接口早就有（/admin/submit/list type=1），别再写成"接口没落地" */
+ok('点歌排期不拉假数据、走真接口', /adminRequest\('\/admin\/submit\/list',\s*'GET',\s*\{[^}]*type:\s*1[^}]*reviewStatus:\s*1/.test(js),
+  '没有按 type=1 & reviewStatus=1 拉已通过的点歌（与 song-schedule 页同一口径）');
+ok('按 scheduleStatus 分已排/候补', /scheduleStatus\) === 1/.test(js) && /scheduleStatus\) === 2/.test(js), '没有区分已排(1) / 候补(2)');
+ok('已排/候补主句', /已排 \$\{seated\} 首 · 候补 \$\{waiting\} 首/.test(js), '主句不是「已排 N 首 · 候补 M 首」');
+ok('点歌卡拉到之前不渲染', /songs: null/.test(js) && /if \(song\) slides\.push/.test(js), 'songs 还没拉到时也把卡画出来了（会先闪一个 0）');
+ok('onShow 也重拉点歌', /onShow\(\)[\s\S]{0,400}?fetchSongs\(\)/.test(js), 'onShow 里没有 fetchSongs()');
+ok('下拉刷新也重拉点歌', /onPullDownRefresh\(\)[\s\S]{0,400}?fetchSongs\(\)/.test(js), '下拉刷新没有带点歌');
+ok('不再声称点歌排期没接口', !/歌曲排期[^\n]*没有接口/.test(js) && !/点歌排期卡等排期接口落地/.test(js),
+  '注释里还写着「点歌排期没有接口」—— 接口早就有了');
+
 console.log(out.join('\n'));
 console.log(failed ? `\n✗ 失败 ${failed} 项` : '\n✓ 工作台大白卡跟着班表四态走');
 process.exit(failed ? 1 : 0);
