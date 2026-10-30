@@ -178,6 +178,14 @@ Page({
     bulkEventCount: 0,
     bulkReason: '',
     bulkSaving: false,
+    // ── 批量配岗位弹层（仅超管，2026-10-30） ──
+    bulkRoleOpen: false,
+    bulkRolePeople: [],
+    bulkRoleChips: [],
+    bulkRolePickCount: 0,
+    bulkRoleText: '',      // 预览：选中的岗位串
+    bulkRoleDept: '',      // 预览：会归到哪个部门
+    bulkRoleSaving: false,
     // ── 我的值班岗位（社干 / 超管自助，多选；部门由岗位自动归） ──
     roleChips: [],         // [{ label: '播音', on: false }, ...] 只列三个主岗位
     roleText: '未选',      // 徽章文案（含库里额外的记者 / 技术）
@@ -873,5 +881,107 @@ Page({
         });
     };
     next(0);
+  },
+
+  /* ══════════ 批量配岗位（仅超管，2026-10-30） ══════════
+     「再次生成班表只排上我自己」有一半原因在这里：配岗位是**逐人**的，
+     漏配一个就等于这个人没资格、生成时直接被跳过。这里一次给多人设同一组岗位（覆盖语义），
+     部门照旧由后端按岗位反推 —— 不多开第二个维度。 */
+
+  openBulkRoles() {
+    if (!this.data.isSuper) return;
+    const people = (this.data.cards || []).map((c) => ({
+      personId: c.personId,
+      name: c.name || '伙伴',
+      cap: c.cap || '尚未配置岗位',
+      on: false,
+    }));
+    if (!people.length) return wx.showToast({ title: '人员名单还没加载出来', icon: 'none' });
+    this.setData({
+      bulkRoleOpen: true,
+      bulkRolePeople: people,
+      bulkRoleChips: this._roleChips([]),
+      bulkRolePickCount: 0,
+      bulkRoleText: '',
+      bulkRoleDept: '',
+      bulkRoleSaving: false,
+    });
+  },
+
+  closeBulkRoles() {
+    if (this.data.bulkRoleSaving) return;
+    this.setData({ bulkRoleOpen: false });
+  },
+
+  toggleBulkRolePerson(e) {
+    const id = Number((e.currentTarget.dataset || {}).id || 0);
+    if (!id) return;
+    const people = (this.data.bulkRolePeople || [])
+      .map((p) => (p.personId === id ? Object.assign({}, p, { on: !p.on }) : p));
+    this.setData({ bulkRolePeople: people, bulkRolePickCount: people.filter((p) => p.on).length });
+  },
+
+  /** 全选 / 全不选（一次点全选，再点取消） */
+  bulkRoleAll() {
+    const list = this.data.bulkRolePeople || [];
+    const all = (this.data.bulkRolePickCount || 0) < list.length;
+    const people = list.map((p) => Object.assign({}, p, { on: all }));
+    this.setData({ bulkRolePeople: people, bulkRolePickCount: all ? people.length : 0 });
+  },
+
+  toggleBulkRole(e) {
+    const label = String((e.currentTarget.dataset || {}).l || '');
+    if (DUTY_ROLE_OPTIONS.indexOf(label) < 0) return;
+    const picked = (this.data.bulkRoleChips || []).filter((c) => c.on).map((c) => c.label);
+    const i = picked.indexOf(label);
+    if (i >= 0) picked.splice(i, 1); else picked.push(label);
+    const roles = normRoles(picked);
+    // 预览：「播音 / 主持 · 播音部」—— 让人保存前就看到会被改成什么样
+    this.setData({
+      bulkRoleChips: this._roleChips(roles),
+      bulkRoleText: roles.join(' / '),
+      bulkRoleDept: DEPT_BY_ROLE[roles[0]] || '',
+    });
+  },
+
+  saveBulkRoles() {
+    if (this.data.bulkRoleSaving) return;
+    const ids = (this.data.bulkRolePeople || []).filter((p) => p.on).map((p) => p.personId);
+    const roles = (this.data.bulkRoleChips || []).filter((c) => c.on).map((c) => c.label);
+    if (!ids.length) return wx.showToast({ title: '先勾要配的人', icon: 'none' });
+    if (!roles.length) return wx.showToast({ title: '先勾要配的岗位', icon: 'none' });
+
+    // ⚠️ 是**覆盖**不是追加，说清楚再动手（有人身上可能还有「记者」这种额外岗位）
+    wx.showModal({
+      title: `给 ${ids.length} 人配岗位`,
+      content: `他们的岗位统一改成「${roles.join(' / ')}」，原有岗位（含记者 / 技术）会被覆盖。确定吗？`,
+      confirmText: '确定覆盖',
+      success: (r) => { if (r.confirm) this._doBulkRoles(ids, normRoles(roles)); },
+    });
+  },
+
+  /** 逐人串行（就几个人，串行比并发稳，出错也能准确说第几个失败） */
+  _doBulkRoles(ids, roles) {
+    this.setData({ bulkRoleSaving: true });
+    let done = 0;
+    const step = (i) => {
+      if (i >= ids.length) {
+        this.setData({ bulkRoleSaving: false, bulkRoleOpen: false });
+        wx.showToast({ title: `已配好 ${done} 人`, icon: 'success' });
+        this.fetch({ week: this.data.weekStart, personId: this.data.targetId || undefined });
+        return;
+      }
+      adminRequest(`/partner/people/${ids[i]}/duty`, 'PUT', { dutyRoles: roles })
+        .then(() => { done += 1; step(i + 1); })
+        .catch((err) => {
+          this.setData({ bulkRoleSaving: false });
+          wx.showModal({
+            title: '批量配岗位中断',
+            content: `已成功 ${done} 人，第 ${i + 1} 人失败：${(err && err.message) || '请求失败'}`,
+            showCancel: false,
+          });
+        });
+    };
+    step(0);
   },
 });

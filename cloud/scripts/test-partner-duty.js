@@ -483,6 +483,19 @@ const TPL = [
     eq('清空部门 → 只剩额外岗位', r.data.dutyRoles, ['记者']);
     eq('清空部门 → qualified false', r.data.qualified, false);
 
+    /* 老数据兼容（2026-10-30）：库里 department 空、但岗位有值 → **读出来按岗位反推**。
+       10-30 之前那版「配岗位」只写 dutyRoles、不写 department，这批人排班时被判「部门不匹配」，
+       陛下看到的就是「点换人也显示其他人未配置部门」。只读推导、不写库，手配的部门永远优先。 */
+    r = await call('PUT', '/partner/people/4/duty', { department: '', dutyRoles: ['主持'] }, SUPER_TOKEN);
+    eq('库里部门确实清空了', r.data.department, '');
+    r = await call('GET', '/partner/people/4', {}, MGR_TOKEN);
+    eq('读出来按岗位反推出部门', r.data.department, '主持部');
+    eq('岗位原样在', r.data.dutyRoles, ['主持']);
+    // 记者 / 技术 不挂部门 → 不许瞎编一个
+    r = await call('PUT', '/partner/people/4/duty', { department: '', dutyRoles: ['记者'] }, SUPER_TOKEN);
+    r = await call('GET', '/partner/people/4', {}, MGR_TOKEN);
+    eq('只有记者时部门仍为空', r.data.department, '');
+
     // 越权：社干 / 停用 / 未登录
     r = await call('PUT', '/partner/people/4/duty', { dutyRoles: ['播音'] }, MGR_TOKEN);
     eq('社干不能配别人的岗位 → 40301', r.code, 40301);

@@ -53,6 +53,28 @@ const DUTY_ROLES = ['播音', '主持', '编辑', '记者', '技术'];
 /** 部门白名单 */
 const DEPARTMENTS = ['播音部', '主持部', '编辑部'];
 
+/**
+ * 岗位 → 部门（2026-10-30 定稿：岗位是主维度，部门是它的影子）
+ *
+ * ⚠️ 只在这一处定义，`me.js`（落库时推）和 `personDto`（读出来时兜底）都用它，
+ *    两套映射表必然出现「配了却判不过」这种自相矛盾。
+ * ⚠️ 记者 / 技术 不挂部门 —— 它们不在表里。
+ */
+const DEPT_BY_ROLE = { 播音: '播音部', 主持: '主持部', 编辑: '编辑部' };
+
+/**
+ * 岗位数组 → 主部门（按 DUTY_ROLES 的顺序取第一个命中项；推不出来返回 ''）
+ *
+ * ⚠️ 顺序必须固定：兼播音+主持的人主部门是「播音部」，换个顺序结果就变了。
+ */
+function deptOfRoles(roles) {
+  const list = Array.isArray(roles) ? roles : [];
+  for (let i = 0; i < DUTY_ROLES.length; i++) {
+    if (list.indexOf(DUTY_ROLES[i]) >= 0 && DEPT_BY_ROLE[DUTY_ROLES[i]]) return DEPT_BY_ROLE[DUTY_ROLES[i]];
+  }
+  return '';
+}
+
 /** 一周固定 5 个值班日（周一 ~ 周五），周六周日不排班 */
 const WEEK_DAYS = 5;
 
@@ -276,12 +298,21 @@ function templatesToSlots(templates) {
 
 /** admin 文档 → 人员池里的一项（**不含 password**） */
 function personDto(a) {
+  const dutyRoles = Array.isArray(a.dutyRoles) ? a.dutyRoles : [];
   return {
     personId: Number(a.id),
     name: a.nickname || a.username || `账号${a.id}`,
     username: a.username || '',
-    department: a.department || '',
-    dutyRoles: Array.isArray(a.dutyRoles) ? a.dutyRoles : [],
+    /*
+     * ⚠️⚠️ 部门这里**允许由岗位反推**（`a.department || deptOfRoles(...)`），2026-10-30 加。
+     *    原因：10-30 之前那版「配岗位」弹层只写 `dutyRoles`、**不写 department**，
+     *    于是老数据「有岗位、没部门」，排班时被判「部门不匹配」，看着像压根没配过
+     *    （陛下当天就是拿这个来问的：「点换人也显示其他人未配置部门」）。
+     *    只读推导、不写库：判定与显示立刻正确，下次保存时自然落库。
+     *    手配的部门**永远优先**，这里只在它为空时兜底。
+     */
+    department: a.department || deptOfRoles(dutyRoles),
+    dutyRoles,
     isSuper: Number(a.role) === ROLE_SUPER,
   };
 }
@@ -321,7 +352,7 @@ function notYet(name) {
 
 module.exports = {
   ROLE_SUPER, ROLE_MANAGER, ROLE_MEMBER,
-  DUTY_ROLES, DEPARTMENTS, WEEK_DAYS,
+  DUTY_ROLES, DEPARTMENTS, WEEK_DAYS, DEPT_BY_ROLE, deptOfRoles,
   asPartner, asSuperPartner, asManager,
   assertWeekStart, currentWeekStart, weekDates, weekStarted,
   hhmm, normalizeTemplates, templatesToSlots,

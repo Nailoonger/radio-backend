@@ -102,6 +102,17 @@
       <text class="bulk-b">开始代录</text>
     </view>
 
+    <!-- 批量配岗位（2026-10-30，仅超管）
+         ⚠️ 为什么需要它：配岗位是**逐人**的，站里四五个人逐张卡片点一遍很容易漏；
+            漏掉的人生成班表时会被判「尚未配置值班岗位」，表现就是「只排上我自己」。 -->
+    <view class="bulk" wx:if="{{isSuper}}" bindtap="openBulkRoles" hover-class="bulk-hover">
+      <view class="bulk-l">
+        <text class="bulk-t">批量配岗位</text>
+        <text class="bulk-s">一次给多个人配同一组岗位；已配过的会被这次覆盖。</text>
+      </view>
+      <text class="bulk-b">选人配岗位</text>
+    </view>
+
     <view class="empty" wx:if="{{!loading && !ready}}">
       <text class="empty-t">本周值班时段还没发布</text>
       <text class="empty-s">发布之后才能收可排时间。</text>
@@ -235,6 +246,59 @@
     <view class="sheet-foot">
       <button class="btn ghost" bindtap="closeBulk">取消</button>
       <button class="btn primary" loading="{{bulkSaving}}" bindtap="saveBulk">保存代录</button>
+    </view>
+  </view>
+</view>
+
+<!-- ══════ 批量配岗位弹层（仅超管，2026-10-30） ══════
+     ⚠️ 语义是**覆盖**：勾中的人会被统一设成这里选的岗位（部门随之自动归）。
+        提示里必须写清，别让人以为是在原有基础上追加。 -->
+<view class="overlay" hidden="{{!bulkRoleOpen}}" catchtap="closeBulkRoles">
+  <view class="sheet" catchtap="stop">
+    <view class="sheet-hd">
+      <view class="sheet-hd-l">
+        <text class="sheet-t">批量配岗位</text>
+        <text class="sheet-sub">勾人 + 勾岗位，保存后这些人的岗位统一改成这里选的（部门自动归）。</text>
+      </view>
+      <text class="sheet-x" bindtap="closeBulkRoles">关闭</text>
+    </view>
+
+    <scroll-view class="sheet-body" scroll-y>
+      <view class="bsec">
+        <view class="bsec-hd">
+          <text class="bsec-t">选择人员（{{bulkRolePickCount}} / {{bulkRolePeople.length}}）</text>
+          <text class="bsec-a" bindtap="bulkRoleAll">全选</text>
+        </view>
+        <view class="chips chips-3">
+          <view class="chip {{item.on ? 'on' : ''}}" wx:for="{{bulkRolePeople}}" wx:key="personId"
+                data-id="{{item.personId}}" bindtap="toggleBulkRolePerson">{{item.name}}</view>
+        </view>
+      </view>
+
+      <view class="bsec">
+        <view class="bsec-hd">
+          <text class="bsec-t">配成哪些岗位（可多选）</text>
+        </view>
+        <view class="chips chips-3">
+          <view class="chip {{item.on ? 'on' : ''}}" wx:for="{{bulkRoleChips}}" wx:key="label"
+                data-l="{{item.label}}" bindtap="toggleBulkRole">{{item.label}}</view>
+        </view>
+      </view>
+
+      <view class="bsec">
+        <text class="bsec-t">会被改成什么样</text>
+        <view class="br-preview" wx:for="{{bulkRolePeople}}" wx:key="personId" wx:if="{{item.on}}">
+          <text class="br-p-name">{{item.name}}</text>
+          <text class="br-p-arrow">→</text>
+          <text class="br-p-val">{{bulkRoleText || '未选岗位'}}{{bulkRoleDept ? ' · ' + bulkRoleDept : ''}}</text>
+        </view>
+      </view>
+      <view class="pad-sm"></view>
+    </scroll-view>
+
+    <view class="sheet-foot">
+      <button class="btn ghost" bindtap="closeBulkRoles">取消</button>
+      <button class="btn primary" loading="{{bulkRoleSaving}}" bindtap="saveBulkRoles">保存</button>
     </view>
   </view>
 </view>

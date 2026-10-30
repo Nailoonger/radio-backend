@@ -414,6 +414,18 @@
 .chip { font-size: 22rpx; line-height: 1.5; padding: 10rpx 20rpx; border-radius: 9999rpx; background: #F5F5F7; color: var(--ink, #1D1D1F); }
 .chip.on { background: var(--accent-tint, #EAF3FD); color: var(--accent, #0066CC); font-weight: 500; }
 
+/* 批量配岗位：保存前的「会被改成什么样」预览（一行一人）
+   ⚠️ 这是**覆盖**操作，所以必须让人先看见结果再按保存 —— 不能只靠一句文案提醒。 */
+.br-preview {
+  display: flex; align-items: baseline; gap: 10rpx;
+  padding: 10rpx 0; border-bottom: 2rpx solid var(--hairline, #E2E2E7);
+  font-size: 21rpx;
+}
+.br-preview:last-child { border-bottom: none; }
+.br-p-name { flex: none; max-width: 240rpx; color: var(--ink, #1D1D1F); }
+.br-p-arrow { flex: none; color: var(--muted, #76767E); }
+.br-p-val { flex: 1; min-width: 0; color: var(--accent, #0066CC); }
+
 .ts-note { padding: 26rpx 8rpx 0; font-size: 20rpx; line-height: 1.7; color: var(--muted, #76767E); }
 
 /* 原来这里还有 .pl-head / .pl-title / .pl-sub：

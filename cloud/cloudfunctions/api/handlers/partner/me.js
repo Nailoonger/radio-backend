@@ -20,7 +20,7 @@ const { C, findOne, updateById } = require('../../lib/db');
 const { ApiError, Codes } = require('../../lib/response');
 const {
   asPartner, asSuperPartner, listPeople, resolvePerson,
-  DUTY_ROLES, DEPARTMENTS,
+  DUTY_ROLES, DEPARTMENTS, deptOfRoles,
 } = require('./_kit');
 
 /**
@@ -134,19 +134,11 @@ async function saveDuty(ctx) {
  * ⚠️ 记者 / 技术 不挂部门，不在这两张表里 —— 更新时**原样保留**，不许被覆盖掉。
  * ⚠️ 历史坑（别再来一次）：上一版改成「只配部门」，界面上部门单选、岗位由部门推 ——
  *    陛下当天就退回来了。他要的是配岗位。**部门和岗位只能有一个能被用户看见，谁是主谁就被点。**
+ * ⚠️ `deptOfRoles` 从 `_kit.js` 引，不在这里另写一份：读（personDto）和写（这里）必须同一张表。
  */
-const DEPT_BY_ROLE = { 播音: '播音部', 主持: '主持部', 编辑: '编辑部' };
-const MAPPED_ROLES = Object.keys(DEPT_BY_ROLE);
 const ROLE_BY_DEPT = { 播音部: '播音', 主持部: '主持', 编辑部: '编辑' };
-
-/** 多选岗位 → 主部门（按 播音→主持→编辑 的顺序取第一个命中的；一个都没命中返回空串） */
-function deptOfRoles(roles) {
-  const list = Array.isArray(roles) ? roles : [];
-  for (let i = 0; i < MAPPED_ROLES.length; i++) {
-    if (list.indexOf(MAPPED_ROLES[i]) >= 0) return DEPT_BY_ROLE[MAPPED_ROLES[i]];
-  }
-  return '';
-}
+/** 三个「挂部门」的岗位（播音/主持/编辑）—— 用来把记者 / 技术这类额外岗位挑出来 */
+const MAPPED_ROLES = Object.keys(ROLE_BY_DEPT).map((d) => ROLE_BY_DEPT[d]);
 
 /** 岗位数组校验 + 去重 + 白名单（saveDuty / saveDutyFor 共用，别再各写一遍） */
 function normalizeRoles(list) {
