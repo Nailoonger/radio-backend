@@ -31,8 +31,12 @@ Page({
     this.load();
   },
   onShow() {
-    // 切回页面时刷新一次权限（15 秒内复用缓存）：超管刚关掉就点不进去，不用等重新登录
+    // 切回页面时刷新一次权限（TTL 只有 1 秒）：超管刚关掉就点不进去，不用等重新登录
     this.refreshPerm();
+    // 停在这一页不动时也要收到权限变化（10 秒一轮）
+    if (this.data.roleKey === 'manager') {
+      perm.startPolling('schedule', (pm) => this._applyPerm(pm));
+    }
     if (this._loadedOnce && !this.data.loading) this.load();
   },
 
@@ -41,13 +45,25 @@ Page({
     if (this.data.roleKey !== 'manager') return Promise.resolve();
     return perm.load().then((pm) => {
       if (this._gone || !pm) return;
-      this.setData({
-        canPlan: pm.schedule !== false,
-        denyPlan: (pm.text && pm.text.schedule) || '暂无权限',
-      });
+      this._applyPerm(pm);
     });
   },
-  onUnload() { this._gone = true; this._request = (this._request || 0) + 1; },
+
+  /** 把权限落到「工作台入口能不能点」上（只动入口，班表照看） */
+  _applyPerm(pm) {
+    if (!pm || this._gone) return;
+    this.setData({
+      canPlan: pm.schedule !== false,
+      denyPlan: (pm.text && pm.text.schedule) || '暂无权限',
+    });
+  },
+
+  onHide() { perm.stopPolling('schedule'); },
+  onUnload() {
+    perm.stopPolling('schedule');
+    this._gone = true;
+    this._request = (this._request || 0) + 1;
+  },
   onPullDownRefresh() { return this.load().finally(() => wx.stopPullDownRefresh()); },
   load() {
     if (!this.data.ready) return Promise.resolve();

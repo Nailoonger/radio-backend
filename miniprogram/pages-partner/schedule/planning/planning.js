@@ -53,12 +53,13 @@ Page({
     });
   },
   /**
-   * 切回页面时重问一次权限（2026-10-31）
+   * 权限的「实时」靠三层（2026-10-31 陛下嫌慢后定）
+   *   ① 切回页面（onShow）重问 —— TTL 只有 1 秒，等于每次都是新值
+   *   ② **停在页面不动时每 10 秒轮询** —— 超管刚关掉，不用切页也能在 10 秒内被踢
+   *   ③ 任何接口回 40301 ⇒ request.js 的钩子立刻强制重取（比 ② 还快，见 app.js）
    *
-   * ⚠️ 为什么需要：`utils/perm.js` 原来永久缓存，超管改了开关、社干这边不重新登录
-   *    就一直是旧值 —— 陛下原话「好像不会实时更新权限，要重新登录才会更新」。
-   *    现在每次 onShow 问一次（15 秒内复用缓存，不会每切一次页就多打请求）；
-   *    真被关掉就当场弹窗退回，不让人继续点下去才发现全报 40301。
+   * ⚠️ 轮询必须成对停（onHide / onUnload）：不停就是后台一直发请求。
+   * ⚠️ 用 key 登记（'planning'）而不是单个回调：多页面叠栈时不会互相踩掉。
    */
   refreshPerm() {
     if (this.data.isSuper) return Promise.resolve();
@@ -70,9 +71,20 @@ Page({
 
   onShow() {
     this.refreshPerm();
+    // 停在页面上不动时也要能收到权限变化（10 秒一轮，见 refreshPerm 头注）
+    if (!this.data.isSuper) {
+      perm.startPolling('planning', (pm) => {
+        if (!this._gone && pm.schedule === false) this.denySchedule(pm);
+      });
+    }
     if (this._loadedOnce && !this.data.loading && !this.data.busy) this.load();
   },
-  onUnload() { this._gone = true; this._request = (this._request || 0) + 1; },
+  onHide() { perm.stopPolling('planning'); },
+  onUnload() {
+    perm.stopPolling('planning');
+    this._gone = true;
+    this._request = (this._request || 0) + 1;
+  },
   onPullDownRefresh() { return this.load().finally(() => wx.stopPullDownRefresh()); },
   goBack() { if (getCurrentPages().length > 1) wx.navigateBack(); else wx.reLaunch({ url: '/pages-partner/schedule/index/index' }); },
   load(opts) {

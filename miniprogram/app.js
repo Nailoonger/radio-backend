@@ -94,6 +94,21 @@ App({
       cloudFunctionName: this.globalData.cloudFunctionName,
     });
 
+    /**
+     * 40301 钩子：被拒的那一刻就把前端权限刷掉
+     *
+     * 权限变更的「实时」靠三层：
+     *   ① 切页面（onShow）重新问 —— TTL 1 秒，等于每次都是新的
+     *   ② 停着不动时 15 秒轮询
+     *   ③ 这一条：**任何接口回 40301** 说明权限刚变过，立刻强制重取
+     * ③ 比 ② 快得多，而且零额外请求（本来就在发这个请求）。
+     *
+     * ⚠️ request.js 不能直接 require perm.js（会循环依赖），所以由这里单向装钩子。
+     */
+    require('./utils/request.js').setForbiddenHook(() => {
+      require('./utils/perm.js').load(true);
+    });
+
     // 云开发初始化（仅有环境 ID 时）：cloud 模式下所有请求依赖它
     if (this.globalData.cloudEnvId && wx.cloud && wx.cloud.init) {
       wx.cloud.init({ env: this.globalData.cloudEnvId, traceUser: true });

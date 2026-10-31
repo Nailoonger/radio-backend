@@ -110,7 +110,10 @@ Page({
     this.refreshBadges();
   },
 
-  onUnload() { this._gone = true; },
+  onUnload() {
+    perm.stopPolling('review');
+    this._gone = true;
+  },
 
   onShow() {
     /* 权限可能刚被超管改过：切回来先对一次，再决定要不要刷角标
@@ -118,17 +121,26 @@ Page({
     this.refreshPermState().then(() => {
       if (this.data.ready) this.refreshBadges();
     });
+    /* 停在审核页不动时也要收到权限变化（10 秒一轮）：
+       这一页最需要它 —— 整页「能审 / 不能审」两态，靠切页面才能变太迟钝。 */
+    if (this.data.roleManager) {
+      perm.startPolling('review', (pm) => this.refreshPermState(pm));
+    }
   },
+
+  onHide() { perm.stopPolling('review'); },
 
   /**
    * 重新对一次「审核权限」，变了就当场切换整页形态
    *
    * ⚠️ 只在这一页做：它整页就是「能审 / 不能审」两态，
    *    不像班表页那样可以「入口拦住但页面照看」。
+   * @param {object} [known] 轮询已经拿到的权限位（传了就不再问一次）
    */
-  refreshPermState() {
+  refreshPermState(known) {
     if (!this.data.ready || !this.data.roleManager) return Promise.resolve();
-    return perm.load().then((pm) => {
+    const get = known ? Promise.resolve(known) : perm.load();
+    return get.then((pm) => {
       if (this._gone || !pm) return;
       const deniedNow = pm.review === false;
       if (deniedNow === this.data.denied) return;
@@ -141,6 +153,7 @@ Page({
         this.fetchCounts();
         this.fetchList(true);
       }
+      this.refreshBadges();
     });
   },
 

@@ -59,6 +59,27 @@ function currentBaseURL() {
   return (app && app.globalData && app.globalData.baseURL) || 'http://localhost:3000/api';
 }
 
+/**
+ * 40301 钩子 —— 被拒的那一刻，就是「权限真相」变了的那一刻
+ *
+ * ═══════════ 为什么要这个钩子 ═══════════
+ * 轮询 10 秒一次，切页面立刻问 —— 但社干要是**正停在工作台上手点了一下**，
+ * 这一下被后端拒了（40301），而他得等下一轮轮询界面才会变。
+ * 其实这时已经拿到了最权威的信号：**权限变了**。所以在这里顺手把前端权限刷掉，
+ * 页面下一次读 `perm` 就是新值，比任何轮询都快。
+ *
+ * ⚠️ 不在 request.js 里直接 require perm.js：两个模块会互相 require（perm 引 request），
+ *    形成循环依赖。改成注册钩子，由 app.js 单向装上去。
+ * ⚠️ 只认 40301：40001 参数错、40901 冲突都不是「权限变了」。
+ */
+let forbiddenHook = null;
+function setForbiddenHook(fn) { forbiddenHook = fn; }
+function notifyForbidden(body) {
+  if (!forbiddenHook) return;
+  if (Number(body && body.code) !== 40301) return;
+  try { forbiddenHook(body.message || ''); } catch (e) { /* 钩子自己出错不能影响主流程 */ }
+}
+
 /** 401 统一处理：按身份清 token */
 function handleUnauthorized(app, scope) {
   if (!app) return;
@@ -120,6 +141,7 @@ function directRequest(path, method, data, scope, options) {
           return reject({ code: 40101, message: '请先登录' });
         }
         if (body.code === 0) return resolve(body.data);
+        notifyForbidden(body);
         reject(decorateServerError(body));
       },
       fail: (err) => {
@@ -153,6 +175,7 @@ function cloudRequest(path, method, data, scope, options) {
           return reject({ code: 40101, message: body.message || '请先登录' });
         }
         if (body.code === 0) return resolve(body.data);
+        notifyForbidden(body);
         reject(decorateServerError(body));
       },
       fail: (err) => {
@@ -209,4 +232,4 @@ function isConflict(err) {
   return !!(err && Number(err.code) === 40901);
 }
 
-module.exports = { request, adminRequest, isConflict, configure, getMode: () => CONFIG.mode };
+module.exports = { request, adminRequest, isConflict, configure, setForbiddenHook, getMode: () => CONFIG.mode };

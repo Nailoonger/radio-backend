@@ -155,18 +155,42 @@ ok('utils/perm.js 存在', !!permUtil);
 ok('权限位缓存有有效期（不许永久缓存）',
   /const TTL_MS = \d+ \* 1000/.test(permUtil),
   '永久缓存 ⇒ 超管改完，社干不重新登录永远看不到');
+/* 2026-10-31 陛下嫌「生效慢」后定的三层：短 TTL + 前台轮询 + 40301 钩子 */
+const ttl = (permUtil.match(/const TTL_MS = (\d+) \* 1000/) || [])[1];
+ok('TTL ≤ 2 秒（切页面就是新值）', Number(ttl) > 0 && Number(ttl) <= 2,
+  `当前 TTL=${ttl}s —— 太长就等于「切回去还是旧的」`);
+const pollMs = (permUtil.match(/const POLL_MS = (\d+) \* 1000/) || [])[1];
+ok('前台轮询 ≤ 15 秒', Number(pollMs) > 0 && Number(pollMs) <= 15,
+  `当前 POLL_MS=${pollMs}s —— 停着不动的人要等这么久才被踢`);
+ok('轮询用 key 登记，多页面叠栈不互相踩',
+  /const pollers = \{\}/.test(permUtil)
+  && /function startPolling\(key, onChange\)/.test(permUtil)
+  && /function stopPolling\(key\)/.test(permUtil));
+/* 40301 钩子：被拒那一刻就是权限变了那一刻，比轮询快且零额外请求 */
+const reqJs = read('miniprogram/utils/request.js');
+ok('request.js 提供 40301 钩子', /function setForbiddenHook/.test(reqJs) && /function notifyForbidden/.test(reqJs));
+ok('两个 reject 出口都触发钩子',
+  (reqJs.match(/notifyForbidden\(body\);/g) || []).length >= 2,
+  '漏一处 ⇒ 那条通道上的 40301 不会刷新权限');
+ok('app.js 装了钩子（否则钩子是死的）',
+  /setForbiddenHook\(\(\) => \{/.test(read('miniprogram/app.js')));
 ok('permissions 页 roleManager 判社干身份比 roleKey 可靠（review 页同款）',
   read('miniprogram/pages-partner/review/review.js').indexOf('roleManager: Number(info.role) === 1') >= 0,
   '用 roleKey 判会把站员一起关在门外（roleKey 只有 super/manager 两档）');
 /* 「不用重新登录」靠的是 onShow 重问，不是靠登录 */
-[['排班工作台', 'schedule/planning/planning.js', 'refreshPerm'],
-  ['班表页', 'schedule/index/index.js', 'refreshPerm'],
-  ['审核页', 'review/review.js', 'refreshPermState']].forEach(([label, rel, fn]) => {
+[['排班工作台', 'schedule/planning/planning.js', 'refreshPerm', 'planning'],
+  ['班表页', 'schedule/index/index.js', 'refreshPerm', 'schedule'],
+  ['审核页', 'review/review.js', 'refreshPermState', 'review']].forEach(([label, rel, fn, key]) => {
   const src = read(`miniprogram/pages-partner/${rel}`);
   const hasFn = new RegExp(fn + '\\(\\)').test(src);
-  const inShow = new RegExp('onShow\\(\\)[\\s\\S]{0,300}this\\.' + fn + '\\(').test(src);
+  const inShow = new RegExp('onShow\\(\\)[\\s\\S]{0,400}this\\.' + fn + '\\(').test(src);
   ok(`${label}：onShow 会重问权限`, hasFn && inShow,
     '只在 onLoad 判一次 ⇒ 超管改完必须重新登录才生效（2026-10-31 陛下反馈的正是这个）');
+  // 轮询必须成对：起了不停就是后台一直发请求
+  ok(`${label}：轮询开 / 停成对`,
+    new RegExp(`startPolling\\('${key}'`).test(src)
+    && (src.match(new RegExp(`stopPolling\\('${key}'\\)`, 'g')) || []).length >= 2,
+    `只 startPolling('${key}') 不 stop，或只在一个生命周期里 stop —— onHide 与 onUnload 都要停`);
 });
 ok('取不到权限时放行（fail-open，后端仍会拦）',
   /\.catch\(\(\) => \{[\s\S]{0,300}?return null;/.test(permUtil),
