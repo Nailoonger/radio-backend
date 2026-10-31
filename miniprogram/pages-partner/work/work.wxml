@@ -1,9 +1,10 @@
-<!-- pages-partner/work/work.wxml · v1（2026-10-28 稿件模块）
+<!-- pages-partner/work/work.wxml · v2（2026-11-01 加回草稿箱）
      事实源：partner-hub/app.html V['my-drafts']（稿件屏）+ 实测几何，1px = 1.923rpx。
      结构：顶部「继续写」卡 → 状态 tab（.stabs）→ 稿件列表（.rows/.row）→ 沉底导出
 
-     与方案的差异：**没有差异**。v151 的 tab 就 3 档（待审核/已通过/已驳回），
-     草稿由顶部「继续写今天这篇」那张卡承接 —— 之前多给的「草稿」tab 已于 2026-10-30 删掉。
+     状态共 4 档：草稿箱 / 待审核 / 已通过 / 已驳回。
+     2026-10-30 按 v151 删过「草稿」，2026-11-01 陛下要求加回来 —— 顶部那张「继续写」
+     只能带最近一篇，草稿一多就找不到别的，所以草稿要占一个正式格子。
      不做：AI 找稿 / AI 续写 —— 没有 AI 服务，不给假入口。 -->
 <view class="page">
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>

@@ -1,18 +1,20 @@
-// pages-partner/work/work.js · v1（2026-10-28 稿件模块）
+// pages-partner/work/work.js · v2（2026-11-01 加回草稿箱）
 //
-// 我的稿件：状态 3 档（待审核 / 已通过 / 已驳回）× 列表 + 顶部「继续写」+ 沉底导出。
+// 我的稿件：状态 4 档（草稿箱 / 待审核 / 已通过 / 已驳回）× 列表 + 顶部「继续写」+ 沉底导出。
 // 数据：GET /partner/draft/list?status=&page=   （服务端按 personId 只给本人的稿）
 // 计数：同一个接口顺带返回 counts（不让前端再打 4 次）
 //
 // ⚠️ 状态是**服务端权威**（0 草稿 / 1 待审 / 2 通过 / 3 驳回），前端只做文案与配色映射。
-// ⚠️⚠️ tab 只有 3 档，**没有「草稿」**（陛下 2026-10-30：「151 方案没有草稿啊删掉」）。
-//    原型里草稿由顶部那张卡承接（「继续写今天这篇」= 最近一篇草稿）；
-//    之前多给的「草稿」tab 是自创，已删。草稿仍可续写，只是不占一个状态位。
+// ⚠️⚠️ tab 的历史（别再来回改）：
+//    2026-10-30 陛下让删掉「草稿」tab（当时的依据是 v151 里草稿由顶部卡承接）；
+//    2026-11-01 陛下又要回来 —— 顶部那张「继续写」只给最近一篇，草稿多了就没法找。
+//    现在 4 档，草稿箱排第一（自己还没交的东西最先看见），点行直接进编辑器续写。
 // ⚠️ AI 找稿 / AI 续写没有服务端能力 ⇒ 不做入口，不编假功能。
 
 const { adminRequest } = require('../../utils/request.js');
 
 const TABS = [
+  { key: 'draft',    status: 0, label: '草稿箱', cntKey: 'draft' },
   { key: 'pending',  status: 1, label: '待审核', cntKey: 'pending' },
   { key: 'approved', status: 2, label: '已通过', cntKey: 'approved' },
   { key: 'rejected', status: 3, label: '已驳回', cntKey: 'rejected' },
@@ -128,7 +130,8 @@ Page({
           loading: false,
           counts,
           tabs,
-          emptyText: ['没有在审的稿', '还没有通过的稿', '没有被驳的稿'][this.data.tabIdx] || '还没有稿件，点上面新建一篇',
+          // ⚠️ 顺序与 TABS 一一对应（草稿箱在最前）；漏一项就会串到下一档的文案
+          emptyText: ['草稿箱是空的，点上面「写新稿」起一篇', '没有在审的稿', '还没有通过的稿', '没有被驳的稿'][this.data.tabIdx] || '还没有稿件',
         });
         return d;
       })
@@ -198,8 +201,11 @@ Page({
 
   onOpen(e) {
     const id = e.currentTarget.dataset.id;
-    // 列表里只会有待审/通过/驳回三种，统一进版本记录（正文只读在版本页里看）。
-    // 草稿不占 tab，从顶部「继续写今天这篇」卡进编辑器。
+    // 草稿箱那档点进去 = 接着写（编辑器）；其余三档是只读的结论，进版本记录页看正文与历史
+    if (TABS[this.data.tabIdx] && TABS[this.data.tabIdx].status === 0) {
+      wx.navigateTo({ url: `/pages-partner/work/editor/editor?id=${id}` });
+      return;
+    }
     wx.navigateTo({ url: `/pages-partner/work/versions/versions?id=${id}` });
   },
 
