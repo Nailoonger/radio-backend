@@ -107,6 +107,16 @@ ok('下拉刷新也重拉点歌', /onPullDownRefresh\(\)[\s\S]{0,400}?fetchSongs
 ok('不再声称点歌排期没接口', !/歌曲排期[^\n]*没有接口/.test(js) && !/点歌排期卡等排期接口落地/.test(js),
   '注释里还写着「点歌排期没有接口」—— 接口早就有了');
 
+/* 自动轮播（2026-11-01 陛下：「班表卡和排歌卡你没做自动轮播」）
+   ⚠️ 三端是同一个 desk 页，所以这一条同时管站员 / 社干 / 超管。
+   只有一张卡时必须不轮播（不然一个卡位在那儿空转），所以 autoplay 绑 slides.length。 */
+ok('大白卡自动轮播（两张卡时每 5 秒换一张）',
+  /<swiper[^>]*autoplay="\{\{slides\.length > 1\}\}"/.test(wxml) && /interval="5000"/.test(wxml),
+  'swiper 没有 autoplay / interval —— 陛下要的是班表卡 ↔ 排歌卡自己轮播');
+ok('只有一张卡时不轮播 / 不循环',
+  /circular="\{\{slides\.length > 1\}\}"/.test(wxml),
+  'circular 写死 true：只有一张卡时会自己绕自己');
+
 console.log(out.join('\n'));
-console.log(failed ? `\n✗ 失败 ${failed} 项` : '\n✓ 工作台大白卡跟着班表四态走');
+console.log(failed ? `\n✗ 失败 ${failed} 项` : '\n✓ 工作台大白卡跟着班表四态走（含自动轮播）');
 process.exit(failed ? 1 : 0);

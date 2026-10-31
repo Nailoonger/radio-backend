@@ -31,7 +31,12 @@
   <!-- 大白卡轮播（v151 .carousel：margin-top -24px 压接欢迎带；卡片左右各内缩 18px）
        ⚠️ swiper 必须有固定高（v3 教训：height:auto 整卡塌陷）⇒ 高度由 js 按当前卡算好传进来 -->
   <view class="bigwrap">
-    <swiper class="slides" style="height: {{slideH}}rpx;" bindchange="onSwiper">
+    <!-- ⚠️ 自动轮播（2026-11-01 陛下要求）：班表卡 ↔ 排歌卡 每 5 秒自己换一张。
+         只有一张卡时 autoplay 关掉（不然会来回空转）；circular 让最后一张接回第一张。
+         手指拖动期间系统会自动暂停，松手继续 —— 这是 swiper 自带行为，不用自己写定时器。 -->
+    <swiper class="slides" style="height: {{slideH}}rpx;"
+            autoplay="{{slides.length > 1}}" interval="5000" duration="420" circular="{{slides.length > 1}}"
+            bindchange="onSwiper">
       <swiper-item wx:for="{{slides}}" wx:key="eb">
         <view class="bigc">
           <!-- 头行：左「正式值班安排」，右「已发布 · 第 N 版」胶囊（原型 .ebrow / .tag.ok） -->
