@@ -67,9 +67,8 @@ Page({
     ready: false,
     loading: true,
     loadError: '',
-    saving: false,
-    /** 全局总闸（缺行 = 全开，服务端已经归一好） */
-    global: { schedule: true, review: true },
+    /** 全局总闸（缺行 = 全开，服务端已经归一好）。三位都要列——少一位就是「显示开、实际关」 */
+    global: { schedule: true, review: true, proxy: true },
     /** 权限位文案：{ key, name, desc, deny }，服务端给，页面不硬编码 */
     meta: [],
     /** 拒绝文案（页尾说明用，按 key 取好，别在 wxml 里写 meta[0] 这种下标 —— 顺序一变就错） */
@@ -78,12 +77,30 @@ Page({
     denyProxy: '暂无代录权限',
     /** 社干名单 */
     people: [],
-    count: { managers: 0, scheduleOn: 0, reviewOn: 0, overridden: 0 },
+    count: { managers: 0, scheduleOn: 0, reviewOn: 0, proxyOn: 0, overridden: 0 },
     /**
      * 权限表还没建（云开发新集合必须先建，否则查询抛 -502005 → 整页「服务器繁忙」）。
      * 2026-10-31 实际踩到。页面不白屏，改成一句「拨一下开关会自动建好」。
      */
     buildNeeded: false,
+    /**
+     * 保存失败的原因（常驻在页面顶部，直到下一次保存成功）
+     *
+     * ⚠️ 原来只有 wx.showToast 闪 1.5 秒 —— 拦截器一刷新就没了，
+     *    表现成「点了没反应 / 点不亮」，人会以为是按钮坏了（2026-10-31 陛下就当成这样）。
+     *    失败必须留下能读的痕迹：一句话 + 失败的那一位。
+     */
+    saveError: '',
+    /**
+     * **按格**的保存中标记（不是全局一把锁）
+     *
+     * ⚠️⚠️ 原来是一个 `saving` 布尔拦住所有格，而且被拦时**一声不响** ——
+     *    先点「排班」再快速点「代录」，第二下直接被吞掉，表现就是
+     *    「代录点不亮」（2026-10-31 陛下报的正是这个）。
+     *    改成每一格自己的标记：三格可以并行保存，互不阻塞；
+     *    只有同一格正在保存时才会忽略重复点击（那是对的，防连点）。
+     */
+    globalBusy: { schedule: false, review: false, proxy: false },
   },
 
   onLoad() {
@@ -111,6 +128,12 @@ Page({
   },
 
   onUnload() { this._gone = true; },
+
+  /** 失败提示里的「重新加载」 */
+  onRetry() {
+    this.setData({ saveError: '' });
+    return this.load();
+  },
 
   goBack() {
     const pages = getCurrentPages();
@@ -148,6 +171,8 @@ Page({
             over: x.over || { schedule: null, review: null, proxy: null },
             eff: x.eff || { schedule: false, review: false, proxy: false },
             overridden: !!x.overridden,
+            // 每位自己的「保存中」标记，见 data.globalBusy 头注
+            busy: { schedule: false, review: false, proxy: false },
           })),
           count: (d && d.count) || { managers: 0, scheduleOn: 0, reviewOn: 0, overridden: 0 },
           buildNeeded: !!(d && d.buildNeeded),
@@ -163,14 +188,19 @@ Page({
   onGlobal(e) {
     const key = e.currentTarget.dataset.key;
     const val = !!e.detail.value;
-    if (!key || this.data.saving) return;
+    // ⚠️ 只拦「同一格正在保存」，不拦别的格（三格互不阻塞）
+    if (!key || this.data.globalBusy[key]) return;
 
     const prev = this.data.global[key];
     // 先动界面：开关组件已经把位置换了，这里回滚会让手指觉得卡。
     // 同时把「跟全局走」的那几个人一起重算 —— 他们那几格要立刻跟着变。
     const global = Object.assign({}, this.data.global);
     global[key] = val;
-    this.setData(Object.assign({ saving: true, global }, recompute(this.data.people, global)));
+    const gb = Object.assign({}, this.data.globalBusy);
+    gb[key] = true;
+    // ⚠️ 整块替换 globalBusy，不用 `globalBusy.x` 路径写法：
+    //    同一个 setData 里既给 people 又给嵌套路径，容易踩到「先合并数组再写路径」的顺序坑。
+    this.setData(Object.assign({ global, globalBusy: gb }, recompute(this.data.people, global)));
 
     perm.load(true);          // 本机权限缓存作废（本页是超管，改完自己也要立刻生效）
 
@@ -182,14 +212,22 @@ Page({
          *    重新 load 会让 loading 回到 true ⇒ 整页闪一下重载（陛下反馈的就是这个）。
          */
         const g = (d && d.global) || global;
-        this.setData(Object.assign({ saving: false, global: g }, recompute(this.data.people, g)));
+        const done = Object.assign({}, this.data.globalBusy);
+        done[key] = false;
+        this.setData(Object.assign({ saveError: '', global: g, globalBusy: done }, recompute(this.data.people, g)));
       })
       .catch((err) => {
         if (this._gone) return;
         // 失败必须把开关拨回去，否则界面在骗人
         const back = Object.assign({}, this.data.global);
         back[key] = prev;
-        this.setData(Object.assign({ saving: false, global: back }, recompute(this.data.people, back)));
+        const done = Object.assign({}, this.data.globalBusy);
+        done[key] = false;
+        this.setData(Object.assign({
+          saveError: `保存失败：${(err && err.message) || '未知原因'}`,
+          global: back,
+          globalBusy: done,
+        }, recompute(this.data.people, back)));
         wx.showToast({ title: (err && err.message) || '没保存成功', icon: 'none' });
       });
   },
@@ -203,9 +241,11 @@ Page({
   onPerson(e) {
     const { id, key } = e.currentTarget.dataset;
     const personId = Number(id);
-    if (!personId || !key || this.data.saving) return;
+    if (!personId || !key) return;
     const row = this.data.people.find((x) => x.personId === personId);
     if (!row) return;
+    // ⚠️ 只拦这一格（不是全局锁），见 data.globalBusy 头注
+    if (row.busy && row.busy[key]) return;
     const next = !row.eff[key];
     this.savePerson(personId, { [key]: next });
   },
@@ -214,8 +254,15 @@ Page({
   onFollow(e) {
     const { id, key } = e.currentTarget.dataset;
     const personId = Number(id);
-    if (!personId || !key || this.data.saving) return;
+    if (!personId || !key) return;
+    const row = this.data.people.find((x) => x.personId === personId);
+    if (row && row.busy && row.busy[key]) return;
     this.savePerson(personId, { [key]: null });
+  },
+
+  /** 找某个人在数组里的下标（排查用；正式逻辑都走整块替换，不用路径 setData） */
+  _indexOf(personId) {
+    return (this.data.people || []).findIndex((p) => Number(p.personId) === Number(personId));
   },
 
   /**
@@ -223,14 +270,17 @@ Page({
    *
    * ⚠️ 响应里带回了 `over / eff / overridden`，直接拿来贴到那一行上就够了。
    *    重拉整页会闪（见 recompute 头注）。
+   * ⚠️ 三格各自一把小锁：不同位可以同时在保存，只有同一格才会拦重复点击。
    */
   savePerson(personId, patch) {
-    this.setData({ saving: true });
+    const pk = Object.keys(patch)[0];
     // 先乐观更新手指下的那一格，避免「点了没反应」
     const optimistic = this.data.people.map((p) => {
-      if (p.personId !== personId) return p;
-      const over = Object.assign({}, p.over, patch);
-      return Object.assign({}, p, { over, overridden: isOverridden(over) });
+      const hit = Number(p.personId) === Number(personId);
+      const over = hit ? Object.assign({}, p.over, patch) : p.over;
+      const busy = Object.assign({}, p.busy);
+      if (hit && pk) busy[pk] = true;
+      return Object.assign({}, p, { over, overridden: isOverridden(over), busy });
     });
     this.setData(recompute(optimistic, this.data.global));
 
@@ -240,17 +290,28 @@ Page({
       .then((d) => {
         if (this._gone) return;
         const people = this.data.people.map((p) => {
-          if (p.personId !== personId) return p;
+          if (Number(p.personId) !== Number(personId)) return p;
           const over = (d && d.over) || p.over;
-          return Object.assign({}, p, { over, overridden: isOverridden(over) });
+          const busy = Object.assign({}, p.busy);
+          if (pk) busy[pk] = false;
+          return Object.assign({}, p, { over, overridden: isOverridden(over), busy });
         });
-        this.setData(Object.assign({ saving: false }, recompute(people, this.data.global)));
+        this.setData(Object.assign({ saveError: '' }, recompute(people, this.data.global)));
       })
       .catch((err) => {
         if (this._gone) return;
-        this.setData({ saving: false });
+        // 手指下那格先解锁，再按服务端实际情况回正（乐观更新已经把界面弄脏了）
+        const people = this.data.people.map((p) => {
+          if (Number(p.personId) !== Number(personId)) return p;
+          const busy = Object.assign({}, p.busy);
+          if (pk) busy[pk] = false;
+          return Object.assign({}, p, { busy });
+        });
+        this.setData({
+          people,
+          saveError: `保存失败：${(err && err.message) || '未知原因'}`,
+        });
         wx.showToast({ title: (err && err.message) || '没保存成功', icon: 'none' });
-        // 失败就按服务端实际情况回正（乐观更新已经把界面弄脏了）
         this.load(true);
       });
   },

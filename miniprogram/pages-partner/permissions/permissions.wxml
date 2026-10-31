@@ -18,6 +18,12 @@
     <view class="hint-note" wx:elif="{{loadError}}">{{loadError}}</view>
 
     <block wx:else>
+      <!-- 保存失败的原因常驻在这里，别只弹 1.5 秒 toast（那样看起来就是「点了没反应」） -->
+      <view class="err-bar" wx:if="{{saveError}}">
+        <text class="err-t">{{saveError}}</text>
+        <text class="err-d">开关已经拨回原来的位置。按这个提示改，或点下面「重新加载」再来一次。</text>
+        <text class="err-a" hover-class="pressed" bindtap="onRetry">重新加载 ›</text>
+      </view>
       <!-- 权限表还没建：不白屏、也不装没事。拨一下开关就会自动建好（见 permissions.js#upsert） -->
       <view class="intro" wx:if="{{buildNeeded}}">
         <text class="intro-t">权限表还没初始化</text>
@@ -38,6 +44,7 @@
             <text class="r-sub">{{item.desc}}</text>
           </view>
           <switch class="sw" checked="{{global[item.key]}}" color="#0066CC"
+                  disabled="{{globalBusy[item.key]}}"
                   data-key="{{item.key}}" bindchange="onGlobal" />
         </view>
       </view>
@@ -63,7 +70,7 @@
           <!-- 三个胶囊一行：排班 / 审核 / 代录。胶囊文案与顺序都来自 meta（_kit 的 PERM_TEXT），
                不在页面里再列一遍 —— 加第四个开关时只改后端，这页自动跟上。 -->
           <view class="p-pills">
-            <view class="pill {{p.eff[m.key] ? 'on' : ''}}" wx:for="{{meta}}" wx:key="key" wx:for-item="m"
+            <view class="pill {{p.eff[m.key] ? 'on' : ''}} {{p.busy[m.key] ? 'busy' : ''}}" wx:for="{{meta}}" wx:key="key" wx:for-item="m"
                   hover-class="pressed"
                   data-id="{{p.personId}}" data-key="{{m.key}}" bindtap="onPerson">
               <text class="pill-n">{{m.short}}</text>

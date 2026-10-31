@@ -137,9 +137,15 @@ ok('app.json 分包登记了新页', appJson.indexOf('"permissions/permissions"'
 const permPageJs = read('miniprogram/pages-partner/permissions/permissions.js');
 ok('页面只给超管（role !== 0 退回）', /Number\(info\.role\) !== 0/.test(permPageJs));
 ok('改完强制刷新本机权限缓存', /perm\.load\(true\)/.test(permPageJs));
+/* ⚠️ 只检 onGlobal 这一段：onRetry（手动「重新加载」）本来就该调 load，那不是保存路径 */
+const onGlobalBody = permPageJs.slice(
+  permPageJs.indexOf('onGlobal(e)'),
+  permPageJs.indexOf('onPerson(e)')
+);
 ok('保存后不整页重拉（否则每拨一次开关页面闪一下）',
   /function recompute\(people, global\)/.test(permPageJs)
-  && !/return this\.load\(\);/.test(permPageJs),
+  && onGlobalBody.length > 0
+  && !/this\.load\(/.test(onGlobalBody),
   '又变回「保存就 load()」了 —— loading 会闪，陛下会说「怎么每次都要重新加载」');
 ok('按人拨位走独立接口', /\/partner\/permissions\/person\/\$\{personId\}/.test(permPageJs));
 ok('支持「跟回全局」（传 null）', /onFollow/.test(permPageJs) && /\[key\]: null/.test(permPageJs));
@@ -209,6 +215,13 @@ ok('权限页：胶囊按 meta 循环（加第四个开关不用改页面）',
   /wx:for="\{\{meta\}\}"[\s\S]{0,200}data-key="\{\{m\.key\}\}"/.test(permWxml),
   '又写死成两格了');
 ok('权限页：跟回全局也按 meta 循环', /wx:if="\{\{p\.over\[m\.key\] !== null\}\}"/.test(permWxml));
+ok('权限页：保存锁是**按格**的，不是一把全局锁',
+  /globalBusy: \{ schedule: false, review: false, proxy: false \}/.test(permPageJs)
+  && !/this\.data\.saving\) return;/.test(permPageJs),
+  '又用全局 saving 拦所有格 ⇒ 先点排班再点代录，第二下被静默吞掉（陛下报的「代录点不亮」就是这个）');
+ok('权限页：保存失败有常驻提示，不只有 1.5 秒 toast',
+  /saveError/.test(permPageJs) && /class="err-bar"/.test(permWxml),
+  '失败一闪而过 ⇒ 看起来就是「点了没反应」');
 
 /* ══════════════ C. 契约 ══════════════ */
 section('C. 契约');

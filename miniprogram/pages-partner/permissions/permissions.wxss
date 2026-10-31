@@ -12,6 +12,20 @@
 }
 .body { flex: 1; padding: 19rpx 35rpx 80rpx; display: flex; flex-direction: column; gap: 23rpx; }
 
+/* 保存失败提示：白卡 + 红字，常驻到下一次保存成功。
+   ⚠️ 不用深色底、也不用红色填充块 —— 只要字是红的就够醒目。 */
+.err-bar {
+  background: #FFF;
+  border-radius: 20rpx;
+  padding: 20rpx 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+.err-t { font-size: 24rpx; font-weight: 600; color: #B42318; line-height: 1.5; }
+.err-d { font-size: 21rpx; color: #76767E; line-height: 1.6; }
+.err-a { font-size: 22rpx; color: var(--accent); padding-top: 2rpx; }
+
 /* 页首说明：浅色卡，不加边框（手机里不加装饰性描边） */
 .intro {
   background: #FFFFFF;
@@ -68,6 +82,8 @@
 .pill.on { background: var(--accent-tint); }
 .pill.on .pill-n { color: var(--accent); font-weight: 600; }
 .pill.on .pill-v { color: var(--accent); }
+/* 这一格正在保存：压暗一点，避免连点；不同格互不阻塞（见 permissions.js 的 globalBusy 头注） */
+.pill.busy { opacity: .55; }
 
 .p-follow { display: flex; gap: 24rpx; flex-wrap: wrap; }
 .fl { font-size: 21rpx; color: var(--accent); }
