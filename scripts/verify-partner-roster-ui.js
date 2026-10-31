@@ -88,6 +88,18 @@ ok('两个只读字段带「自动识别」标',
 ok('进来先判 needPhone 再弹（判据来自后端）',
   /needPhone/.test(js) && /openSheet\(false\)/.test(js),
   'js 里没看到用 needPhone 触发首次弹层');
+/* ⚠️ 2026-10-31 陛下截图打回：屏幕上号码已经 11 位、按钮也亮着，点保存却弹「手机号要 11 位」。
+   根因是 model:value / setData 都是异步落地，输完立刻点保存时 this.data.sheet.phone 还停在上一拍。
+   ⇒ 提交必须读 bindinput 里同步赋值的 _lastPhone，不能读 data。 */
+ok('输入时同步缓存 _lastPhone（不靠 setData 时序）',
+  /onPhone\(e\)\s*\{[\s\S]{0,200}this\._lastPhone\s*=/.test(js),
+  'onPhone 里没有 this._lastPhone = v');
+ok('保存读的是 _lastPhone 而不是 data 里的值',
+  /const phone = digits\(this\._lastPhone/.test(js),
+  'onSave 还在读 this.data.sheet.phone —— 输完立刻点保存会判失败');
+ok('打开弹层时把提交源对齐', /openSheet\(editing\)\s*\{[\s\S]{0,200}this\._lastPhone\s*=/.test(js));
+ok('号码合法时收掉旧提示', /if \(ok\) wx\.hideToast\(\)/.test(js),
+  '缺 wx.hideToast() —— 「格式没问题」会和「要 11 位」同屏');
 
 /* ══════════ C. 底部红字入口 ══════════ */
 out.push('---- C. 修改我的个人资料 ----');

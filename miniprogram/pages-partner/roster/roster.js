@@ -152,6 +152,7 @@ Page({
   openSheet(editing) {
     const phone = editing ? digits(this.data.me.phone) : '';
     const ok = phoneOK(phone);
+    this._lastPhone = phone;          // 打开时就把提交源对齐，编辑态原样保存也不会读到空
     this.setData({
       sheet: {
         editing: !!editing,
@@ -178,9 +179,22 @@ Page({
   },
 
   /** 输入：只算校验，不改输入值（值由 model:value 双向绑定负责） */
+  /**
+   * 输入手机号
+   *
+   * ⚠️⚠️ 为什么还要单独存一份 `this._lastPhone`（2026-10-31 陛下截图打回）：
+   *    `model:value` 和 setData 都是**异步**落地的。用户输完第 11 位、手指马上点「保存」，
+   *    这时 `this.data.sheet.phone` 有可能还是上一拍的值（10 位）⇒ 校验判失败、
+   *    弹一句「手机号要 11 位」，可屏幕上明明写着 11 位、按钮还是亮的。
+   *    ⇒ 提交一律读 `_lastPhone`（bindinput 里同步赋值，不经过 setData），
+   *      `sheet.phone` 只负责回显。
+   * ⚠️ 号码一旦合法就把之前那句错误 toast 收掉，否则「格式没问题」和「要 11 位」会同屏打架。
+   */
   onPhone(e) {
     const v = digits(e.detail.value);
+    this._lastPhone = v;
     const ok = phoneOK(v);
+    if (ok) wx.hideToast();
     this.setData({
       'sheet.ok': ok,
       'sheet.err': errTextOf(v),
@@ -191,7 +205,8 @@ Page({
   onSave() {
     const sheet = this.data.sheet;
     if (!sheet) return;
-    const phone = digits(sheet.phone);
+    // 以 bindinput 同步缓存的那份为准；没有过输入事件（编辑态原样保存）才退回 data
+    const phone = digits(this._lastPhone != null ? this._lastPhone : sheet.phone);
     if (!phoneOK(phone)) {
       wx.showToast({ title: '手机号要 11 位、1 开头', icon: 'none' });
       return;
