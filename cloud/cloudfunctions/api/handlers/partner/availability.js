@@ -21,12 +21,18 @@
  *    - 存 picks 时同时记下 `slotVersion`（当时依据的时段版本号）
  *    - 读的时候若 `slotVersion` 与当前生效版本不一致，标 `stale: true` 让前端提示重填
  *    这是刻意保留的脏数据可见性 —— 静默丢弃站员填过的东西更糟。
+ *
+ * ═══════════ 默认周 = 下一周（2026-10-31 陛下定） ═══════════
+ * 「当然是本周填下一周的啊」。不传 week 时落 `nextWeekStart()`，
+ * 不是 `currentWeekStart()` —— 下周的班表读的是下周那一份填报，落到本周等于填了没用。
+ * 前端要区分「本周 / 下一周 / 往期」，所以 GET 同时回 thisWeekStart 与 nextWeekStart，
+ * 由前端决定文案，不在后端拼中文。
  */
 
 const { C, findById, findMany, insertOne, updateById, removeWhere } = require('../../lib/db');
 const { ApiError, Codes } = require('../../lib/response');
 const {
-  asPartner, assertWeekStart, currentWeekStart, weekDates,
+  asPartner, assertWeekStart, currentWeekStart, nextWeekStart, weekDates,
   templatesToSlots, listPeople,
 } = require('./_kit');
 const { findPublished } = require('./slots');
@@ -119,7 +125,10 @@ function availabilityDto(doc, slots, currentVersion) {
 async function get(ctx) {
   const p = await asPartner(ctx);
   const q = ctx.query || {};
-  const weekStart = q.week ? assertWeekStart(q.week) : currentWeekStart();
+  // 默认周 = 下一周（见文件头）；显式带 week 时照传，翻周看往期用
+  const thisWeek = currentWeekStart();
+  const nextWeek = nextWeekStart();
+  const weekStart = q.week ? assertWeekStart(q.week) : nextWeek;
   const dates = weekDates(weekStart);
 
   const { version, slots } = await currentSlots();
@@ -163,6 +172,11 @@ async function get(ctx) {
 
   return {
     weekStart,
+    // 本周 / 下一周的锚点都给出去：前端拿它标「下一周 / 本周 / 往期」胶囊，
+    // 前端不算日期（跨时区、跨月会算错，且和云函数两套口径）
+    thisWeekStart: thisWeek,
+    nextWeekStart: nextWeek,
+    isNextWeek: weekStart === nextWeek,
     weekDates: dates,
     slotVersion: version,
     slots,
@@ -201,7 +215,8 @@ async function get(ctx) {
 async function save(ctx) {
   const p = await asPartner(ctx);
   const body = ctx.body || {};
-  const weekStart = assertWeekStart(body.week || currentWeekStart());
+  // 前端总会带 week；不带时按「下一周」兜底（见文件头），与 GET 同口径
+  const weekStart = assertWeekStart(body.week || nextWeekStart());
 
   const rawTarget = body.personId === undefined || body.personId === null || body.personId === ''
     ? p.id
@@ -221,7 +236,7 @@ async function save(ctx) {
 
   const { version, slots } = await currentSlots();
   if (!slots.length) {
-    throw new ApiError(Codes.PARAM_ERROR, '本周的值班时段尚未发布，暂时不能填报');
+    throw new ApiError(Codes.PARAM_ERROR, '这一周的值班时段尚未发布，暂时不能填报');
   }
 
   const picks = normalizePicks(body.picks, slots);
@@ -313,7 +328,7 @@ async function reset(ctx) {
    * 无论前端把参数拼在 URL 上（direct 模式）还是放 body（cloud 模式）都能工作。
    */
   const q = Object.assign({}, ctx.query || {}, ctx.body || {});
-  const weekStart = q.week ? assertWeekStart(q.week) : currentWeekStart();
+  const weekStart = q.week ? assertWeekStart(q.week) : nextWeekStart();
   const target = q.personId === undefined || q.personId === '' ? p.id : Number(q.personId);
   if (!Number.isInteger(target) || target <= 0) {
     throw new ApiError(Codes.PARAM_ERROR, 'personId 不合法');

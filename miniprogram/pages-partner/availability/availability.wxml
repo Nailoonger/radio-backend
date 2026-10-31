@@ -16,21 +16,23 @@
     </view>
   </view>
 
-  <!-- 周切换：左右文字链 + 中间「本周」红胶囊 + 月日（与请假 / 考勤页同一套，2026-10-30 定）
-       ⚠️ 「本周」是红底白字的胶囊标签；翻到别的周就换成灰底的「非本周」（陛下 2026-10-30 定） -->
+  <!-- 周切换：左右文字链 + 中间胶囊 + 月日（与请假 / 考勤页同一套外壳，2026-10-30 定）
+       ⚠️⚠️ 本页胶囊**不是**「本周 / 非本周」（2026-10-31 变）：站员这一周填的是下一周，
+          所以默认落在下一周，红胶囊写「下一周」；翻回本周写「本周」、再往前写「往期」。
+          文案在 JS 里算好（weekTag），模板只渲染。 -->
   <view class="wk-nav">
     <text class="wk-b" bindtap="onPrevWeek">‹ 上一周</text>
     <view class="wk-mid">
-      <text class="wk-tag {{isThisWeek ? 'on' : 'off'}}">{{isThisWeek ? '本周' : '非本周'}}</text>
+      <text class="wk-tag {{isTargetWeek ? 'on' : 'off'}}">{{weekTag}}</text>
       <text class="wk-c">{{weekText || '加载中'}}</text>
     </view>
-    <text class="wk-b r {{isThisWeek ? 'off' : ''}}" bindtap="onNextWeek">下一周 ›</text>
+    <text class="wk-b r {{isTargetWeek ? 'off' : ''}}" bindtap="onNextWeek">下一周 ›</text>
   </view>
 
   <!-- ══════ 站员：就地填报 ══════ -->
   <block wx:if="{{isMember}}">
     <view class="empty" wx:if="{{!loading && !ready}}">
-      <text class="empty-t">本周值班时段还没发布</text>
+      <text class="empty-t">这一周的值班时段还没发布</text>
       <text class="empty-s">等超管在「值班时段」里发布后，这里才会出现可选的时段。</text>
     </view>
     <view class="warn" wx:if="{{stale}}">
@@ -63,7 +65,7 @@
 
     <view class="confirm" bindtap="onToggleConfirm" hover-class="confirm-hover">
       <view class="cbox {{confirmed ? 'on' : ''}}"><text class="cbox-t" wx:if="{{confirmed}}">✓</text></view>
-      <text class="ctext">我确认已完整填写本周可排时间。</text>
+      <text class="ctext">我确认已完整填写这一周的可排时间。</text>
     </view>
 
     <view class="foot" wx:if="{{ready}}">
@@ -114,7 +116,7 @@
     </view>
 
     <view class="empty" wx:if="{{!loading && !ready}}">
-      <text class="empty-t">本周值班时段还没发布</text>
+      <text class="empty-t">这一周的值班时段还没发布</text>
       <text class="empty-s">发布之后才能收可排时间。</text>
     </view>
 
@@ -191,7 +193,7 @@
 
       <view class="confirm" bindtap="onToggleConfirm" hover-class="confirm-hover">
         <view class="cbox {{confirmed ? 'on' : ''}}"><text class="cbox-t" wx:if="{{confirmed}}">✓</text></view>
-        <text class="ctext">我确认已完整填写本周可排时间。</text>
+        <text class="ctext">我确认已完整填写这一周的可排时间。</text>
       </view>
       <view class="pad-sm"></view>
     </scroll-view>
@@ -209,7 +211,7 @@
     <view class="sheet-hd">
       <view class="sheet-hd-l">
         <text class="sheet-t">批量代录可排时间</text>
-        <text class="sheet-sub">选择本周可以参加的场次；保存后这些人按这次统一覆盖。</text>
+        <text class="sheet-sub">选择这一周可以参加的场次；保存后这些人按这次统一覆盖。</text>
       </view>
       <text class="sheet-x" bindtap="closeBulk">关闭</text>
     </view>

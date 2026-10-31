@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>可排时间 · 默认下一周 v1</title>
+<style>
+  :root {
+    --accent: #0066CC; --accent-tint: #EAF3FD; --ink: #1D1D1F;
+    --muted: #76767E; --red-fg: #B42318; --parchment: #F5F5F7; --hairline: #E2E2E7;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 40px 32px 56px; background: var(--parchment); color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { margin: 0 0 8px; font-size: 20px; letter-spacing: -0.3px; }
+  .lead { margin: 0 0 26px; font-size: 13px; line-height: 1.9; color: #6B6B73; }
+  .lead b { color: var(--ink); }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+    background: #fff; border: 1px solid var(--hairline); border-radius: 5px; padding: 1px 5px; }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .card { background: #fff; border-radius: 16px; padding: 16px 14px 18px; }
+  .cap { margin: 0 0 12px; font-size: 12px; color: var(--muted); }
+  .cap b { color: var(--ink); }
+
+  /* ── 与 miniprogram/pages-partner/availability/availability.wxss 的 .wk-nav 一一对应 ── */
+  .wk-nav { display: flex; align-items: center; padding: 6rpx 6rpx 16rpx; }
+  .wk-b { flex: 1; font-size: 13px; color: var(--accent); }
+  .wk-b.r { text-align: right; }
+  .wk-b.off { color: #B3B3B8; }
+  .wk-mid { flex: none; display: flex; align-items: center; gap: 8px; }
+  .wk-tag { flex: none; font-size: 10.5px; line-height: 1.6; padding: 1px 7px; border-radius: 9999rpx;
+    font-weight: 500; white-space: nowrap; }
+  .wk-tag.on { background: var(--red-fg); color: #FFF; }
+  .wk-tag.off { background: #F1F1F4; color: var(--muted); }
+  .wk-c { font-size: 15px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  .note { margin: 10px 0 0; font-size: 11.5px; line-height: 1.8; color: #8A8A92; }
+  .note b { color: #6B6B73; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 26px; font-size: 12.5px;
+    background: #fff; border-radius: 14px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #F0F0F0; vertical-align: top; line-height: 1.7; }
+  th { color: var(--muted); font-weight: 600; background: #FAFAFC; }
+  td.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; }
+
+  .why { background: #fff; border-radius: 14px; padding: 16px 20px; margin-top: 18px; }
+  .why h2 { margin: 0 0 8px; font-size: 13px; }
+  .why ul { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.95; color: #6B6B73; }
+  .why b { color: var(--ink); }
+  .why li + li { margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>值班时间代录 · 默认周改成「下一周」 v1</h1>
+  <p class="lead">陛下原话：<b>「可排时间存哪一周，当然是本周填下一周的啊」</b>。所以这页默认打开的那一周，
+    从<b>本周</b>改成了<b>下一周</b>；胶囊也随之改口径 —— 照抄「本周 / 非本周」会把默认页标成「非本周」，
+    看着像进错了页面。下面三段是同一个切换条的三种状态，颜色、字号、间距全部照搬
+    <code>availability.wxss</code> 里的 <code>.wk-nav</code> 一套。</p>
+
+  <div class="cards">
+    <div class="card">
+      <p class="cap"><b>默认打开</b> · 要填的那一周</p>
+      <div class="wk-nav">
+        <span class="wk-b">‹ 上一周</span>
+        <span class="wk-mid"><span class="wk-tag on">下一周</span><span class="wk-c">11/02 – 11/06</span></span>
+        <span class="wk-b r off">下一周 ›</span>
+      </div>
+      <p class="note">红胶囊 = 你现在填的这一周；右边「下一周 ›」置灰（已经在最前了）。</p>
+    </div>
+
+    <div class="card">
+      <p class="cap"><b>往回翻一格</b> · 本周</p>
+      <div class="wk-nav">
+        <span class="wk-b">‹ 上一周</span>
+        <span class="wk-mid"><span class="wk-tag off">本周</span><span class="wk-c">10/26 – 10/30</span></span>
+        <span class="wk-b r">下一周 ›</span>
+      </div>
+      <p class="note">灰胶囊 = 不是要填的那一周，只是看一眼。可以改，但下周排班不会读它。</p>
+    </div>
+
+    <div class="card">
+      <p class="cap"><b>再往前</b> · 往期</p>
+      <div class="wk-nav">
+        <span class="wk-b">‹ 上一周</span>
+        <span class="wk-mid"><span class="wk-tag off">往期</span><span class="wk-c">10/19 – 10/23</span></span>
+        <span class="wk-b r">下一周 ›</span>
+      </div>
+      <p class="note">「往期」取代原来的「非本周」，一眼能看出是往前翻的旧周。</p>
+    </div>
+  </div>
+
+  <table>
+    <tr><th style="width:170px">位置</th><th>改前</th><th>改后</th></tr>
+    <tr><td>默认打开哪一周</td><td>本周（日历上的本周）</td><td><b>下一周</b>（还没开始的那一周）</td></tr>
+    <tr><td>周锚点怎么算</td><td>云函数不给 week 就返回本周</td><td>不给 week 就返回<b>下一周</b>（<code>nextWeekStart()</code>）</td></tr>
+    <tr><td>胶囊文案</td><td class="mono">本周 / 非本周</td><td class="mono">下一周 / 本周 / 往期 / 后续周</td></tr>
+    <tr><td>红胶囊点亮谁</td><td>日历上的本周</td><td><b>要填的那一周</b>（默认＝下一周）</td></tr>
+    <tr><td>「本周可排 N / 12 个时段」</td><td>写死「本周」</td><td>去掉「本周」二字：<b>可排 N / 12 个时段</b></td></tr>
+    <tr><td>「本周值班时段还没发布」</td><td>写死「本周」</td><td><b>这一周的值班时段还没发布</b></td></tr>
+    <tr><td>确认勾选</td><td>我确认已完整填写本周可排时间</td><td>我确认已完整填写<b>这一周</b>的可排时间</td></tr>
+  </table>
+
+  <div class="why">
+    <h2>为什么必须改、以及为什么要后端给锚点</h2>
+    <ul>
+      <li><b>不改会白填：</b>下周班表（<code>schedule.generate</code>）读的是<b>下周那份</b>可排时间
+        （<code>DUTY_AVAILABILITY{weekStart = 被排的那一周}</code>）。默认落在本周，站员填完、
+        下周生成时读不到 → 所有人都「未确认该时段可排时间」，只能靠超管逐人代录。</li>
+      <li><b>前端不算周一：</b>默认周一律由云函数给（<code>thisWeekStart</code> / <code>nextWeekStart</code> 一起回），
+        手机自己算在跨时区、跨月、系统时间被改过时会差一周，而<b>班表错一周是无声的</b> —— 界面不会报错。</li>
+      <li><b>其它页不受影响：</b>请假、考勤、排班工作台、我的班表仍然是「本周 / 非本周」那套；
+        只有这一页换成「下一周」口径，校验脚本按页分两种口径各查各的。</li>
+      <li><b>还没做：</b>「周一 0 点到周六 24 点才能填、周日整页只读（超管可代录）」这条硬拦截不在本版，
+        要和「周日 0 点切下周」一起单独做一轮，因为会连带请假 / 考勤 / 工作台的「本周」口径。</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

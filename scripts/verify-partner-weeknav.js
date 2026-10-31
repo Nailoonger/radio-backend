@@ -7,20 +7,28 @@
  *   考勤 attendance · 请假 leave · 值班时间代录 availability · 排班工作台 planning · 我的班表 schedule/index
  *
  * 判据（任一不满足即退出码 1）：
- *   ① wxml 里同时出现 .wk-nav / .wk-mid / .wk-tag / .wk-c，且胶囊文案是「本周 / 非本周」
- *   ② wxss 里定义了 .wk-tag.on（红）与 .wk-tag.off（灰）
- *   ③ 副作用：weekText 不许再自己拼「本周」二字（会和胶囊打架）
+ *   ① wxml 里同时出现 .wk-nav / .wk-mid / .wk-tag / .wk-c
+ *   ② 胶囊有两种口径，各自查各的：
+ *        this   → 文案「本周 / 非本周」，跟着 isThisWeek 亮   （考勤/请假/工作台/我的班表）
+ *        target → 文案由 weekTag 给，跟着 isTargetWeek 亮     （值班时间代录，见下）
+ *   ③ wxss 里定义了 .wk-tag.on（红）与 .wk-tag.off（灰）
+ *   ④ 副作用：weekText 不许再自己拼「本周」二字（会和胶囊打架）
+ *
+ * ⚠️ 为什么「值班时间代录」单独一种口径（2026-10-31 陛下定）：
+ *    这页填的是**下一周**（「当然是本周填下一周的啊」），默认打开的就不是本周。
+ *    照抄「本周/非本周」会把默认页标成「非本周」，看着像打开错了页面。
+ *    所以它的胶囊写「下一周 / 本周 / 往期 / 后续周」，红点落在下一周。
  */
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const PAGES = [
-  ['考勤', 'miniprogram/pages-partner/attendance/attendance'],
-  ['请假', 'miniprogram/pages-partner/leave/leave'],
-  ['值班时间代录', 'miniprogram/pages-partner/availability/availability'],
-  ['排班工作台', 'miniprogram/pages-partner/schedule/planning/planning'],
-  ['我的班表', 'miniprogram/pages-partner/schedule/index/index'],
+  ['考勤', 'miniprogram/pages-partner/attendance/attendance', 'this'],
+  ['请假', 'miniprogram/pages-partner/leave/leave', 'this'],
+  ['值班时间代录', 'miniprogram/pages-partner/availability/availability', 'target'],
+  ['排班工作台', 'miniprogram/pages-partner/schedule/planning/planning', 'this'],
+  ['我的班表', 'miniprogram/pages-partner/schedule/index/index', 'this'],
 ];
 
 let failed = 0;
@@ -31,19 +39,34 @@ const ok = (name, cond, detail) => {
 };
 const read = (p) => (fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : '');
 
-PAGES.forEach(([label, base]) => {
+PAGES.forEach(([label, base, mode]) => {
   const wxml = read(path.join(ROOT, base + '.wxml'));
   const wxss = read(path.join(ROOT, base + '.wxss'));
   const js = read(path.join(ROOT, base + '.js'));
 
   ok(`${label}：有周切换结构`, /class="wk-nav"/.test(wxml) && /class="wk-mid"/.test(wxml));
-  ok(`${label}：有本周/非本周胶囊`, /wk-tag \{\{isThisWeek \? 'on' : 'off'\}\}/.test(wxml));
-  ok(`${label}：胶囊文案是「本周 / 非本周」`, /\{\{isThisWeek \? '本周' : '非本周'\}\}/.test(wxml), '找不到 {{isThisWeek ? \'本周\' : \'非本周\'}}');
-  ok(`${label}：js 里有 isThisWeek`, /isThisWeek/.test(js));
+  if (mode === 'target') {
+    ok(`${label}：胶囊跟着「要填的那一周」点亮`, /wk-tag \{\{isTargetWeek \? 'on' : 'off'\}\}/.test(wxml));
+    ok(`${label}：胶囊文案由 weekTag 给`, /\{\{weekTag\}\}/.test(wxml) && /weekTag = '下一周'/.test(js), '模板要写 {{weekTag}}，JS 里要有 weekTag 的默认值');
+    ok(`${label}：js 里有 isTargetWeek`, /isTargetWeek/.test(js));
+    ok(`${label}：文案不再自称「本周」`, !/本周(值班时段|可排时间)/.test(wxml + js), '还有「本周可排/本周值班时段」这类写死本周的文案');
+  } else {
+    ok(`${label}：有本周/非本周胶囊`, /wk-tag \{\{isThisWeek \? 'on' : 'off'\}\}/.test(wxml));
+    ok(`${label}：胶囊文案是「本周 / 非本周」`, /\{\{isThisWeek \? '本周' : '非本周'\}\}/.test(wxml), '找不到 {{isThisWeek ? \'本周\' : \'非本周\'}}');
+    ok(`${label}：js 里有 isThisWeek`, /isThisWeek/.test(js));
+  }
   ok(`${label}：wxss 有 .wk-tag.on`, /\.wk-tag\.on\s*\{/.test(wxss));
   ok(`${label}：wxss 有 .wk-tag.off`, /\.wk-tag\.off\s*\{/.test(wxss));
   ok(`${label}：weekText 不自己拼「本周」`, !/weekText:\s*`本周/.test(js), 'weekText 里拼了「本周 」，会和胶囊重复');
 });
+
+// 可排时间的默认周必须是「下一周」（2026-10-31 陛下定）
+// ⚠️ 回到 currentWeekStart 的后果不是报错，是**填了白填**：下周排班读的是下周那一份填报，
+//    读不到就全员「未确认该时段可排时间」，只能靠超管逐人代录。
+const avSrc = read(path.join(ROOT, 'cloud/cloudfunctions/api/handlers/partner/availability.js'));
+ok('云函数：可排时间默认周是下一周',
+  /q\.week \? assertWeekStart\(q\.week\) : nextWeek\b/.test(avSrc) && /body\.week \|\| nextWeekStart\(\)/.test(avSrc),
+  'availability 的默认周又回到 currentWeekStart 了');
 
 // 时间表组件标题也不许恒写「本周」（工作台能翻周）
 const tt = read(path.join(ROOT, 'miniprogram/pages-partner/schedule/timetable/index.wxml'));

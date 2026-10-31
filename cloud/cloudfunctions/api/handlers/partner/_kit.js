@@ -174,6 +174,21 @@ function currentWeekStart(ts) {
   return bj.dayKey(r.start.getTime());
 }
 
+/**
+ * 北京时间「下一周周一」的 YYYY-MM-DD
+ *
+ * ⚠️ 可排时间的默认周锚点（2026-10-31 陛下定：「当然是本周填下一周的啊」）。
+ *    站员周一 0 点到周六 24 点填的是**还没开始**的那一周，所以不给 week 时
+ *    一律落到这里，而不是本周 —— 落到本周会让「填了没用」：
+ *    下周排班读的是下周的填报，本周那份早就用过一次了。
+ * ⚠️ 用 bj.nextWeekRange 而不是 currentWeekStart + 7 的字符串拼接：
+ *    时刻一律由 lib/bjTime 算，跨月 / 跨年由它兜住，不在业务层自己做日期算术。
+ */
+function nextWeekStart(ts) {
+  const r = bj.nextWeekRange(ts === undefined ? Date.now() : ts);
+  return bj.dayKey(r.start.getTime());
+}
+
 /** 从 weekStart 展开 5 个值班日的日期字符串（周一 ~ 周五） */
 function weekDates(weekStart) {
   const s = assertWeekStart(weekStart);
@@ -354,7 +369,7 @@ module.exports = {
   ROLE_SUPER, ROLE_MANAGER, ROLE_MEMBER,
   DUTY_ROLES, DEPARTMENTS, WEEK_DAYS, DEPT_BY_ROLE, deptOfRoles,
   asPartner, asSuperPartner, asManager,
-  assertWeekStart, currentWeekStart, weekDates, weekStarted,
+  assertWeekStart, currentWeekStart, nextWeekStart, weekDates, weekStarted,
   hhmm, normalizeTemplates, templatesToSlots,
   personDto, listPeople, resolvePerson,
   notYet,

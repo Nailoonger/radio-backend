@@ -11,8 +11,8 @@
 // ⚠️ 顶部标题栏只写「值班时间代录」，**不写日期**；当周的月和日放在下面的周切换卡里居中显示
 //    （2026-10-30 陛下定：大粗体标题删掉，换成「10/26 — 10/30」+ 左右翻周按钮装进一张卡）。
 //
-// ⚠️ 周锚点不从手机算。首次加载**不传 week**，由云函数按北京时间返回本周周一，
-//    之后翻页才 ±7 天。小程序端自己 `new Date().getDay()` 算周一，
+// ⚠️ 周锚点不从手机算。首次加载**不传 week**，由云函数按北京时间返回**下一周**周一
+//    （2026-10-31 定：站员这一周填的是下一周），之后翻页才 ±7 天。小程序端自己 `new Date().getDay()` 算周一，
 //    在跨时区 / 跨月 / 系统时间被改过的手机上会和后端差一周，而班表错一周是无声的。
 //
 // ⚠️ 规则「有不能来的时段必须填说明」在前端只是提示，真正的拦截在云函数
@@ -136,10 +136,12 @@ Page({
   data: {
     statusBarHeight: 20,
     loading: true,
-    ready: false,          // 本周时段是否已发布
+    ready: false,          // 这一周的时段是否已发布
     weekStart: '',
-    weekText: '',          // 「本周 10/26 – 10/30」
-    isThisWeek: true,      // 本周时右边「下一周」置灰（仍可点，与请假 / 考勤页同口径）
+    weekText: '',          // 「10/26 – 10/30」（不含「本周」二字，胶囊单独说）
+    isThisWeek: true,      // 看的是不是日历上的本周（只用于文案，不决定默认周）
+    isTargetWeek: true,    // 看的是不是「这一周要填的那一周」＝下一周 ⇒ 红胶囊、右箭头置灰
+    weekTag: '下一周',     // 胶囊文案：下一周 / 本周 / 往期 / 后续周
     days: [],
     reason: '',
     reasonLen: 0,
@@ -205,9 +207,9 @@ Page({
   _pickMap: {},
   /** 当前查看/代录的对象（0 = 自己） */
   _targetId: 0,
-  /** 本周周一（首次不带 week 请求时由云函数给出），用来算「本周 / 非本周」 */
+  /** 从排班工作台深链进来时带的「本周」，只为兼容旧链接；界面胶囊现在由云函数的两个锚点算 */
   _baseWeek: '',
-  /** 最近一次请求带的 week（空 = 本周）。基准周只在不带 week 的请求里认 */
+  /** 最近一次请求带的 week（空 = 下一周，由云函数兜底） */
   _fetchWeek: '',
   /** 自己的岗位（/partner/me 带回，完整串：含记者 / 技术）。空 → 排班永远过不了「岗位」这条门槛 */
   _myRoles: [],
@@ -232,9 +234,9 @@ Page({
 
     /**
      * 从排班工作台翻到某一周再点「值班时间代录」进来的情况（2026-10-30）。
-     * 不带这两个参数的话，这页永远打开本周 —— 在下一周代录完，回工作台点「再次生成」
-     * 当然一点变化都没有（两边不是同一周），这就是陛下报的「没有效果」。
-     *   week = 要看哪一周；base = 本周是哪一周（只为标「本周 / 非本周」那颗胶囊）
+     * 不带 week 的话，这页会打开默认周（现在是下一周）—— 在工作台翻到别的周代录时，
+     * 两边必须是同一周，否则回工作台点「再次生成」一点变化都没有。
+     *   week = 要看哪一周（代录/补填指定周时才有）
      */
     const o = options || {};
     this._fetchWeek = String(o.week || '');
@@ -311,9 +313,9 @@ Page({
             isMe: Number(r.personId) === meIdNow,
             confirmed: submitted,
             desc: submitted
-              ? `本周可排 ${n} / ${totalSlots} 个时段。`
-              : '下一周时间尚未提交；可以当面核实后替他填。',
-            statText: `本周 ${n} / ${totalSlots} 个时段`,
+              ? `可排 ${n} / ${totalSlots} 个时段。`
+              : '这一周的可排时间尚未提交；可以当面核实后替他填。',
+            statText: `可排 ${n} / ${totalSlots} 个时段`,
           };
         });
 
@@ -325,12 +327,23 @@ Page({
         //    （陛下 2026-10-29：「我从来没填过这个原因为什么每次点开都有自带的」）。
         //    旧原因仍留在库里，只是不再出现在界面上。
 
-        // ── 顶部周标签：本周 / 非本周 + 月日 ──
-        // ⚠️ 基准周只在**不带 week 的请求**里记：带了 week 说明用户要的是某一周，
-        //    拿它当「本周」会把下一周标成「本周」（从工作台深链进来就是这么错的）。
+        // ── 顶部周标签：下一周 / 本周 / 往期 + 月日 ──
+        // ⚠️⚠️ 2026-10-31 口径变了：站员这一周填的是**下一周**（陛下原话「当然是本周填下一周的啊」），
+        //    所以默认落在下一周，红色胶囊点亮的也是「下一周」。
+        //    两个锚点都由云函数给（thisWeekStart / nextWeekStart），前端**不自己算周一**：
+        //    跨时区、跨月、系统时间被改过的手机上算错一周，界面上看不出来（班表错一周是无声的）。
         const ws = data.weekStart || '';
-        if (!this._baseWeek && ws && !o.week) this._baseWeek = ws;
-        const isThis = this._baseWeek ? ws === this._baseWeek : !o.week;
+        const thisWs = data.thisWeekStart || '';
+        const nextWs = data.nextWeekStart || '';
+        // 云函数还是老版本（不回这两个字段）时，按「默认就是下一周」理解，
+        // 免得把默认页标成「往期」——那会让人以为打开错了页面。
+        const isNext = nextWs ? ws === nextWs : true;
+        let weekTag = '下一周';
+        if (!isNext) {
+          if (thisWs && ws === thisWs) weekTag = '本周';
+          else if (thisWs && ws < thisWs) weekTag = '往期';
+          else weekTag = '后续周';
+        }
         this._fetchWeek = o.week || '';
 
         this.setData({
@@ -338,7 +351,9 @@ Page({
           ready: !!data.ready,
           weekStart: ws,
           weekText: this.labelOf(ws, data.weekDates),
-          isThisWeek: isThis,
+          isThisWeek: !!(thisWs && ws === thisWs),
+          isTargetWeek: isNext,
+          weekTag,
           days,
           cards,
           people,
@@ -590,7 +605,7 @@ Page({
   _doSubmit(after) {
     if (this.data.submitting) return;
     if (!this.data.ready) {
-      return wx.showToast({ title: '本周值班时段尚未发布', icon: 'none' });
+      return wx.showToast({ title: '这一周的值班时段尚未发布', icon: 'none' });
     }
 
     const picks = [];
@@ -787,7 +802,7 @@ Page({
 
   openBulk() {
     if (!this.data.isSuper) return;
-    if (!this.data.ready) return wx.showToast({ title: '本周值班时段还没发布', icon: 'none' });
+    if (!this.data.ready) return wx.showToast({ title: '这一周的值班时段还没发布', icon: 'none' });
     const people = (this.data.cards || []).map((c) => ({
       personId: c.personId, name: c.name, on: true,
     }));
