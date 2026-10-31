@@ -124,7 +124,7 @@ const setPerson = (pid, patch, id = 1) => call('PUT', `/partner/permissions/pers
 
   r = await call('GET', '/partner/draft/review', {}, 2);
   equal('甲审稿队列 40301', r.code, 40301);
-  equal('甲审稿拒绝文案', r.message, '暂无审核权限');
+  equal('甲审稿拒绝文案（三档统一四个字）', r.message, '暂无权限');
   yes('乙审稿队列可读', (await call('GET', '/partner/draft/review', {}, 3)).code === 0);
 
   /* ───────── ⑥ 跟回全局（null）───────── */

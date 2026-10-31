@@ -45,6 +45,20 @@ const BANNED_TOKEN = sign({ id: 3, username: 'banned', role: 1 });
 const WEEK = '2026-11-02'; // 周一
 const WEEK2 = '2026-11-09'; // 下一个周一
 
+/**
+ * ⚠️⚠️ 进程时钟钉在 2026-11-04（周三）10:00 —— 别删！
+ *
+ * 填写窗口是「周一 0 点 ~ 周六 24 点；周日整页只读，只有超管能动」
+ * （见 _kit.availabilityWindow）。这套测试里一堆 `PUT /partner/availability` 是
+ * **社干自填**，一旦在周日晚上跑就直接 40301 ⇒ 整段脚本崩在 `r.data.availability`。
+ * 2026-11-01 凌晨（周日）就实际踩到了：同一份代码周六全绿、周日全红。
+ *
+ * 钉死时钟后：结果与"这天是星期几"无关，也仍满足 WEEK / WEEK2 这组固定锚点。
+ * 只改本进程的 Date.now，不动产品代码。
+ */
+const FROZEN_NOW = new Date('2026-11-04T10:00:00+08:00').getTime();
+Date.now = () => FROZEN_NOW;
+
 function baseSeed() {
   const t = new Date('2026-01-01T00:00:00+08:00');
   return {
@@ -248,9 +262,8 @@ const TPL = [
     // ⚠️ 契约：0 = 自己。曾经无条件回自己的 id，前端 `isProxy = !!targetId` 恒真，
     //    导致「自己填自己」被当成代录（说明强制必填、还回填上次的原因）。
     eq('本人时 targetId=0（不是自己的 id）', r.data.targetId, 0);
-    // ⚠️ 2026-10-31：指导老师（超管）**不参与排班** ⇒ 不进这张汇总表。
-    //    人池 3 人（老师 + 小周 + 小吴），能排的是 2 人；留着老师会把完成度拉低。
-    eq('汇总总数=可排人员池（不含老师）', r.data.summary.total, 2);
+    // 2026-11-01：超管也参与排班 ⇒ 汇总表含他（老师 + 小周 + 小吴 共 3 人）
+    eq('汇总总数=人员池', r.data.summary.total, 3);
     eq('已确认 0', r.data.summary.confirmed, 0);
   }
   {
@@ -305,7 +318,7 @@ const TPL = [
     eq('回读 picks 带时段信息', r.data.me.picks[0].slot.title, '早间开台');
     eq('stale=false（时段版本一致）', r.data.me.stale, false);
     eq('汇总已确认 1', r.data.summary.confirmed, 1);
-    eq('汇总待确认 1（另一人是老师，不计入）', r.data.summary.pending, 1);
+    eq('汇总待确认 2', r.data.summary.pending, 2);
   }
   {
     const r = await call('PUT', '/partner/availability', {

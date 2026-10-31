@@ -174,7 +174,7 @@ Page({
     readonlyText: '',
     /** 代录权限（独立开关，2026-10-31）：没开就只能填自己的 */
     canProxy: false,
-    denyProxy: '暂无代录权限',
+    denyProxy: '暂无权限',
     cards: [],             // 人员卡片（社干/超管）
     // ── 单人代录弹层 ──
     sheetOpen: false,
@@ -390,7 +390,7 @@ Page({
           readonly: !!(data.window && data.window.readonly),
           readonlyText: (data.window && data.window.text) || '',
           canProxy: !!(data.abilities && data.abilities.canProxy),
-          denyProxy: (data.abilities && data.abilities.denyProxy) || '暂无代录权限',
+          denyProxy: (data.abilities && data.abilities.denyProxy) || '暂无权限',
         });
         this.recount();
       })
@@ -821,7 +821,7 @@ Page({
      * 没开就只能填自己的 —— 卡片还在，点了说一句，不装死也不藏入口。
      */
     if (id !== meId && !this.data.canProxy) {
-      wx.showToast({ title: this.data.denyProxy || '暂无代录权限', icon: 'none' });
+      wx.showToast({ title: this.data.denyProxy || '暂无权限', icon: 'none' });
       return;
     }
     const card = (this.data.cards || []).find((c) => Number(c.personId) === id) || {};

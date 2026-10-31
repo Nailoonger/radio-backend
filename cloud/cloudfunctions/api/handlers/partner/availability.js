@@ -170,14 +170,9 @@ async function get(ctx) {
   const doneMap = {};
   weekDocs.forEach((d) => { doneMap[Number(d.personId)] = d; });
 
-  /**
-   * ⚠️ 指导老师（超管）不参与排班 ⇒ 这张「谁填了 / 谁没填」的表里也不该有他。
-   *    留在里面会把完成度拖低（「3/5 已填」其实是 3/4），而且代录列表里点他也没意义
-   *    （后端 setCell 会以「指导老师不参与排班」拦下）。口径与 schedule.js#contextFor 一致。
-   */
-  const schedulable = people.filter((x) => !x.isSuper);
-
-  const rows = schedulable.map((x) => {
+  /* 2026-11-01：超管也参与排班 ⇒ 这张「谁填了 / 谁没填」的表里必须有他，
+     否则老师看不到自己还差哪一周没确认（他也不会有代录记录可查）。 */
+  const rows = people.map((x) => {
     const d = doneMap[x.personId];
     return {
       personId: x.personId,
@@ -206,8 +201,7 @@ async function get(ctx) {
     slotVersion: version,
     slots,
     ready: slots.length > 0,
-    // 与 summary.rows 同源（都已排除指导老师），别一个含他一个不含他
-    people: schedulable,
+    people,
     me: availabilityDto(mineDoc, slots, version),
     target: targetId === p.id ? null : availabilityDto(targetDoc, slots, version),
     // ⚠️⚠️ 前端契约：**0 = 自己**。传别人的 personId 才是代录。

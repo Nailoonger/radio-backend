@@ -143,7 +143,7 @@ async function asManager(ctx) {
  *   就成了循环依赖（打包成单文件后表现为「读到一半 undefined」这种极难查的崩）。
  *   所以「怎么读、怎么判」沉在这里，`permissions.js` 只做 HTTP 层的编排。
  *
- * ⚠️ `deny` 就是前端弹窗的标题，陛下原话是「暂无权限」「暂无审核权限」「暂无代录权限」，
+ * ⚠️ `deny` 就是前端弹窗/拒绝页的标题，2026-11-01 起**三档统一成四个字「暂无权限」**，
  *    别在页面里再硬编码一遍 —— 改词只改这张表。
  *
  * ⚠️⚠️ 2026-10-31 二次定稿：`schedule` 与 `proxy` **必须分开**。
@@ -155,9 +155,12 @@ async function asManager(ctx) {
 const PERM_KEYS = ['schedule', 'review', 'proxy'];
 const PERM_TEXT = {
   // ⚠️ `short` 给人少的胶囊用（一行要塞三个，写全名会挤成两三行）
+  // ⚠️⚠️ `deny` 三档一律「暂无权限」四个字（2026-11-01 陛下定）：
+  //   被关掉的人**不需要被教育**怎么申请，页面/弹窗只留这四个字，不写「找超管开通」这类话。
+  //   221101 之前是三档各写一套（排班/审核/代录各一句），字数多、还暗示"去申请"，已统一。
   schedule: { key: 'schedule', name: '排班权限', short: '排班', desc: '进入排班工作台', deny: '暂无权限' },
-  review: { key: 'review', name: '审核权限', short: '审核', desc: '进入审核模块', deny: '暂无审核权限' },
-  proxy: { key: 'proxy', name: '代录权限', short: '代录', desc: '替别人填可排时间', deny: '暂无代录权限' },
+  review: { key: 'review', name: '审核权限', short: '审核', desc: '进入审核模块', deny: '暂无权限' },
+  proxy: { key: 'proxy', name: '代录权限', short: '代录', desc: '替别人填可排时间', deny: '暂无权限' },
 };
 
 /** 三态归一：true / false / null（null = 跟随全局；脏值一律当跟随，不当作 true） */
@@ -202,7 +205,7 @@ async function readGlobalPerm() {
   /**
    * ⚠️⚠️ 默认值必须把**每一个** PERM_KEYS 都列出来。
    *    只写 `{schedule:true, review:true}` 时，后加的 `proxy` 会取到 undefined
-   *    ⇒ `!!undefined === false` ⇒ 所有社干一夜之间「暂无代录权限」。
+   *    ⇒ `!!undefined === false` ⇒ 所有社干一夜之间被关在代录门外。
    *    这次是测试逮住的；靠肉眼看是看不出来的（界面上开关还显示着「开」）。
    */
   const out = { schedule: true, review: true, proxy: true };

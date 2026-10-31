@@ -104,38 +104,29 @@ async function mine(ctx) {
 /**
  * 这一周排班要用到的上下文（所有校验 / 候选 / 自动排班都从这里取人）
  *
- * ⚠️⚠️ 2026-10-31：**指导老师（超管）不参与排班**。
- *    他是指挥角色：既不该被自动排进班表，也不该出现在「换人」候选里。
- *    所以候选池 `people` 只留 `!isSuper` 的人。
- *
- * ⚠️ 但 `byId` 必须用**全量**人员建：班表里可能还留着历史数据（老师以前被排过的行），
- *    校验时得能认出他是谁 —— 只拿过滤后的人建 byId，那些行会被判成
- *    「账号已停用或不在人员池」，整周班表变成不可发布（发布前 check 直接拦下）。
- *
- * ⚠️ 要让老师也能被排班，把这行的 `.filter` 去掉即可（一处开关，别在别处另写判断）。
+ * ⚠️⚠️ 2026-11-01 定稿：**超管（指导老师）也参与排班**，和站员/社干一视同仁。
+ *    能不能被排，只看他那周的**可排时间**有没有落到这个时段上
+ *    （自己填的 `source=self`，或社干代录的 `source=proxy`，都算）——
+ *    没有可排时间就不给排，三个角色通用，不按角色开后门。
+ *    这条硬条件在 `reasonsFor` 里（「未确认该时段可排时间或填报已过期」），
+ *    自动排班 / 换人 / 手工塞人都走同一个判断，所以不必在这里再按角色过滤。
  */
 async function contextFor(w) {
-  const [limits, leaveSet, avail, allPeople] = await Promise.all([
+  const [limits, leaveSet, avail, people] = await Promise.all([
     effectiveLimits(), approvedSet(w.weekStart), findAllPaged(C.DUTY_AVAILABILITY, { weekStart: w.weekStart }), listPeople(),
   ]);
-  const allById = {}; const canMap = {};
-  allPeople.forEach((x) => { allById[x.personId] = x; });
+  const byId = {}; const canMap = {};
+  people.forEach((x) => { byId[x.personId] = x; });
   avail.forEach((a) => { if (Number(a.slotVersion) === w.slotVersion && a.confirmedAt) canMap[Number(a.personId)] = new Set((a.picks || []).filter((x) => x.can === true).map((x) => x.slotKey)); });
-  const people = allPeople.filter((x) => !x.isSuper);
-  return { ...limits, leaveSet, people, byId: allById, canMap, dates: weekDates(w.weekStart), slots: w.slots };
+  return { ...limits, leaveSet, people, byId, canMap, dates: weekDates(w.weekStart), slots: w.slots };
 }
 
 function reasonsFor(person, def, rows, c) {
   const reasons = [];
   if (!person) return ['账号已停用或不在人员池'];
   const id = Number(person.personId); const day = c.dates[def.day];
-  /**
-   * 指导老师（超管）不参与排班 —— 他不进候选池（见 contextFor），
-   * 这里单列一条，是为了让**历史数据**里已经排上的老师行报得明白：
-   * 否则会显示「未配置部门 / 未配置岗位 / 未确认可排时间」三连，看着像资料没填全，
-   * 实际原因是这位根本不该被排。
-   */
-  if (person.isSuper) return ['指导老师不参与排班'];
+  /* 2026-11-01：超管不再单列一条「不参与排班」的拒绝原因 —— 他也参与排班，
+     和所有人吃同一套硬条件（部门 / 岗位 / 可排时间 / 请假 / 上限）。 */
   /**
    * ⚠️ 部门与岗位要**分开报**（2026-10-30 陛下被合并提示坑过）：
    *    原来一句「尚未配置部门与岗位资格」把两件事糊在一起 ——

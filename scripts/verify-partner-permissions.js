@@ -63,9 +63,14 @@ ok('_kit 有 asProxyer', /async function asProxyer\s*\(/.test(kitJs));
 ok('三个权限位齐全（schedule / review / proxy）',
   /const PERM_KEYS = \['schedule', 'review', 'proxy'\]/.test(kitJs),
   'PERM_KEYS 不是三位：代录又要跟别的开关挤在一起了');
-ok('拒绝文案：暂无权限', kitJs.indexOf("deny: '暂无权限'") >= 0);
-ok('拒绝文案：暂无审核权限', kitJs.indexOf("deny: '暂无审核权限'") >= 0);
-ok('拒绝文案：暂无代录权限', kitJs.indexOf("deny: '暂无代录权限'") >= 0);
+/* 2026-11-01 陛下定：三档权限被关，页面/弹窗只留**四个字**「暂无权限」，
+   不许出现「暂无审核权限」「暂无代录权限」，更不许写「找超管申请」这类话。 */
+const denyLines = kitJs.split('\n').filter((l) => /deny:/.test(l) && !/^\s*\*/.test(l));
+ok('拒绝文案：三档都是「暂无权限」四个字',
+  denyLines.length === 3 && denyLines.every((l) => l.indexOf("deny: '暂无权限'") >= 0),
+  '有一档又写了别的字 —— 被关掉的人只该看到这四个字');
+ok('拒绝文案不再出现「暂无审核权限 / 暂无代录权限」',
+  kitJs.indexOf('暂无审核权限') < 0 && kitJs.indexOf('暂无代录权限') < 0);
 ok('全局缺行视为全开（升级当天不改现状）',
   /const out = \{ schedule: true, review: true, proxy: true \}/.test(kitJs),
   'readGlobalPerm 的默认值漏了一位 —— 那一夜所有人都会「暂无XX权限」，而界面还显示着开');

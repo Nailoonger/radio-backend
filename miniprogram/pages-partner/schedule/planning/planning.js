@@ -41,8 +41,10 @@ Page({
   /** 排班权限被关掉时的收尾：弹窗 + 退回，不留在这一页 */
   denySchedule(pm) {
     wx.showModal({
+      // ⚠️ 只有标题这一句（2026-11-01 陛下定）：被关掉的人不需要被指点「去找超管开」，
+      //    正文留空。后端 PERM_TEXT 的 deny 三档统一是「暂无权限」。
       title: (pm && pm.text && pm.text.schedule) || '暂无权限',
-      content: '超管没有给你开排班工作台的权限。要用，找超管在「权限管理」里开一下。',
+      content: '',
       showCancel: false,
       confirmText: '知道了',
       success: () => {

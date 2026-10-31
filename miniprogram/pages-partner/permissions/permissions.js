@@ -71,10 +71,8 @@ Page({
     global: { schedule: true, review: true, proxy: true },
     /** 权限位文案：{ key, name, desc, deny }，服务端给，页面不硬编码 */
     meta: [],
-    /** 拒绝文案（页尾说明用，按 key 取好，别在 wxml 里写 meta[0] 这种下标 —— 顺序一变就错） */
-    denySchedule: '暂无权限',
-    denyReview: '暂无审核权限',
-    denyProxy: '暂无代录权限',
+    /* ⚠️ 2026-11-01：删掉页尾那段说明后，这三个 deny 字段已无引用，一并清掉。
+       三档拒绝文案统一成「暂无权限」四个字，源头在 _kit.PERM_TEXT，页面不另存一份。 */
     /** 社干名单 */
     people: [],
     count: { managers: 0, scheduleOn: 0, reviewOn: 0, proxyOn: 0, overridden: 0 },
@@ -151,17 +149,10 @@ Page({
       .then((d) => {
         if (this._gone) return;
         const meta = (d && d.meta) || [];
-        const denyOf = (k, fb) => {
-          const hit = meta.find((m) => m && m.key === k);
-          return (hit && hit.deny) || fb;
-        };
         this.setData({
           loading: false,
-          global: (d && d.global) || { schedule: true, review: true },
+          global: (d && d.global) || { schedule: true, review: true, proxy: true },
           meta,
-          denySchedule: denyOf('schedule', '暂无权限'),
-          denyReview: denyOf('review', '暂无审核权限'),
-          denyProxy: denyOf('proxy', '暂无代录权限'),
           people: ((d && d.people) || []).map((x) => ({
             personId: x.personId,
             name: x.name,
