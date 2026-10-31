@@ -189,7 +189,9 @@ Page({
     const editTitle = [head, edit.slot || ''].filter(Boolean).join(' · ');
     this.setData({
       sheetOpen: true, edit, editTitle, editTime: edit.time || '',
-      reason: '', fixed: true, candidateLoading: true, candidateError: '',
+      // ⚠️ fixed 先给 false，等候选人回来再按「这一格现在的人是不是固定的」定
+      //    （见 loadCandidates）。写死 true 会让「打开看一眼就保存」把自动生成的人固化住。
+      reason: '', fixed: false, candidateLoading: true, candidateError: '',
       candidates: [], selectedCount: 0, curText: '空缺',
     });
     this.loadCandidates();
@@ -205,7 +207,16 @@ Page({
     return adminRequest('/partner/schedule/candidates', 'GET', { week: this.data.week.weekStart, day: edit.day, slotKey: edit.slotKey })
       .then((r) => {
         const candidates = (r.list || []).map((p) => Object.assign({}, p, { selected: !!p.selected, reasonText: (p.reasons || []).map((s) => typeof s === 'string' ? s : s.message || '').join('；') || (p.eligible ? '时间与资格符合' : '不符合排班条件') }));
-        this.setData({ candidates, selectedCount: candidates.filter((p) => p.selected).length });
+        /**
+         * 「固定」默认值跟着**这一格现在的人**走，不写死。
+         * 口径（2026-10-31 陛下定）：自动生成出来的人一律不固定；只有超管手动调整之后
+         * 那个人才固定，并且这里可以选「取消固定」。
+         * ⚠️ 原来无脑 fixed:true ⇒ 打开弹层看一眼、原样保存，自动排上来的人就被悄悄钉死，
+         *    之后「再次生成」再也换不掉他 —— 而界面上没有任何提示。
+         */
+        const chosen = candidates.filter((p) => p.selected);
+        const allFixed = chosen.length > 0 && chosen.every((p) => p.fixed);
+        this.setData({ candidates, selectedCount: chosen.length, fixed: allFixed });
         this.composeCur();
       }).catch((e) => this.setData({ candidateError: e.message || '候选人加载失败' })).finally(() => this.setData({ candidateLoading: false }));
   },
