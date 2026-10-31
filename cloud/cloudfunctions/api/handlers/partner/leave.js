@@ -5,6 +5,7 @@
  *
  *   GET  /partner/leave/mine        我的请假（含待批 / 已批 / 被驳）
  *   GET  /partner/leave/pending     待我批的（社干）
+ *   GET  /partner/leave/reviewed    已审批的（社干；请假审批页第二个 tab）
  *   POST /partner/leave             提申请 body: { weekStart, day, slot, reason }
  *   PUT  /partner/leave/:id/review  批 / 驳 body: { approve: bool, reason }
  *   DELETE /partner/leave/:id       撤回（只能撤自己的、且还在待批）
@@ -14,9 +15,17 @@
  *   站员可能只请午间那一场，整天关掉会误伤下午。
  *
  * ═══════════ 批准后谁改班表 ═══════════
- *   这里**只改请假状态**，不动 assignment。班表上那一格变空是「生成/修订班表」时
- *   按「已批准的请假」过滤实现的 —— 单向依赖，谁也不会被对方写坏。
- *   理由：如果批假时顺手删 assignment，撤回批准就恢复不回来了（信息丢失）。
+ *   ⚠️⚠️ 2026-11-01 陛下定（推翻 10-28 的旧口径）：
+ *   「超管批准请假之后，班表那边自动解锁格子把人删掉显示空缺，
+ *     然后等待配置成功之后才可重新发布班表，在这期间主页卡片显示班表已撤回，
+ *     此时班表为草稿状态，直到配置完成发布新的班表。」
+ *
+ *   所以批准 = **两件事**：改请假状态 + 让班表退回草稿（见 schedule.releaseCell）。
+ *   旧注释写的「只改请假状态，不动班表」是错的 —— 那样批准完班表上还挂着要走的人，
+ *   班表页一句「已发布」就把这件事藏住了，只有重新生成才会变，等于没人知道格子空了。
+ *
+ *   未发布 / 已是草稿的周：releaseCell 不改任何东西（没有正式班次可让），
+ *   批准照常生效，之后生成时 `approvedSet` 会把这个人过滤掉。
  */
 
 const { C, findOne, findMany, insertOne, updateWhere, count } = require('../../lib/db');
@@ -89,6 +98,32 @@ async function pending(ctx) {
     count(C.DUTY_LEAVE, { status: STATUS.REJECTED }),
   ]);
   return { weekStart, list: rows.map(dto), total: rows.length, counts: { pending: total, approved, rejected } };
+}
+
+/**
+ * 已审批队列（请假审批页的第二个 tab，2026-11-01 新增）
+ *
+ * 「超管我的页面的请假进度名字改为请假审批，进入之后可以看到待审批和已审批两个。」
+ *
+ * 口径：
+ *   · 不分周 —— 「已审批」是处理记录，按处理时间倒序，翻周没有意义
+ *     （待审批那档才按周，因为要对着本周班表批）
+ *   · 已批准 + 已驳回**都算已审批**，各自带 statusText，页面用标签区颜色
+ *   · 带 weekStart / day / slot：页面要显示「周三 午间」和日期
+ */
+async function reviewed(ctx) {
+  await asManager(ctx);
+  const [approved, rejected] = await Promise.all([
+    findMany(C.DUTY_LEAVE, { status: STATUS.APPROVED }, { orderBy: [['reviewedAt', 'desc'], ['id', 'desc']], limit: 60 }),
+    findMany(C.DUTY_LEAVE, { status: STATUS.REJECTED }, { orderBy: [['reviewedAt', 'desc'], ['id', 'desc']], limit: 60 }),
+  ]);
+  const list = approved.concat(rejected)
+    // ⚠️ 「本人撤回」也落在 status=REJECTED，但它没有 reviewedAt（没人审过）⇒ 不进已审批
+    .filter((x) => !!x.reviewedAt)
+    .sort((a, b) => new Date(b.reviewedAt || b.updateTime || 0) - new Date(a.reviewedAt || a.updateTime || 0))
+    .slice(0, 100)
+    .map(dto);
+  return { list, counts: { approved: list.filter((x) => x.status === STATUS.APPROVED).length, rejected: list.filter((x) => x.status === STATUS.REJECTED).length } };
 }
 
 async function create(ctx) {
@@ -168,7 +203,20 @@ async function review(ctx) {
     };
     const affected = await updateWhere(C.DUTY_LEAVE, { id, status: STATUS.PENDING }, patch);
     if (!affected) throw new ApiError(Codes.CONFLICT, '这条刚被别人处理过');
-    return dto(Object.assign({}, doc, patch));
+    /**
+     * 批准 ⇒ 这一格让开（见文件头「批准后谁改班表」）。
+     * 已经在 withWeekLock 里，releaseCell 直接用这把锁，不再抢。
+     * 驳回 / 本周没发布 ⇒ changed=false，班表一个字段都不动。
+     */
+    let released = false;
+    if (approve) {
+      const r = await require('./schedule').releaseCell(
+        doc.weekStart, doc.day, doc.slot, doc.personId, p,
+        `批准 ${doc.personName || ''} ${doc.day} ${doc.slot} 请假`
+      );
+      released = !!r.changed;
+    }
+    return Object.assign(dto(Object.assign({}, doc, patch)), { scheduleWithdrawn: released });
   });
 }
 
@@ -305,4 +353,4 @@ async function impact(ctx) {
   };
 }
 
-module.exports = { mine, pending, create, review, remove, approvedSet, impact, STATUS };
+module.exports = { mine, pending, reviewed, create, review, remove, approvedSet, impact, STATUS };

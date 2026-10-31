@@ -12,7 +12,7 @@ const { asPartner, asManager, asSuperPartner, asScheduler, assertWeekStart, curr
 const { effectiveLimits } = require('./rule');
 const { approvedSet } = require('./leave');
 const DAY_NAMES = ['周一', '周二', '周三', '周四', '周五'];
-const ACTIONS = { generate: '生成草稿', cell: '调整人选', fixed: '调整固定状态', clear: '清空草稿', publish: '发布班表', withdraw: '撤回发布' };
+const ACTIONS = { generate: '生成草稿', cell: '调整人选', fixed: '调整固定状态', clear: '清空草稿', publish: '发布班表', withdraw: '撤回发布', leave: '批假退回草稿' };
 const actorName = (p) => (p.admin && (p.admin.nickname || p.admin.username)) || '';
 const revisionOf = (doc) => Number(doc && doc.revision) || 0;
 const plain = (v) => JSON.parse(JSON.stringify(v));
@@ -374,6 +374,46 @@ async function withdraw(ctx) {
   }, true);
 }
 
+/**
+ * 批假后把这一格让出来（2026-11-01 陛下定）
+ *
+ * 「超管批准请假之后，班表那边自动解锁格子把人删掉显示空缺，然后等待配置成功之后
+ *   才可重新发布班表，在这期间主页卡片显示班表已撤回，此时班表为草稿状态，
+ *   直到配置完成发布新的班表。」—— 原话，代码照这个走。
+ *
+ * 做的事：
+ *   ① 从这一周的草稿行里删掉「这个人 + 这一天 + 这一场」，格子变空（published 态下
+ *      rows 来自 duty_assignments，所以删的就是正式班次那一行）；
+ *   ② 整周退回 `state:'draft'` + `withdrawnAt` —— 和超管手动撤回落的是同一组字段，
+ *      大白卡按 `draft + withdrawnAt` 显示「本周班表已撤回」（见 desk.js#fetchSchedule）；
+ *   ③ 不设 fixed、不清 publishedRows：之后照常「补齐 → 发布」，
+ *      publish 的校验天然要求缺岗补齐（allowMissing 除外）。
+ *
+ * ⚠️ duty_assignments 那一行**保留**（与 withdraw 一致：「撤回后 assignment 保留，
+ *    供在原有人选上修订」）。发布时 replaceFormal 会用 draftRows 整表覆盖，
+ *    所以旧行不会复活。
+ * ⚠️ 必须在 withWeekLock 内调用（leave.review 已经持锁），这里不再抢锁。
+ *
+ * @returns {{changed:boolean, week:object}} changed=false ⇒ 本周不是已发布态 / 这人本来不在这一格
+ */
+async function releaseCell(weekStart, day, slotName, personId, p, note) {
+  const w = await loadWeek(weekStart);
+  if (!w.doc || w.doc.state !== 'published') return { changed: false, week: publicWeek(w, p) };
+  const pid = Number(personId);
+  const rest = w.rows.filter((r) => !(r.day === day && r.slot === slotName && Number(r.personId) === pid));
+  if (rest.length === w.rows.length) return { changed: false, week: publicWeek(w, p) };
+  await writeWeek(w, p, {
+    ...draftPatch(w, rest),
+    publishedAt: null,
+    withdrawnAt: new Date(),
+    withdrawnBy: p.id,
+    withdrawnByName: actorName(p),
+  });
+  const saved = await loadWeek(weekStart);
+  await log(saved, p, 'leave', note, Number(w.doc.version) || 0);
+  return { changed: true, week: publicWeek(saved, p) };
+}
+
 async function clear(ctx) {
   return mutation(ctx, async (w, p, b) => {
     assertEditable(w);
@@ -419,4 +459,4 @@ async function month(ctx) {
   return { month: ym, weeks: selected.map((w) => w.weekStart || w._id).sort(), list, total: list.reduce((n,p) => n+p.count,0) };
 }
 
-module.exports = { get, mine, month, generate, check, candidates, publish, withdraw, setCell, clear, history, withWeekLock };
+module.exports = { get, mine, month, generate, check, candidates, publish, withdraw, setCell, clear, history, withWeekLock, releaseCell };

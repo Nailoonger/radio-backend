@@ -71,6 +71,10 @@ const SUITE = [
   // 内部稿件审核处理台（2026-11-01）：详情鉴权 / 队列先交先审 / 驳回必填理由 / 权限开关四件事。
   // 标 true —— 处理台的接口散在 draft.js 与 _kit.js 两处，sync 漏一个就整页打不开。
   ['test-partner-draft-review.js', true],
+  // 批假联动班表（2026-11-01）：批准让格 → 整周退回草稿 → 补齐才能重新发布 → 已审批队列。
+  // 标 true —— 这条链路横跨 leave.js 与 schedule.js 两个模块（releaseCell 是跨模块调用），
+  // sync 漏打包其中一个，批准就只改请假、班表纹丝不动，而那正是陛下报的那个错。
+  ['test-partner-leave-flow.js', true],
   ['test-http-bridge.js', true],
   // ⚠️ 标 false：它测的是 **admin-web 前端**那一层（`admin-web/src/utils/http.js` 的上传适配），
   //    跟「云函数源码 vs 打包产物」无关，跑两遍没意义。

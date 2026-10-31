@@ -244,6 +244,7 @@ const PARTNER_ROUTES = [
   // 请假：站员申请、社干批
   ['GET /partner/leave/mine', 'partner.leave.mine'],
   ['GET /partner/leave/pending', 'partner.leave.pending'],
+  ['GET /partner/leave/reviewed', 'partner.leave.reviewed'],
   ['POST /partner/leave', 'partner.leave.create'],
   ['PUT /partner/leave/:id/review', 'partner.leave.review'],
   ['DELETE /partner/leave/:id', 'partner.leave.remove'],
