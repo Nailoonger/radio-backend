@@ -30,7 +30,7 @@
 
 const { C, findOne, findMany, insertOne, updateWhere, count } = require('../../lib/db');
 const { ApiError, Codes } = require('../../lib/response');
-const { asPartner, asManager } = require('./_kit');
+const { asPartner, asReviewer } = require('./_kit');
 const { nextId } = require('../../lib/db');
 
 const STATUS = { DRAFT: 0, PENDING: 1, APPROVED: 2, REJECTED: 3 };
@@ -126,7 +126,8 @@ async function list(ctx) {
 
 /** GET /partner/draft/review —— 社干审稿队列（不限作者） */
 async function reviewList(ctx) {
-  await asManager(ctx);
+  // ⚠️ 2026-10-31：走 asReviewer —— 社干被关掉「审核权限」时这里 40301（弹窗「暂无审核权限」）
+  await asReviewer(ctx);
   const q = ctx.query || {};
   const page = Math.max(1, Number(q.page) || 1);
   const pageSize = Math.min(50, Math.max(1, Number(q.pageSize) || 20));
@@ -298,7 +299,8 @@ async function submit(ctx) {
  * 驳回必须写理由（前端也能看到为什么）。
  */
 async function review(ctx) {
-  const p = await asManager(ctx);
+  // 同上：审核权限被关掉时连「通过/驳回」这个动作本身也不许发生
+  const p = await asReviewer(ctx);
   const id = pickId(ctx);
   const b = ctx.body || {};
   const approve = b.approve === true || b.approve === 'true' || b.approve === 1;

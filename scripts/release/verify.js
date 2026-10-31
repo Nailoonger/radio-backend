@@ -109,6 +109,8 @@ function verify(options = {}) {
   node('伙伴端工作台大白卡', [path.join(root, 'scripts/verify-partner-home-cards.js')]);
   // 可排时间页时段方块：未选中必须是「白底 + 可见描边」，不许和羊皮纸页面底色同色（2026-11-01 陛下打回）
   node('伙伴端可排时间时段方块', [path.join(root, 'scripts/verify-partner-availability-ui.js')]);
+  // 权限分发（2026-10-31 陛下要求）：超管开关 + 按人覆盖，入口/拦截/文案一起校验
+  node('伙伴端权限分发', [path.join(root, 'scripts/verify-partner-permissions.js')]);
   if (scope === 'mini') return { scope, miniFiles: miniFiles.length };
 
   const revision = options.revision || env.RELEASE_REVISION;

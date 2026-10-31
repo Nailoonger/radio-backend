@@ -1,4 +1,5 @@
 const { adminRequest } = require('../../../utils/request');
+const perm = require('../../../utils/perm');
 const vm = require('../view-model');
 Page({
   /** 正在查看的周（空串 = 本周，由云函数按北京时间决定，前端不自己算）
@@ -7,13 +8,26 @@ Page({
   _viewWeek: '',
   /** 本周周一 —— 用来判断「现在看的是不是本周」 */
   _baseWeek: '',
-  data: { statusBarHeight: 20, ready: false, loading: true, loadError: '', roleKey: 'member', isMember: true, tabId: 'schedule', myId: 0, badges: {}, week: {}, state: 'empty', stateText: '', stateSub: '', needText: '', weekStart: '', weekText: '', isThisWeek: true, monthLabel: '', monthList: [], monthTotal: 0, myLeaves: [], leavePending: 0 },
+  data: { statusBarHeight: 20, ready: false, loading: true, loadError: '', roleKey: 'member', isMember: true, tabId: 'schedule', myId: 0, badges: {}, week: {}, state: 'empty', stateText: '', stateSub: '', needText: '', weekStart: '', weekText: '', isThisWeek: true, monthLabel: '', monthList: [], monthTotal: 0, myLeaves: [], leavePending: 0,
+    /* 2026-10-31：社干能不能进排班工作台（超管分发）。true 是默认值，只有确知被关掉才变 false
+       —— 权限接口挂了不该把人锁在门外（后端 asScheduler 还会再拦一次）。 */
+    canPlan: true, denyPlan: '暂无权限' },
   onLoad() {
     const app = getApp();
     if (!app.isAdminLoggedIn()) return wx.reLaunch({ url: '/pages-partner/login/login' });
     const info = app.globalData.adminInfo || {};
     const roleKey = Number(info.role) === 0 ? 'super' : (Number(info.role) === 2 ? 'member' : 'manager');
     this.setData({ ready: true, statusBarHeight: app.globalData.statusBarHeight || 20, roleKey, isMember: roleKey === 'member', tabId: roleKey === 'member' ? 'schedule' : 'scheduling', myId: Number(info.id) || 0 });
+    // 社干才查权限：超管恒放行、站员根本进不了工作台
+    if (roleKey === 'manager') {
+      perm.load().then((pm) => {
+        if (this._gone || !pm) return;
+        this.setData({
+          canPlan: pm.schedule !== false,
+          denyPlan: (pm.text && pm.text.schedule) || '暂无权限',
+        });
+      });
+    }
     this.load();
   },
   onShow() { if (this._loadedOnce && !this.data.loading) this.load(); },
@@ -93,7 +107,21 @@ Page({
   onNextWeek() { this.shiftWeek(1); },
   goLeave() { wx.navigateTo({ url: '/pages-partner/leave/leave' }); },
   goAvailability() { wx.navigateTo({ url: '/pages-partner/availability/availability' }); },
-  goPlanning() { if (!this.data.isMember) wx.navigateTo({ url: '/pages-partner/schedule/planning/planning' }); },
+  goPlanning() {
+    if (this.data.isMember) return;
+    /* 排班权限被关掉时就在这儿弹窗，别跳过去再被 planning 弹回来 ——
+       页面闪一下再退，看起来像卡了。 */
+    if (this.data.canPlan === false) {
+      wx.showModal({
+        title: this.data.denyPlan,
+        content: '超管没有给你开排班工作台的权限。要用，找超管在「权限管理」里开一下。',
+        showCancel: false,
+        confirmText: '知道了',
+      });
+      return;
+    }
+    wx.navigateTo({ url: '/pages-partner/schedule/planning/planning' });
+  },
   goWorkload() { if (!this.data.isMember) wx.navigateTo({ url: '/pages-partner/schedule/workload/workload' }); },
   goHistory() { if (!this.data.isMember) wx.navigateTo({ url: '/pages-partner/schedule/history/history?week=' + this.data.week.weekStart }); },
   onExport() {

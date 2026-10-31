@@ -96,7 +96,9 @@ const modKeyToFile = (key) => key.replace(/\./g, '/') + '.js';
 
   eq('★ 双向刚好一一对应（数量相等）', REG.length, fileKeys.length);
   // 27 → 37：伙伴端 handlers 落成一组（me/slots/availability/draft/rule/leave/attendance/schedule/accounts/feedback）
-  eq('REGISTRY 条数（1 system + 11 user + 15 admin + 10 partner）', REG.length, 37);
+  // 37 → 38：2026-10-31 加 partner.permissions（超管权限分发）
+  // ⚠️ 新增任何 handler 都要同步这两个数字，否则这条会红 —— 它红是**提醒**，不是 bug。
+  eq('REGISTRY 条数（1 system + 11 user + 15 admin + 11 partner）', REG.length, 38);
 
   // 辅助件必须真的是辅助件（没有被路由引用）
   const routeModKeys = [...new Set(RAW_ROUTES.map(([, hk]) => {

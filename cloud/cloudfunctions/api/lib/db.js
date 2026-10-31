@@ -65,6 +65,11 @@ const C = {
 
   // 伙伴端 · 互评（匿名聚合，读接口永不返回评价人）
   PARTNER_FEEDBACK: 'partner_feedback',
+
+  // 伙伴端 · 权限分发（2026-10-31）
+  // ⚠️ 两条 _id 口径：`global` = 全局总闸；`p:<adminId>` = 按人覆盖。
+  //    与 setting:/switch:/ack:/week: 同一套「业务键当 _id」写法，不加索引。
+  PARTNER_PERMISSION: 'partner_permissions',
 };
 
 const coll = (name) => db.collection(name);

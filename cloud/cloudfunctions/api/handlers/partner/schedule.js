@@ -8,7 +8,7 @@ const crypto = require('crypto');
 const { C, findOne, findMany, findAllPaged, insertOne, insertWithId, updateWhere, removeWhere, nextId } = require('../../lib/db');
 const { ApiError, Codes } = require('../../lib/response');
 const bj = require('../../lib/bjTime');
-const { asPartner, asManager, asSuperPartner, assertWeekStart, currentWeekStart, weekDates, templatesToSlots, listPeople } = require('./_kit');
+const { asPartner, asManager, asSuperPartner, asScheduler, assertWeekStart, currentWeekStart, weekDates, templatesToSlots, listPeople } = require('./_kit');
 const { effectiveLimits } = require('./rule');
 const { approvedSet } = require('./leave');
 const DAY_NAMES = ['周一', '周二', '周三', '周四', '周五'];
@@ -190,7 +190,8 @@ function requestedSlot(w, b) {
 }
 
 async function candidates(ctx) {
-  await asManager(ctx);
+  // 换人候选池是工作台里的动作 ⇒ 跟排班权限走
+  await asScheduler(ctx);
   const q = ctx.query || {}; const w = await loadWeek(q.week ? assertWeekStart(q.week) : currentWeekStart());
   const def = requestedSlot(w, q); const c = await contextFor(w);
   const chosen = w.rows.filter((r) => { const s = slotForRow(r, w.slots, c.dates); return s && s.slotKey === def.slotKey; });
@@ -240,8 +241,14 @@ async function log(w, p, action, reason, version) {
     snapshot: { weekStart: w.weekStart, slotVersion: w.slotVersion, templates: w.templates, assignments: plain(w.rows) },
   });
 }
+/**
+ * 所有「改班表」的动作共用这一扇门
+ *
+ * ⚠️ 2026-10-31 起走 `asScheduler`（不是 asManager）：社干要被「排班权限」这道开关管住。
+ *    前端进不来是入口拦截，这里才是**真拦截** —— 绕过前端直接调接口同样 40301。
+ */
 async function mutation(ctx, fn, superOnly = false) {
-  const p = superOnly ? await asSuperPartner(ctx) : await asManager(ctx);
+  const p = superOnly ? await asSuperPartner(ctx) : await asScheduler(ctx);
   const b = ctx.body || {}; const weekStart = assertWeekStart(b.weekStart);
   return withWeekLock(weekStart, async () => { const w = await loadWeek(weekStart); assertRevision(w, b); return fn(w, p, b); });
 }

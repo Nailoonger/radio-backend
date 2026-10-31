@@ -30,7 +30,7 @@
  *     **只改本文件的 personKey() 与 resolvePerson()，不动任何接口签名**。
  */
 
-const { C, findOne, findAllPaged } = require('../../lib/db');
+const { C, findOne, findById, findAllPaged } = require('../../lib/db');
 const { ApiError, Codes } = require('../../lib/response');
 const { requireAdmin } = require('../../lib/auth');
 const bj = require('../../lib/bjTime');
@@ -130,6 +130,107 @@ async function asManager(ctx) {
   if (p.role !== ROLE_SUPER && p.role !== ROLE_MANAGER) {
     throw new ApiError(Codes.FORBIDDEN, '站员没有这个权限');
   }
+  return p;
+}
+
+// ─────────────────────────── 权限分发（2026-10-31）───────────────────────────
+
+/**
+ * 两个权限位 —— **只在这里定义一次**
+ *
+ * 为什么低层放在 _kit 而不是 permissions.js：
+ *   `permissions.js` 要用 `_kit.asSuperPartner`，如果 `_kit` 反过来 require 它，
+ *   就成了循环依赖（打包成单文件后表现为「读到一半 undefined」这种极难查的崩）。
+ *   所以「怎么读、怎么判」沉在这里，`permissions.js` 只做 HTTP 层的编排。
+ *
+ * ⚠️ `deny` 就是前端弹窗的标题，陛下原话是「暂无权限」「暂无审核权限」，
+ *    别在页面里再硬编码一遍 —— 改词只改这张表。
+ */
+const PERM_KEYS = ['schedule', 'review'];
+const PERM_TEXT = {
+  schedule: { key: 'schedule', name: '排班权限', desc: '进入排班工作台', deny: '暂无权限' },
+  review: { key: 'review', name: '审核权限', desc: '进入审核模块', deny: '暂无审核权限' },
+};
+
+/** 三态归一：true / false / null（null = 跟随全局；脏值一律当跟随，不当作 true） */
+function triPerm(v) {
+  if (v === true || v === false) return v;
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  return null;
+}
+
+/** 全局总闸；**缺行 = 全开**（与 system_switch 同口径，发版当天不改变任何人的现状） */
+async function readGlobalPerm() {
+  const doc = await findById(C.PARTNER_PERMISSION, 'global');
+  const out = { schedule: true, review: true };
+  if (doc) {
+    PERM_KEYS.forEach((k) => {
+      const v = triPerm(doc[k]);
+      if (v !== null) out[k] = v;
+    });
+  }
+  return out;
+}
+
+/** 某个 admin.id 的按人设置（null = 没单独设过） */
+async function readPersonPerm(adminId) {
+  const id = Number(adminId);
+  const out = { schedule: null, review: null };
+  if (!Number.isInteger(id) || id <= 0) return out;
+  const doc = await findById(C.PARTNER_PERMISSION, `p:${id}`);
+  if (doc) PERM_KEYS.forEach((k) => { out[k] = triPerm(doc[k]); });
+  return out;
+}
+
+/** 生效值 = 按人覆盖全局 */
+function effectivePerm(global, over) {
+  const out = {};
+  PERM_KEYS.forEach((k) => {
+    const v = over ? over[k] : null;
+    out[k] = (v === true || v === false) ? v : !!(global && global[k]);
+  });
+  return out;
+}
+
+/** admin 文档 → 生效权限（两次读：全局 + 按人） */
+async function permsOf(admin) {
+  const id = Number(admin && admin.id);
+  const [global, over] = await Promise.all([readGlobalPerm(), readPersonPerm(id)]);
+  return effectivePerm(global, over);
+}
+
+/**
+ * 排班工作台权限（生成 / 发布 / 撤回 / 换人 / 清空 / 候选池）
+ *
+ * 超管恒放行 —— 他自己就是总闸，不该被自己关的开关锁在门外。
+ * 站员照样 40301（这是**角色**层面的拒绝，和开关无关，别把两件事混成一句话）。
+ * 社干被关掉时抛的 message 就是弹窗标题：`暂无权限`。
+ */
+async function asScheduler(ctx) {
+  const p = ctx.partner || (await asPartner(ctx));
+  if (p.isSuper) {
+    p.perms = { schedule: true, review: true };
+    return p;
+  }
+  if (p.role !== ROLE_MANAGER) throw new ApiError(Codes.FORBIDDEN, '站员没有这个权限');
+  const perms = await permsOf(p.admin);
+  p.perms = perms;
+  if (!perms.schedule) throw new ApiError(Codes.FORBIDDEN, PERM_TEXT.schedule.deny);
+  return p;
+}
+
+/** 审核模块权限（内部稿件审稿队列 / 通过 / 驳回），语义同 asScheduler */
+async function asReviewer(ctx) {
+  const p = ctx.partner || (await asPartner(ctx));
+  if (p.isSuper) {
+    p.perms = { schedule: true, review: true };
+    return p;
+  }
+  if (p.role !== ROLE_MANAGER) throw new ApiError(Codes.FORBIDDEN, '站员没有这个权限');
+  const perms = await permsOf(p.admin);
+  p.perms = perms;
+  if (!perms.review) throw new ApiError(Codes.FORBIDDEN, PERM_TEXT.review.deny);
   return p;
 }
 
@@ -338,8 +439,43 @@ function personDto(a) {
     department: a.department || deptOfRoles(dutyRoles),
     dutyRoles,
     isSuper: Number(a.role) === ROLE_SUPER,
+    isMember: Number(a.role) === ROLE_MEMBER,
+    /*
+     * 手机号（2026-10-31 伙伴名册）：**只存 admin 文档上的 `phone`**，不另起表。
+     * ⚠️ 空值统一成 ''，不要 null / undefined —— 前端拿它判「要不要强制填」，
+     *    三种空值各写一遍判断迟早漏一个（`!x` 能过，`x === ''` 就漏）。
+     * ⚠️ 这里不做脱敏：名册的用途就是「找人打电话」，脱敏等于没这功能。
+     */
+    phone: normalizePhone(a.phone, { strict: false }),
   };
 }
+
+/**
+ * 手机号规范化（2026-10-31）
+ *
+ * 只认大陆手机号：11 位、1 开头、第二位 3–9。空白与 `-` `(` `)` 一律当分隔符去掉，
+ * 全角数字转半角（微信键盘切全角很容易打出来）。
+ *
+ * @param {*} raw         原始值
+ * @param {object} opt    strict=true 时非法直接抛 PARAM_ERROR（写接口用）；
+ *                        false 时非法返回 ''（读接口用，脏数据不该让整张名册挂掉）。
+ */
+function normalizePhone(raw, opt) {
+  const strict = !!(opt && opt.strict);
+  let v = String(raw == null ? '' : raw)
+    .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+    .replace(/[\s\-()（）]/g, '');
+  if (!v) {
+    if (strict) throw new ApiError(Codes.PARAM_ERROR, '请填写手机号');
+    return '';
+  }
+  if (!/^1[3-9]\d{9}$/.test(v)) {
+    if (strict) throw new ApiError(Codes.PARAM_ERROR, '手机号要 11 位、1 开头，请检查后重填');
+    return '';
+  }
+  return v;
+}
+
 
 /**
  * 取人员池：admin 表 status=1 的全部账号
@@ -377,9 +513,10 @@ function notYet(name) {
 module.exports = {
   ROLE_SUPER, ROLE_MANAGER, ROLE_MEMBER,
   DUTY_ROLES, DEPARTMENTS, WEEK_DAYS, DEPT_BY_ROLE, deptOfRoles,
-  asPartner, asSuperPartner, asManager,
+  asPartner, asSuperPartner, asManager, asScheduler, asReviewer,
+  PERM_KEYS, PERM_TEXT, triPerm, readGlobalPerm, readPersonPerm, effectivePerm, permsOf,
   assertWeekStart, currentWeekStart, nextWeekStart, weekDates, weekStarted,
   hhmm, normalizeTemplates, templatesToSlots,
-  personDto, listPeople, resolvePerson,
+  personDto, normalizePhone, listPeople, resolvePerson,
   notYet,
 };

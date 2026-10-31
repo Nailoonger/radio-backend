@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>权限管理 v1</title>
+<style>
+  :root {
+    --accent: #0066CC; --accent-tint: #EAF3FD; --ink: #1D1D1F;
+    --muted: #76767E; --parchment: #F5F5F7; --hairline: #E3E3E8;
+    --red: #B42318;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; padding: 38px 28px 60px; background: var(--parchment); color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  h1 { margin: 0 0 8px; font-size: 20px; letter-spacing: -.3px; }
+  h1 .ver {
+    display: inline-block; margin-left: 8px; vertical-align: 3px;
+    font-size: 11px; font-weight: 600; color: var(--accent); background: var(--accent-tint);
+    border-radius: 9999px; padding: 2px 9px; letter-spacing: 0;
+  }
+  .lead { margin: 0 0 22px; font-size: 13px; line-height: 1.95; color: #6B6B73; }
+  .lead b { color: var(--ink); }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+    background: #fff; border: 1px solid var(--hairline); border-radius: 5px; padding: 1px 5px; }
+
+  .stage { display: flex; gap: 24px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+
+  /* ── 手机外壳：只在这里有框（手机里不加装饰性描边） ── */
+  .phone {
+    width: 316px; flex: none; background: #fff; border-radius: 30px;
+    box-shadow: 0 14px 40px rgba(29,29,31,.10), 0 1px 3px rgba(29,29,31,.06);
+    overflow: hidden; position: relative;
+  }
+  .p-cap { text-align: center; font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+  .p-cap b { color: var(--ink); }
+  .p-col { flex: none; display: flex; flex-direction: column; }
+
+  .sb { height: 26px; }
+  .nav { height: 44px; display: flex; align-items: center; justify-content: center; position: relative; }
+  .nav-t { font-size: 16px; font-weight: 600; }
+  .nav-b { position: absolute; left: 16px; display: flex; align-items: center; }
+  .chev { width: 9px; height: 9px; border-left: 2px solid #333; border-bottom: 2px solid #333; transform: rotate(45deg); }
+
+  .body { padding: 9px 18px 26px; background: #F5F5F7; }
+
+  /* ── 权限管理页 ── */
+  .intro { background: #fff; border-radius: 18px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px; }
+  .intro-t { font-size: 13.5px; font-weight: 500; line-height: 1.5; }
+  .intro-d { font-size: 11.5px; color: var(--muted); line-height: 1.65; }
+
+  .sh { display: flex; align-items: baseline; justify-content: space-between; padding: 12px 4px 6px; }
+  .sh .t { font-size: 13px; font-weight: 600; }
+  .sh .n { font-size: 11px; color: var(--muted); }
+
+  .rows { background: #fff; border-radius: 18px; padding: 0 16px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 14px 0; }
+  .row + .row, .prow + .prow { border-top: 1px solid var(--hairline); }
+  .r-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .r-name { font-size: 14px; font-weight: 500; }
+  .r-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* 开关：自己画，尺寸与小程序 switch(scale .8) 后的观感一致 */
+  .sw { width: 42px; height: 26px; border-radius: 9999px; background: #E4E4E9; position: relative;
+    flex: none; cursor: pointer; transition: background .16s; }
+  .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.18); transition: transform .16s; }
+  .sw.on { background: var(--accent); }
+  .sw.on::after { transform: translateX(16px); }
+
+  .prow { padding: 14px 0; display: flex; flex-direction: column; gap: 9px; }
+  .p-head { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+  .p-name { font-size: 14px; font-weight: 500; }
+  .p-sub { font-size: 11px; color: var(--muted); }
+  .p-tag { font-size: 10px; color: var(--accent); background: var(--accent-tint);
+    border-radius: 9999px; padding: 2px 8px; }
+
+  .p-pills { display: flex; gap: 8px; }
+  .pill { flex: 1; min-width: 0; border-radius: 9999px; background: #F5F5F7; padding: 8px 0;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer;
+    transition: background .14s; user-select: none; }
+  .pill:active { opacity: .7; }
+  .pill-n { font-size: 12.5px; font-weight: 500; color: #333; }
+  .pill-v { font-size: 10.5px; color: var(--muted); }
+  .pill.on { background: var(--accent-tint); }
+  .pill.on .pill-n { color: var(--accent); font-weight: 600; }
+  .pill.on .pill-v { color: var(--accent); }
+
+  .p-follow { display: flex; gap: 12px; }
+  .fl { font-size: 10.5px; color: var(--accent); cursor: pointer; }
+  .fl:active { opacity: .7; }
+
+  .note { font-size: 10.5px; color: var(--muted); line-height: 1.7; text-align: center; padding: 8px 10px 0; }
+
+  /* ── 班表页入口 ── */
+  .card { background: #fff; border-radius: 18px; padding: 14px 16px; }
+  .wk { display: flex; align-items: center; gap: 8px; }
+  .wk-c { font-size: 15px; font-weight: 600; }
+  .wk-tag { font-size: 10px; background: var(--red); color: #fff; border-radius: 9999px; padding: 1px 7px; }
+  .entry { display: flex; align-items: center; gap: 10px; padding: 14px 0; cursor: pointer; }
+  .entry + .entry { border-top: 1px solid var(--hairline); }
+  .e-main { flex: 1; min-width: 0; }
+  .e-t { font-size: 14px; font-weight: 500; }
+  .e-d { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .e-a { color: #B3B3B8; font-size: 15px; }
+  .entry:active { opacity: .72; }
+
+  /* ── 审核页 ── */
+  .deny { background: #fff; border-radius: 16px; padding: 38px 22px; display: flex;
+    flex-direction: column; align-items: center; gap: 8px; margin-top: 14px; }
+  .deny-t { font-size: 16px; font-weight: 600; }
+  .deny-d { font-size: 11.5px; color: var(--muted); line-height: 1.7; text-align: center; }
+  .stabs { display: flex; gap: 18px; }
+  .stab { font-size: 13px; color: var(--muted); padding: 4px 0 8px; display: flex; gap: 5px; align-items: baseline; }
+  .stab.on { color: var(--ink); font-weight: 600; border-bottom: 2px solid var(--accent); }
+  .stab .n { font-size: 10px; color: #A0A0A8; }
+  .ftags { display: flex; gap: 8px; margin-top: 10px; }
+  .ftag { font-size: 12px; padding: 5px 11px; border-radius: 6px; background: #F0F0F4; color: #55555D; }
+  .ftag.on { background: var(--ink); color: #fff; }
+  .rline { display: flex; flex-direction: column; gap: 4px; padding: 13px 0; }
+  .rline + .rline { border-top: 1px solid var(--hairline); }
+  .rline .tt { font-size: 13.5px; font-weight: 500; }
+  .rline .mm { font-size: 11px; color: var(--muted); }
+
+  /* ── 弹窗 ── */
+  .mask { position: absolute; inset: 0; background: rgba(0,0,0,.22); display: none;
+    align-items: center; justify-content: center; padding: 0 34px; }
+  .mask.on { display: flex; }
+  .dlg { width: 100%; background: #fff; border-radius: 14px; overflow: hidden; text-align: center; }
+  .dlg-t { font-size: 15px; font-weight: 600; padding: 20px 18px 6px; }
+  .dlg-d { font-size: 12px; color: #4A4A52; line-height: 1.65; padding: 0 20px 18px; }
+  .dlg-b { border-top: 1px solid var(--hairline); font-size: 15px; color: var(--accent); padding: 12px; cursor: pointer; }
+
+  .toast { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%);
+    background: rgba(29,29,31,.86); color: #fff; font-size: 12px; padding: 9px 16px;
+    border-radius: 9999px; opacity: 0; transition: opacity .18s; pointer-events: none; white-space: nowrap; }
+  .toast.on { opacity: 1; }
+
+  /* ── 状态面板 ── */
+  .panel { margin-top: 26px; background: #fff; border-radius: 16px; padding: 16px 20px; }
+  .panel h2 { margin: 0 0 10px; font-size: 13px; }
+  .panel table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .panel th, .panel td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #F2F2F5; }
+  .panel th { color: var(--muted); font-weight: 600; background: #FAFAFC; }
+  .yes { color: var(--accent); font-weight: 600; }
+  .no { color: var(--red); font-weight: 600; }
+  .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; color: #6B6B73; }
+
+  .why { background: #fff; border-radius: 16px; padding: 16px 22px; margin-top: 16px; }
+  .why h2 { margin: 0 0 8px; font-size: 13px; }
+  .why ul { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.95; color: #6B6B73; }
+  .why b { color: var(--ink); }
+  .why li + li { margin-top: 3px; }
+
+  .who { display: flex; gap: 6px; justify-content: center; margin-bottom: 10px; }
+  .who button {
+    font: inherit; font-size: 11.5px; padding: 5px 13px; border-radius: 9999px;
+    border: 1px solid var(--hairline); background: #fff; color: #55555D; cursor: pointer;
+  }
+  .who button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>超管 · 工作台「管理」→ 权限管理<span class="ver">v1</span></h1>
+  <p class="lead">
+    陛下原话：<b>「工作台首页管理那个模块做一个权限管理……是否开启社干进入排班工作台的排班权限，开启社干可以进入排班工作台，
+    否则返回弹窗暂无权限，是否开启社干的审核模块的权限，开启则可以进入，关闭则显示暂无审核权限，
+    超管可以在这里分发权限给社干，比如让某个社干可以使用排班或者审核功能，也可以全部关闭」</b>。<br>
+    下面三个屏是<b>能点的</b>：左屏的开关和胶囊都可以拨，中屏、右屏会立刻跟着变。
+    所有颜色、圆角、字号都取自 <code>permissions.wxss</code> / <code>review.wxss</code>，没有另起一套。
+  </p>
+
+  <div class="stage">
+
+    <!-- ① 超管：权限管理 -->
+    <div class="p-col">
+      <p class="p-cap"><b>① 超管 · 权限管理</b>（开关可点）</p>
+      <div class="phone">
+        <div class="sb"></div>
+        <div class="nav">
+          <div class="nav-b"><i class="chev"></i></div>
+          <div class="nav-t">权限管理</div>
+        </div>
+        <div class="body">
+          <div class="intro">
+            <div class="intro-t">这两个开关管的是社干能不能进排班工作台和审核模块。</div>
+            <div class="intro-d">关掉之后，班表、考勤、请假、可排时间照常能看 —— 只是进不去那两处。</div>
+          </div>
+
+          <div class="sh"><span class="t">总开关</span><span class="n">对全体社干</span></div>
+          <div class="rows">
+            <div class="row">
+              <div class="r-main">
+                <div class="r-name">排班权限</div>
+                <div class="r-sub">进入排班工作台</div>
+              </div>
+              <div class="sw" id="swSched" data-k="schedule"></div>
+            </div>
+            <div class="row">
+              <div class="r-main">
+                <div class="r-name">审核权限</div>
+                <div class="r-sub">进入审核模块</div>
+              </div>
+              <div class="sw" id="swReview" data-k="review"></div>
+            </div>
+          </div>
+          <div class="note" id="globalNote"></div>
+
+          <div class="sh"><span class="t">分发给社干</span><span class="n">2 人</span></div>
+          <div class="rows" id="people"></div>
+          <div class="note">
+            总开关是默认值；单独拨过的社干以他自己那一格为准。<br>
+            被关掉的人进这两处时会看到「暂无权限」和「暂无审核权限」。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② 社干：班表页入口 -->
+    <div class="p-col">
+      <p class="p-cap"><b>② 社干 · 班表页入口</b>（点那一行）</p>
+      <div class="who" id="who1"></div>
+      <div class="phone">
+        <div class="sb"></div>
+        <div class="nav"><div class="nav-t">班表</div></div>
+        <div class="body" style="min-height:318px">
+          <div class="card">
+            <div class="wk">
+              <span class="wk-c">11/02 – 11/06</span>
+              <span class="wk-tag">本周</span>
+            </div>
+            <div style="font-size:11.5px;color:#76767E;margin-top:6px">第 11 周 · 已发布</div>
+          </div>
+
+          <div class="sh" style="padding-top:14px"><span class="t">排班协作</span><span class="n">2 项</span></div>
+          <div class="rows">
+            <div class="entry" id="entryPlan">
+              <div class="e-main">
+                <div class="e-t">排班工作台</div>
+                <div class="e-d">生成 · 换人 · 发布</div>
+              </div>
+              <span class="e-a">›</span>
+            </div>
+            <div class="entry" onclick="toast('这是「值班时段」，本版没动它')">
+              <div class="e-main">
+                <div class="e-t">值班时段</div>
+                <div class="e-d">本周的场次与人数</div>
+              </div>
+              <span class="e-a">›</span>
+            </div>
+          </div>
+          <div class="note">关掉排班权限后，这一行还在，点了弹「暂无权限」——<br>不藏入口，免得人以为是坏了。</div>
+        </div>
+        <div class="mask" id="mask1">
+          <div class="dlg">
+            <div class="dlg-t" id="m1t">暂无权限</div>
+            <div class="dlg-d">超管没有给你开排班工作台的权限。要用，找超管在「权限管理」里开一下。</div>
+            <div class="dlg-b" onclick="close1()">知道了</div>
+          </div>
+        </div>
+        <div class="toast" id="toast1"></div>
+      </div>
+    </div>
+
+    <!-- ③ 社干：审核 -->
+    <div class="p-col">
+      <p class="p-cap"><b>③ 社干 · 审核</b>（跟着权限变）</p>
+      <div class="who" id="who2"></div>
+      <div class="phone">
+        <div class="sb"></div>
+        <div class="nav"><div class="nav-t">审核</div></div>
+        <div class="body" style="min-height:318px" id="reviewBody"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="panel">
+    <h2>现在的生效值（右边两屏看到的就是这份）</h2>
+    <table>
+      <thead><tr><th>人</th><th>按人设置</th><th>排班 · 生效</th><th>审核 · 生效</th></tr></thead>
+      <tbody id="tbl"></tbody>
+    </table>
+  </div>
+
+  <div class="why">
+    <h2>几个口径，先说清楚</h2>
+    <ul>
+      <li><b>两层：总开关是默认值，按人是覆盖。</b>拨一下某个人的胶囊 = 给他单独设；点「跟回全局」= 撤掉单独设置。
+        所以「全局关掉 + 单独开小王」就是只给小王开 —— 这才是「分发」。</li>
+      <li><b>缺行 = 全开。</b>这套开关上线当天，所有人的观感和现在一模一样，不会突然一片「暂无权限」。</li>
+      <li><b>超管不受开关约束。</b>自己关的闸不能把自己锁在门外。</li>
+      <li><b>只关这两处。</b>请假、考勤、看自己的班表、填可排时间照常 —— 权限不等于把人停掉。</li>
+      <li><b>后端也拦。</b>不只是前端藏入口：生成/发布/撤回/换人/候选池/代录/审稿 全部在云函数里二次校验，
+        绕过小程序直接调接口一样 40301。</li>
+      <li><b>操作即时生效。</b>开关没有「保存」按钮，拨完就落库；失败会把开关拨回去，不会界面和库里两个样。</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+/* 演示数据：两个人的「按人设置」，null = 跟全局 */
+var state = {
+  global: { schedule: true, review: true },
+  people: [
+    { id: 2, name: '陈叙', username: '20240112', dept: '播音部', over: { schedule: null, review: null } },
+    { id: 3, name: '林望', username: '20240228', dept: '主持部', over: { schedule: null, review: null } }
+  ],
+  who1: 0, who2: 0
+};
+
+function eff(p) {
+  return {
+    schedule: p.over.schedule === null ? state.global.schedule : p.over.schedule,
+    review: p.over.review === null ? state.global.review : p.over.review
+  };
+}
+function overridden(p) { return p.over.schedule !== null || p.over.review !== null; }
+function overS(p) { return p.over.schedule !== null; }
+function overR(p) { return p.over.review !== null; }
+
+/* ── 左屏：总开关 + 分发列表 ── */
+function renderPerm() {
+  document.getElementById('swSched').className = 'sw' + (state.global.schedule ? ' on' : '');
+  document.getElementById('swReview').className = 'sw' + (state.global.review ? ' on' : '');
+  document.getElementById('globalNote').innerHTML =
+    (state.global.schedule ? '社干可以进排班工作台' : '社干进不去排班工作台') + ' · ' +
+    (state.global.review ? '可以进审核' : '进不去审核');
+
+  var box = document.getElementById('people');
+  box.innerHTML = state.people.map(function (p, i) {
+    var e = eff(p);
+    var follow = [];
+    if (overS(p)) follow.push('<span class="fl" data-follow="' + i + '" data-k="schedule">排班跟回全局</span>');
+    if (overR(p)) follow.push('<span class="fl" data-follow="' + i + '" data-k="review">审核跟回全局</span>');
+    return '' +
+      '<div class="prow">' +
+        '<div class="p-head">' +
+          '<span class="p-name">' + p.name + '</span>' +
+          '<span class="p-sub">' + p.username + ' · ' + p.dept + '</span>' +
+          (overridden(p) ? '<span class="p-tag">单独设置</span>' : '') +
+        '</div>' +
+        '<div class="p-pills">' +
+          '<div class="pill' + (e.schedule ? ' on' : '') + '" data-pill="' + i + '" data-k="schedule">' +
+            '<span class="pill-n">排班</span><span class="pill-v">' + (e.schedule ? '可用' : '不可用') + '</span></div>' +
+          '<div class="pill' + (e.review ? ' on' : '') + '" data-pill="' + i + '" data-k="review">' +
+            '<span class="pill-n">审核</span><span class="pill-v">' + (e.review ? '可用' : '不可用') + '</span></div>' +
+        '</div>' +
+        (follow.length ? '<div class="p-follow">' + follow.join('') + '</div>' : '') +
+      '</div>';
+  }).join('');
+}
+
+document.addEventListener('click', function (e) {
+  var t = e.target;
+  var sw = t.closest && t.closest('.sw');
+  if (sw) {
+    var k = sw.dataset.k;
+    state.global[k] = !state.global[k];
+    renderAll();
+    return;
+  }
+  var pill = t.closest && t.closest('.pill');
+  if (pill) {
+    var i = Number(pill.dataset.pill), pk = pill.dataset.k;
+    var p = state.people[i];
+    p.over[pk] = !eff(p)[pk];      // 拨成「当前生效值的反面」＝显式覆盖
+    renderAll();
+    return;
+  }
+  var fl = t.closest && t.closest('.fl');
+  if (fl && fl.dataset.follow !== undefined) {
+    var fi = Number(fl.dataset.follow);
+    state.people[fi].over[fl.dataset.k] = null;   // 跟回全局
+    renderAll();
+  }
+});
+
+/* ── 中屏：班表入口 ── */
+function renderWho(hostId, key) {
+  document.getElementById(hostId).innerHTML = state.people.map(function (p, i) {
+    return '<button class="' + (state[key] === i ? 'on' : '') + '" data-who="' + key + '" data-i="' + i + '">' +
+      p.name + '</button>';
+  }).join('');
+}
+document.addEventListener('click', function (e) {
+  var b = e.target.closest && e.target.closest('[data-who]');
+  if (!b) return;
+  state[b.dataset.who] = Number(b.dataset.i);
+  renderAll();
+});
+
+document.getElementById('entryPlan').addEventListener('click', function () {
+  var p = state.people[state.who1];
+  if (eff(p).schedule) {
+    toast('进入排班工作台', 'toast1');
+  } else {
+    document.getElementById('m1t').textContent = '暂无权限';
+    document.getElementById('mask1').classList.add('on');
+  }
+});
+function close1() { document.getElementById('mask1').classList.remove('on'); }
+
+var toastTimer = null;
+function toast(msg, id) {
+  var el = document.getElementById(id || 'toast1');
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { el.classList.remove('on'); }, 1500);
+}
+
+/* ── 右屏：审核页 ── */
+function renderReview() {
+  var p = state.people[state.who2];
+  var host = document.getElementById('reviewBody');
+  if (!eff(p).review) {
+    host.innerHTML =
+      '<div class="deny">' +
+        '<div class="deny-t">暂无审核权限</div>' +
+        '<div class="deny-d">超管没有给你开审核模块的权限。要用，找超管在「权限管理」里开一下。</div>' +
+      '</div>';
+    return;
+  }
+  host.innerHTML =
+    '<div class="stabs">' +
+      '<span class="stab on">待审核<span class="n">3</span></span>' +
+      '<span class="stab">已通过<span class="n">12</span></span>' +
+      '<span class="stab">已驳回<span class="n">1</span></span>' +
+    '</div>' +
+    '<div class="ftags">' +
+      '<span class="ftag on">点歌</span><span class="ftag">文稿</span><span class="ftag">留言</span>' +
+    '</div>' +
+    '<div class="rows" style="margin-top:12px">' +
+      '<div class="rline"><span class="tt">《夜航西飞》· 点给高三的晚上</span><span class="mm">高二(3)班 · 今天 12:40</span></div>' +
+      '<div class="rline"><span class="tt">《晴天》· 周三午间</span><span class="mm">高一(1)班 · 今天 09:12</span></div>' +
+      '<div class="rline"><span class="tt">《海底》· 期末前最后一期</span><span class="mm">高二(7)班 · 昨天 18:03</span></div>' +
+    '</div>';
+}
+
+/* ── 状态面板 ── */
+function renderTable() {
+  document.getElementById('tbl').innerHTML = state.people.map(function (p) {
+    var e = eff(p);
+    var over = [];
+    if (overS(p)) over.push('排班＝' + (p.over.schedule ? '单独开' : '单独关'));
+    if (overR(p)) over.push('审核＝' + (p.over.review ? '单独开' : '单独关'));
+    return '<tr>' +
+      '<td>' + p.name + '</td>' +
+      '<td class="mono">' + (over.length ? over.join(' · ') : '跟全局') + '</td>' +
+      '<td class="' + (e.schedule ? 'yes' : 'no') + '">' + (e.schedule ? '可用' : '不可用') + '</td>' +
+      '<td class="' + (e.review ? 'yes' : 'no') + '">' + (e.review ? '可用' : '不可用') + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function renderAll() {
+  renderPerm();
+  renderWho('who1', 'who1');
+  renderWho('who2', 'who2');
+  renderReview();
+  renderTable();
+}
+renderAll();
+</script>
+</body>
+</html>

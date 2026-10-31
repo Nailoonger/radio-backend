@@ -67,11 +67,27 @@
         "me/me",
         "login/login",
         "todo/todo",
+        "desk/desk",
         "review/review",
         "review-detail/detail",
         "message/message",
         "availability/availability",
-        "schedule/slots/slots"
+        "schedule/slots/slots",
+        "work/work",
+        "work/editor/editor",
+        "work/versions/versions",
+        "schedule/index/index",
+        "leave/leave",
+        "attendance/attendance",
+        "roster/roster",
+        "rules/rules",
+        "feedback/feedback",
+        "accounts/accounts",
+        "permissions/permissions",
+        "song-schedule/song-schedule",
+        "schedule/planning/planning",
+        "schedule/workload/workload",
+        "schedule/history/history"
       ]
     }
   ]

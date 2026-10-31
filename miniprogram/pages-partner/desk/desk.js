@@ -71,6 +71,7 @@ const ROUTES = {
   feedback: '/pages-partner/feedback/feedback',
   notices: '/pages/notices/notices',
   accounts: '/pages-partner/accounts/accounts',
+  permissions: '/pages-partner/permissions/permissions',
   'song-schedule': '/pages-partner/song-schedule/song-schedule',
   planning: '/pages-partner/schedule/planning/planning',
   me: '/pages-partner/me/me',
@@ -435,10 +436,18 @@ Page({
       // 内部稿件待审：/partner/draft/review 是全站待审（list 那个只看自己的稿）
       pick(adminRequest('/partner/draft/review', 'GET', { status: 0, page: 1, pageSize: 1 }), (d) => Number((d && d.total) || 0)),
       pick(adminRequest('/partner/leave/pending', 'GET', {}), (d) => Number((d && d.counts && d.counts.pending) || 0)),
-    ]).then(([accounts, rules, att, drafts, leaves]) => {
+      // 权限管理（超管）：被限住的社干人数 —— 「有人被关着」是这一页唯一需要一眼看见的事
+      isSuper
+        ? pick(adminRequest('/partner/permissions', 'GET', {}), (d) => {
+          const list = (d && Array.isArray(d.people)) ? d.people : [];
+          return list.filter((x) => !(x.eff && x.eff.schedule) || !(x.eff && x.eff.review)).length;
+        })
+        : Promise.resolve(null),
+    ]).then(([accounts, rules, att, drafts, leaves, limited]) => {
       if (this._gone) return;
       const mods = {
         accounts, rules, drafts, leaves,
+        limited,
         recorded: att ? att.recorded : null,
         unmarked: att ? att.unmarked : null,
       };
@@ -522,6 +531,8 @@ Page({
         //   排班工作台对齐后按原型撤掉。
         mods: [
           { go: 'accounts', t: '账号', d: '分发 · 重置 · 停用', n: n(mods.accounts), u: '个账号' },
+          // 2026-10-31 新增：社干能不能进排班工作台 / 审核，由超管在这里分发
+          { go: 'permissions', t: '权限管理', d: '社干 · 排班与审核', n: n(mods.limited), u: '人被限' },
           { go: 'rules', t: '排班规则', d: '场次上限与轮值', n: n(mods.rules), u: '条规则' },
           { go: 'att-overview', t: '考勤总览', d: '全站出勤统计', n: n(mods.recorded), u: '场已录' },
         ],

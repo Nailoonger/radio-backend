@@ -33,7 +33,7 @@ const { C, findById, findMany, insertOne, updateById, removeWhere } = require('.
 const { ApiError, Codes } = require('../../lib/response');
 const {
   asPartner, assertWeekStart, currentWeekStart, nextWeekStart, weekDates,
-  templatesToSlots, listPeople,
+  templatesToSlots, listPeople, permsOf, PERM_TEXT,
 } = require('./_kit');
 const { findPublished } = require('./slots');
 
@@ -230,6 +230,12 @@ async function save(ctx) {
   if (isProxy) {
     // ⚠️ 代录是社干的特权：站员只能填自己的（2026-10-29 加站员角色后必须在这里拦）
     if (p.isMember) throw new ApiError(Codes.FORBIDDEN, '只能填自己的可排时间');
+    // ⚠️ 2026-10-31：代录属于排班工作台的一部分 —— 社干的「排班权限」被关掉时，代录一起关。
+    //    不留这个缝的话，「关掉排班权限」只是不让他进工作台，他还能从代录页替全站人填，
+    //    等于门锁了但窗没关。
+    if (!p.isSuper && !(await permsOf(p.admin)).schedule) {
+      throw new ApiError(Codes.FORBIDDEN, PERM_TEXT.schedule.deny);
+    }
     if (reason.length < 2) throw new ApiError(Codes.PARAM_ERROR, '代录必须填写原因（至少 2 个字）');
     if (reason.length > 200) throw new ApiError(Codes.PARAM_ERROR, '原因过长（上限 200 字）');
   }

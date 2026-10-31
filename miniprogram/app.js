@@ -258,6 +258,8 @@ App({
         this.globalData.adminInfo = data.admin;
         wx.setStorageSync('admin_token', data.token);
         wx.setStorageSync('adminInfo', data.admin);
+        // 换了账号 ⇒ 上一个账号的权限位必须作废（模块级缓存，不清会串号）
+        require('./utils/perm.js').clear();
         return data;
       });
   },
@@ -270,6 +272,7 @@ App({
     this.globalData.adminInfo = null;
     wx.removeStorageSync('admin_token');
     wx.removeStorageSync('adminInfo');
+    require('./utils/perm.js').clear();
   },
 
   /**

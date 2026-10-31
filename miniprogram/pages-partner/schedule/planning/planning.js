@@ -1,4 +1,5 @@
 const { adminRequest } = require('../../../utils/request');
+const perm = require('../../../utils/perm');
 const vm = require('../view-model');
 Page({
   data: {
@@ -21,7 +22,35 @@ Page({
     const info = app.globalData.adminInfo || {};
     if (Number(info.role) === 2) return wx.reLaunch({ url: '/pages-partner/schedule/index/index' });
     this.setData({ ready: true, isSuper: Number(info.role) === 0, myId: Number(info.id) || 0, statusBarHeight: app.globalData.statusBarHeight || 20 });
-    this.load();
+
+    /**
+     * ⚠️ 2026-10-31：社干进工作台前先过「排班权限」这道开关（超管分发的）。
+     *    被关掉 ⇒ 弹「暂无权限」、退回班表页，**一个排班请求都不发** ——
+     *    先拉数据再弹窗会让人看见一闪而过的班表，比直接拒绝更像坏了。
+     *    超管恒放行（他自己就是总闸），所以只有 role=1 才查。
+     */
+    if (Number(info.role) === 1) {
+      return perm.load().then((pm) => {
+        if (pm && pm.schedule === false) return this.denySchedule(pm);
+        this.load();
+      });
+    }
+    return this.load();
+  },
+
+  /** 排班权限被关掉时的收尾：弹窗 + 退回，不留在这一页 */
+  denySchedule(pm) {
+    wx.showModal({
+      title: (pm && pm.text && pm.text.schedule) || '暂无权限',
+      content: '超管没有给你开排班工作台的权限。要用，找超管在「权限管理」里开一下。',
+      showCancel: false,
+      confirmText: '知道了',
+      success: () => {
+        const pages = getCurrentPages();
+        if (pages.length > 1) wx.navigateBack({ delta: 1 });
+        else wx.reLaunch({ url: '/pages-partner/schedule/index/index' });
+      },
+    });
   },
   onShow() { if (this._loadedOnce && !this.data.loading && !this.data.busy) this.load(); },
   onUnload() { this._gone = true; this._request = (this._request || 0) + 1; },

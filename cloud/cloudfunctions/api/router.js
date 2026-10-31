@@ -207,6 +207,8 @@ const ADMIN_ROUTES = [
 const PARTNER_ROUTES = [
   ['GET /partner/me', 'partner.me.profile'],
   ['PUT /partner/me/duty', 'partner.me.saveDuty'],
+  // 自己的联系方式（手机号）。只改自己，不走 admin 权限 —— 站员也要能填。
+  ['PUT /partner/me/profile', 'partner.me.saveMyProfile'],
 
   ['GET /partner/people', 'partner.me.people'],
   ['GET /partner/people/:id', 'partner.me.personDetail'],
@@ -269,6 +271,13 @@ const PARTNER_ROUTES = [
   // 账号管理（超管）：从学生名册拉人进伙伴端
   ['GET /partner/accounts/candidates', 'partner.accounts.candidates'],
   ['POST /partner/accounts/import', 'partner.accounts.importAccounts'],
+
+  // 权限管理（超管，2026-11-01）：全局总闸 + 按人覆盖
+  // ⚠️ /mine 必须排在 /person/:id 之前的前面（段数不同其实不会撞，但字面量优先是硬规矩）
+  ['GET /partner/permissions/mine', 'partner.permissions.mine'],
+  ['GET /partner/permissions', 'partner.permissions.get'],
+  ['PUT /partner/permissions/person/:id', 'partner.permissions.savePerson'],
+  ['PUT /partner/permissions', 'partner.permissions.saveGlobal'],
 
   // 互评：当场说一句，匿名聚合
   ['GET /partner/feedback/pending', 'partner.feedback.pending'],

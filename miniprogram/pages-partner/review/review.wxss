@@ -216,3 +216,18 @@ button.sm2.q { color: #76767E; font-weight: 400; }
 }
 
 .pressed { opacity: 0.72; }
+
+/* ══════════ 拒绝态（2026-10-31：社干被关掉「审核权限」）══════════
+   浅色白卡 + 一句实话。不给按钮、不给假列表。 */
+.deny {
+  background: #FFFFFF;
+  border-radius: 28rpx;
+  padding: 72rpx 44rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+.deny-t { font-size: 31rpx; font-weight: 600; color: #1D1D1F; }
+.deny-d { font-size: 23rpx; color: #76767E; line-height: 1.7; text-align: center; }

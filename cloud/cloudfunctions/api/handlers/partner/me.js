@@ -19,33 +19,56 @@
 const { C, findOne, updateById } = require('../../lib/db');
 const { ApiError, Codes } = require('../../lib/response');
 const {
-  asPartner, asSuperPartner, listPeople, resolvePerson,
-  DUTY_ROLES, DEPARTMENTS, deptOfRoles,
+  asPartner, asSuperPartner, listPeople, resolvePerson, permsOf,
+  DUTY_ROLES, DEPARTMENTS, deptOfRoles, normalizePhone,
 } = require('./_kit');
 
 /**
- * 把「身份 + 资格」翻译成能力位
+ * 只有「社干」才需要查权限开关 —— 超管恒放行、站员一律 false，
+ * 这两种人多查两次库纯属浪费（/partner/me 是打开 App 第一个接口）。
+ */
+async function permsFor(p) {
+  if (p.isSuper || !p.isManager) return null;
+  return permsOf(p.admin);
+}
+
+/**
+ * 把「身份 + 资格 + 权限开关」翻译成能力位
  *
  * ⚠️ 与 handler 里的实际鉴权**必须一一对应**：
  *    canEditSlots 为 true 的接口必须只要求 asPartner；
  *    为 false 的接口才要求 asSuperPartner。
  *    两边不一致就会出现「按钮点了报 40301」，这是最容易被当成 bug 报上来的形态。
+ *
+ * ⚠️ 2026-11-01：`canManageSchedule` / `canReview` 不再只看角色，还要看**超管分发的开关**
+ *    （`partner_permissions`：全局总闸 + 按人覆盖）。所以这两个位必须由调用方传 `perms` 进来，
+ *    本函数同步、不自己查库 —— 查库是 async，塞进来会让所有调用点都要跟着改成 await，
+ *    而调用点本来就在 async 函数里，在外面查一次更清楚。
+ *    **perms 缺省时按「角色能就当作能」兜底**：这是升级前的行为，
+ *    用在「不需要权限位」的返回体里（比如 slots 的能力位）不会因为少传一个参数就全变 false。
  */
-function abilities(p) {
+function abilities(p, perms) {
   // 站员（role=2）只有「做自己的事」：填自己的可排时间、看自己的班/考勤/请假、互评、写稿。
   // ⚠️ 这里每一位都必须与 handler 的鉴权一一对应：
   //    为 true 的接口必须只要求 asPartner；为 false 的必须要求 asManager / asSuperPartner。
   const mgr = p.isSuper || p.isManager;
+  const pm = perms || { schedule: mgr, review: mgr };
+  // 超管恒放行（他自己就是总闸）；社干看开关；站员一律 false
+  const schedOk = p.isSuper || (p.isManager && pm.schedule === true);
+  const revOk = p.isSuper || (p.isManager && pm.review === true);
   return {
     // 超管：时段配置、排班规则、账号管理
     canEditSlots: p.isSuper,
     canPublishSlots: p.isSuper,
     canEditRules: p.isSuper,
     canManageAccounts: p.isSuper,
+    // 超管专属：权限分发
+    canManagePermissions: p.isSuper,
     // 社干（含超管）：代录、生成/发布班表、审稿、批假、点名、看汇总
+    //   ⇒ 前三项吃权限开关（排班工作台 / 审核模块），后三项仍看角色
     canProxyAvailability: mgr,
-    canManageSchedule: mgr,
-    canReview: mgr,
+    canManageSchedule: schedOk,
+    canReview: revOk,
     canApproveLeave: mgr,
     canMarkAttendance: mgr,
     canViewOverview: mgr,
@@ -60,6 +83,7 @@ function abilities(p) {
 async function profile(ctx) {
   const p = await asPartner(ctx);
   const a = p.admin;
+  const perms = await permsFor(p);
   return {
     id: p.id,
     username: a.username || '',
@@ -75,7 +99,7 @@ async function profile(ctx) {
     qualified: !!(p.department && p.dutyRoles.length),
     createTime: a.createTime || null,
     lastLoginAt: a.lastLoginAt || null,
-    abilities: abilities(p),
+    abilities: abilities(p, perms),
   };
 }
 
@@ -118,7 +142,7 @@ async function saveDuty(ctx) {
     department,
     dutyRoles,
     qualified: !!(department && dutyRoles.length),
-    abilities: abilities(p),
+    abilities: abilities(p, await permsFor(p)),
   };
 }
 
@@ -235,7 +259,7 @@ async function personDetail(ctx) {
 /** 内部复用：给 slots/availability 返回能力位 */
 async function abilityOf(ctx) {
   const p = await asPartner(ctx);
-  return abilities(p);
+  return abilities(p, await permsFor(p));
 }
 
 module.exports = { profile, saveDuty, saveDutyFor, people, personDetail, abilities, abilityOf };
