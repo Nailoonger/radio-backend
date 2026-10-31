@@ -1,0 +1,145 @@
+/* pages-partner/roster/roster.wxss · v2（2026-10-31 加手机号）
+   ⚠️ 按钮一律写 `button.pbtn`（元素+类）。app.wxss 里有 `button.xxx` 级别的规则（如 button.btn 的
+      display/width），单类选择器 `.pbtn` 会被静默压掉 —— 表现是「按钮看着有点歪」而不是报错。 */
+.page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(45deg);
+  margin-left: 6rpx;
+}
+.body { flex: 1; padding: 19rpx 35rpx 80rpx; display: flex; flex-direction: column; gap: 23rpx; }
+
+.sum { display: flex; background: #FFFFFF; border-radius: 28rpx; padding: 24rpx 10rpx; }
+.sum-i { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8rpx; }
+.sum-n { font-size: 34rpx; font-weight: 600; color: #1D1D1F; font-variant-numeric: tabular-nums; }
+.sum-l { font-size: 19rpx; color: #76767E; }
+
+.search { display: flex; }
+.inp {
+  flex: 1;
+  height: 84rpx;
+  background: #FFFFFF;
+  border-radius: 9999rpx;
+  padding: 0 30rpx;
+  font-size: 25rpx;
+  color: #1D1D1F;
+  box-sizing: border-box;
+}
+.ph { color: #B3B3B8; }
+
+.rows { background: #FFFFFF; border-radius: 35rpx; padding: 0 31rpx; }
+.row { display: flex; align-items: center; gap: 20rpx; padding: 26rpx 0; }
+.row + .row { border-top: 2rpx solid #E3E3E8; }
+.av {
+  width: 72rpx; height: 72rpx; border-radius: 50%;
+  background: #EAF3FD; color: #0066CC;
+  font-size: 27rpx; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  flex: none;
+}
+.r-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.r-line { display: flex; align-items: center; gap: 8rpx; }
+.r-name { font-size: 27rpx; font-weight: 500; color: #1D1D1F; }
+.r-sub { font-size: 21rpx; color: #76767E; margin-top: 6rpx; }
+
+/* 「我」标记：名册里认自己那一行 */
+.me-tag {
+  font-size: 17rpx; line-height: 1;
+  padding: 5rpx 9rpx; border-radius: 9999rpx;
+  background: #EAF3FD; color: #0066CC; font-weight: 600;
+}
+/* 身份：超管/社干蓝、站员灰 —— 名册里人人有身份，别只标社干（站员那几行会像缺信息） */
+.r-role { font-size: 19rpx; font-weight: 500; }
+.r-role.sup { color: #0066CC; }
+.r-role.mgr { color: #0066CC; }
+.r-role.mem { color: #76767E; }
+
+/* 号码比部门/岗位更实：同一行里把号码压深一档，扫起来才快 */
+.r-tel { color: #3A3A3E; font-variant-numeric: tabular-nums; }
+.r-tel-none { color: #B3B3B8; }
+
+/* 列表底部唯一的自助入口：红字 + 下划线。别改成按钮，那是陛下点名的形态 */
+.prof-edit {
+  text-align: center;
+  font-size: 25rpx;
+  color: #D93025;
+  text-decoration: underline;
+  padding: 10rpx 0 6rpx;
+}
+
+.hint-note { text-align: center; font-size: 23rpx; color: #76767E; padding: 30rpx 0; }
+
+/* ══════════ 手机号弹层 ══════════
+   ⚠️ 首次态没有关闭、点遮罩也不收（需求「否则无法进入」）。这不是漏写。
+   ⚠️ 输入行只留一条 hairline 底线，不做装饰描边框；focus 时底线变 accent = 有状态含义。 */
+.mask {
+  position: fixed; left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(20, 20, 24, 0.32);
+  display: flex; align-items: center; justify-content: center;
+  padding: 44rpx 32rpx;
+  z-index: 90;
+}
+.sheet {
+  width: 100%;
+  background: #FFFFFF;
+  border-radius: 44rpx;
+  padding: 44rpx 40rpx 36rpx;
+  box-sizing: border-box;
+  display: flex; flex-direction: column;
+}
+.eb { font-size: 21rpx; letter-spacing: 3rpx; color: #0066CC; }
+.ttl { font-size: 38rpx; font-weight: 600; color: #1D1D1F; line-height: 1.4; margin-top: 16rpx; }
+.desc { font-size: 23rpx; color: #76767E; line-height: 1.75; margin-top: 14rpx; }
+
+.fields { margin-top: 26rpx; }
+.f {
+  display: flex; align-items: center; gap: 22rpx;
+  min-height: 104rpx;
+  border-bottom: 2rpx solid #F0F0F3;
+}
+.f:last-child { border-bottom: 0; }
+.lb { width: 106rpx; flex: none; font-size: 25rpx; color: #76767E; }
+.vl { flex: 1; min-width: 0; font-size: 29rpx; color: #1D1D1F; font-variant-numeric: tabular-nums; }
+.tk {
+  flex: none; font-size: 19rpx; line-height: 1;
+  padding: 8rpx 13rpx; border-radius: 9999rpx;
+  color: #B3B3B8; border: 2rpx solid #E3E3E8;
+}
+.inp2 {
+  flex: 1; min-width: 0;
+  height: 104rpx;
+  font-size: 31rpx; color: #1D1D1F;
+  letter-spacing: 1rpx;
+  font-variant-numeric: tabular-nums;
+}
+.ph2 { font-size: 25rpx; color: #B3B3B8; letter-spacing: 0; }
+.f-inp:focus-within { border-bottom-color: #0066CC; }
+
+.err { font-size: 23rpx; line-height: 1.6; min-height: 36rpx; margin-top: 20rpx; }
+.err.mute { color: #76767E; }
+.err.warn { color: #D93025; }
+
+button.pbtn {
+  width: 100%;
+  height: 96rpx;
+  line-height: 96rpx;
+  margin: 28rpx 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 28rpx;
+  background: #0066CC;
+  color: #FFFFFF;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+button.pbtn::after { border: 0; }
+button.pbtn.dis { background: #E8E8ED; color: #9A9AA0; }
+button.pbtn.pressed { opacity: 0.86; }
+.pbtn-cancel {
+  text-align: center;
+  font-size: 25rpx;
+  color: #76767E;
+  padding-top: 22rpx;
+}

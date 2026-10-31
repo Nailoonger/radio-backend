@@ -111,6 +111,8 @@ function verify(options = {}) {
   node('伙伴端可排时间时段方块', [path.join(root, 'scripts/verify-partner-availability-ui.js')]);
   // 权限分发（2026-10-31 陛下要求）：超管开关 + 按人覆盖，入口/拦截/文案一起校验
   node('伙伴端权限分发', [path.join(root, 'scripts/verify-partner-permissions.js')]);
+  // 伙伴名册手机号（2026-10-31）：三端入口 / 首次强制弹层没有出口 / 底部红字 / 前后端号码规则一致
+  node('伙伴端名册手机号', [path.join(root, 'scripts/verify-partner-roster-ui.js')]);
   if (scope === 'mini') return { scope, miniFiles: miniFiles.length };
 
   const revision = options.revision || env.RELEASE_REVISION;

@@ -27,6 +27,8 @@ const ROWS = {
     { id: 'people',   icon: 'cal',   label: '可排时间', state: '' },
     { id: 'my-att',   icon: 'chk',   label: '考勤',     state: '' },
     { id: 'leave',    icon: 'clock', label: '请假进度', state: '' },
+    // 2026-10-31：名册三端都要有 —— 站员端原来漏了这一行（只有 ROWS.admin 里有）
+    { id: 'roster',   icon: 'ppl',   label: '伙伴名册', state: '' },
     { id: 'feedback', icon: 'star',  label: '互评',     state: '' },
     { id: 'notices',  icon: 'mega',  label: '站内公告', state: '' },
     // 2026-10-31 账号密码统一：站员的密码就是他的学生密码，改这里学生端立刻同步
@@ -144,6 +146,8 @@ Page({
           role: me.role,
           createTime: me.createTime
         });
+        // 名册那行给个「待填手机号」：不填进不去，入口上先说一声，别等点进去才被弹窗拦
+        that.markRosterState(!!me.needPhone);
       })
       .catch(function (err) {
         if (err && err.code === 40101) {
@@ -171,6 +175,21 @@ Page({
       days: daysSince(info.created_at || info.createdAt),
       rows: roleKey === 'member' ? ROWS.member : ROWS.admin
     });
+  },
+
+  /**
+   * 「伙伴名册」那一行的右侧提示
+   *
+   * 没填手机号的人进名册会被强制弹窗拦住（见 pages-partner/roster），
+   * 所以入口上先写一句「待填手机号」—— 比点进去被拦下来体验好，
+   * 也避免用户以为那是页面坏了。
+   * ⚠️ 判据来自后端 `/partner/me` 的 needPhone，不要在前端自己判空。
+   */
+  markRosterState(needPhone) {
+    const rows = (this.data.rows || []).map((r) => (r.id === 'roster'
+      ? Object.assign({}, r, { state: needPhone ? '待填手机号' : '' })
+      : r));
+    this.setData({ rows });
   },
 
   onNav(e) {
@@ -236,7 +255,7 @@ Page({
     if (newP === oldP) return wx.showToast({ title: '新密码不能和当前密码一样', icon: 'none' });
 
     this.setData({ pwdSaving: true, pwdErr: '' });
-    adminRequest('PUT', '/admin/change-password', { oldPassword: oldP, newPassword: newP })
+    adminRequest('/admin/change-password', 'PUT', { oldPassword: oldP, newPassword: newP })
       .then(function (res) {
         // 后端回的新 token：不换的话下一次请求直接 40101
         if (res && res.token) {

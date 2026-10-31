@@ -84,6 +84,7 @@ async function profile(ctx) {
   const p = await asPartner(ctx);
   const a = p.admin;
   const perms = await permsFor(p);
+  const phone = normalizePhone(a.phone, { strict: false });
   return {
     id: p.id,
     username: a.username || '',
@@ -97,11 +98,46 @@ async function profile(ctx) {
     dutyRoles: p.dutyRoles,
     // 资格是否完整：没部门也没岗位的人，排班时无法通过硬条件过滤，等于「永远不会被排上」
     qualified: !!(p.department && p.dutyRoles.length),
+    /*
+     * 手机号（2026-10-31 伙伴名册）：
+     *   phone     —— 规范化后的号码，没填就是 ''
+     *   needPhone —— 前端拿它决定「进名册要不要弹强制填写」。
+     *                ⚠️ 由后端算，不让前端自己 `!phone` 判：前端判空写错一次，
+     *                弹窗就永远不弹（或者每次都弹），这是最容易被忽略的静默漂移。
+     */
+    phone,
+    needPhone: !phone,
     createTime: a.createTime || null,
     lastLoginAt: a.lastLoginAt || null,
     abilities: abilities(p, perms),
   };
 }
+
+/**
+ * PUT /partner/me/profile   body: { phone }
+ *
+ * 自己改自己的手机号（名册用）。
+ *
+ * ⚠️ 只允许改手机号：姓名/学号是学校名册来的，伙伴自己不能改 —— 这条边界要写死在 handler 里，
+ *    不能只靠前端不给输入框（否则改个包就能提交 nickname）。
+ * ⚠️ 站员也要能调：所以只 `asPartner`，不进 asManager / asSuperPartner。
+ * ⚠️ 只落 `phone` + `phoneUpdatedAt`，**不碰 updateTime**：updateTime 是管理员账号的
+ *    资料修订时间，被「填个手机号」刷掉会让后台的「最近更新」看着很怪。
+ */
+async function saveMyProfile(ctx) {
+  const p = await asPartner(ctx);
+  const body = ctx.body || {};
+  if (body.phone === undefined) throw new ApiError(Codes.PARAM_ERROR, '请填写手机号');
+
+  const phone = normalizePhone(body.phone, { strict: true });
+  const now = new Date();
+  await updateById(C.ADMIN, p.admin._id, { phone, phoneUpdatedAt: now });
+
+  // 就地更新，后面 abilities() 之类读的是同一个对象
+  p.admin.phone = phone;
+  return { phone, needPhone: false, phoneUpdatedAt: now };
+}
+
 
 /**
  * PUT /partner/me/duty   body: { department, dutyRoles: [] }
@@ -242,11 +278,31 @@ async function saveDutyFor(ctx) {
   };
 }
 
-/** GET /partner/people —— 人员池（排班选人、代录选人都走这里） */
+/**
+ * GET /partner/people —— 人员池（排班选人、代录选人都走这里）
+ *
+ * 2026-10-31 起顺带回一个 `me`：名册页要「自己那行置顶 + 判断要不要弹强制填写」，
+ * 这两件事都得知道「我是名单里的哪一行」。挂在同一个接口里返回，
+ * 比让前端再打一次 /partner/me 少一次往返（名册是打开就要用的页面）。
+ * ⚠️ `me` 可能是 null：admin 行 status 被停用的人不会出现在 list 里 —— 这时前端按「没填过」处理。
+ */
 async function people(ctx) {
-  await asPartner(ctx);
+  const p = await asPartner(ctx);
   const list = await listPeople();
-  return { list, total: list.length };
+  const mine = list.filter((x) => x.personId === Number(p.id))[0] || null;
+  return {
+    list,
+    total: list.length,
+    me: mine ? {
+      personId: mine.personId,
+      name: mine.name,
+      username: mine.username,
+      phone: mine.phone,
+      needPhone: !mine.phone,
+      isSuper: mine.isSuper,
+      isMember: mine.isMember,
+    } : null,
+  };
 }
 
 /** GET /partner/people/:id —— 单个成员（代录前确认对方资格） */
@@ -262,4 +318,4 @@ async function abilityOf(ctx) {
   return abilities(p, await permsFor(p));
 }
 
-module.exports = { profile, saveDuty, saveDutyFor, people, personDetail, abilities, abilityOf };
+module.exports = { profile, saveDuty, saveMyProfile, saveDutyFor, people, personDetail, abilities, abilityOf };

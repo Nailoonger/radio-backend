@@ -1,0 +1,95 @@
+<!-- pages-partner/roster/roster.wxml · v2（2026-10-31 加手机号）
+     事实源：partner-hat V.roster —— 站员和社干都在同一份名册里。
+     数据：GET /partner/people（admin 表 status=1 的全部账号；顺带回 me 那一行）
+
+     ⚠️ 第一次进来必须先把手机号填上（`me.needPhone`），弹层**没有关闭、点遮罩也不收** ——
+        这是需求「否则无法进入」的实现方式，不是漏写关闭按钮。别"顺手"给补一个 ×。
+     ⚠️ 列表底部那行红字（修改我的个人资料）是唯一的自助入口；
+        姓名 / 学号来自学校名册，谁都不能改，弹层里就是只读文本，不给输入框。
+     ⚠️ 手机号显示**不脱敏**：名册的用途就是「找人打电话」，脱敏等于没这功能。 -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">伙伴名册</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <view class="sum">
+      <view class="sum-i"><text class="sum-n">{{total}}</text><text class="sum-l">在册</text></view>
+      <view class="sum-i"><text class="sum-n">{{superCount}}</text><text class="sum-l">超管</text></view>
+      <view class="sum-i"><text class="sum-n">{{deptCount}}</text><text class="sum-l">部门</text></view>
+    </view>
+
+    <view class="search">
+      <input class="inp" value="{{kw}}" bindinput="onKw" placeholder="搜名字 / 学号 / 号码" placeholder-class="ph" />
+    </view>
+
+    <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
+    <view class="hint-note" wx:elif="{{list.length === 0}}">{{kw ? '没有匹配的人' : '名册是空的'}}</view>
+
+    <view class="rows" wx:else>
+      <view class="row" wx:for="{{list}}" wx:key="personId">
+        <view class="av">{{item.initial}}</view>
+        <view class="r-main">
+          <view class="r-line">
+            <text class="r-name">{{item.name}}</text>
+            <text class="me-tag" wx:if="{{item.isMe}}">我</text>
+            <text class="r-role {{item.isSuper ? 'sup' : (item.isMember ? 'mem' : 'mgr')}}">{{item.chip}}</text>
+          </view>
+          <view class="r-sub">
+            <text>{{item.sub}}</text>
+            <text class="r-tel" wx:if="{{item.phone}}"> · {{item.tel}}</text>
+            <text class="r-tel-none" wx:else> · 未填手机号</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 名册列表底部：唯一的自助入口。红色 + 下划线，别改成按钮 -->
+    <view class="prof-edit" wx:if="{{!loading}}" bindtap="onEditProfile">修改我的个人资料</view>
+  </view>
+
+  <!-- ══ 手机号弹层：首次强制填写 / 修改资料 共用一套字段 ══ -->
+  <view class="mask" wx:if="{{sheet}}" catchtouchmove="noop" catchtap="noop">
+    <view class="sheet">
+      <text class="eb">伙伴名册</text>
+      <text class="ttl">{{sheet.title}}</text>
+      <text class="desc">{{sheet.desc}}</text>
+
+      <view class="fields">
+        <view class="f">
+          <text class="lb">姓名</text>
+          <text class="vl">{{me.name}}</text>
+          <text class="tk">自动识别</text>
+        </view>
+        <view class="f">
+          <text class="lb">学号</text>
+          <text class="vl">{{me.username || '—'}}</text>
+          <text class="tk">自动识别</text>
+        </view>
+        <view class="f f-inp">
+          <text class="lb">手机号</text>
+          <input
+            class="inp2"
+            model:value="{{sheet.phone}}"
+            type="number"
+            maxlength="11"
+            bindinput="onPhone"
+            placeholder="必填 · 11 位手机号"
+            placeholder-class="ph2"
+            focus="{{sheet.focus}}"
+          />
+        </view>
+      </view>
+
+      <text class="err {{sheet.errTone}}">{{sheet.err}}</text>
+
+      <button class="pbtn {{sheet.ok ? '' : 'dis'}}" disabled="{{!sheet.ok}}" bindtap="onSave">{{sheet.btn}}</button>
+      <view class="pbtn-cancel" wx:if="{{sheet.editing}}" bindtap="onCancel">取消</view>
+    </view>
+  </view>
+</view>

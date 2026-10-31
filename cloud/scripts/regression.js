@@ -65,6 +65,9 @@ const SUITE = [
   // 权限分发（2026-10-31）：全局总闸 + 按人覆盖。吃库，且要验「哪些接口真被拦」，
   // 所以标 true —— 源码与打包产物各跑一遍，防止 sync 漏带 permissions.js。
   ['test-partner-permissions.js', true],
+  // 伙伴名册 · 手机号（2026-10-31）：名册三端都能读、me 那一行、自助改号码的清洗与边界。
+  // 标 true —— 源码与打包产物各跑一遍，防止 sync 漏带 me.js 的新导出 saveMyProfile。
+  ['test-partner-roster-phone.js', true],
   ['test-http-bridge.js', true],
   // ⚠️ 标 false：它测的是 **admin-web 前端**那一层（`admin-web/src/utils/http.js` 的上传适配），
   //    跟「云函数源码 vs 打包产物」无关，跑两遍没意义。

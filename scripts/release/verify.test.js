@@ -60,12 +60,14 @@ test('policy 与 mini 范围只执行对应校验，不构建或安装线上产�
   // 1 = 发布控制回归；2 = 小程序语法；3 = 伙伴端周切换一致性；4 = 工作台大白卡（后两条 2026-10-30 新增）
   // 5 = 可排时间时段方块（2026-11-01 新增：未选中态不许和页面底色同色）
   // 6 = 权限分发（2026-10-31 新增：超管开关 + 按人覆盖，入口/拦截/文案一起校验）
-  assert.equal(stages.length, 6);
+  // 7 = 名册手机号（2026-10-31 新增：三端入口 / 首次强制弹层无出口 / 红字改资料 / 前后端规则一致）
+  assert.equal(stages.length, 7);
   assert.ok(stages[1].args.includes('--check'));
   assert.ok(stages[2].args[0].endsWith('verify-partner-weeknav.js'));
   assert.ok(stages[3].args[0].endsWith('verify-partner-home-cards.js'));
   assert.ok(stages[4].args[0].endsWith('verify-partner-availability-ui.js'));
   assert.ok(stages[5].args[0].endsWith('verify-partner-permissions.js'));
+  assert.ok(stages[6].args[0].endsWith('verify-partner-roster-ui.js'));
   assert.throws(() => verify({ root, scope: 'unknown', runStage }), /scope/);
 });
 
