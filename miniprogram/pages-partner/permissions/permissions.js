@@ -14,6 +14,53 @@
 const { adminRequest } = require('../../utils/request.js');
 const perm = require('../../utils/perm.js');
 
+/**
+ * 三个权限位 —— 与后端 `_kit.PERM_KEYS` 同序。
+ * ⚠️ 只用来做**本地重算**（拨完开关立刻更新那一格，不再打一次 GET 把整页重刷）。
+ */
+const KEYS = ['schedule', 'review', 'proxy'];
+
+/** 按人设置 + 全局 → 生效值（与后端 effectivePerm 同一口径，别自己发明第三个版本） */
+function effOf(over, global) {
+  const o = over || {};
+  const g = global || {};
+  const out = {};
+  KEYS.forEach((k) => {
+    const v = o[k];
+    out[k] = (v === true || v === false) ? v : !!g[k];
+  });
+  return out;
+}
+
+/** 这一行有没有任何一位是「单独设置」（三位全是 null = 完全跟全局） */
+function isOverridden(over) {
+  const o = over || {};
+  return KEYS.some((k) => o[k] === true || o[k] === false);
+}
+
+/**
+ * 本地重算生效值与计数
+ *
+ * ⚠️⚠️ 为什么必须本地算，而不是保存后重新 `load()`：
+ *    整页重拉会把 `loading` 置回 true，页面先变成「正在加载……」，再整块重绘 ——
+ *    表现就是「每拨一次开关，页面闪一下重载」（陛下 2026-10-31 反馈的正是这个）。
+ *    这里只改受影响的那几行，DOM 不会整页重建。
+ */
+function recompute(people, global) {
+  const next = (people || []).map((p) => Object.assign({}, p, {
+    eff: effOf(p.over, global),
+    overridden: isOverridden(p.over),
+  }));
+  const count = {
+    managers: next.length,
+    scheduleOn: next.filter((x) => x.eff.schedule).length,
+    reviewOn: next.filter((x) => x.eff.review).length,
+    proxyOn: next.filter((x) => x.eff.proxy).length,
+    overridden: next.filter((x) => x.overridden).length,
+  };
+  return { people: next, count };
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -71,8 +118,12 @@ Page({
     else wx.reLaunch({ url: '/pages-partner/desk/desk' });
   },
 
-  load() {
-    this.setData({ loading: true, loadError: '' });
+  /**
+   * 拉整页数据
+   * @param {boolean} silent true = 不显示「正在加载」（保存失败回正时用，避免闪一下）
+   */
+  load(silent) {
+    if (!silent) this.setData({ loading: true, loadError: '' });
     return adminRequest('/partner/permissions', 'GET', {})
       .then((d) => {
         if (this._gone) return;
@@ -113,20 +164,32 @@ Page({
     const key = e.currentTarget.dataset.key;
     const val = !!e.detail.value;
     if (!key || this.data.saving) return;
-    // 先动界面：开关组件已经把位置换了，这里回滚会让手指觉得卡
-    const global = { ...this.data.global, [key]: val };
-    this.setData({ saving: true, global });
+
+    const prev = this.data.global[key];
+    // 先动界面：开关组件已经把位置换了，这里回滚会让手指觉得卡。
+    // 同时把「跟全局走」的那几个人一起重算 —— 他们那几格要立刻跟着变。
+    const global = Object.assign({}, this.data.global);
+    global[key] = val;
+    this.setData(Object.assign({ saving: true, global }, recompute(this.data.people, global)));
+
+    perm.load(true);          // 本机权限缓存作废（本页是超管，改完自己也要立刻生效）
+
     adminRequest('/partner/permissions', 'PUT', { [key]: val })
-      .then(() => {
+      .then((d) => {
         if (this._gone) return;
-        perm.load(true);          // 本机缓存作废
-        return this.load();
+        /**
+         * ⚠️ 只吃响应里的 `global`，**不重新 load()**。
+         *    重新 load 会让 loading 回到 true ⇒ 整页闪一下重载（陛下反馈的就是这个）。
+         */
+        const g = (d && d.global) || global;
+        this.setData(Object.assign({ saving: false, global: g }, recompute(this.data.people, g)));
       })
-      .then(() => { if (!this._gone) this.setData({ saving: false }); })
       .catch((err) => {
         if (this._gone) return;
         // 失败必须把开关拨回去，否则界面在骗人
-        this.setData({ saving: false, global: { ...this.data.global, [key]: !val } });
+        const back = Object.assign({}, this.data.global);
+        back[key] = prev;
+        this.setData(Object.assign({ saving: false, global: back }, recompute(this.data.people, back)));
         wx.showToast({ title: (err && err.message) || '没保存成功', icon: 'none' });
       });
   },
@@ -155,19 +218,40 @@ Page({
     this.savePerson(personId, { [key]: null });
   },
 
+  /**
+   * 保存某个人的某一位 —— **只更新这一行**，不整页重拉
+   *
+   * ⚠️ 响应里带回了 `over / eff / overridden`，直接拿来贴到那一行上就够了。
+   *    重拉整页会闪（见 recompute 头注）。
+   */
   savePerson(personId, patch) {
     this.setData({ saving: true });
+    // 先乐观更新手指下的那一格，避免「点了没反应」
+    const optimistic = this.data.people.map((p) => {
+      if (p.personId !== personId) return p;
+      const over = Object.assign({}, p.over, patch);
+      return Object.assign({}, p, { over, overridden: isOverridden(over) });
+    });
+    this.setData(recompute(optimistic, this.data.global));
+
+    perm.load(true);
+
     adminRequest(`/partner/permissions/person/${personId}`, 'PUT', patch)
-      .then(() => {
+      .then((d) => {
         if (this._gone) return;
-        perm.load(true);
-        return this.load();
+        const people = this.data.people.map((p) => {
+          if (p.personId !== personId) return p;
+          const over = (d && d.over) || p.over;
+          return Object.assign({}, p, { over, overridden: isOverridden(over) });
+        });
+        this.setData(Object.assign({ saving: false }, recompute(people, this.data.global)));
       })
-      .then(() => { if (!this._gone) this.setData({ saving: false }); })
       .catch((err) => {
         if (this._gone) return;
         this.setData({ saving: false });
         wx.showToast({ title: (err && err.message) || '没保存成功', icon: 'none' });
+        // 失败就按服务端实际情况回正（乐观更新已经把界面弄脏了）
+        this.load(true);
       });
   },
 });

@@ -53,6 +53,12 @@ Page({
     /* 2026-10-31：社干被超管关掉「审核权限」时整页置灰态（只说这一句，不给假列表） */
     denied: false,
     denyReview: '暂无审核权限',
+    /**
+     * 是不是 role=1 的社干 —— **只有他吃「审核权限」这道开关**。
+     * ⚠️ 不能用 roleKey 判：这一页的 roleKey 只有 super / manager 两档，
+     *    站员也会被归到 manager（见 onLoad），拿它判会把站员一起关在门外。
+     */
+    roleManager: false,
   },
 
   onLoad(query) {
@@ -72,6 +78,7 @@ Page({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
       ready: true,
       roleKey: Number(info.role) === 0 ? 'super' : 'manager',
+      roleManager: Number(info.role) === 1,
       kindIdx,
       stateLabels: KINDS[kindIdx].key === 'message' ? STATE_MESSAGE : STATE_SUBMIT,
     });
@@ -106,8 +113,35 @@ Page({
   onUnload() { this._gone = true; },
 
   onShow() {
-    // 回到这一页（从处理台审完回来 / 切 tab 回来）底栏数字要跟着变
-    if (this.data.ready) this.refreshBadges();
+    /* 权限可能刚被超管改过：切回来先对一次，再决定要不要刷角标
+       （2026-10-31：原来只在 onLoad 判一次，改完不重新登录就一直是旧状态） */
+    this.refreshPermState().then(() => {
+      if (this.data.ready) this.refreshBadges();
+    });
+  },
+
+  /**
+   * 重新对一次「审核权限」，变了就当场切换整页形态
+   *
+   * ⚠️ 只在这一页做：它整页就是「能审 / 不能审」两态，
+   *    不像班表页那样可以「入口拦住但页面照看」。
+   */
+  refreshPermState() {
+    if (!this.data.ready || !this.data.roleManager) return Promise.resolve();
+    return perm.load().then((pm) => {
+      if (this._gone || !pm) return;
+      const deniedNow = pm.review === false;
+      if (deniedNow === this.data.denied) return;
+      this.setData({
+        denied: deniedNow,
+        denyReview: (pm.text && pm.text.review) || '暂无审核权限',
+      });
+      // 从只读恢复成可用：把数据补上（之前一个请求都没发）
+      if (!deniedNow) {
+        this.fetchCounts();
+        this.fetchList(true);
+      }
+    });
   },
 
   onPullDownRefresh() {

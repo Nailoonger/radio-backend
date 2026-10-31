@@ -14,38 +14,56 @@
 
 const { adminRequest } = require('./request.js');
 
+/**
+ * 缓存有效期
+ *
+ * ⚠️ 原来是**永久缓存**（拿到一次就一直用），于是超管改了开关，社干那边不重新登录
+ *    永远是旧值 —— 陛下 2026-10-31 原话「好像不会实时更新权限，要重新登录才会更新」。
+ *    改成短 TTL：页面切回来（onShow）会重新问，但 15 秒内多次切页不会重复打请求。
+ */
+const TTL_MS = 15 * 1000;
+
 let cached = null;
+let cachedAt = 0;
 let inflight = null;
 
 /**
  * 取当前账号的权限位
  * @param {boolean} force 忽略缓存重取（例如刚在权限管理页改完）
- * @returns {Promise<null|{isSuper:boolean, schedule:boolean, review:boolean, text:object}>}
+ * @returns {Promise<null|{isSuper:boolean, schedule:boolean, review:boolean, proxy:boolean, text:object}>}
  */
 function load(force) {
-  if (!force && cached) return Promise.resolve(cached);
-  if (!force && inflight) return inflight;
+  const fresh = cached && (Date.now() - cachedAt) < TTL_MS;
+  if (!force && fresh) return Promise.resolve(cached);
+  // 并发合并：同一次渲染里几个页面同时问，只打一个请求
+  if (inflight) return inflight;
   inflight = adminRequest('/partner/permissions/mine', 'GET', {})
     .then((d) => {
       cached = d || null;
+      cachedAt = Date.now();
       inflight = null;
       return cached;
     })
     .catch(() => {
+      // 取不到就作废缓存，下次重试；调用方按「不知道」处理（放行，后端仍会拦）
       inflight = null;
+      cached = null;
+      cachedAt = 0;
       return null;
     });
   return inflight;
 }
 
-/** 已经拿到的权限位（同步；没拿过就是 null） */
+/** 已经拿到的权限位（同步；没拿过或已过期就是 null） */
 function peek() {
-  return cached;
+  const fresh = cached && (Date.now() - cachedAt) < TTL_MS;
+  return fresh ? cached : null;
 }
 
 /** 退出登录 / 换账号时必须调，否则下一个人会看到上一个人的权限 */
 function clear() {
   cached = null;
+  cachedAt = 0;
   inflight = null;
 }
 

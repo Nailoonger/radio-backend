@@ -137,12 +137,34 @@ ok('app.json 分包登记了新页', appJson.indexOf('"permissions/permissions"'
 const permPageJs = read('miniprogram/pages-partner/permissions/permissions.js');
 ok('页面只给超管（role !== 0 退回）', /Number\(info\.role\) !== 0/.test(permPageJs));
 ok('改完强制刷新本机权限缓存', /perm\.load\(true\)/.test(permPageJs));
+ok('保存后不整页重拉（否则每拨一次开关页面闪一下）',
+  /function recompute\(people, global\)/.test(permPageJs)
+  && !/return this\.load\(\);/.test(permPageJs),
+  '又变回「保存就 load()」了 —— loading 会闪，陛下会说「怎么每次都要重新加载」');
 ok('按人拨位走独立接口', /\/partner\/permissions\/person\/\$\{personId\}/.test(permPageJs));
 ok('支持「跟回全局」（传 null）', /onFollow/.test(permPageJs) && /\[key\]: null/.test(permPageJs));
 
 const permUtil = read('miniprogram/utils/perm.js');
 ok('utils/perm.js 存在', !!permUtil);
-ok('取不到权限时放行（fail-open，后端仍会拦）', /\.catch\(\(\) => \{\s*\n\s*inflight = null;\s*\n\s*return null;/.test(permUtil));
+ok('权限位缓存有有效期（不许永久缓存）',
+  /const TTL_MS = \d+ \* 1000/.test(permUtil),
+  '永久缓存 ⇒ 超管改完，社干不重新登录永远看不到');
+ok('permissions 页 roleManager 判社干身份比 roleKey 可靠（review 页同款）',
+  read('miniprogram/pages-partner/review/review.js').indexOf('roleManager: Number(info.role) === 1') >= 0,
+  '用 roleKey 判会把站员一起关在门外（roleKey 只有 super/manager 两档）');
+/* 「不用重新登录」靠的是 onShow 重问，不是靠登录 */
+[['排班工作台', 'schedule/planning/planning.js', 'refreshPerm'],
+  ['班表页', 'schedule/index/index.js', 'refreshPerm'],
+  ['审核页', 'review/review.js', 'refreshPermState']].forEach(([label, rel, fn]) => {
+  const src = read(`miniprogram/pages-partner/${rel}`);
+  const hasFn = new RegExp(fn + '\\(\\)').test(src);
+  const inShow = new RegExp('onShow\\(\\)[\\s\\S]{0,300}this\\.' + fn + '\\(').test(src);
+  ok(`${label}：onShow 会重问权限`, hasFn && inShow,
+    '只在 onLoad 判一次 ⇒ 超管改完必须重新登录才生效（2026-10-31 陛下反馈的正是这个）');
+});
+ok('取不到权限时放行（fail-open，后端仍会拦）',
+  /\.catch\(\(\) => \{[\s\S]{0,300}?return null;/.test(permUtil),
+  '改成 fail-closed 了 ⇒ 断网一次就把人锁在门外');
 ok('换账号会清缓存（app.js）',
   (read('miniprogram/app.js').match(/require\('\.\/utils\/perm\.js'\)\.clear\(\)/g) || []).length >= 2,
   '登录与退出都要清，否则串号');

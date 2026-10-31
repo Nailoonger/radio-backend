@@ -30,7 +30,23 @@ Page({
     }
     this.load();
   },
-  onShow() { if (this._loadedOnce && !this.data.loading) this.load(); },
+  onShow() {
+    // 切回页面时刷新一次权限（15 秒内复用缓存）：超管刚关掉就点不进去，不用等重新登录
+    this.refreshPerm();
+    if (this._loadedOnce && !this.data.loading) this.load();
+  },
+
+  /** 权限可能刚被超管改过 —— 只重问权限，不整页重拉 */
+  refreshPerm() {
+    if (this.data.roleKey !== 'manager') return Promise.resolve();
+    return perm.load().then((pm) => {
+      if (this._gone || !pm) return;
+      this.setData({
+        canPlan: pm.schedule !== false,
+        denyPlan: (pm.text && pm.text.schedule) || '暂无权限',
+      });
+    });
+  },
   onUnload() { this._gone = true; this._request = (this._request || 0) + 1; },
   onPullDownRefresh() { return this.load().finally(() => wx.stopPullDownRefresh()); },
   load() {

@@ -52,7 +52,26 @@ Page({
       },
     });
   },
-  onShow() { if (this._loadedOnce && !this.data.loading && !this.data.busy) this.load(); },
+  /**
+   * 切回页面时重问一次权限（2026-10-31）
+   *
+   * ⚠️ 为什么需要：`utils/perm.js` 原来永久缓存，超管改了开关、社干这边不重新登录
+   *    就一直是旧值 —— 陛下原话「好像不会实时更新权限，要重新登录才会更新」。
+   *    现在每次 onShow 问一次（15 秒内复用缓存，不会每切一次页就多打请求）；
+   *    真被关掉就当场弹窗退回，不让人继续点下去才发现全报 40301。
+   */
+  refreshPerm() {
+    if (this.data.isSuper) return Promise.resolve();
+    return perm.load().then((pm) => {
+      if (this._gone || !pm) return;
+      if (pm.schedule === false) return this.denySchedule(pm);
+    });
+  },
+
+  onShow() {
+    this.refreshPerm();
+    if (this._loadedOnce && !this.data.loading && !this.data.busy) this.load();
+  },
   onUnload() { this._gone = true; this._request = (this._request || 0) + 1; },
   onPullDownRefresh() { return this.load().finally(() => wx.stopPullDownRefresh()); },
   goBack() { if (getCurrentPages().length > 1) wx.navigateBack(); else wx.reLaunch({ url: '/pages-partner/schedule/index/index' }); },
