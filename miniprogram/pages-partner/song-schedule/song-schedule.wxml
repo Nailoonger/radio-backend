@@ -1,0 +1,55 @@
+<!-- pages-partner/song-schedule/song-schedule.wxml · v1（2026-10-29 歌曲排期与候补）
+     事实源：partner-hub/app.html V['song-schedule'] ——「审核通过不等于排上；排期和候补是另一件事，这一屏只读。」
+     接口：GET /admin/submit/list?type=1&reviewStatus=1（已通过的点歌，按 scheduleStatus 分组）
+     状态：0 未排 / 1 已排 / 2 候补 / 3 自动驳回
+     ⚠️ 只读：排期规则与全局名额在电脑端（超管）管，手机端不放操作按钮。 -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">歌曲排期</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <view class="hero">
+      <text class="hero-t">本周已排 <text class="n">{{seatedCount}}</text> 首 · 候补 <text class="n warn">{{waitingCount}}</text> 首</text>
+      <text class="hero-d">候补的会先占用没人来的时段；名额没满的时段还能再收。</text>
+    </view>
+
+    <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
+    <view class="hint-note" wx:elif="{{!seated.length && !waiting.length}}">这周还没有排上的歌</view>
+
+    <!-- 已排 -->
+    <block wx:if="{{seated.length}}">
+      <view class="sec-h2"><text class="sec-t">已排</text><text class="sec-s">{{seated.length}} 首</text></view>
+      <view class="rows">
+        <view class="row" wx:for="{{seated}}" wx:key="id">
+          <view class="r-main">
+            <text class="r-title">《{{item.songName}}》{{item.singer ? ' · ' + item.singer : ''}}</text>
+            <text class="r-sub">{{item.slotText}}{{item.nickname ? ' · ' + item.nickname : ''}}</text>
+          </view>
+          <text class="tag done">{{item.playText}}</text>
+        </view>
+      </view>
+    </block>
+
+    <!-- 候补 -->
+    <block wx:if="{{waiting.length}}">
+      <view class="sec-h2"><text class="sec-t">候补</text><text class="sec-s">{{waiting.length}} 首</text></view>
+      <view class="rows">
+        <view class="row" wx:for="{{waiting}}" wx:key="id">
+          <view class="r-main">
+            <text class="r-title">《{{item.songName}}》{{item.singer ? ' · ' + item.singer : ''}}</text>
+            <text class="r-sub">{{item.slotText}}{{item.nickname ? ' · ' + item.nickname : ''}}</text>
+          </view>
+          <text class="tag warn">候补</text>
+        </view>
+      </view>
+    </block>
+
+    <view class="note">这一屏社干只读：排期规则、全局名额由超管在电脑端管；点歌的名额占用走的是点歌那一套。</view>
+  </view>
+</view>

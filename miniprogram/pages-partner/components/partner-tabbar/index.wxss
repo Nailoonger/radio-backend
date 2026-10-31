@@ -1,0 +1,94 @@
+/* 伙伴端底部导航 · v1
+   参数逐条量自 v151 原型 .tabbar（app.html 1268-1285 行），1px ≈ 1.923rpx：
+   dock：absolute bottom 20px / left-right 16px / min-height 64px / padding 5px /
+         白底 1px #E6E6EA 圆角 34px 投影 0 6px 20px #00000009
+   pill：min-height 54px 圆角 28px 图标 22px 文字 12px
+   选中：.on .pill 背景 --tile(#272729) 白字（既有设计系统深色件，合规）
+   角标：锚在图标框右上，#D92D20，min-width 14px 高 14px 圆角 8px 字 9px/600 */
+
+.tb {
+  position: fixed;
+  left: 31rpx;
+  right: 31rpx;
+  bottom: 38rpx;
+  z-index: 30;
+  min-height: 123rpx;
+  padding: 10rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #FFFFFF;
+  border: 1rpx solid #E6E6EA;
+  border-radius: 65rpx;
+  box-shadow: 0 12rpx 38rpx rgba(0, 0, 0, 0.035);
+  box-sizing: border-box;
+}
+
+.ti {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ti-hover { opacity: 0.82; }
+
+.pill {
+  width: 100%;
+  min-height: 104rpx;
+  border-radius: 54rpx;
+  gap: 6rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12rpx 6rpx;
+  color: #7A7A7A;
+  font-size: 23rpx;
+  line-height: 1.35;
+  background: transparent;
+  font-weight: 400;
+  box-sizing: border-box;
+}
+
+.iw {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42rpx;
+  height: 42rpx;
+}
+.ic {
+  width: 42rpx;
+  height: 42rpx;
+  display: block;
+}
+
+/* 角标：向右超出约 8px、向上超 4px，贴图标框右上角（陛下标注的位置） */
+.bg {
+  position: absolute;
+  top: -6rpx;
+  left: calc(100% - 2rpx);
+  transform: translateX(-50%);
+  min-width: 27rpx;
+  max-width: 46rpx;
+  height: 27rpx;
+  border-radius: 15rpx;
+  background: #D92D20;
+  color: #FFFFFF;
+  font-size: 17rpx;
+  line-height: 27rpx;
+  text-align: center;
+  padding: 0 6rpx;
+  font-weight: 600;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+}
+
+.ti.on .pill {
+  background: #272729;
+  color: #FFFFFF;
+  font-weight: 500;
+}

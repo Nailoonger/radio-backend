@@ -1,0 +1,41 @@
+/* pages-partner/song-schedule/song-schedule.wxss · v1（2026-10-29 歌曲排期） */
+.page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(45deg);
+  margin-left: 6rpx;
+}
+.body { flex: 1; padding: 19rpx 35rpx 80rpx; display: flex; flex-direction: column; gap: 23rpx; }
+
+.hero { background: #FFFFFF; border-radius: 30rpx; padding: 28rpx 31rpx; display: flex; flex-direction: column; gap: 10rpx; }
+.hero-t { font-size: 27rpx; color: #1D1D1F; line-height: 1.5; }
+.hero-t .n { font-size: 34rpx; font-weight: 600; color: #0066CC; font-variant-numeric: tabular-nums; }
+.hero-t .n.warn { color: #B26A00; }
+.hero-d { font-size: 21rpx; color: #76767E; line-height: 1.6; }
+
+.sec-h2 { display: flex; align-items: baseline; justify-content: space-between; padding: 4rpx 6rpx 0; }
+.sec-t { font-size: 25rpx; font-weight: 600; color: #1D1D1F; }
+.sec-s { font-size: 21rpx; color: #B3B3B8; font-variant-numeric: tabular-nums; }
+
+.rows { background: #FFFFFF; border-radius: 35rpx; padding: 0 31rpx; }
+.row { display: flex; align-items: center; gap: 19rpx; padding: 26rpx 0; }
+.row + .row { border-top: 2rpx solid #E3E3E8; }
+.r-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6rpx; }
+.r-title {
+  font-size: 26rpx; font-weight: 500; color: #1D1D1F;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.r-sub { font-size: 21rpx; color: #76767E; }
+
+.tag {
+  flex: none; font-size: 19rpx; line-height: 1.5;
+  padding: 8rpx 13rpx; border-radius: 13rpx; white-space: nowrap;
+}
+.tag.done { background: #EAF7EF; color: #1E8E4E; }
+.tag.warn { background: #FDF3DC; color: #B26A00; }
+
+.note { font-size: 21rpx; color: #76767E; line-height: 1.7; text-align: center; padding: 0 20rpx; }
+.hint-note { text-align: center; font-size: 23rpx; color: #76767E; padding: 30rpx 0; }
+.pressed { opacity: .72; }

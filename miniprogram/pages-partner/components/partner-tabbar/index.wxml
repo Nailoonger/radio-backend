@@ -1,0 +1,17 @@
+<!-- 伙伴端底部导航 · 浮动白胶囊 dock（样式逐条量自 v151 .tabbar） -->
+<view class="tb">
+  <view wx:for="{{tabs}}"
+        wx:key="id"
+        class="ti {{item.on ? 'on' : ''}}"
+        hover-class="ti-hover"
+        data-id="{{item.id}}"
+        bindtap="onTap">
+    <view class="pill">
+      <view class="iw">
+        <image class="ic" src="/assets/partner/tab-{{item.icon}}{{item.on ? '-on' : ''}}.png" mode="aspectFit"/>
+        <text wx:if="{{item.badge}}" class="bg">{{item.badge}}</text>
+      </view>
+      <text class="lb">{{item.name}}</text>
+    </view>
+  </view>
+</view>

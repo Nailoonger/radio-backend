@@ -1,0 +1,44 @@
+<!-- pages-partner/rules/rules.wxml · v1（2026-10-28 排班规则）
+     v151：这一页「发布值班时段 + 设两条硬约束」。时段发布已有独立页（schedule/slots），
+     这里只做两条硬约束：每天最多几场、每周最多几场。
+     ⚠️ 「硬约束优先」：到上限的人不再进候选池，宁可留缺岗也不硬凑 —— 界面上写明。
+     接口：GET /partner/rules · PUT /partner/rules（超管） -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">排班规则</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
+
+    <block wx:else>
+      <view class="rows">
+        <view class="row" wx:for="{{items}}" wx:key="key">
+          <view class="r-main">
+            <text class="r-name">{{item.name}}</text>
+            <text class="r-sub">{{item.on ? '生效中' : '已关闭（不限制）'}}</text>
+          </view>
+          <view class="stepper">
+            <view class="st-b" hover-class="pressed" data-key="{{item.key}}" data-d="-1" bindtap="step">−</view>
+            <text class="st-v">{{item.value}}</text>
+            <view class="st-b" hover-class="pressed" data-key="{{item.key}}" data-d="1" bindtap="step">+</view>
+          </view>
+          <switch class="sw" checked="{{item.on}}" color="#0066CC"
+                  data-key="{{item.key}}" bindchange="onToggle" />
+        </view>
+      </view>
+
+      <view class="note">硬约束优先：到了上限的人不会再被排进来，凑不齐就留缺岗，不硬凑。</view>
+
+      <view class="acts">
+        <button class="btn primary" hover-class="pressed" bindtap="onSave" disabled="{{saving || !dirty}}">保存</button>
+      </view>
+      <view class="note" wx:if="{{!canEdit}}">只有超管能改这两条。</view>
+    </block>
+  </view>
+</view>
