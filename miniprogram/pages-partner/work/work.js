@@ -61,7 +61,11 @@ Page({
     this.setData({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
       ready: true,
-      roleKey: Number(info.role) === 0 ? 'super' : 'manager',
+      // ⚠️⚠️ admin.role 三档：0 超管 / 1 社干 / 2 站员，**三档都要写**。
+      //    这里原来只有 `=== 0 ? 'super' : 'manager'`，站员（2）被当成社干 ⇒
+      //    底栏按 manager 渲染出「审核」那格，点进去才被拦「暂无审核权限」（2026-10-31 陛下报的）。
+      //    口径与 me.js / schedule/index.js / desk.js#roleKeyOf 一致，别在这里另发明一套。
+      roleKey: Number(info.role) === 0 ? 'super' : (Number(info.role) === 2 ? 'member' : 'manager'),
     });
     this.fetchList(true);
     this.refreshBadges();

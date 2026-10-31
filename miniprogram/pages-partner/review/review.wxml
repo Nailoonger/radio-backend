@@ -23,7 +23,7 @@
          只给一句实话，不给空列表 —— 空列表会让人以为「今天没人投稿」。 -->
     <view class="deny" wx:if="{{denied}}">
       <text class="deny-t">{{denyReview}}</text>
-      <text class="deny-d">超管没有给你开审核模块的权限。要用，找超管在「权限管理」里开一下。</text>
+      <text class="deny-d">{{denySub}}</text>
     </view>
 
     <block wx:else>

@@ -53,10 +53,12 @@ Page({
     /* 2026-10-31：社干被超管关掉「审核权限」时整页置灰态（只说这一句，不给假列表） */
     denied: false,
     denyReview: '暂无审核权限',
+    /** 拒绝态的第二行说明 —— 社干（权限被关）与站员（本来就没这角色）说的不是同一句话 */
+    denySub: '超管没有给你开审核模块的权限。要用，找超管在「权限管理」里开一下。',
     /**
      * 是不是 role=1 的社干 —— **只有他吃「审核权限」这道开关**。
-     * ⚠️ 不能用 roleKey 判：这一页的 roleKey 只有 super / manager 两档，
-     *    站员也会被归到 manager（见 onLoad），拿它判会把站员一起关在门外。
+     * ⚠️ 不能用 roleKey 判：roleKey 是给底栏用的呈现值（super / manager / member），
+     *    权限开关只认角色码 role===1，两件事别混。
      */
     roleManager: false,
   },
@@ -77,7 +79,9 @@ Page({
     this.setData({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
       ready: true,
-      roleKey: Number(info.role) === 0 ? 'super' : 'manager',
+      // ⚠️ 三档都要写：0 超管 / 1 社干 / 2 站员。原来只判 0，站员会被当成社干渲染出底栏
+      //    「审核」格（自己高亮自己），点进去才被拦 —— 口径见 work.js 同一处注释。
+      roleKey: Number(info.role) === 0 ? 'super' : (Number(info.role) === 2 ? 'member' : 'manager'),
       roleManager: Number(info.role) === 1,
       kindIdx,
       stateLabels: KINDS[kindIdx].key === 'message' ? STATE_MESSAGE : STATE_SUBMIT,
@@ -86,8 +90,21 @@ Page({
     /**
      * 2026-10-31：社干被关掉「审核权限」⇒ 整页就一句「暂无审核权限」，**一个请求都不发**。
      * 只靠列表接口返回空是骗人的（看着像「今天没人投稿」），所以做成显式的拒绝态。
-     * 超管恒放行；站员本来就不看这一页。
+     * 超管恒放行。
+     *
+     * ⚠️ 站员（role=2）同样不发请求：审核是社干的活，站员底栏里根本没有这一格
+     *    （原来 roleKey 只判 0，站员会被当成社干渲染出「审核」tab，点进来才被拦 —— 已修）。
+     *    这里兜的是「绕过底栏直接进这页」的情况：给一句实话，别让他看页面转圈或报 40301。
      */
+    if (Number(info.role) === 2) {
+      this.setData({
+        loading: false,
+        denied: true,
+        denyReview: '暂无审核权限',
+        denySub: '审核是社干的活，你的底栏里没有这一格。写稿、改稿去「稿件」页。',
+      });
+      return;
+    }
     if (Number(info.role) === 1) {
       return perm.load().then((pm) => {
         if (this._gone) return;

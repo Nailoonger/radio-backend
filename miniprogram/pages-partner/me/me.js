@@ -44,14 +44,39 @@ const ROWS = {
   ]
 };
 
-/** 建号到今天的天数（v151 joinedDays 口径：含当天，floor(diff)+1，最少 1） */
+/**
+ * 建号到今天的天数（v151 joinedDays 口径：含当天，floor(diff)+1，最少 1）
+ *
+ * ⚠️⚠️ 2026-10-31 修「天数一直显示 1」：
+ *   ① 字段名读错 —— `/partner/me` 回的是 `createTime`（admin 表就是驼峰），
+ *      这里原来只认 `created_at` / `createdAt`，三个都没中 ⇒ 传进 undefined ⇒ 恒 1。
+ *      字段名只有一个事实源：后端返回体。别在前端猜第二种写法。
+ *   ② 云开发返回的时间是 **ISO 串**（`2026-10-01T04:00:00.000Z`）。
+ *      原来先把 `-` 全换成 `/` 再 new Date ⇒ `2026/10/01T04:00:00.000Z` 在 iOS 上直接
+ *      Invalid Date ⇒ 也是恒 1。次序必须反过来：先原样试，失败了才退到手写格式的兜底。
+ *   ③ 天数按**本地日历日**相减（不是 24h 除法）：
+ *      23:30 建号、次日 00:10 打开，刚好跨一天，人应该看到 2 天。
+ */
 function daysSince(v) {
   if (!v) return 1;
   var d;
-  if (typeof v === 'number') d = new Date(v);
-  else d = new Date(String(v).replace(' ', 'T').replace(/-/g, '/'));
-  if (isNaN(d.getTime())) return 1;
-  return Math.max(1, Math.floor((Date.now() - d.getTime()) / 86400000) + 1);
+  if (typeof v === 'number') {
+    d = new Date(v);
+  } else {
+    var s = String(v).trim();
+    // 先按原样（ISO 8601 带 T）解析 —— 这是云开发/云函数的真实返回格式
+    d = new Date(s);
+    if (isNaN(d.getTime())) {
+      // 兜底：`2026-10-01 12:00:00` 这种 MySQL 直连格式，iOS 只认 `2026/10/01 12:00:00`
+      d = new Date(s.replace(/-/g, '/').replace('T', ' ').replace(/\.\d+Z?$/, ''));
+    }
+  }
+  if (!d || isNaN(d.getTime())) return 1;
+  var today = new Date();
+  // 本地日历日归零后再相减，避开时区与「不足 24 小时」的取整坑
+  var a = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  var b = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.max(1, Math.round((b - a) / 86400000) + 1);
 }
 
 Page({
@@ -172,7 +197,8 @@ Page({
         grade: '',
         account: info.username || ''
       },
-      days: daysSince(info.created_at || info.createdAt),
+      // ⚠️ createTime 才是后端字段名（见 daysSince 头注①）；另两种是历史缓存里的写法，只为兼容
+      days: daysSince(info.createTime || info.created_at || info.createdAt),
       rows: roleKey === 'member' ? ROWS.member : ROWS.admin
     });
   },
