@@ -567,6 +567,25 @@
 }
 .wk-tag.on { background: var(--red-fg, #B42318); color: #FFF; }
 .wk-tag.off { background: #F1F1F4; color: var(--muted, #76767E); }
+
+/* ══════════ 填写窗口只读条（2026-10-31）══════════
+   周日整页只读时出现在周切换下面。浅色卡 + 红色小字，不用深色底。
+   ⚠️ 只有只读那天才出现 —— 周一~周六不显示，免得天天看着一句废话。 */
+.ro-bar {
+  margin: 0 18rpx 12rpx;
+  background: #FFF;
+  border-radius: 24rpx;
+  padding: 20rpx 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+.ro-t { font-size: 25rpx; font-weight: 600; color: var(--red-fg, #B42318); }
+.ro-s { font-size: 21rpx; color: var(--muted, #76767E); line-height: 1.7; }
+
+/* 只读时按钮与勾选框压暗（按钮本身还有 disabled，这里只管观感） */
+button.btn[disabled] { opacity: .45; }
+.confirm.off { opacity: .5; }
 .wk-c {
   font-size: 30rpx; font-weight: 600;
   color: var(--ink, #1D1D1F);

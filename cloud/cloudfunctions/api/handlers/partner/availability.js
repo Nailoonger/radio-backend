@@ -34,6 +34,7 @@ const { ApiError, Codes } = require('../../lib/response');
 const {
   asPartner, assertWeekStart, currentWeekStart, nextWeekStart, weekDates,
   templatesToSlots, listPeople, permsOf, PERM_TEXT,
+  availabilityWindow, assertWindowWritable,
 } = require('./_kit');
 const { findPublished } = require('./slots');
 
@@ -131,6 +132,20 @@ async function get(ctx) {
   const weekStart = q.week ? assertWeekStart(q.week) : nextWeek;
   const dates = weekDates(weekStart);
 
+  /**
+   * 代录资格（2026-10-31 二次定稿）：超管恒可；社干看「代录权限」开关；站员只能填自己的。
+   * ⚠️ 这里连**看**都要拦：能拿别人的 personId 读出他填了什么，等于把「谁能来」全站公开了。
+   */
+  const canProxy = p.isSuper || (p.isManager && (await permsOf(p.admin)).proxy);
+
+  /**
+   * 填写窗口（周一 0 点 ~ 周六 24 点；周日整页只读，只有超管能动）。
+   * ⚠️ 同时把 `readonly` 给前端：整页只读要在**打开时就渲染出来**，
+   *    不能等用户点完保存才弹一句「周日只读」。
+   */
+  const win = availabilityWindow();
+  const readonly = !win.open && !p.isSuper;
+
   const { version, slots } = await currentSlots();
 
   // 目标成员：不传就是自己；传别人 = 代录查看
@@ -139,6 +154,9 @@ async function get(ctx) {
     targetId = Number(q.personId);
     if (!Number.isInteger(targetId) || targetId <= 0) {
       throw new ApiError(Codes.PARAM_ERROR, 'personId 不合法');
+    }
+    if (!canProxy) {
+      throw new ApiError(Codes.FORBIDDEN, p.isMember ? '只能填自己的可排时间' : PERM_TEXT.proxy.deny);
     }
   }
 
@@ -197,7 +215,19 @@ async function get(ctx) {
       pending: rows.length - confirmed,
       rows,
     },
-    abilities: { canProxy: true },
+    /**
+     * 填写窗口（2026-10-31）
+     * ⚠️ 不要把 `open` 和 `readonly` 合成一个字段：周日对超管是「开着的」，
+     *    对其他人是「只读的」—— 两个布尔各说一件事，合成一个必然有人被误导。
+     */
+    window: {
+      open: win.open,
+      readonly,
+      weekday: win.weekday,
+      text: win.text,
+    },
+    // ⚠️ denyProxy 也从后端给：拒绝文案只该有一处源头（_kit 的 PERM_TEXT）
+    abilities: { canProxy, readonly, denyProxy: PERM_TEXT.proxy.deny },
   };
 }
 
@@ -218,6 +248,14 @@ async function save(ctx) {
   // 前端总会带 week；不带时按「下一周」兜底（见文件头），与 GET 同口径
   const weekStart = assertWeekStart(body.week || nextWeekStart());
 
+  /**
+   * 填写窗口闸（2026-10-31）：周日整页只读，非超管一律拒绝写。
+   * ⚠️ 放在代录判断**之前**：周日不管是谁、替谁填，都先吃这一刀。
+   *    顺序反了的话，超管之外的人会先收到「暂无代录权限」这种更具体的错，
+   *    让人以为是权限问题，实际是日子不对。
+   */
+  assertWindowWritable(p);
+
   const rawTarget = body.personId === undefined || body.personId === null || body.personId === ''
     ? p.id
     : Number(body.personId);
@@ -230,11 +268,13 @@ async function save(ctx) {
   if (isProxy) {
     // ⚠️ 代录是社干的特权：站员只能填自己的（2026-10-29 加站员角色后必须在这里拦）
     if (p.isMember) throw new ApiError(Codes.FORBIDDEN, '只能填自己的可排时间');
-    // ⚠️ 2026-10-31：代录属于排班工作台的一部分 —— 社干的「排班权限」被关掉时，代录一起关。
-    //    不留这个缝的话，「关掉排班权限」只是不让他进工作台，他还能从代录页替全站人填，
-    //    等于门锁了但窗没关。
-    if (!p.isSuper && !(await permsOf(p.admin)).schedule) {
-      throw new ApiError(Codes.FORBIDDEN, PERM_TEXT.schedule.deny);
+    /**
+     * ⚠️⚠️ 2026-10-31 二次定稿：代录吃**代录权限**（`proxy`），不再吃排班权限（`schedule`）。
+     *    第一版把两件事绑在一起，陛下纠回来了：「不开（代录权限）的话社干只能填写自己的」。
+     *    这两件事本来就该分开 —— 排班是「排谁上班」，代录是「替别人说他能不能来」。
+     */
+    if (!p.isSuper && !(await permsOf(p.admin)).proxy) {
+      throw new ApiError(Codes.FORBIDDEN, PERM_TEXT.proxy.deny);
     }
     if (reason.length < 2) throw new ApiError(Codes.PARAM_ERROR, '代录必须填写原因（至少 2 个字）');
     if (reason.length > 200) throw new ApiError(Codes.PARAM_ERROR, '原因过长（上限 200 字）');
@@ -322,6 +362,8 @@ async function save(ctx) {
  */
 async function reset(ctx) {
   const p = await asPartner(ctx);
+  // 撤销也是「改」，同样吃填写窗口（周日只有超管能撤）
+  assertWindowWritable(p);
   /**
    * ⚠️⚠️ DELETE 的参数**不在 ctx.query 里**。
    *

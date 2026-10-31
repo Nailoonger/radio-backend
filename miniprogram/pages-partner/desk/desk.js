@@ -440,7 +440,11 @@ Page({
       isSuper
         ? pick(adminRequest('/partner/permissions', 'GET', {}), (d) => {
           const list = (d && Array.isArray(d.people)) ? d.people : [];
-          return list.filter((x) => !(x.eff && x.eff.schedule) || !(x.eff && x.eff.review)).length;
+          // 三格里任意一关就算「被限」：排班 / 审核 / 代录
+          return list.filter((x) => {
+            const e = x.eff || {};
+            return !e.schedule || !e.review || !e.proxy;
+          }).length;
         })
         : Promise.resolve(null),
     ]).then(([accounts, rules, att, drafts, leaves, limited]) => {
@@ -531,8 +535,8 @@ Page({
         //   排班工作台对齐后按原型撤掉。
         mods: [
           { go: 'accounts', t: '账号', d: '分发 · 重置 · 停用', n: n(mods.accounts), u: '个账号' },
-          // 2026-10-31 新增：社干能不能进排班工作台 / 审核，由超管在这里分发
-          { go: 'permissions', t: '权限管理', d: '社干 · 排班与审核', n: n(mods.limited), u: '人被限' },
+          // 2026-10-31 新增：社干能不能进排班工作台 / 审核 / 替别人代录，由超管在这里分发
+          { go: 'permissions', t: '权限管理', d: '排班 · 审核 · 代录', n: n(mods.limited), u: '人被限' },
           { go: 'rules', t: '排班规则', d: '场次上限与轮值', n: n(mods.rules), u: '条规则' },
           { go: 'att-overview', t: '考勤总览', d: '全站出勤统计', n: n(mods.recorded), u: '场已录' },
         ],

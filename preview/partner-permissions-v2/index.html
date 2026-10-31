@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>权限管理 v2</title>
+<style>
+  :root {
+    --accent: #0066CC; --accent-tint: #EAF3FD; --ink: #1D1D1F;
+    --muted: #76767E; --parchment: #F5F5F7; --hairline: #E3E3E8;
+    --red: #B42318;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; padding: 38px 24px 60px; background: var(--parchment); color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  .wrap { max-width: 1360px; margin: 0 auto; }
+  h1 { margin: 0 0 8px; font-size: 20px; letter-spacing: -.3px; }
+  h1 .ver {
+    display: inline-block; margin-left: 8px; vertical-align: 3px;
+    font-size: 11px; font-weight: 600; color: var(--accent); background: var(--accent-tint);
+    border-radius: 9999px; padding: 2px 9px; letter-spacing: 0;
+  }
+  .lead { margin: 0 0 18px; font-size: 13px; line-height: 1.95; color: #6B6B73; }
+  .lead b { color: var(--ink); }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+    background: #fff; border: 1px solid var(--hairline); border-radius: 5px; padding: 1px 5px; }
+
+  .stage { display: flex; gap: 20px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+  .p-col { flex: none; display: flex; flex-direction: column; }
+  .p-cap { text-align: center; font-size: 12px; color: var(--muted); margin: 0 0 9px; }
+  .p-cap b { color: var(--ink); }
+
+  .phone {
+    width: 300px; background: #fff; border-radius: 28px;
+    box-shadow: 0 14px 40px rgba(29,29,31,.10), 0 1px 3px rgba(29,29,31,.06);
+    overflow: hidden; position: relative;
+  }
+  .sb { height: 24px; }
+  .nav { height: 42px; display: flex; align-items: center; justify-content: center; position: relative; }
+  .nav-t { font-size: 15.5px; font-weight: 600; }
+  .nav-b { position: absolute; left: 15px; }
+  .chev { width: 9px; height: 9px; border-left: 2px solid #333; border-bottom: 2px solid #333; transform: rotate(45deg); }
+  .body { padding: 8px 15px 22px; background: #F5F5F7; min-height: 300px; }
+
+  .intro { background: #fff; border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+  .intro-t { font-size: 12.5px; font-weight: 500; line-height: 1.5; }
+  .intro-d { font-size: 11px; color: var(--muted); line-height: 1.6; }
+
+  .sh { display: flex; align-items: baseline; justify-content: space-between; padding: 10px 4px 5px; }
+  .sh .t { font-size: 12.5px; font-weight: 600; }
+  .sh .n { font-size: 10.5px; color: var(--muted); }
+
+  .rows { background: #fff; border-radius: 16px; padding: 0 14px; }
+  .row { display: flex; align-items: center; gap: 8px; padding: 12px 0; }
+  .row + .row, .prow + .prow, .rline + .rline { border-top: 1px solid var(--hairline); }
+  .r-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .r-name { font-size: 13.5px; font-weight: 500; }
+  .r-sub { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+
+  .sw { width: 40px; height: 24px; border-radius: 9999px; background: #E4E4E9; position: relative;
+    flex: none; cursor: pointer; transition: background .16s; }
+  .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.18); transition: transform .16s; }
+  .sw.on { background: var(--accent); }
+  .sw.on::after { transform: translateX(16px); }
+
+  .prow { padding: 12px 0; display: flex; flex-direction: column; gap: 8px; }
+  .p-head { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
+  .p-name { font-size: 13.5px; font-weight: 500; }
+  .p-sub { font-size: 10.5px; color: var(--muted); }
+  .p-tag { font-size: 9.5px; color: var(--accent); background: var(--accent-tint);
+    border-radius: 9999px; padding: 2px 7px; }
+
+  .p-pills { display: flex; gap: 6px; }
+  .pill { flex: 1; min-width: 0; border-radius: 9999px; background: #F5F5F7; padding: 7px 0;
+    display: flex; flex-direction: column; align-items: center; gap: 1px; cursor: pointer; user-select: none; }
+  .pill:active { opacity: .7; }
+  .pill-n { font-size: 12px; font-weight: 500; color: #333; white-space: nowrap; }
+  .pill-v { font-size: 10px; color: var(--muted); white-space: nowrap; }
+  .pill.on { background: var(--accent-tint); }
+  .pill.on .pill-n { color: var(--accent); font-weight: 600; }
+  .pill.on .pill-v { color: var(--accent); }
+
+  .p-follow { display: flex; gap: 10px; flex-wrap: wrap; }
+  .fl { font-size: 10px; color: var(--accent); cursor: pointer; }
+  .fl:active { opacity: .7; }
+
+  .note { font-size: 10px; color: var(--muted); line-height: 1.65; text-align: center; padding: 7px 8px 0; }
+
+  /* 班表入口 */
+  .card { background: #fff; border-radius: 16px; padding: 12px 14px; }
+  .wk { display: flex; align-items: center; gap: 7px; }
+  .wk-c { font-size: 14.5px; font-weight: 600; }
+  .wk-tag { font-size: 9.5px; background: var(--red); color: #fff; border-radius: 9999px; padding: 1px 6px; }
+  .entry { display: flex; align-items: center; gap: 8px; padding: 12px 0; cursor: pointer; }
+  .entry + .entry { border-top: 1px solid var(--hairline); }
+  .e-main { flex: 1; min-width: 0; }
+  .e-t { font-size: 13.5px; font-weight: 500; }
+  .e-d { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+  .e-a { color: #B3B3B8; font-size: 14px; }
+  .entry:active { opacity: .72; }
+
+  /* 只读条 */
+  .ro-bar { background: #fff; border-radius: 14px; padding: 10px 13px; display: flex;
+    flex-direction: column; gap: 3px; margin-bottom: 8px; }
+  .ro-t { font-size: 12px; font-weight: 600; color: var(--red); }
+  .ro-s { font-size: 10px; color: var(--muted); line-height: 1.6; }
+
+  /* 人员卡片 */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pc { background: #fff; border-radius: 14px; padding: 10px 11px; cursor: pointer; }
+  .pc:active { opacity: .75; }
+  .pc-top { display: flex; align-items: center; gap: 6px; }
+  .pc-av { width: 22px; height: 22px; border-radius: 50%; background: var(--accent-tint); color: var(--accent);
+    font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex: none; }
+  .pc-name { font-size: 12.5px; font-weight: 500; }
+  .pc-bd { margin-left: auto; font-size: 9.5px; color: var(--accent); }
+  .pc-bd.warn { color: var(--red); }
+  .pc-p { font-size: 10px; color: var(--muted); line-height: 1.6; margin-top: 6px; }
+  .pc-stat { font-size: 10px; color: #55555D; margin-top: 6px; display: block; }
+  .ro .pc { opacity: .62; }
+
+  /* 弹层 */
+  .overlay { position: absolute; inset: 0; background: rgba(0,0,0,.22); display: none;
+    align-items: flex-end; }
+  .overlay.on { display: flex; }
+  .sheet { width: 100%; background: #fff; border-radius: 18px 18px 0 0; padding: 14px 15px 16px; }
+  .sheet-hd { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+  .sheet-t { font-size: 14px; font-weight: 600; }
+  .sheet-sub { font-size: 10.5px; color: var(--muted); margin-top: 3px; display: block; }
+  .sheet-x { font-size: 12px; color: var(--accent); cursor: pointer; }
+  .slot { display: flex; align-items: center; justify-content: space-between;
+    background: #fff; border: 1px solid #E1E3EA; border-radius: 10px; padding: 9px 11px; margin-bottom: 6px; }
+  .slot.on { background: var(--accent-tint); border-color: var(--accent); }
+  .slot-t { font-size: 12px; }
+  .slot-s { font-size: 10px; color: var(--muted); }
+  .sheet-foot { display: flex; gap: 8px; margin-top: 10px; }
+  .btn { flex: 1; height: 38px; border-radius: 9999px; font-size: 13px; border: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-family: inherit; }
+  .btn.ghost { background: #fff; border: 1px solid var(--hairline); color: #333; }
+  .btn.primary { background: var(--accent); color: #fff; font-weight: 500; }
+  .btn[disabled] { opacity: .45; cursor: not-allowed; }
+
+  /* 弹窗（modal） */
+  .mask { position: absolute; inset: 0; background: rgba(0,0,0,.22); display: none;
+    align-items: center; justify-content: center; padding: 0 30px; }
+  .mask.on { display: flex; }
+  .dlg { width: 100%; background: #fff; border-radius: 14px; overflow: hidden; text-align: center; }
+  .dlg-t { font-size: 14.5px; font-weight: 600; padding: 18px 16px 5px; }
+  .dlg-d { font-size: 11.5px; color: #4A4A52; line-height: 1.6; padding: 0 18px 16px; }
+  .dlg-b { border-top: 1px solid var(--hairline); font-size: 14px; color: var(--accent); padding: 11px; cursor: pointer; }
+
+  .toast { position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%);
+    background: rgba(29,29,31,.86); color: #fff; font-size: 11.5px; padding: 8px 15px;
+    border-radius: 9999px; opacity: 0; transition: opacity .18s; pointer-events: none; white-space: nowrap; }
+  .toast.on { opacity: 1; }
+
+  /* 审核页 */
+  .stabs { display: flex; gap: 16px; }
+  .stab { font-size: 12.5px; color: var(--muted); padding: 4px 0 7px; display: flex; gap: 4px; align-items: baseline; }
+  .stab.on { color: var(--ink); font-weight: 600; border-bottom: 2px solid var(--accent); }
+  .stab .n { font-size: 9.5px; color: #A0A0A8; }
+  .ftags { display: flex; gap: 6px; margin-top: 9px; }
+  .ftag { font-size: 11.5px; padding: 4px 10px; border-radius: 6px; background: #F0F0F4; color: #55555D; }
+  .ftag.on { background: var(--ink); color: #fff; }
+  .rline { display: flex; flex-direction: column; gap: 3px; padding: 11px 0; }
+  .rline .tt { font-size: 12.5px; font-weight: 500; }
+  .rline .mm { font-size: 10.5px; color: var(--muted); }
+  .deny { background: #fff; border-radius: 14px; padding: 32px 18px; display: flex;
+    flex-direction: column; align-items: center; gap: 7px; margin-top: 12px; }
+  .deny-t { font-size: 15px; font-weight: 600; }
+  .deny-d { font-size: 11px; color: var(--muted); line-height: 1.65; text-align: center; }
+
+  /* 面板 */
+  .toolbar { display: flex; gap: 8px; justify-content: center; margin: 22px 0 6px; flex-wrap: wrap; }
+  .toolbar button {
+    font: inherit; font-size: 12px; padding: 6px 14px; border-radius: 9999px;
+    border: 1px solid var(--hairline); background: #fff; color: #55555D; cursor: pointer;
+  }
+  .toolbar button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+  .panel { margin-top: 14px; background: #fff; border-radius: 16px; padding: 14px 18px; }
+  .panel h2 { margin: 0 0 8px; font-size: 12.5px; }
+  .panel table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  .panel th, .panel td { text-align: left; padding: 6px 9px; border-bottom: 1px solid #F2F2F5; }
+  .panel th { color: var(--muted); font-weight: 600; background: #FAFAFC; }
+  .yes { color: var(--accent); font-weight: 600; }
+  .no { color: var(--red); font-weight: 600; }
+  .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10.5px; color: #6B6B73; }
+
+  .why { background: #fff; border-radius: 16px; padding: 14px 20px; margin-top: 14px; }
+  .why h2 { margin: 0 0 7px; font-size: 12.5px; }
+  .why ul { margin: 0; padding-left: 17px; font-size: 12px; line-height: 1.9; color: #6B6B73; }
+  .why b { color: var(--ink); }
+  .why li + li { margin-top: 3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>权限管理 + 填写窗口<span class="ver">v2</span></h1>
+  <p class="lead">
+    v2 按陛下这次的口径重做，两处关键改动：<br>
+    ① <b>「代录」拆成独立的第三个开关</b> —— v1 我错把它绑在排班权限上。现在是三件事各一个开关：<b>排班 / 审核 / 代录</b>。<br>
+    ② <b>填写窗口</b> —— 谁都能填自己的（代录不开就只能填自己的），窗口是<b>周一 0 点到周六 24 点</b>；
+        <b>周日整页只读</b>，要改只能超管代录。<br>
+    下面四屏都能点：左屏拨开关，其余三屏立刻跟着变；最上面那排按钮切「今天周几」和「我是谁」。
+  </p>
+
+  <div class="toolbar" id="tbDay"></div>
+  <div class="toolbar" id="tbWho"></div>
+
+  <div class="stage">
+
+    <!-- ① 超管：权限管理 -->
+    <div class="p-col">
+      <p class="p-cap"><b>① 超管 · 权限管理</b>（开关可点）</p>
+      <div class="phone">
+        <div class="sb"></div>
+        <div class="nav"><div class="nav-b"><i class="chev"></i></div><div class="nav-t">权限管理</div></div>
+        <div class="body">
+          <div class="intro">
+            <div class="intro-t">三个开关：进不进得了排班工作台、审核模块，以及能不能替别人代录。</div>
+            <div class="intro-d">关掉之后，班表、考勤、请假照常能看；自己的可排时间也照常能填。</div>
+          </div>
+
+          <div class="sh"><span class="t">总开关</span><span class="n">对全体社干</span></div>
+          <div class="rows" id="globalRows"></div>
+          <div class="note" id="globalNote"></div>
+
+          <div class="sh"><span class="t">分发给社干</span><span class="n">2 人</span></div>
+          <div class="rows" id="people"></div>
+          <div class="note">
+            总开关是默认值；单独拨过的社干以他自己那一格为准。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② 班表入口 -->
+    <div class="p-col">
+      <p class="p-cap"><b>② 班表页 · 点「排班工作台」</b></p>
+      <div class="phone">
+        <div class="sb"></div>
+        <div class="nav"><div class="nav-t">班表</div></div>
+        <div class="body">
+          <div class="card">
+            <div class="wk"><span class="wk-c">11/02 – 11/06</span><span class="wk-tag">本周</span></div>
+            <div style="font-size:11px;color:#76767E;margin-top:5px">第 11 周 · 已发布</div>
+          </div>
+          <div class="sh" style="padding-top:12px"><span class="t">排班协作</span><span class="n">2 项</span></div>
+          <div class="rows">
+            <div class="entry" id="entryPlan">
+              <div class="e-main"><div class="e-t">排班工作台</div><div class="e-d">生成 · 换人 · 发布</div></div>
+              <span class="e-a">›</span>
+            </div>
+            <div class="entry" onclick="toast(1,'这个不动')">
+              <div class="e-main"><div class="e-t">值班时段</div><div class="e-d">本周的场次与人数</div></div>
+              <span class="e-a">›</span>
+            </div>
+          </div>
+          <div class="note">关了排班权限，入口还在、点了弹「暂无权限」；<br>班表本身照常看得到。</div>
+        </div>
+        <div class="mask" id="mask1">
+          <div class="dlg">
+            <div class="dlg-t">暂无权限</div>
+            <div class="dlg-d">超管没有给你开排班工作台的权限。要用，找超管在「权限管理」里开一下。</div>
+            <div class="dlg-b" onclick="close1()">知道了</div>
+          </div>
+        </div>
+        <div class="toast" id="toast1"></div>
+      </div>
+    </div>
+
+    <!-- ③ 可排时间 -->
+    <div class="p-col">
+      <p class="p-cap"><b>③ 可排时间</b>（点人员卡片 / 点方块）</p>
+      <div class="phone">
+        <div class="sb"></div>
+        <div class="nav"><div class="nav-t">值班时间代录</div></div>
+        <div class="body" id="availBody">
+          <div class="wk" style="padding:2px 2px 8px">
+            <span class="wk-c">11/02 – 11/06</span>
+            <span class="wk-tag">下一周</span>
+          </div>
+          <div id="roBar"></div>
+          <div class="sh"><span class="t">我这一周的场次</span><span class="n" id="avHint"></span></div>
+          <div class="rows" id="mySlots"></div>
+          <div class="sheet-foot" style="margin-top:12px">
+            <button class="btn ghost" id="btnReset">清空</button>
+            <button class="btn primary" id="btnSubmit">提交</button>
+          </div>
+          <div id="pcHost"></div>
+        </div>
+        <div class="overlay" id="ov">
+          <div class="sheet">
+            <div class="sheet-hd">
+              <div><div class="sheet-t" id="ovTitle">代录</div>
+                <span class="sheet-sub">蓝色＝能来，灰色＝不能来；点一下切换。</span></div>
+              <span class="sheet-x" onclick="closeOv()">关闭</span>
+            </div>
+            <div id="ovSlots"></div>
+            <div class="sheet-foot">
+              <button class="btn ghost" onclick="closeOv()">取消</button>
+              <button class="btn primary" id="ovSave">保存</button>
+            </div>
+          </div>
+        </div>
+        <div class="toast" id="toast3"></div>
+      </div>
+    </div>
+
+    <!-- ④ 审核 -->
+    <div class="p-col">
+      <p class="p-cap"><b>④ 审核</b></p>
+      <div class="phone">
+        <div class="sb"></div>
+        <div class="nav"><div class="nav-t">审核</div></div>
+        <div class="body" id="reviewBody"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="panel">
+    <h2>现在的生效值（右边三屏看到的就是这份）</h2>
+    <table>
+      <thead><tr><th>人</th><th>按人设置</th><th>排班</th><th>审核</th><th>代录</th></tr></thead>
+      <tbody id="tbl"></tbody>
+    </table>
+  </div>
+
+  <div class="why">
+    <h2>v2 的几处口径，请陛下核一遍</h2>
+    <ul>
+      <li><b>三个开关各管一件事：</b>排班＝进不进工作台（生成/换人/发布）；审核＝进不进审核台；代录＝能不能替别人填可排时间。
+        关掉排班不影响代录，关掉代录不影响排班。</li>
+      <li><b>填自己的永远能填</b>，只要在窗口内 —— 代录权限不开，社干就只填自己的，不是不能填。</li>
+      <li><b>窗口按「今天星期几」判</b>：周一 0 点到周六 24 点可改；<b>周日整页只读</b>，所有人（含社干）都不能改，只能超管代录。
+        站员同样只读，不例外。</li>
+      <li><b>超管两个豁免：</b>不受三个开关约束（自己关的闸锁不住自己），也不受周日只读约束（周日就靠他兜底）。</li>
+      <li><b>只读是「打开就只读」</b>：页面一进来就能看到提示条、方块点了不响应、按钮压暗禁用，
+        不是等点完保存才告诉你不行。</li>
+      <li><b>后端也拦：</b>代录、保存、撤销、生成、发布、撤回、换人、审稿全都二次校验；绕过小程序直接调接口一样 40301。</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+/* ───────── 演示状态 ───────── */
+var state = {
+  global: { schedule: true, review: true, proxy: true },
+  people: [
+    { id: 2, name: '陈叙', dept: '播音部', over: { schedule: null, review: null, proxy: null } },
+    { id: 3, name: '林望', dept: '主持部', over: { schedule: null, review: null, proxy: null } }
+  ],
+  /* 当前演示身份：'super' 或 people 下标 */
+  actor: 0,
+  /* 今天是不是周日 */
+  sunday: false
+};
+var KEYS = [
+  { key: 'schedule', name: '排班权限', short: '排班', desc: '进入排班工作台' },
+  { key: 'review', name: '审核权限', short: '审核', desc: '进入审核模块' },
+  { key: 'proxy', name: '代录权限', short: '代录', desc: '替别人填可排时间' }
+];
+
+function isSuper() { return state.actor === 'super'; }
+function me() { return isSuper() ? null : state.people[state.actor]; }
+function effOf(p) {
+  if (!p) return { schedule: true, review: true, proxy: true };
+  return {
+    schedule: p.over.schedule === null ? state.global.schedule : p.over.schedule,
+    review: p.over.review === null ? state.global.review : p.over.review,
+    proxy: p.over.proxy === null ? state.global.proxy : p.over.proxy
+  };
+}
+function eff() { return effOf(me()); }
+function overridden(p) { return p.over.schedule !== null || p.over.review !== null || p.over.proxy !== null; }
+/* 只读：周日 + 不是超管 */
+function readonly() { return state.sunday && !isSuper(); }
+
+/* ───────── ① 权限管理 ───────── */
+function renderPerm() {
+  document.getElementById('globalRows').innerHTML = KEYS.map(function (k) {
+    return '<div class="row"><div class="r-main"><div class="r-name">' + k.name + '</div>' +
+      '<div class="r-sub">' + k.desc + '</div></div>' +
+      '<div class="sw' + (state.global[k.key] ? ' on' : '') + '" data-sw="' + k.key + '"></div></div>';
+  }).join('');
+
+  document.getElementById('globalNote').innerHTML = KEYS.map(function (k) {
+    return k.short + (state.global[k.key] ? '开' : '关');
+  }).join(' · ');
+
+  document.getElementById('people').innerHTML = state.people.map(function (p, i) {
+    var e = effOf(p);
+    var follow = KEYS.filter(function (k) { return p.over[k.key] !== null; })
+      .map(function (k) {
+        return '<span class="fl" data-follow="' + i + '" data-k="' + k.key + '">' + k.short + '跟回全局</span>';
+      }).join('');
+    return '<div class="prow">' +
+      '<div class="p-head"><span class="p-name">' + p.name + '</span>' +
+        '<span class="p-sub">' + p.dept + '</span>' +
+        (overridden(p) ? '<span class="p-tag">单独设置</span>' : '') + '</div>' +
+      '<div class="p-pills">' + KEYS.map(function (k) {
+        return '<div class="pill' + (e[k.key] ? ' on' : '') + '" data-pill="' + i + '" data-k="' + k.key + '">' +
+          '<span class="pill-n">' + k.short + '</span>' +
+          '<span class="pill-v">' + (e[k.key] ? '可用' : '不可用') + '</span></div>';
+      }).join('') + '</div>' +
+      (follow ? '<div class="p-follow">' + follow + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+/* ───────── ③ 可排时间 ───────── */
+var SLOTS = [
+  { t: '早间', s: '06:50 – 07:20', on: true },
+  { t: '午间', s: '12:10 – 12:40', on: false },
+  { t: '傍晚', s: '17:30 – 18:00', on: true }
+];
+
+function renderAvail() {
+  var ro = readonly();
+  document.getElementById('avHint').textContent = ro ? '只读' : '点一下切换';
+  document.getElementById('roBar').innerHTML = ro
+    ? '<div class="ro-bar"><span class="ro-t">周日只读 · 要改只能找超管代录</span>' +
+      '<span class="ro-s">填写窗口是周一 0 点到周六 24 点。周日这天要动，只能找超管代录。</span></div>'
+    : '';
+
+  document.getElementById('mySlots').innerHTML = SLOTS.map(function (s, i) {
+    return '<div class="slot' + (s.on ? ' on' : '') + '" data-slot="' + i + '">' +
+      '<span class="slot-t">' + s.t + '</span><span class="slot-s">' + s.s + '</span></div>';
+  }).join('');
+
+  document.getElementById('btnSubmit').disabled = ro;
+  document.getElementById('btnReset').disabled = ro;
+  document.getElementById('ovSave').disabled = ro;
+
+  /* 人员卡片：代录开不开决定点了会怎样；这里简化成一行两格 */
+  var others = state.people.filter(function (p) { return !me() || p.id !== me().id; });
+  var html = '<div class="sh"><span class="t">' + (isSuper() ? '替谁代录' : '人员') +
+    '</span><span class="n">' + (eff().proxy || isSuper() ? '可代录' : '仅自己') + '</span></div>' +
+    '<div class="grid ' + (ro ? 'ro' : '') + '">' +
+    others.map(function (p) {
+      return '<div class="pc" data-pc="' + p.id + '">' +
+        '<div class="pc-top"><span class="pc-av">' + p.name.slice(0, 1) + '</span>' +
+        '<span class="pc-name">' + p.name + '</span>' +
+        '<span class="pc-bd warn">未提交</span></div>' +
+        '<span class="pc-stat">可排 0 / 3 个时段</span></div>';
+    }).join('') + '</div>';
+  document.getElementById('pcHost').innerHTML = html;
+}
+
+function openProxy(id) {
+  if (!(eff().proxy || isSuper())) {
+    toast(3, '暂无代录权限');
+    return;
+  }
+  if (readonly()) {
+    toast(3, '周日只读 · 要改只能找超管代录');
+    return;
+  }
+  var p = state.people.filter(function (x) { return x.id === id; })[0];
+  document.getElementById('ovTitle').textContent = (p ? p.name : '该成员') + ' · 下一周可排时间';
+  document.getElementById('ovSlots').innerHTML = SLOTS.map(function (s, i) {
+    return '<div class="slot' + (s.on ? ' on' : '') + '" data-ovslot="' + i + '">' +
+      '<span class="slot-t">' + s.t + '</span><span class="slot-s">' + s.s + '</span></div>';
+  }).join('');
+  document.getElementById('ov').classList.add('on');
+}
+function closeOv() { document.getElementById('ov').classList.remove('on'); }
+
+/* ───────── ④ 审核 ───────── */
+function renderReview() {
+  var host = document.getElementById('reviewBody');
+  if (!(eff().review || isSuper())) {
+    host.innerHTML = '<div class="deny"><div class="deny-t">暂无审核权限</div>' +
+      '<div class="deny-d">超管没有给你开审核模块的权限。要用，找超管在「权限管理」里开一下。</div></div>';
+    return;
+  }
+  host.innerHTML =
+    '<div class="stabs"><span class="stab on">待审核<span class="n">3</span></span>' +
+    '<span class="stab">已通过<span class="n">12</span></span>' +
+    '<span class="stab">已驳回<span class="n">1</span></span></div>' +
+    '<div class="ftags"><span class="ftag on">点歌</span><span class="ftag">文稿</span><span class="ftag">留言</span></div>' +
+    '<div class="rows" style="margin-top:10px">' +
+    '<div class="rline"><span class="tt">《夜航西飞》· 点给高三的晚上</span><span class="mm">高二(3)班 · 今天 12:40</span></div>' +
+    '<div class="rline"><span class="tt">《晴天》· 周三午间</span><span class="mm">高一(1)班 · 今天 09:12</span></div>' +
+    '</div>';
+}
+
+/* ───────── 表格 ───────── */
+function renderTable() {
+  document.getElementById('tbl').innerHTML = state.people.map(function (p) {
+    var e = effOf(p);
+    var over = KEYS.filter(function (k) { return p.over[k.key] !== null; })
+      .map(function (k) { return k.short + '＝' + (p.over[k.key] ? '单独开' : '单独关'); });
+    return '<tr><td>' + p.name + '</td>' +
+      '<td class="mono">' + (over.length ? over.join(' · ') : '跟全局') + '</td>' +
+      '<td class="' + (e.schedule ? 'yes' : 'no') + '">' + (e.schedule ? '可进' : '不可进') + '</td>' +
+      '<td class="' + (e.review ? 'yes' : 'no') + '">' + (e.review ? '可进' : '不可进') + '</td>' +
+      '<td class="' + (e.proxy ? 'yes' : 'no') + '">' + (e.proxy ? '可代录' : '仅自己') + '</td></tr>';
+  }).join('');
+}
+
+/* ───────── 工具栏 ───────── */
+function renderToolbar() {
+  document.getElementById('tbDay').innerHTML =
+    '<button class="' + (state.sunday ? '' : 'on') + '" data-day="0">今天是周六（窗口开）</button>' +
+    '<button class="' + (state.sunday ? 'on' : '') + '" data-day="1">今天是周日（整页只读）</button>';
+  document.getElementById('tbWho').innerHTML =
+    '<button class="' + (state.actor === 0 ? 'on' : '') + '" data-who="0">我是陈叙（社干）</button>' +
+    '<button class="' + (state.actor === 1 ? 'on' : '') + '" data-who="1">我是林望（社干）</button>' +
+    '<button class="' + (isSuper() ? 'on' : '') + '" data-who="super">我是超管（老师）</button>';
+}
+
+/* ───────── 事件 ───────── */
+document.addEventListener('click', function (e) {
+  var t = e.target;
+  if (!t.closest) return;
+
+  var b = t.closest('[data-day]');
+  if (b) { state.sunday = b.dataset.day === '1'; return renderAll(); }
+
+  b = t.closest('[data-who]');
+  if (b) { state.actor = b.dataset.who === 'super' ? 'super' : Number(b.dataset.who); return renderAll(); }
+
+  var sw = t.closest('[data-sw]');
+  if (sw) { var k = sw.dataset.sw; state.global[k] = !state.global[k]; return renderAll(); }
+
+  var pill = t.closest('[data-pill]');
+  if (pill) {
+    var i = Number(pill.dataset.pill), pk = pill.dataset.k;
+    var p = state.people[i];
+    p.over[pk] = !effOf(p)[pk];
+    return renderAll();
+  }
+
+  var fl = t.closest('[data-follow]');
+  if (fl) { state.people[Number(fl.dataset.follow)].over[fl.dataset.k] = null; return renderAll(); }
+
+  var pc = t.closest('[data-pc]');
+  if (pc) return openProxy(Number(pc.dataset.pc));
+
+  var sl = t.closest('[data-slot]');
+  if (sl) {
+    if (readonly()) return toast(3, '周日只读 · 要改只能找超管代录');
+    var si = Number(sl.dataset.slot);
+    SLOTS[si].on = !SLOTS[si].on;
+    return renderAvail();
+  }
+
+  var os = t.closest('[data-ovslot]');
+  if (os) {
+    if (readonly()) return toast(3, '周日只读 · 要改只能找超管代录');
+    var oi = Number(os.dataset.ovslot);
+    SLOTS[oi].on = !SLOTS[oi].on;
+    return renderAvail();
+  }
+});
+
+document.getElementById('entryPlan').addEventListener('click', function () {
+  if (eff().schedule || isSuper()) toast(1, '进入排班工作台');
+  else document.getElementById('mask1').classList.add('on');
+});
+function close1() { document.getElementById('mask1').classList.remove('on'); }
+
+document.getElementById('btnSubmit').addEventListener('click', function () {
+  if (readonly()) return toast(3, '周日只读 · 要改只能找超管代录');
+  toast(3, '已提交');
+});
+document.getElementById('btnReset').addEventListener('click', function () {
+  if (readonly()) return toast(3, '周日只读 · 要改只能找超管代录');
+  toast(3, '已清空');
+});
+document.getElementById('ovSave').addEventListener('click', function () {
+  if (readonly()) return toast(3, '周日只读 · 要改只能找超管代录');
+  toast(3, '已代录');
+  closeOv();
+});
+
+var timers = {};
+function toast(id, msg) {
+  var el = document.getElementById('toast' + id);
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(timers[id]);
+  timers[id] = setTimeout(function () { el.classList.remove('on'); }, 1500);
+}
+
+function renderAll() {
+  renderToolbar();
+  renderPerm();
+  renderAvail();
+  renderReview();
+  renderTable();
+}
+renderAll();
+</script>
+</body>
+</html>

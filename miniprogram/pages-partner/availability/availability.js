@@ -165,6 +165,16 @@ Page({
     // ── v151 对齐：角色视图 ──
     isMember: false,       // 站员：就地填报
     isSuper: false,        // 超管：多批量代录
+    /**
+     * 填写窗口（2026-10-31 陛下定）：周一 0 点 ~ 周六 24 点可填，**周日整页只读**，
+     * 要改只能超管代录。三个字段都由云函数给（`data.window` / `data.abilities`），
+     * 前端不自己 `new Date().getDay()` —— 手机时区/改过的系统时间会让它判错一天。
+     */
+    readonly: false,
+    readonlyText: '',
+    /** 代录权限（独立开关，2026-10-31）：没开就只能填自己的 */
+    canProxy: false,
+    denyProxy: '暂无代录权限',
     cards: [],             // 人员卡片（社干/超管）
     // ── 单人代录弹层 ──
     sheetOpen: false,
@@ -376,6 +386,11 @@ Page({
           slotVersion: data.slotVersion || 0,
           stale: !!(shown && shown.stale),
           dirty: false,
+          // 填写窗口 + 代录权限（都在云函数算，前端只负责渲染）
+          readonly: !!(data.window && data.window.readonly),
+          readonlyText: (data.window && data.window.text) || '',
+          canProxy: !!(data.abilities && data.abilities.canProxy),
+          denyProxy: (data.abilities && data.abilities.denyProxy) || '暂无代录权限',
         });
         this.recount();
       })
@@ -390,6 +405,21 @@ Page({
     const app = getApp();
     const info = (app && app.globalData && app.globalData.adminInfo) || wx.getStorageSync('adminInfo') || {};
     return Number(info.id) || 0;
+  },
+
+  /**
+   * 只读态统一闸（2026-10-31）
+   *
+   * 周日整页只读：所有会改数据的动作（点方块 / 全选 / 勾确认 / 提交 / 清空 / 弹层保存）
+   * 都在这里被拦一次，返回 true 表示已经弹过提示、调用方直接 return。
+   *
+   * ⚠️ 只在这一处写文案（`readonlyText` 由云函数给）：六个入口各写一句，
+   *    改口径时必然漏一个，最后变成「有的地方说周一~周六，有的地方说别的」。
+   */
+  _blockedByWindow() {
+    if (!this.data.readonly) return false;
+    wx.showToast({ title: this.data.readonlyText || '周日只读 · 要改只能找超管代录', icon: 'none' });
+    return true;
   },
 
   labelOf(weekStart, dates) {
@@ -532,6 +562,7 @@ Page({
    * 全选 = 全部能来；再点 = 全部不能来（没有「待选」这一层）。
    */
   onToggleAll() {
+    if (this._blockedByWindow()) return;
     const target = this.data.allOn ? 0 : 1;
     const st = stateOf(target);
     const days = (this.data.days || []).map((d) => {
@@ -547,6 +578,8 @@ Page({
 
   /** 点方块：能来 ⇄ 不能来（两态，点一下即变） */
   onTapSlot(e) {
+    // 周日整页只读：点方块只弹提示，不改状态（2026-10-31）
+    if (this._blockedByWindow()) return;
     // ⚠️⚠️ 用**数字索引**定位（data-di / data-si），不要靠字符串 key 传定位信息：
     //    聚合键 `名称|起止` 跨天会重复，字符串一撞车就是「点一个亮一片」（批量 chips 踩过）。
     //    索引不会撞，参数没取到时下面还会留 console.warn 便于定罪。
@@ -608,6 +641,7 @@ Page({
   /** 真正的提交 —— 站员的「提交」和代录弹层的「保存」共用这一份 */
   _doSubmit(after) {
     if (this.data.submitting) return;
+    if (this._blockedByWindow()) return;
     if (!this.data.ready) {
       return wx.showToast({ title: '这一周的值班时段尚未发布', icon: 'none' });
     }
@@ -661,6 +695,7 @@ Page({
 
   /** 清空本周填报（填错了重来） */
   onReset() {
+    if (this._blockedByWindow()) return;
     wx.showModal({
       title: '清空填报',
       content: '清空后需要重新选择，确定吗？',
@@ -781,6 +816,14 @@ Page({
     const id = Number(e.currentTarget.dataset.id);
     if (!id) return;
     const meId = this._myId();
+    /**
+     * 代录权限（2026-10-31 独立开关）：点别人的卡片要有「代录权限」；
+     * 没开就只能填自己的 —— 卡片还在，点了说一句，不装死也不藏入口。
+     */
+    if (id !== meId && !this.data.canProxy) {
+      wx.showToast({ title: this.data.denyProxy || '暂无代录权限', icon: 'none' });
+      return;
+    }
     const card = (this.data.cards || []).find((c) => Number(c.personId) === id) || {};
     this.setData({ avTitle: `${card.name || '该成员'} · 下一周可排时间` });
     return this.fetch({ week: this.data.weekStart, personId: id === meId ? 0 : id })
@@ -795,6 +838,7 @@ Page({
   stop() {},
 
   onToggleConfirm() {
+    if (this._blockedByWindow()) return;
     this.setData({ confirmed: !this.data.confirmed });
   },
 

@@ -52,10 +52,12 @@ function abilities(p, perms) {
   // ⚠️ 这里每一位都必须与 handler 的鉴权一一对应：
   //    为 true 的接口必须只要求 asPartner；为 false 的必须要求 asManager / asSuperPartner。
   const mgr = p.isSuper || p.isManager;
-  const pm = perms || { schedule: mgr, review: mgr };
+  const pm = perms || { schedule: mgr, review: mgr, proxy: mgr };
   // 超管恒放行（他自己就是总闸）；社干看开关；站员一律 false
   const schedOk = p.isSuper || (p.isManager && pm.schedule === true);
   const revOk = p.isSuper || (p.isManager && pm.review === true);
+  // ⚠️ 代录（2026-10-31 二次定稿）：独立的第三个开关，不再跟排班权限绑在一起
+  const proxyOk = p.isSuper || (p.isManager && pm.proxy === true);
   return {
     // 超管：时段配置、排班规则、账号管理
     canEditSlots: p.isSuper,
@@ -65,8 +67,8 @@ function abilities(p, perms) {
     // 超管专属：权限分发
     canManagePermissions: p.isSuper,
     // 社干（含超管）：代录、生成/发布班表、审稿、批假、点名、看汇总
-    //   ⇒ 前三项吃权限开关（排班工作台 / 审核模块），后三项仍看角色
-    canProxyAvailability: mgr,
+    //   ⇒ 代录 / 排班 / 审核吃各自那道开关，其余三项仍看角色
+    canProxyAvailability: proxyOk,
     canManageSchedule: schedOk,
     canReview: revOk,
     canApproveLeave: mgr,

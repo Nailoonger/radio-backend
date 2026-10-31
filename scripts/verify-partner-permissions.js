@@ -59,11 +59,26 @@ ok('注册表登记了 partner.permissions',
 const kitJs = read('cloud/cloudfunctions/api/handlers/partner/_kit.js');
 ok('_kit 有 asScheduler', /async function asScheduler\s*\(/.test(kitJs));
 ok('_kit 有 asReviewer', /async function asReviewer\s*\(/.test(kitJs));
+ok('_kit 有 asProxyer', /async function asProxyer\s*\(/.test(kitJs));
+ok('三个权限位齐全（schedule / review / proxy）',
+  /const PERM_KEYS = \['schedule', 'review', 'proxy'\]/.test(kitJs),
+  'PERM_KEYS 不是三位：代录又要跟别的开关挤在一起了');
 ok('拒绝文案：暂无权限', kitJs.indexOf("deny: '暂无权限'") >= 0);
 ok('拒绝文案：暂无审核权限', kitJs.indexOf("deny: '暂无审核权限'") >= 0);
+ok('拒绝文案：暂无代录权限', kitJs.indexOf("deny: '暂无代录权限'") >= 0);
 ok('全局缺行视为全开（升级当天不改现状）',
-  /const out = \{ schedule: true, review: true \}/.test(kitJs), 'readGlobalPerm 的默认值不是全开');
+  /const out = \{ schedule: true, review: true, proxy: true \}/.test(kitJs),
+  'readGlobalPerm 的默认值漏了一位 —— 那一夜所有人都会「暂无XX权限」，而界面还显示着开');
 ok('三态：null 表示跟随全局', /function triPerm\s*\(/.test(kitJs) && /return null;/.test(kitJs));
+
+/* 填写窗口（2026-10-31）：周一 0 点 ~ 周六 24 点；周日整页只读 */
+ok('_kit 有 availabilityWindow', /function availabilityWindow\s*\(ts\)/.test(kitJs));
+ok('_kit 有 assertWindowWritable', /function assertWindowWritable\s*\(p, ts\)/.test(kitJs));
+ok('窗口按「今天是不是周日」判，不看目标周',
+  /const dow = bj\.weekdayOf\(t\);[\s\S]{0,40}const open = dow !== 0;/.test(kitJs),
+  '判据变成看目标周了 ⇒ 「周日整页只读」会时灵时不灵');
+ok('窗口只放超管过去（照陛下原话「要改只能超管代录」）',
+  /if \(w\.open \|\| \(p && p\.isSuper\)\) return w;/.test(kitJs));
 
 /* 真接口有没有挂在闸上 */
 const scheduleJs = read('cloud/cloudfunctions/api/handlers/partner/schedule.js');
@@ -73,9 +88,15 @@ ok('排班写接口走 asScheduler',
 ok('候选池走 asScheduler', /async function candidates\(ctx\) \{[\s\S]{0,200}await asScheduler\(ctx\)/.test(scheduleJs));
 
 const availabilityJs = read('cloud/cloudfunctions/api/handlers/partner/availability.js');
-ok('代录跟着排班权限走（门锁了窗也得锁）',
-  /if \(!p\.isSuper && !\(await permsOf\(p\.admin\)\)\.schedule\)/.test(availabilityJs),
-  '代录没接开关 ⇒ 关掉排班权限还能替全站人填');
+ok('代录吃「代录权限」，不吃排班权限',
+  /if \(!p\.isSuper && !\(await permsOf\(p\.admin\)\)\.proxy\)/.test(availabilityJs),
+  '代录又绑回 schedule 了 ⇒ 关掉排班权限连收时间都停摆');
+ok('代录**查看**也要拦（不能读别人填了什么）',
+  /if \(!canProxy\) \{[\s\S]{0,120}PERM_TEXT\.proxy\.deny/.test(availabilityJs));
+ok('保存吃填写窗口', /async function save\(ctx\) \{[\s\S]{0,400}assertWindowWritable\(p\)/.test(availabilityJs));
+ok('撤销也吃填写窗口', /async function reset\(ctx\) \{[\s\S]{0,200}assertWindowWritable\(p\)/.test(availabilityJs));
+ok('GET 把只读态给前端（打开就渲染，不是点完才拒）',
+  /const readonly = !win\.open && !p\.isSuper;/.test(availabilityJs) && /readonly,/.test(availabilityJs));
 
 const draftJs = read('cloud/cloudfunctions/api/handlers/partner/draft.js');
 ok('审稿队列走 asReviewer', /async function reviewList\(ctx\) \{[\s\S]{0,200}await asReviewer\(ctx\)/.test(draftJs));
@@ -133,8 +154,48 @@ ok('审核页：被拒不发请求', /if \(this\.data\.denied\) return Promise\.
 ok('审核页：拒绝态显示「暂无审核权限」', /\{\{denyReview\}\}/.test(reviewWxml));
 ok('审核页：拒绝态没有假列表', /<view class="deny" wx:if="\{\{denied\}\}">/.test(reviewWxml));
 
+/* ── 可排时间页：填写窗口 + 代录权限 ── */
+const availJs = read('miniprogram/pages-partner/availability/availability.js');
+const availWxml = read('miniprogram/pages-partner/availability/availability.wxml');
+ok('可排时间：只读闸存在', /_blockedByWindow\(\)/.test(availJs));
+ok('可排时间：点方块 / 全选 / 勾确认 / 提交 / 清空 都挂了闸',
+  (availJs.match(/if \(this\._blockedByWindow\(\)\) return;/g) || []).length >= 5,
+  '有入口没挂闸 ⇒ 周日那天还能改，整页只读就是句空话');
+ok('可排时间：代录入口问 canProxy（没开只能填自己）',
+  /id !== meId && !this\.data\.canProxy/.test(availJs));
+ok('可排时间：只读文案来自云函数，不在页面写死',
+  /readonlyText: \(data\.window && data\.window\.text\)/.test(availJs));
+ok('可排时间：只读提示条在页面上', /class="ro-bar" wx:if="\{\{readonly\}\}"/.test(availWxml));
+ok('可排时间：提交 / 清空在只读时 disabled',
+  /bindtap="onSubmit" disabled="\{\{readonly\}\}"/.test(availWxml)
+  && /bindtap="onReset" disabled="\{\{readonly\}\}"/.test(availWxml));
+ok('可排时间：弹层保存也 disabled',
+  /bindtap="saveAv" disabled="\{\{readonly\}\}"/.test(availWxml));
+
+/* ── 权限页：三格胶囊由 meta 驱动，不是写死两个 ── */
+const permWxml = read('miniprogram/pages-partner/permissions/permissions.wxml');
+ok('权限页：胶囊按 meta 循环（加第四个开关不用改页面）',
+  /wx:for="\{\{meta\}\}"[\s\S]{0,200}data-key="\{\{m\.key\}\}"/.test(permWxml),
+  '又写死成两格了');
+ok('权限页：跟回全局也按 meta 循环', /wx:if="\{\{p\.over\[m\.key\] !== null\}\}"/.test(permWxml));
+
+/* ══════════════ C. 契约 ══════════════ */
+section('C. 契约');
+
+const contractJs = read('cloud/contracts/partner.js');
+['GET /partner/permissions', 'PUT /partner/permissions',
+  'PUT /partner/permissions/person/:id', 'GET /partner/permissions/mine'].forEach((k) => {
+  ok(`契约登记：${k}`, contractJs.indexOf(`'${k}'`) >= 0);
+});
+ok('契约：PERM_SET 三位齐全',
+  /const PERM_SET = \{ schedule: 'boolean', review: 'boolean', proxy: 'boolean' \}/.test(contractJs));
+ok('契约：可排时间给了 window 形状（open / readonly 分开）',
+  /window: \{[\s\S]{0,200}readonly: 'boolean'/.test(contractJs));
+ok('契约：ABILITIES 补了 canReview / canManagePermissions',
+  contractJs.indexOf('canManagePermissions') >= 0 && contractJs.indexOf('canReview') >= 0);
+
 /* ══════════════ C. 新页面不许深色 ══════════════ */
-section('C. 视觉底线');
+section('D. 视觉底线');
 
 const permWxss = read('miniprogram/pages-partner/permissions/permissions.wxss');
 ok('没有 var(--tile)', permWxss.indexOf('var(--tile') < 0);
@@ -143,5 +204,5 @@ ok('用了 accent 强调', permWxss.indexOf('var(--accent') >= 0);
 
 /* 输出 */
 console.log(out.join('\n'));
-console.log(failed ? `\n✗ 失败 ${failed} 项` : '\n✓ 权限分发口径一致（后端 4 接口 + 前端 3 处拦截 + 1 个新页）');
+console.log(failed ? `\n✗ 失败 ${failed} 项` : '\n✓ 权限分发 + 填写窗口口径一致（3 个开关 · 4 个接口 · 前端 4 处拦截 · 1 个新页）');
 process.exit(failed ? 1 : 0);

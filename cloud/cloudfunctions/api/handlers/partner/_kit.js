@@ -136,20 +136,28 @@ async function asManager(ctx) {
 // ─────────────────────────── 权限分发（2026-10-31）───────────────────────────
 
 /**
- * 两个权限位 —— **只在这里定义一次**
+ * 三个权限位 —— **只在这里定义一次**
  *
  * 为什么低层放在 _kit 而不是 permissions.js：
  *   `permissions.js` 要用 `_kit.asSuperPartner`，如果 `_kit` 反过来 require 它，
  *   就成了循环依赖（打包成单文件后表现为「读到一半 undefined」这种极难查的崩）。
  *   所以「怎么读、怎么判」沉在这里，`permissions.js` 只做 HTTP 层的编排。
  *
- * ⚠️ `deny` 就是前端弹窗的标题，陛下原话是「暂无权限」「暂无审核权限」，
+ * ⚠️ `deny` 就是前端弹窗的标题，陛下原话是「暂无权限」「暂无审核权限」「暂无代录权限」，
  *    别在页面里再硬编码一遍 —— 改词只改这张表。
+ *
+ * ⚠️⚠️ 2026-10-31 二次定稿：`schedule` 与 `proxy` **必须分开**。
+ *    第一版把「代录」绑在排班权限上，陛下当场纠回来：
+ *    「代录的话需要超管开放代录权限给社干才可以……不开的话社干只能填写自己的」。
+ *    这两件事的语义本来就不同 —— 排班是「排谁上班」，代录是「替别人说自己能不能来」。
+ *    一个人可以只会收时间、不会排班（宣传口的人常常这样）。
  */
-const PERM_KEYS = ['schedule', 'review'];
+const PERM_KEYS = ['schedule', 'review', 'proxy'];
 const PERM_TEXT = {
-  schedule: { key: 'schedule', name: '排班权限', desc: '进入排班工作台', deny: '暂无权限' },
-  review: { key: 'review', name: '审核权限', desc: '进入审核模块', deny: '暂无审核权限' },
+  // ⚠️ `short` 给人少的胶囊用（一行要塞三个，写全名会挤成两三行）
+  schedule: { key: 'schedule', name: '排班权限', short: '排班', desc: '进入排班工作台', deny: '暂无权限' },
+  review: { key: 'review', name: '审核权限', short: '审核', desc: '进入审核模块', deny: '暂无审核权限' },
+  proxy: { key: 'proxy', name: '代录权限', short: '代录', desc: '替别人填可排时间', deny: '暂无代录权限' },
 };
 
 /** 三态归一：true / false / null（null = 跟随全局；脏值一律当跟随，不当作 true） */
@@ -163,7 +171,13 @@ function triPerm(v) {
 /** 全局总闸；**缺行 = 全开**（与 system_switch 同口径，发版当天不改变任何人的现状） */
 async function readGlobalPerm() {
   const doc = await findById(C.PARTNER_PERMISSION, 'global');
-  const out = { schedule: true, review: true };
+  /**
+   * ⚠️⚠️ 默认值必须把**每一个** PERM_KEYS 都列出来。
+   *    只写 `{schedule:true, review:true}` 时，后加的 `proxy` 会取到 undefined
+   *    ⇒ `!!undefined === false` ⇒ 所有社干一夜之间「暂无代录权限」。
+   *    这次是测试逮住的；靠肉眼看是看不出来的（界面上开关还显示着「开」）。
+   */
+  const out = { schedule: true, review: true, proxy: true };
   if (doc) {
     PERM_KEYS.forEach((k) => {
       const v = triPerm(doc[k]);
@@ -210,7 +224,7 @@ async function permsOf(admin) {
 async function asScheduler(ctx) {
   const p = ctx.partner || (await asPartner(ctx));
   if (p.isSuper) {
-    p.perms = { schedule: true, review: true };
+    p.perms = { schedule: true, review: true, proxy: true };
     return p;
   }
   if (p.role !== ROLE_MANAGER) throw new ApiError(Codes.FORBIDDEN, '站员没有这个权限');
@@ -224,7 +238,7 @@ async function asScheduler(ctx) {
 async function asReviewer(ctx) {
   const p = ctx.partner || (await asPartner(ctx));
   if (p.isSuper) {
-    p.perms = { schedule: true, review: true };
+    p.perms = { schedule: true, review: true, proxy: true };
     return p;
   }
   if (p.role !== ROLE_MANAGER) throw new ApiError(Codes.FORBIDDEN, '站员没有这个权限');
@@ -232,6 +246,63 @@ async function asReviewer(ctx) {
   p.perms = perms;
   if (!perms.review) throw new ApiError(Codes.FORBIDDEN, PERM_TEXT.review.deny);
   return p;
+}
+
+/**
+ * 代录权限（替别人填可排时间）
+ *
+ * ⚠️ 站员的报错文案**保持原样**「只能填自己的可排时间」：
+ *    对站员来说这不是「没开权限」，而是角色上就没有这件事 —— 两句话别混成一句。
+ */
+async function asProxyer(ctx) {
+  const p = ctx.partner || (await asPartner(ctx));
+  if (p.isSuper) {
+    p.perms = { schedule: true, review: true, proxy: true };
+    return p;
+  }
+  if (p.role !== ROLE_MANAGER) throw new ApiError(Codes.FORBIDDEN, '只能填自己的可排时间');
+  const perms = await permsOf(p.admin);
+  p.perms = perms;
+  if (!perms.proxy) throw new ApiError(Codes.FORBIDDEN, PERM_TEXT.proxy.deny);
+  return p;
+}
+
+// ─────────────────────────── 可排时间填写窗口 ───────────────────────────
+
+/**
+ * 填写窗口：**周一 00:00 ~ 周六 23:59:59.999 可填，周日整日只读**（2026-10-31 陛下定）
+ *
+ * 原话：「填写窗口是周一 0 点到周六 24 点，周日那天整页只读，要改只能超管代录」。
+ *
+ * ⚠️ 判据只有一条：**看「今天」是星期几**，不看目标周。
+ *    周日已经算下一周了（`currentWeekStart` 的 duty 口径），这天收时间意味着
+ *    「下周班表已经该生成了，再改就来不及」，所以关窗，把例外通道留给超管。
+ * ⚠️ 返回 `open` 而不是直接抛错：GET 也要用它 —— 前端要先知道「现在是只读态」
+ *    才能把整页渲染成只读，而不是等点了保存才被拒。
+ */
+function availabilityWindow(ts) {
+  const t = ts === undefined ? Date.now() : ts;
+  const dow = bj.weekdayOf(t);        // 0 = 周日
+  const open = dow !== 0;
+  return {
+    open,
+    weekday: dow,
+    // 文案只在这里写一份：前端整页只读的提示条直接用它
+    text: open ? '' : '周日只读 · 要改只能找超管代录',
+  };
+}
+
+/**
+ * 写接口的窗口闸
+ *
+ * ⚠️ 只放超管过去（陛下原话「要改只能超管代录」）。
+ *    所以周日这天，**有代录权限的社干也被关在门外** —— 这不是漏掉，是照原话做的。
+ *    如果哪天要放开，改这一行就行，别去动前端。
+ */
+function assertWindowWritable(p, ts) {
+  const w = availabilityWindow(ts);
+  if (w.open || (p && p.isSuper)) return w;
+  throw new ApiError(Codes.FORBIDDEN, w.text);
 }
 
 // ─────────────────────────── 值班周锚点 ───────────────────────────
@@ -513,8 +584,9 @@ function notYet(name) {
 module.exports = {
   ROLE_SUPER, ROLE_MANAGER, ROLE_MEMBER,
   DUTY_ROLES, DEPARTMENTS, WEEK_DAYS, DEPT_BY_ROLE, deptOfRoles,
-  asPartner, asSuperPartner, asManager, asScheduler, asReviewer,
+  asPartner, asSuperPartner, asManager, asScheduler, asReviewer, asProxyer,
   PERM_KEYS, PERM_TEXT, triPerm, readGlobalPerm, readPersonPerm, effectivePerm, permsOf,
+  availabilityWindow, assertWindowWritable,
   assertWeekStart, currentWeekStart, nextWeekStart, weekDates, weekStarted,
   hhmm, normalizeTemplates, templatesToSlots,
   personDto, normalizePhone, listPeople, resolvePerson,

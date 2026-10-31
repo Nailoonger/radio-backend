@@ -29,6 +29,14 @@
     <text class="wk-b r {{isTargetWeek ? 'off' : ''}}" bindtap="onNextWeek">下一周 ›</text>
   </view>
 
+  <!-- 填写窗口提示条（2026-10-31）：周日整页只读，只有超管能动。
+       ⚠️ 文案来自云函数 `window.text`，页面不写死 —— 改口径只改 _kit。
+       ⚠️ 只在只读时出现；周一~周六不显示这条，免得天天看着一句废话。 -->
+  <view class="ro-bar" wx:if="{{readonly}}">
+    <text class="ro-t">{{readonlyText}}</text>
+    <text class="ro-s">填写窗口是周一 0 点到周六 24 点。周日这天要动，只能找超管代录。</text>
+  </view>
+
   <!-- ══════ 站员：就地填报 ══════ -->
   <block wx:if="{{isMember}}">
     <view class="empty" wx:if="{{!loading && !ready}}">
@@ -59,18 +67,18 @@
 
     <view class="note">
       <view class="note-hd"><text class="lbl">说明</text><text class="lbl-tip">{{reasonTip}}</text></view>
-      <textarea class="ta" model:value="{{reason}}" placeholder="{{reasonPh}}" placeholder-class="ta-ph" maxlength="200" auto-height></textarea>
+      <textarea class="ta" model:value="{{reason}}" placeholder="{{reasonPh}}" placeholder-class="ta-ph" maxlength="200" auto-height disabled="{{readonly}}"></textarea>
       <text class="cnt">{{reasonLen}}/200</text>
     </view>
 
-    <view class="confirm" bindtap="onToggleConfirm" hover-class="confirm-hover">
+    <view class="confirm {{readonly ? 'off' : ''}}" bindtap="onToggleConfirm" hover-class="confirm-hover">
       <view class="cbox {{confirmed ? 'on' : ''}}"><text class="cbox-t" wx:if="{{confirmed}}">✓</text></view>
       <text class="ctext">我确认已完整填写这一周的可排时间。</text>
     </view>
 
     <view class="foot" wx:if="{{ready}}">
-      <button class="btn ghost" bindtap="onReset">清空</button>
-      <button class="btn primary" loading="{{submitting}}" bindtap="onSubmit">提交</button>
+      <button class="btn ghost" bindtap="onReset" disabled="{{readonly}}">清空</button>
+      <button class="btn primary" loading="{{submitting}}" bindtap="onSubmit" disabled="{{readonly}}">提交</button>
     </view>
   </block>
 
@@ -200,7 +208,7 @@
 
     <view class="sheet-foot">
       <button class="btn ghost" bindtap="closeAv">取消</button>
-      <button class="btn primary" loading="{{submitting}}" bindtap="saveAv">保存</button>
+      <button class="btn primary" loading="{{submitting}}" bindtap="saveAv" disabled="{{readonly}}">保存</button>
     </view>
   </view>
 </view>

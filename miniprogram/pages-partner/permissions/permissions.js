@@ -28,6 +28,7 @@ Page({
     /** 拒绝文案（页尾说明用，按 key 取好，别在 wxml 里写 meta[0] 这种下标 —— 顺序一变就错） */
     denySchedule: '暂无权限',
     denyReview: '暂无审核权限',
+    denyProxy: '暂无代录权限',
     /** 社干名单 */
     people: [],
     count: { managers: 0, scheduleOn: 0, reviewOn: 0, overridden: 0 },
@@ -81,17 +82,16 @@ Page({
           meta,
           denySchedule: denyOf('schedule', '暂无权限'),
           denyReview: denyOf('review', '暂无审核权限'),
+          denyProxy: denyOf('proxy', '暂无代录权限'),
           people: ((d && d.people) || []).map((x) => ({
             personId: x.personId,
             name: x.name,
             username: x.username,
             department: x.department || '',
-            over: x.over || { schedule: null, review: null },
-            eff: x.eff || { schedule: false, review: false },
+            // over 原样透传（每位是 true / false / null），模板直接用它判「跟回全局」要不要露
+            over: x.over || { schedule: null, review: null, proxy: null },
+            eff: x.eff || { schedule: false, review: false, proxy: false },
             overridden: !!x.overridden,
-            // 每个人的「覆盖说明」：哪些位是他单独设的（界面上标个小点，跟全局区分开）
-            overSchedule: (x.over || {}).schedule === true || (x.over || {}).schedule === false,
-            overReview: (x.over || {}).review === true || (x.over || {}).review === false,
           })),
           count: (d && d.count) || { managers: 0, scheduleOn: 0, reviewOn: 0, overridden: 0 },
         });

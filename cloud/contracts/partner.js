@@ -105,8 +105,22 @@ const ABILITIES = {
   canManageAccounts: 'boolean',
   canProxyAvailability: 'boolean',
   canManageSchedule: 'boolean',
+  // 2026-10-31：超管分发的三个开关 ⇒ 这三位不再只看角色
+  canReview: 'boolean',
+  canManagePermissions: 'boolean',
   isPartner: 'boolean',
 };
+
+/**
+ * 权限分发（2026-10-31）
+ *
+ * PERM_SET —— 生效值，一定是布尔（前端直接拿来开关）
+ * PERM_TRI —— 按人那份，可能是 null（＝跟随全局）
+ * ⚠️ 这两个别合成一个：合起来的那一刻，前端就分不清「没设」和「设成了关」，
+ *    「跟回全局」这个动作也就没法做了。
+ */
+const PERM_SET = { schedule: 'boolean', review: 'boolean', proxy: 'boolean' };
+const PERM_TRI = { schedule: 'boolean|null', review: 'boolean|null', proxy: 'boolean|null' };
 
 const contract = {
   // ─────────────────────────── 身份 ───────────────────────────
@@ -270,7 +284,18 @@ const contract = {
           confirmedAt: 'any', stale: 'boolean',
         }],
       },
-      abilities: { canProxy: 'boolean' },
+      /**
+       * 填写窗口（2026-10-31）：周一 0 点 ~ 周六 24 点可填，周日整页只读。
+       * ⚠️ open 和 readonly 是两个布尔，别合并：周日对超管是「开着」的，
+       *    对其他人是「只读」的 —— 合成一个必然有人被误导。
+       */
+      window: {
+        open: 'boolean',        // 窗口本身开没开（周日 false）
+        readonly: 'boolean',    // 当前这个人是不是只读（超管永远 false）
+        weekday: 'number',      // 0 = 周日
+        text: 'string',         // 只读时的提示文案，空串表示不限
+      },
+      abilities: { canProxy: 'boolean', readonly: 'boolean', denyProxy: 'string' },
     },
   },
 
@@ -278,7 +303,7 @@ const contract = {
     method: 'PUT',
     path: '/partner/availability',
     auth: 'admin',
-    desc: '自填或代录。personId 不等于自己 ⇒ 代录，必须留原因（≥2 字）。',
+    desc: '自填或代录。personId 不等于自己 ⇒ 代录，要有「代录权限」且必须留原因（≥2 字）。周日整页只读，只有超管能写。',
     req: {
       week: 'string?',
       personId: 'number?',
@@ -297,9 +322,62 @@ const contract = {
     method: 'DELETE',
     path: '/partner/availability',
     auth: 'admin',
-    desc: '撤销填报。只能撤自己的、或自己代录的。',
+    desc: '撤销填报。只能撤自己的、或自己代录的；同样吃填写窗口（周日只有超管能撤）。',
     req: { week: 'string?', personId: 'number?' },
     resp: { removed: 'number' },
+  },
+
+  // ─────────────── 权限分发（2026-10-31，超管）───────────────
+  // 三个开关（排班 / 审核 / 代录）× 两层（全局总闸 + 按人覆盖，null = 跟随全局）。
+  // ⚠️ 三条只给超管；`/mine` 谁都能调，前端进「工作台 / 审核 / 代录」前先问它。
+  'GET /partner/permissions': {
+    method: 'GET',
+    path: '/partner/permissions',
+    auth: 'super',
+    desc: '权限看板：全局总闸 + 社干名单（含按人覆盖与生效值）。只列 role=1 的在用账号。',
+    req: {},
+    resp: {
+      global: PERM_SET,
+      people: [{
+        personId: 'number', name: 'string', username: 'string', department: 'string',
+        dutyRoles: 'string[]', over: PERM_TRI, eff: PERM_SET, overridden: 'boolean',
+      }],
+      count: {
+        managers: 'number', scheduleOn: 'number', reviewOn: 'number',
+        proxyOn: 'number', overridden: 'number',
+      },
+      meta: [{ key: 'string', name: 'string', short: 'string', desc: 'string', deny: 'string' }],
+    },
+  },
+
+  'PUT /partner/permissions': {
+    method: 'PUT',
+    path: '/partner/permissions',
+    auth: 'super',
+    desc: '改全局总闸。三位只能是布尔 —— 「跟随」只属于按人那层，全局没有「跟随」可言。',
+    req: { schedule: 'boolean?', review: 'boolean?', proxy: 'boolean?' },
+    resp: { global: PERM_SET, changed: 'string[]' },
+  },
+
+  'PUT /partner/permissions/person/:id': {
+    method: 'PUT',
+    path: '/partner/permissions/person/:id',
+    auth: 'super',
+    desc: '给某个社干单独设置。传 null = 撤销单独设置、跟回全局。只能对社干，超管与站员一律 40001。',
+    req: { schedule: 'boolean|null', review: 'boolean|null', proxy: 'boolean|null' },
+    resp: { personId: 'number', name: 'string', over: PERM_TRI, eff: PERM_SET, overridden: 'boolean' },
+  },
+
+  'GET /partner/permissions/mine': {
+    method: 'GET',
+    path: '/partner/permissions/mine',
+    auth: 'admin',
+    desc: '我自己的生效权限。超管恒 true（总闸锁不住自己），站员一律 false（角色层面就不是他的人）。',
+    req: {},
+    resp: {
+      isSuper: 'boolean', schedule: 'boolean', review: 'boolean', proxy: 'boolean',
+      text: { schedule: 'string', review: 'string', proxy: 'string' },
+    },
   },
 };
 

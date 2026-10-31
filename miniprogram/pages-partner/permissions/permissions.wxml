@@ -19,8 +19,8 @@
 
     <block wx:else>
       <view class="intro">
-        <text class="intro-t">这两个开关管的是社干能不能进排班工作台和审核模块。</text>
-        <text class="intro-d">关掉之后，班表、考勤、请假、可排时间照常能看 —— 只是进不去那两处。</text>
+        <text class="intro-t">三个开关：进不进得了排班工作台、审核模块，以及能不能替别人代录。</text>
+        <text class="intro-d">关掉之后，班表、考勤、请假照常能看；自己的可排时间也照常能填 —— 只是这几处进不去、替不了别人。</text>
       </view>
 
       <!-- ① 全局总开关：一刀切，所有人先吃它 -->
@@ -54,25 +54,23 @@
             <text class="p-tag" wx:if="{{p.overridden}}">单独设置</text>
           </view>
 
+          <!-- 三个胶囊一行：排班 / 审核 / 代录。胶囊文案与顺序都来自 meta（_kit 的 PERM_TEXT），
+               不在页面里再列一遍 —— 加第四个开关时只改后端，这页自动跟上。 -->
           <view class="p-pills">
-            <view class="pill {{p.eff.schedule ? 'on' : ''}}" hover-class="pressed"
-                  data-id="{{p.personId}}" data-key="schedule" bindtap="onPerson">
-              <text class="pill-n">排班</text>
-              <text class="pill-v">{{p.eff.schedule ? '可用' : '不可用'}}</text>
-            </view>
-            <view class="pill {{p.eff.review ? 'on' : ''}}" hover-class="pressed"
-                  data-id="{{p.personId}}" data-key="review" bindtap="onPerson">
-              <text class="pill-n">审核</text>
-              <text class="pill-v">{{p.eff.review ? '可用' : '不可用'}}</text>
+            <view class="pill {{p.eff[m.key] ? 'on' : ''}}" wx:for="{{meta}}" wx:key="key" wx:for-item="m"
+                  hover-class="pressed"
+                  data-id="{{p.personId}}" data-key="{{m.key}}" bindtap="onPerson">
+              <text class="pill-n">{{m.short}}</text>
+              <text class="pill-v">{{p.eff[m.key] ? '可用' : '不可用'}}</text>
             </view>
           </view>
 
           <!-- 只在这一位被单独设过时才给「跟回全局」，不到处都是链接 -->
-          <view class="p-follow" wx:if="{{p.overSchedule || p.overReview}}">
-            <text class="fl" wx:if="{{p.overSchedule}}" hover-class="pressed"
-                  data-id="{{p.personId}}" data-key="schedule" bindtap="onFollow">排班跟回全局</text>
-            <text class="fl" wx:if="{{p.overReview}}" hover-class="pressed"
-                  data-id="{{p.personId}}" data-key="review" bindtap="onFollow">审核跟回全局</text>
+          <view class="p-follow" wx:if="{{p.overridden}}">
+            <block wx:for="{{meta}}" wx:key="key" wx:for-item="m">
+              <text class="fl" wx:if="{{p.over[m.key] !== null}}" hover-class="pressed"
+                    data-id="{{p.personId}}" data-key="{{m.key}}" bindtap="onFollow">{{m.short}}跟回全局</text>
+            </block>
           </view>
         </view>
       </view>
@@ -81,7 +79,7 @@
 
       <view class="note">
         总开关是默认值；单独拨过的社干以他自己那一格为准。
-        被关掉的人进这两处时会看到「{{denySchedule}}」和「{{denyReview}}」。
+        被关掉的人会分别看到「{{denySchedule}}」「{{denyReview}}」「{{denyProxy}}」。
       </view>
     </block>
   </view>

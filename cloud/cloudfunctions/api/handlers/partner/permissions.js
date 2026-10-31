@@ -128,6 +128,7 @@ async function get(ctx) {
     managers: people.length,
     scheduleOn: people.filter((x) => x.eff.schedule).length,
     reviewOn: people.filter((x) => x.eff.review).length,
+    proxyOn: people.filter((x) => x.eff.proxy).length,
     overridden: people.filter((x) => x.overridden).length,
   };
 
@@ -189,13 +190,19 @@ async function savePerson(ctx) {
  */
 async function mine(ctx) {
   const p = await asPartner(ctx);
-  const text = { schedule: PERM_TEXT.schedule.deny, review: PERM_TEXT.review.deny };
+  const text = {
+    schedule: PERM_TEXT.schedule.deny,
+    review: PERM_TEXT.review.deny,
+    proxy: PERM_TEXT.proxy.deny,
+  };
 
   // 超管恒 true：他自己就是总闸，不该被自己关的开关锁在门外
-  if (p.isSuper) return { isSuper: true, schedule: true, review: true, text };
+  if (p.isSuper) return { isSuper: true, schedule: true, review: true, proxy: true, text };
 
-  // 站员：这两个模块本来就不属于他，权限位一律 false（这是角色，不是开关）
-  if (Number(p.role) !== ROLE_MANAGER) return { isSuper: false, schedule: false, review: false, text };
+  // 站员：这几处本来就不属于他，权限位一律 false（这是角色，不是开关）
+  if (Number(p.role) !== ROLE_MANAGER) {
+    return { isSuper: false, schedule: false, review: false, proxy: false, text };
+  }
 
   const [global, over] = await Promise.all([readGlobalPerm(), readPersonPerm(p.id)]);
   return { isSuper: false, ...effectivePerm(global, over), over, text };
