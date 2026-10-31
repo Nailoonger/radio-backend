@@ -114,9 +114,16 @@ function shape(value, expected, at='response') {
   equal('regenerate refills every slot',r.data.week.summary.filled,6);equal('regenerate leaves nobody fixed',r.data.week.summary.fixed,0);
   equal('withdraw member hides',(await get(3)).data.total,0);equal('withdraw mine hides',(await call('GET',`/partner/schedule/mine?week=${WEEK}`,{},3)).data.count,0);
   equal('withdraw month hides',(await call('GET',`/partner/schedule/month?month=${WEEK.slice(0,7)}`,{},3)).data.total,0);
-  r=await mutate('PUT','cell',{day:DATES[0],slotKey:'0-2',personIds:[1],reason:'老师顶班'});equal('edit preserved draft',r.code,0);
+  // 2026-10-31 新口径：指导老师（超管）**不参与排班** ⇒ 硬塞进去必须被拒，且原因说人话
+  // （以前这里用 personIds:[1] 把老师排进班表；老师是 id 1、role 0）
+  r=await mutate('PUT','cell',{day:DATES[0],slotKey:'0-2',personIds:[1],reason:'老师顶班'});
+  equal('teacher cannot be scheduled',r.code,40901);
+  yes('teacher blocked with plain reason',r.data.issues.some((x)=>/指导老师不参与排班/.test(x.message)));
+  equal('teacher absent from candidates',(await call('GET',`/partner/schedule/candidates?week=${WEEK}&day=${DATES[0]}&slotKey=0-2`,{},2)).data.list.some((x)=>x.personId===1),false);
+  // 换成另一个合格人选（社干 2，播音部，当天没有别的班）
+  r=await mutate('PUT','cell',{day:DATES[0],slotKey:'0-2',personIds:[2],reason:'临时顶班'});equal('edit preserved draft',r.code,0);
   equal('editing draft leaves formal unchanged',JSON.stringify(H.dump().duty_assignments),formal);
-  r=await mutate('POST','publish');equal('republish succeeds',r.code,0); equal('version increments',r.data.week.version,2);equal('latest member gets new person',(await get(3)).data.days[0].slots[0].groups[1].people[0].personId,1);
+  r=await mutate('POST','publish');equal('republish succeeds',r.code,0); equal('version increments',r.data.week.version,2);equal('latest member gets new person',(await get(3)).data.days[0].slots[0].groups[1].people[0].personId,2);
   r=await call('GET',`/partner/schedule/history?week=${WEEK}`,{},1);equal('history publications',r.data.versions.length,2);
   const v1=r.data.list.find((x)=>x.action==='publish'&&x.version===1); equal('old snapshot retained',v1.snapshot.assignments.find((a)=>a.slotKey==='0-2').personId,5);
   yes('history real operator',r.data.list.every((x)=>x.operatorName)); shape(r.data,contract['GET /partner/schedule/history'].resp);
