@@ -110,5 +110,24 @@ function cssRules(){
   await test('存在入场动画时填充模式使用 both',()=>{
     for(const rule of cssRules()){if(rule.declarations.animation&&rule.declarations.animation!=='none')assert.ok(/\bboth\b/.test(rule.declarations.animation)||rule.declarations['animation-fill-mode']==='both','动画需 both：'+rule.selectors.join(','));}
   });
+  await test('学生端登录页不再有微信登录入口（2026-10-02 拍板，2026-10-31 摘掉按钮）',()=>{
+    // 学生登录页是主包那一份：伙伴端 wxss 是 @import 它的，视觉共用，入口逻辑各写各的。
+    const studentBase=path.join(__dirname,'..','miniprogram','pages','login');
+    const studentWxml=fs.readFileSync(path.join(studentBase,'login.wxml'),'utf8');
+    const studentJs=fs.readFileSync(path.join(studentBase,'login.js'),'utf8');
+    assert.doesNotMatch(studentWxml,/微信一键登录|ghost-btn|or-row/,'学生登录页不许再出现微信入口');
+    assert.doesNotMatch(studentJs,/\bapp\.login\s*\(/,'学生登录页不许再调 app.login()');
+    assert.doesNotMatch(studentJs,/^\s*(?:async\s+)?doLogin\s*\(/m,'doLogin 已随按钮删除，别留死方法');
+  });
+  await test('伙伴端账号提示与学生端逐字一致',()=>{
+    // 两边都是拿学号当账号进站（伙伴只是学生身份的第二种角色），提示语必须同一句，
+    // 否则会出现「社干填伙伴账号」这种库里根本不存在的口径。
+    const studentWxml=fs.readFileSync(path.join(__dirname,'..','miniprogram','pages','login','login.wxml'),'utf8');
+    const labelOf=text=>/<view class="field-label">([^<]*)<\/view>/.exec(text)?.[1];
+    const placeholderOf=text=>/<input\b[^>]*\bplaceholder="([^"]*)"/.exec(text)?.[1];
+    assert.equal(labelOf(wxml),'学号');
+    assert.equal(labelOf(wxml),labelOf(studentWxml));
+    assert.equal(placeholderOf(wxml),placeholderOf(studentWxml));
+  });
   console.log('\n伙伴小程序登录校验：'+checks+' 项通过。');
 })().catch(error=>{console.error(error);process.exitCode=1;});

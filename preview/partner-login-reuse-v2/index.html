@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>伙伴端登录复用学生端 v1</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 30px 24px 56px; background: #EDEDF1; color: #1D1D1F;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1060px; margin: 0 auto; }
+  h1 { margin: 0 0 6px; font-size: 19px; font-weight: 600; letter-spacing: -.2px; }
+  .lead { margin: 0 0 22px; font-size: 12.5px; line-height: 1.85; color: #6B6B73; }
+  .lead b { color: #1D1D1F; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; color: #0066CC; }
+
+  .row { display: flex; gap: 26px; align-items: flex-start; flex-wrap: wrap; }
+  .col { flex: none; }
+  .cap { font-size: 12.5px; font-weight: 600; margin: 0 0 10px; }
+  .cap span { font-weight: 400; color: #76767E; }
+
+  /* ── 手机 ── */
+  .phone { width: 375px; height: 720px; flex: none; border-radius: 36px; border: 1px solid #D6D6DD;
+    overflow: hidden; box-shadow: 0 18px 44px -22px rgba(20,22,34,.35); display: flex; flex-direction: column;
+    background: linear-gradient(135deg, #e1ecf8 0%, #fbfdfe 100%); }
+  .statusbar { height: 44px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font-size: 12px; font-weight: 600; }
+  .navtip { height: 0; }
+
+  /* ══ 以下全部照 pages/login/login.wxss 换算（1rpx = 0.5px），一个值都没改 ══ */
+  .topbar { height: 48px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; flex: none; }
+  .back { width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,.66);
+    box-shadow: 0 1px 4px rgba(15,28,46,.08); display: flex; align-items: center; justify-content: center; }
+  .chev-l { width: 8px; height: 8px; border-left: 1.5px solid #4b5563; border-bottom: 1.5px solid #4b5563; transform: rotate(45deg); margin-left: 3px; }
+  .topbar-brand { display: flex; align-items: center; gap: 7px; }
+  .badge { width: 24px; height: 24px; border-radius: 50%; flex: none; }
+  .topbar-name { font-size: 13px; font-weight: 600; color: #1d1d1f; letter-spacing: -.1px; }
+  .topbar-spacer { width: 30px; }
+
+  .cbody { flex: 1; padding: 6px 22px 0; display: flex; flex-direction: column; }
+  .brand { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 4px 0 14px; flex: none; }
+  .radio-art { position: relative; width: 168px; height: 122px; flex: none; }
+  .radio-body { position: absolute; left: 37.5px; top: 65px; width: 90px; height: 38px; border: 2.5px solid #0066cc; border-radius: 5px; }
+  .sp-outer { position: absolute; left: 48px; top: 71px; width: 26px; height: 26px; border: 2.5px solid #0066cc; border-radius: 50%; }
+  .sp-inner { position: absolute; left: 53.5px; top: 76.5px; width: 15px; height: 15px; border: 2px solid rgba(0,102,204,.55); border-radius: 50%; }
+  .sp-dot { position: absolute; left: 58.5px; top: 81.5px; width: 4.5px; height: 4.5px; background: #0066cc; border-radius: 50%; }
+  .knob { position: absolute; width: 9px; height: 9px; border: 2px solid #0066cc; border-radius: 50%; }
+  .knob.k1 { left: 95.5px; top: 79.5px; } .knob.k2 { left: 111.5px; top: 79.5px; }
+  .tick { position: absolute; width: 2px; height: 4px; background: #0066cc; border-radius: 1px; left: 3.5px; top: 1px; }
+  .wave { position: absolute; border: 2.5px solid transparent; border-top-color: rgba(0,102,204,.9); border-radius: 50%; }
+  .w1 { left: 61.5px; top: 44px; width: 42px; height: 42px; }
+  .w2 { left: 50.5px; top: 33px; width: 64px; height: 64px; border-top-color: rgba(0,102,204,.55); }
+  .w3 { left: 39.5px; top: 22px; width: 86px; height: 86px; border-top-color: rgba(0,102,204,.3); }
+  .tagline { font-size: 12px; color: #6b7280; letter-spacing: .2px; }
+
+  .glass { position: relative; border-radius: 22px; padding: 22px 20px 19px; background: rgba(255,255,255,.68);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    box-shadow: inset 0 1px 2px rgba(255,255,255,.55), 0 4px 10px -4px rgba(15,28,46,.045), 0 12px 28px -8px rgba(15,28,46,.04); }
+  .glass::before { content: ''; position: absolute; inset: 0; border-radius: 22px; border: 1px solid rgba(255,255,255,.55); border-bottom-color: rgba(255,255,255,.18); pointer-events: none; }
+  .card-title { font-size: 18px; font-weight: 600; color: #141519; letter-spacing: -.3px; }
+  .card-sub { font-size: 12px; color: #6e7178; margin-top: 4px; line-height: 1.5; }
+  .field { margin-top: 13px; }
+  .field-label { font-size: 11px; font-weight: 500; color: #6b7280; margin-bottom: 5px; display: block; }
+  .input { display: flex; align-items: center; gap: 6px; background: #fff; border-radius: 10px; padding: 2px 11px; box-shadow: inset 0 0 0 1px rgba(10,26,46,.08); }
+  .ipt { flex: 1; min-width: 0; height: 40px; font-size: 13.5px; color: #141519; display: flex; align-items: center; }
+  .ph { color: #b3b4bd; }
+  .eye { flex: none; font-size: 10.5px; color: #b3bac2; }
+  .submit { width: 100%; height: 44px; margin-top: 20px; border-radius: 12px; font-size: 14.5px; font-weight: 600; letter-spacing: 5px;
+    color: #fff; background: #2f6be8; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 18px -6px rgba(47,107,232,.45); }
+  .divider { height: 1px; margin: 15px 0 11px; background: rgba(10,26,46,.09); }
+  .card-foot { display: flex; align-items: center; justify-content: space-between; }
+  .foot-txt { font-size: 11px; color: #8a9199; }
+  .admin-entry { margin: 12px auto 0; font-size: 12.5px; color: #6b7280; display: flex; align-items: center; gap: 4px; flex: none; }
+  .admin-entry .arw { color: #9aa3ae; }
+
+  /* ── 说明 ── */
+  table { width: 100%; border-collapse: collapse; margin-top: 22px; font-size: 12px; background: #fff; border-radius: 14px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid #F0F0F0; vertical-align: top; }
+  th { color: #76767E; font-weight: 600; background: #FAFAFC; }
+  td.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; }
+  .why { background: #fff; border-radius: 14px; padding: 16px 20px; margin-top: 18px; }
+  .why h2 { margin: 0 0 8px; font-size: 13px; }
+  .why ul { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.95; color: #6B6B73; }
+  .why b { color: #1D1D1F; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>伙伴端登录 · 复用学生端设计 v2</h1>
+  <p class="lead">左＝学生端，右＝伙伴端。<b>两边共用同一份样式</b>（伙伴端 wxss 只有一行
+    <code>@import "../../pages/login/login.wxss"</code>）。v2 改动：<b>学生端摘掉「微信一键登录」按钮</b>、
+    伙伴端删掉副标题「用站内分配的伙伴账号进入」、账号提示改回与学生端一字不差。</p>
+
+  <div class="row" id="row"></div>
+
+  <table>
+    <tr><th style="width:150px">位置</th><th>学生端</th><th>伙伴端</th></tr>
+    <tr><td>卡片标题</td><td>学生登录</td><td>伙伴登录</td></tr>
+    <tr><td>卡片副标题</td><td>使用学校分发的学号进入广播站</td><td><b>没有</b>（v2 已删）</td></tr>
+    <tr><td>插画下的一句话</td><td>让每一个声音，都被听见</td><td>和伙伴一起，把每一场准备好</td></tr>
+    <tr><td>账号字段</td><td class="mono">学号</td><td class="mono">学号（v2 与学生端一字不差）</td></tr>
+    <tr><td>账号占位符</td><td class="mono">学校分发的学号，如 20240101</td><td class="mono">学校分发的学号，如 20240101</td></tr>
+    <tr><td>「或 · 微信一键登录」</td><td><b>没有</b>（v2 已摘）</td><td><b>没有</b></td></tr>
+    <tr><td>卡底两行</td><td>不收集头像与手机号 / 头像由姓名生成</td><td>账号由站内管理员开通 / 忘记密码？（可点）</td></tr>
+    <tr><td>卡片下方灰字入口</td><td>伙伴端登录 →</td><td>切换至学生端 →</td></tr>
+  </table>
+
+  <div class="why">
+    <h2>怎么做的</h2>
+    <ul>
+      <li><b>wxml</b> 照学生端结构逐块搬（顶栏 / 收音机线稿 / 玻璃卡 / 卡底注 / 灰字入口）。</li>
+      <li><b>wxss</b> 只有一行 <code>@import</code> 引学生端那份 —— 不复制第二份，学生端以后改视觉伙伴端自动跟上。</li>
+      <li>为什么不塞进 <code>app.wxss</code> 共用：全局已经有一个 <code>.body</code>（padding 0 40rpx），
+          登录页的 <code>.body</code> 是 padding 12rpx 44rpx 0，塞进全局会把全站页面的 <code>.body</code> 顶掉。</li>
+      <li><b>js 一行登录逻辑都没动</b>：方法名本来就对得上（inputUsername / inputPassword / togglePwd /
+          doLogin / goBack / goStudentLogin / showLoginHelp）。</li>
+      <li><b>v2 学生端</b>：删掉 <code>.or-row</code>（「或」分隔）与 <code>button.ghost-btn</code>（微信一键登录），
+          连带删 <code>.wx</code> 绿点样式与 <code>doLogin()</code> 这个随之变死的方法。
+          <code>app.login()</code> 本体保留 —— <code>pages/submit/submit.js</code> 还在用。</li>
+      <li><b>v2 伙伴端</b>：删副标题「用站内分配的伙伴账号进入」；账号字段回到「学号」，
+          占位符与学生端同一句（库里伙伴就是拿学号进的，不存在「伙伴账号」这种东西）。</li>
+      <li><b>守卫补两条</b>：学生端不许再出现微信入口连同 <code>app.login()</code> 调用；
+          伙伴端账号字段的标题与占位符必须与学生端<b>逐字相等</b>。</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const ART = `
+  <view class="radio-art">
+    <div class="wave w1"></div><div class="wave w2"></div><div class="wave w3"></div>
+    <div class="radio-body"></div>
+    <div class="sp-outer"></div><div class="sp-inner"></div><div class="sp-dot"></div>
+    <div class="knob k1"><div class="tick"></div></div><div class="knob k2"><div class="tick"></div></div>
+  </view>`;
+
+const PAGES = [
+  {
+    cap: '学生端 <span>· pages/login/login（v2：微信按钮已摘）</span>',
+    title: '学生登录', sub: '使用学校分发的学号进入广播站',
+    tagline: '让每一个声音，都被听见',
+    label: '学号', ph: '学校分发的学号，如 20240101', ph2: '初始密码为 user+学号（如 user20240101）',
+    foot: ['不收集头像与手机号', '头像由姓名生成'],
+    entry: '伙伴端登录',
+  },
+  {
+    cap: '伙伴端 <span>· pages-partner/login/login（v2）</span>',
+    title: '伙伴登录', sub: '',
+    tagline: '和伙伴一起，把每一场准备好',
+    label: '学号', ph: '学校分发的学号，如 20240101', ph2: '请输入密码',
+    foot: ['账号由站内管理员开通', '忘记密码？'],
+    entry: '切换至学生端',
+  },
+];
+
+document.getElementById('row').innerHTML = PAGES.map((p) => `
+  <div class="col">
+    <p class="cap">${p.cap}</p>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+      <div class="topbar">
+        <div class="back"><div class="chev-l"></div></div>
+        <div class="topbar-brand">
+          <img class="badge" src="../../miniprogram/assets/station-badge.png" alt="">
+          <span class="topbar-name">菁悠广播站</span>
+        </div>
+        <div class="topbar-spacer"></div>
+      </div>
+      <div class="cbody">
+        <div class="brand">
+          ${ART}
+          <span class="tagline">${p.tagline}</span>
+        </div>
+        <div class="glass">
+          <div class="card-title">${p.title}</div>
+          ${p.sub ? `<div class="card-sub">${p.sub}</div>` : ''}
+
+          <div class="field">
+            <span class="field-label">${p.label}</span>
+            <div class="input"><div class="ipt"><span class="ph">${p.ph}</span></div></div>
+          </div>
+
+          <div class="field">
+            <span class="field-label">密码</span>
+            <div class="input"><div class="ipt"><span class="ph">${p.ph2}</span></div><span class="eye">显示</span></div>
+          </div>
+
+          <div class="submit">登 录</div>
+
+          <div class="divider"></div>
+          <div class="card-foot">
+            <span class="foot-txt">${p.foot[0]}</span><span class="foot-txt">${p.foot[1]}</span>
+          </div>
+        </div>
+
+        <div class="admin-entry"><span>${p.entry}</span><span class="arw">→</span></div>
+      </div>
+    </div>
+  </div>`).join('');
+</script>
+</body>
+</html>

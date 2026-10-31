@@ -1,7 +1,7 @@
 // pages/login/login.js
 // 登录两步式：
-//   step=login    学号 + 密码登录（主通道）；微信一键登录降级为次要入口（开关 account_login_required
-//                 打开时后端直接拒绝，这里只负责把后端文案透传出来）
+//   step=login    学号 + 密码登录（唯一通道；2026-10-31 已摘掉「微信一键登录」按钮，
+//                 全站不再有微信登录入口，后端对应老接口保持不动但无人再调）
 //   step=activate 首登激活：还是初始密码（isDefaultPwd）时强制改密，成功后拿新 token 返回
 const app = getApp();
 
@@ -118,19 +118,6 @@ Page({
       if (pages.length > 1) wx.navigateBack();
       else wx.switchTab({ url: '/pages/index/index' });
     }, 600);
-  },
-
-  /** 微信一键登录（老通道；开关打开时后端会拒绝，文案照透） */
-  async doLogin() {
-    this.setData({ loading: true });
-    try {
-      await app.login();
-      this.done();
-    } catch (e) {
-      wx.showToast({ title: (e && e.message) || '登录失败', icon: 'none' });
-    } finally {
-      this.setData({ loading: false });
-    }
   },
 
   goBack() {

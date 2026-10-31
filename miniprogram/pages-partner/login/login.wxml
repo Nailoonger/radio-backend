@@ -38,12 +38,11 @@
 
     <view class="glass">
       <view class="card-title">伙伴登录</view>
-      <view class="card-sub">用站内分配的伙伴账号进入</view>
 
       <view class="field">
-        <view class="field-label">学号 / 伙伴账号</view>
+        <view class="field-label">学号</view>
         <view class="input {{loginError ? 'err' : ''}}">
-          <input class="ipt" type="text" placeholder="站员填学号，社干填伙伴账号"
+          <input class="ipt" type="text" placeholder="学校分发的学号，如 20240101"
                  placeholder-class="ph" value="{{username}}"
                  bindinput="inputUsername" confirm-type="next" />
         </view>

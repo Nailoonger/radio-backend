@@ -65,17 +65,6 @@
           {{loading ? '登录中……' : '登 录'}}
         </button>
 
-        <view class="or-row">
-          <view class="or-line"></view>
-          <text class="or-txt">或</text>
-          <view class="or-line"></view>
-        </view>
-
-        <button class="ghost-btn" hover-class="pressed"
-                bindtap="doLogin" disabled="{{loading}}">
-          <view class="wx"></view>微信一键登录
-        </button>
-
         <view class="card-divider"></view>
         <view class="card-foot">
           <text class="foot-txt">不收集头像与手机号</text>
