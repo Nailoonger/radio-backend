@@ -1,0 +1,53 @@
+<!-- pages-partner/notices/edit/edit.wxml · v1（2026-11-01）
+     新建 / 编辑公告。字段：标题 · 正文 · 置顶 · 发布。
+     「发布」就是 isShow，关掉再存 = 草稿（站员与电脑端都看不到，这里列表能看到）。
+     接口：POST /admin/notice/create · PUT /admin/notice/:id -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">{{isNew ? '新建公告' : '编辑公告'}}</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
+    <block wx:else>
+      <view class="card">
+        <text class="lb">标题</text>
+        <!-- ⚠️ 一律 `model:value` 双向绑定，不要手写 value + bindinput + setData：
+             后者会和输入法的 composition 抢，中文打到一半被截断（MEMORY 铁律）。 -->
+        <input class="inp" model:value="{{title}}"
+               maxlength="60" placeholder="一句话说清这条公告" placeholder-class="ph" />
+
+        <text class="lb mt">正文</text>
+        <textarea class="ta" model:value="{{content}}"
+                  maxlength="5000" auto-height show-confirm-bar="{{false}}"
+                  placeholder="写清楚时间、地点、要谁做什么" placeholder-class="ph" />
+      </view>
+
+      <view class="card">
+        <view class="sw-row">
+          <view class="sw-main">
+            <text class="sw-t">置顶</text>
+            <text class="sw-d">排在公告列表最前面</text>
+          </view>
+          <switch class="sw" checked="{{isTop}}" color="#0066CC" bindchange="onTop" />
+        </view>
+        <view class="sw-row">
+          <view class="sw-main">
+            <text class="sw-t">发布</text>
+            <text class="sw-d">{{isShow ? '站员和电脑端后台都能看到' : '存成草稿，只有这里看得到'}}</text>
+          </view>
+          <switch class="sw" checked="{{isShow}}" color="#0066CC" bindchange="onShowSwitch" />
+        </view>
+      </view>
+
+      <button class="btn primary" hover-class="pressed" bindtap="onSave" disabled="{{saving}}">{{saveText}}</button>
+      <view class="note" wx:if="{{!isNew}}">改完保存，站员端和管理端 web 都是这一条，不用两边各发一次。</view>
+    </block>
+  </view>
+</view>

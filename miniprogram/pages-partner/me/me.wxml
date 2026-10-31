@@ -34,10 +34,12 @@
       </view>
     </view>
 
-    <!-- 2026-11-01：「修改密码」从卡片里拿出来，和「退出登录」一左一右并排 -->
+    <!-- 2026-11-01 陛下改：不再是两个按钮，改成**带下划线的文字**，一行居中，中间用「｜」分开。
+         ⚠️ 下划线各自贴着文字（text-decoration 只覆盖文字宽度），中间那条「｜」不带下划线。 -->
     <view class="acts">
-      <button class="act" hover-class="act-hover" bindtap="openPwd">修改密码</button>
-      <button class="act danger" hover-class="act-hover" bindtap="onLogout">退出登录</button>
+      <text class="act" hover-class="act-hover" bindtap="openPwd">修改密码</text>
+      <text class="act-sep">｜</text>
+      <text class="act danger" hover-class="act-hover" bindtap="onLogout">退出登录</text>
     </view>
   </view>
   <view class="dock-gap"></view>

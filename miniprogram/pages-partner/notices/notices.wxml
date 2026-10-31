@@ -1,5 +1,8 @@
-<!-- pages-partner/notices/notices.wxml · v1（2026-11-01）
-     伙伴端「站内公告」：读 /admin/notice/list（admin_token），只显示 isShow=1。
+<!-- pages-partner/notices/notices.wxml · v2（2026-11-01 社干/超管可就地新建与修改）
+     列表读 /admin/notice/list（admin_token，与管理端 web 同一张表）：
+       · 置顶的排在最前（服务端 orderBy isTop desc, publishTime desc）
+       · 未发布的（isShow=0）照样列出来，用灰标签标「未发布」—— 不然发完就消失
+       · 点行 = 展开 / 收起正文；右上「编辑」进编辑页（站员看不到）
      ⚠️ 不要改回 /pages/notices/notices —— 那一页走学生端 token，社干/超管点进来是 40101。 -->
 <view class="page">
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
@@ -13,19 +16,28 @@
   </view>
 
   <view class="body">
+    <view class="top" wx:if="{{canEdit}}">
+      <text class="top-n">{{loading ? '' : list.length + ' 条公告'}}</text>
+      <view class="new-btn" hover-class="pressed" bindtap="onNew">
+        <text class="new-plus">＋</text><text>新建公告</text>
+      </view>
+    </view>
+
     <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
     <view class="hint-note" wx:elif="{{list.length === 0}}">还没有公告</view>
     <view class="rows" wx:else>
-      <view class="row" wx:for="{{list}}" wx:key="k"
-            hover-class="row-hover" data-id="{{item.id}}" bindtap="onToggle">
-        <view class="r-main">
+      <view class="row" wx:for="{{list}}" wx:key="k">
+        <view class="r-main" hover-class="row-hover" data-id="{{item.id}}" bindtap="onToggle">
           <view class="r-top">
             <text class="tag top" wx:if="{{item.isTop}}">置顶</text>
-            <text class="r-title {{item.isTop ? 'with-top' : ''}}">{{item.title}}</text>
+            <text class="tag hide" wx:if="{{!item.isShow}}">未发布</text>
+            <text class="r-title">{{item.title}}</text>
           </view>
           <text class="r-time">{{item.timeText}}</text>
           <text class="r-body {{openId === item.id ? 'open' : ''}}">{{item.content}}</text>
+          <text class="r-more" wx:if="{{item.long}}">{{openId === item.id ? '收起' : '展开'}}</text>
         </view>
+        <text class="r-edit" wx:if="{{canEdit}}" catchtap="onEdit" data-id="{{item.id}}">编辑</text>
       </view>
     </view>
   </view>

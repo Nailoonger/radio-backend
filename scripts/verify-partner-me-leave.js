@@ -40,6 +40,8 @@ const attJs = read('miniprogram/pages-partner/attendance/attendance.js');
 const attWxml = read('miniprogram/pages-partner/attendance/attendance.wxml');
 const fbWxml = read('miniprogram/pages-partner/feedback/feedback.wxml');
 const deskJs = read('miniprogram/pages-partner/desk/desk.js');
+const timetableWxml = read('miniprogram/pages-partner/schedule/timetable/index.wxml');
+const scheduleWxml = read('miniprogram/pages-partner/schedule/index/index.wxml');
 const todoJs = read('miniprogram/utils/partnerTodo.js');
 const appJson = read('miniprogram/app.json');
 
@@ -61,15 +63,20 @@ ok('三端同一份（applyAdmin 不再按角色挑 rows）',
 
 ok('「修改密码」不再是卡片里的一行',
   !/id: 'pwd'/.test(meJs) && !/label: '修改密码'/.test(meJs),
-  'pwd 又回到 rows 里了 —— 陛下要求它在「退出登录」旁边');
-ok('底部一左一右两个按钮（修改密码 / 退出登录）',
+  'pwd 又回到 rows 里了 —— 陛下要求它在卡片底部当文字链接');
+ok('底部是一行文字链，不是按钮',
   /<view class="acts">/.test(meWxml)
-  && /bindtap="openPwd"[^>]*>修改密码/.test(meWxml)
-  && /bindtap="onLogout"[^>]*>退出登录/.test(meWxml),
-  '模板里找不到并排的两个按钮');
-ok('两个按钮样式写成 button.act（元素+类）',
-  /button\.act \{/.test(meWxss),
-  '单类 .act 会被 app.wxss 的 button 默认样式压掉（宽度/display 全失效）');
+  && /<text class="act"[^>]*bindtap="openPwd"[^>]*>修改密码<\/text>/.test(meWxml)
+  && /<text class="act danger"[^>]*bindtap="onLogout"[^>]*>退出登录<\/text>/.test(meWxml),
+  '又变回 <button> 了 —— 陛下 2026-11-01 明确说不要做按钮');
+ok('两个链接之间用「｜」分隔',
+  /<text class="act-sep">｜<\/text>/.test(meWxml),
+  '分隔符没了 / 换成了别的字符');
+ok('下划线只贴文字（text-decoration，不是 border-bottom）',
+  /text-decoration:\s*underline/.test(meWxss) && !/button\.act\s*\{/.test(meWxss),
+  'border-bottom 会把整格宽度画线、两条连成一条 —— 陛下要的是「下划线不连在一起」');
+ok('分隔符自己不带下划线',
+  /\.act-sep\s*\{[\s\S]{0,160}text-decoration:\s*none/.test(meWxss));
 ok('openPwd 方法存在（弹层还归它开）', /openPwd\(\) \{/.test(meJs));
 ok('卡片里不再有 pwd 的点击分支', !/id === 'pwd'/.test(meJs));
 
@@ -143,7 +150,7 @@ ok('不再有写死的 desk: 0 角标',
 ok('工作台自己的角标与区块数字同源（读 mods）',
   /const coop = s\.roleKey === 'member' \? 0 : \(n\(m\.drafts\) \+ n\(m\.leaves\) \+ n\(m\.unmarked\)\)/.test(deskJs));
 
-/* ══════════════ E. 三处文案 ══════════════ */
+/* ══════════════ E. 文案 ══════════════ */
 out.push('\n---- E. 文案 ----');
 
 ok('请假页删掉「批完之后班表上那一格会空出来。」',
@@ -153,10 +160,54 @@ ok('考勤页改「如有错误请联系社干」',
   /如有错误请联系社干/.test(strip(attWxml)) && !/考勤由社干按场点名，这里只看不录/.test(strip(attWxml)));
 ok('互评页改「匿名互评  不作考核」',
   /匿名互评  不作考核/.test(strip(fbWxml)) && !/不是考核，是当场说一句/.test(strip(fbWxml)));
+ok('班表删掉「行头＝值班时段的名称与起止时间…」那段说明',
+  !/行头＝值班时段的名称与起止时间/.test(strip(timetableWxml)),
+  '又写回去了 —— 陛下 2026-11-01 说删');
+ok('班表删掉底部「排班不使用个人权重…保留缺岗」',
+  !/排班不使用个人权重/.test(strip(scheduleWxml)));
 ok('页面注释不再自称「只改请假状态、不动班表」',
   !/只改请假状态/.test(leaveJs) && !/批准只改请假状态/.test(read('cloud/cloudfunctions/api/handlers/partner/leave.js')),
   '旧口径的注释留着，下一个人就会照着它把逻辑改回去');
 
+/* ══════════════ F. 请假审批：周切换贴到 tabs 头上 ══════════════ */
+out.push('\n---- F. 请假审批的周切换 ----');
+
+const wkAt = reviewWxml.indexOf('class="wk-nav"');
+const tabAt = reviewWxml.indexOf('class="stabs"');
+ok('周切换在 page 顶部、tabs 之上',
+  wkAt >= 0 && tabAt > wkAt,
+  `wk-nav@${wkAt} / stabs@${tabAt} —— 周切换必须在两档 tab 的头上（陛下 2026-11-01）`);
+ok('周切换只在待审批档显示（已审批不分周，留它＝假控件）',
+  /<view class="wk-nav"[^>]*wx:if="\{\{tabIdx === 0\}\}"/.test(reviewWxml));
+ok('tabs 不再有 margin-top（否则和周条之间多一层缝）',
+  /\.stabs\s*\{[\s\S]{0,220}margin:\s*0 0 8rpx/.test(read('miniprogram/pages-partner/leave-review/leave-review.wxss')));
+
+/* ══════════════ G. 站内公告：伙伴端能新建 / 修改 / 置顶 ══════════════ */
+out.push('\n---- G. 站内公告可写 ----');
+
+const noticeJs = read('miniprogram/pages-partner/notices/notices.js');
+const editJs = read('miniprogram/pages-partner/notices/edit/edit.js');
+const editWxml = read('miniprogram/pages-partner/notices/edit/edit.wxml');
+
+ok('列表页给社干/超管「新建」入口（站员没有）',
+  /canEdit:\s*role === 0 \|\| role === 1/.test(noticeJs) && /bindtap="onNew"/.test(read('miniprogram/pages-partner/notices/notices.wxml')),
+  '三档必须写满：漏了 role===1 社干就发不了公告');
+ok('新建 / 编辑页已注册', /"notices\/edit\/edit"/.test(appJson));
+ok('新建走 POST /admin/notice/create', /adminRequest\('\/admin\/notice\/create', 'POST'/.test(editJs));
+ok('修改走 PUT /admin/notice/:id', /adminRequest\(`\/admin\/notice\/\$\{this\.data\.id\}`, 'PUT'/.test(editJs));
+ok('置顶是 isTop 开关（服务端 orderBy isTop desc 生效）',
+  /isTop:\s*this\.data\.isTop \? 1 : 0/.test(editJs) && /bindchange="onTop"/.test(editWxml),
+  '置顶没进请求体 —— 拨了开关保存也不生效');
+ok('「发布」= isShow，关掉存草稿（按钮文案跟着变）',
+  /isShow:\s*this\.data\.isShow \? 1 : 0/.test(editJs) && /syncSaveText/.test(editJs));
+ok('列表不隐藏未发布的（否则发完就消失）',
+  !/\.filter\(\(x\) => Number\(x\.isShow\) !== 0\)/.test(noticeJs) && /未发布/.test(read('miniprogram/pages-partner/notices/notices.wxml')));
+ok('站员进编辑页被拦（三档写满）',
+  /const canEdit = role === 0 \|\| role === 1/.test(editJs) && /暂无权限/.test(editJs));
+ok('输入框用 model:value（别和输入法抢）',
+  /model:value="\{\{title\}\}"/.test(editWxml) && /model:value="\{\{content\}\}"/.test(editWxml)
+  && !/bindinput="onTitle"/.test(editWxml));
+
 console.log(out.join('\n'));
-console.log(failed ? `\n✗ 失败 ${failed} 项` : '\n✓ 我的页六卡同序 · 请假审批独立页 · 考勤只看不录 · 工作台角标 · 三处文案');
+console.log(failed ? `\n✗ 失败 ${failed} 项` : '\n✓ 我的页六卡同序 · 文字链底栏 · 请假审批独立页 · 考勤只看不录 · 工作台角标 · 站内公告可写');
 process.exit(failed ? 1 : 0);

@@ -22,5 +22,5 @@
     </block>
   </view>
   <view class="legend"><text><text class="dot me"></text>我</text><text><text class="dot leave"></text>请假待批</text><text><text class="dot ok"></text>已批准</text><text><text class="dot empty"></text>空缺</text><text wx:if="{{editable || showFixed}}"><text class="dot fixed"></text>固定 · 仅排班工作台可见</text></view>
-  <text class="note">行头＝值班时段的名称与起止时间；只在某一天出现的时段（如早会）单独放在上方横带。格子里一人一个胶囊，小字是部门。{{editable ? '浅红＝已固定的人，发布后站员端不显示这个标记。' : ''}}</text>
+  <!-- 2026-11-01 陛下让删：「行头＝值班时段的名称与起止时间…小字是部门。」那段说明 -->
 </view>

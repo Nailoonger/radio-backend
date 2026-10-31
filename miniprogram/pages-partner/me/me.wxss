@@ -189,38 +189,39 @@
 }
 .rv + .chev { margin-left: 0; }
 
-/* 底部两个并排按钮：修改密码 / 退出登录（一左一右，2026-11-01）
-   ⚠️ 样式一律写 `button.act`（元素+类）：app.wxss 的 `button.btn`(0,1,1) 会压掉单类名的宽度设置。
-   白底 + 描边，只有「退出登录」是红字 —— 红色留给真正不可逆的那一个。 */
+/* 底部一行文字链：修改密码 ｜ 退出登录（2026-11-01）
+   ⚠️ 陛下要求：**不做按钮**，做带下划线的文字，中间「｜」分隔，下划线不连在一起。
+   ⇒ 下划线只能走 `text-decoration: underline`（只覆盖文字自身宽度），
+     绝不能用 border-bottom（那会把整格宽度画线、两条连成一条）。
+   ⇒ 颜色不变：修改密码深墨 #1D1D1F，退出登录仍是 #FF3B30；分隔符借用次要灰。 */
 .acts {
   position: relative;
   z-index: 3;
   display: flex;
-  gap: 20rpx;
-  width: calc(100% - 69.2308rpx);
-  margin: 25rpx auto 0;
-}
-button.act {
-  flex: 1;
-  min-width: 0;
-  display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100rpx;
-  margin: 0;
-  padding: 18rpx 26rpx;
-  border: 1rpx solid #E2E2E7;
-  border-radius: 9999rpx;
-  box-sizing: border-box;
-  background: #FFFFFF;
-  color: #1D1D1F;
-  font-size: 28rpx;
-  font-weight: 400;
-  line-height: 1.5;
+  gap: 16rpx;
+  margin: 32rpx auto 0;
+  padding: 0 34.6154rpx;
 }
-button.act::after { border: 0; }
-button.act.danger { color: #FF3B30; }
-.act-hover { opacity: .8; }
+.act {
+  font-size: 28rpx;
+  line-height: 1.5;
+  color: #1D1D1F;
+  text-decoration: underline;
+  /* 下划线与文字留一点缝，别贴着字脚 */
+  text-underline-offset: 3rpx;
+  text-decoration-thickness: 1rpx;
+}
+.act.danger { color: #FF3B30; }
+.act-sep {
+  font-size: 26rpx;
+  line-height: 1.5;
+  color: #B3B3B8;
+  /* 分隔符本身不带下划线 —— 「下划线不连在一起」 */
+  text-decoration: none;
+}
+.act-hover { opacity: .6; }
 .dock-gap {
   height: 210rpx;
   height: calc(210rpx + env(safe-area-inset-bottom));

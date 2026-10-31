@@ -14,6 +14,17 @@
   </view>
 
   <view class="body">
+    <!-- 2026-11-01 陛下改：周切换从「待审批」区块里提出来，**贴在两档 tab 的头上**（顶到最上）。
+         ⚠️ 只在待审批档显示：已审批是处理记录、不分周，留着一条改了没反应的周条＝假控件。 -->
+    <view class="wk-nav" wx:if="{{tabIdx === 0}}">
+      <text class="wk-b" bindtap="prevWeek">‹ 上一周</text>
+      <view class="wk-mid">
+        <text class="wk-tag {{isThisWeek ? 'on' : 'off'}}">{{isThisWeek ? '本周' : '非本周'}}</text>
+        <text class="wk-c">{{weekText || '加载中'}}</text>
+      </view>
+      <text class="wk-b r {{isThisWeek ? 'off' : ''}}" bindtap="nextWeek">下一周 ›</text>
+    </view>
+
     <!-- 两档 tab（照稿件页 .stabs：文字 + 方块数字 + 蓝下划线） -->
     <view class="stabs">
       <view class="stab {{tabIdx === 0 ? 'on' : ''}}" data-i="0" bindtap="onTab">
@@ -28,16 +39,6 @@
 
     <!-- ───────── 待审批 ───────── -->
     <block wx:if="{{tabIdx === 0}}">
-      <!-- 周切换（与请假 / 考勤 / 排班工作台四页同一套写法） -->
-      <view class="wk-nav">
-        <text class="wk-b" bindtap="prevWeek">‹ 上一周</text>
-        <view class="wk-mid">
-          <text class="wk-tag {{isThisWeek ? 'on' : 'off'}}">{{isThisWeek ? '本周' : '非本周'}}</text>
-          <text class="wk-c">{{weekText || '加载中'}}</text>
-        </view>
-        <text class="wk-b r {{isThisWeek ? 'off' : ''}}" bindtap="nextWeek">下一周 ›</text>
-      </view>
-
       <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
       <view class="hint-note" wx:elif="{{pending.length === 0}}">这一周没有待批的请假</view>
       <view class="rows" wx:else>

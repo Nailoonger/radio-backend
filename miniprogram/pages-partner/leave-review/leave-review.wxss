@@ -18,12 +18,14 @@
   gap: 23rpx;
 }
 
-/* ── 两档 tab（待审批 / 已审批），与稿件页状态条同一套 ── */
+/* ── 两档 tab（待审批 / 已审批），与稿件页状态条同一套 ──
+   ⚠️ 上面现在顶着「周切换」条（2026-11-01 陛下要求贴顶），所以这里不再留 margin-top，
+      否则 body 的 23rpx gap 之外又多一层，两条之间的缝会比别处宽。 */
 .stabs {
   display: flex;
   align-items: stretch;
   border-bottom: 2rpx solid #E3E3E8;
-  margin: 4rpx 0 8rpx;
+  margin: 0 0 8rpx;
 }
 .stab {
   flex: 1;

@@ -1,0 +1,83 @@
+/* pages-partner/notices/edit/edit.wxss · v1（2026-11-01）
+   与 notices 列表 / 请假同源：.body padding 19/35，白卡 r35 p31，主按钮 9999 胶囊。
+   ⚠️ button 的样式写 `button.btn`（元素+类）：app.wxss 的 `button.btn{display:block;width:auto}`
+      特异性 (0,1,1)，只写单类会被静默压掉（按钮退化成单行行盒、文字贴上沿）。 */
+
+.page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(45deg);
+  margin-left: 6rpx;
+}
+.body {
+  flex: 1;
+  padding: 19rpx 35rpx 80rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 23rpx;
+}
+
+.card { background: #FFFFFF; border-radius: 35rpx; padding: 31rpx; display: flex; flex-direction: column; }
+.lb { font-size: 23rpx; color: #76767E; line-height: 1.5; }
+.lb.mt { margin-top: 26rpx; }
+.inp {
+  margin-top: 12rpx;
+  height: 88rpx;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+  background: #F5F5F7;
+  border-radius: 18rpx;
+  font-size: 29rpx;
+  color: #1D1D1F;
+}
+.ta {
+  margin-top: 12rpx;
+  width: 100%;
+  min-height: 300rpx;
+  padding: 20rpx 24rpx;
+  box-sizing: border-box;
+  background: #F5F5F7;
+  border-radius: 18rpx;
+  font-size: 27rpx;
+  line-height: 1.7;
+  color: #1D1D1F;
+}
+.ph { color: #B3B3B8; }
+
+/* 开关行：左说明右开关 */
+.sw-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 22rpx 0;
+}
+.sw-row + .sw-row { border-top: 2rpx solid #E3E3E8; }
+.sw-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.sw-t { font-size: 27rpx; color: #1D1D1F; line-height: 1.5; }
+.sw-d { font-size: 21rpx; color: #76767E; line-height: 1.5; margin-top: 6rpx; }
+.sw { transform: scale(.8); transform-origin: right center; flex: none; }
+
+button.btn {
+  height: 96rpx;
+  border-radius: 9999rpx;
+  font-size: 27rpx;
+  font-weight: 500;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  box-sizing: border-box;
+}
+button.btn::after { border: 0; }
+button.btn.primary { background: #0066CC; color: #FFFFFF; }
+button.btn[disabled] { opacity: .45; }
+
+.note { font-size: 21rpx; color: #76767E; line-height: 1.7; text-align: center; }
+.hint-note { text-align: center; font-size: 23rpx; color: #76767E; padding: 30rpx 0; }
+.pressed { opacity: .72; }

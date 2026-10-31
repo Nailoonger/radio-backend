@@ -29,7 +29,7 @@
       </block>
       <view class="blk" wx:if="{{myLeaves.length}}"><view class="blk-h"><text class="t">我的请假</text><text class="more">{{leavePending}} 条待批</text></view><view class="row" wx:for="{{myLeaves}}" wx:key="id"><text class="r-text">{{item.label}}</text><text class="tag {{item.tagCls}}">{{item.statusText}}</text></view></view>
       <view class="blk" wx:if="{{isMember}}"><view class="blk-h"><text class="t">本月场次</text><text class="more">{{monthLabel}}</text></view><view class="hint-note" wx:if="{{!monthList.length && !personalError}}">本月还没有正式值班安排</view><view class="row" wx:for="{{monthList}}" wx:key="personId"><text class="r-text {{item.mine ? 'mine' : ''}}">{{item.personName}}{{item.mine ? '（我）' : ''}}</text><text class="rv">{{item.count}} 场</text></view></view>
-      <view class="ts-bar"><text class="ts-bar-h">排班不使用个人权重：先满足硬条件，再按轮值均衡；没有合格的人就保留缺岗。</text></view>
+      <!-- 2026-11-01 陛下让删：「排班不使用个人权重：先满足硬条件…保留缺岗。」这句底部说明 -->
     </block>
   </view>
 </view>

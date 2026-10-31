@@ -1,6 +1,7 @@
-/* pages-partner/notices/notices.wxss · v1（2026-11-01）
+/* pages-partner/notices/notices.wxss · v2（2026-11-01）
    与请假 / 请假审批同源：.body padding 19/35，白卡 r35，行 padding 31 0，行间 2rpx 分隔。
-   正文默认收 3 行，点行展开（不用弹层：长公告就地读完，退出成本低）。 */
+   正文默认收 3 行，点行展开（不用弹层：长公告就地读完，退出成本低）。
+   v2 增：顶部「N 条公告 + 新建公告」、未发布灰标签、右侧「编辑」文字入口。 */
 
 .page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
 .chev {
@@ -18,12 +19,31 @@
   gap: 23rpx;
 }
 
+/* 顶部：条数 + 新建 */
+.top { display: flex; align-items: center; justify-content: space-between; padding: 2rpx 6rpx; }
+.top-n { font-size: 23rpx; color: #76767E; }
+.new-btn {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  height: 64rpx;
+  padding: 0 26rpx;
+  border-radius: 9999rpx;
+  background: #0066CC;
+  color: #FFFFFF;
+  font-size: 25rpx;
+  font-weight: 500;
+  line-height: 1;
+  box-sizing: border-box;
+}
+.new-plus { font-size: 29rpx; line-height: 1; margin-top: -2rpx; }
+
 .rows { background: #FFFFFF; border-radius: 35rpx; padding: 0 31rpx; }
 .row { display: flex; align-items: flex-start; gap: 19rpx; padding: 31rpx 0; }
 .row + .row { border-top: 2rpx solid #E3E3E8; }
-.row-hover { background: #FAFAFC; }
+.row-hover { opacity: .72; }
 .r-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.r-top { display: flex; align-items: center; gap: 12rpx; }
+.r-top { display: flex; align-items: center; flex-wrap: wrap; gap: 10rpx; }
 .r-title {
   flex: 0 1 auto;
   min-width: 0;
@@ -51,8 +71,18 @@
   -webkit-line-clamp: 0;
   overflow: visible;
 }
+.r-more { margin-top: 8rpx; font-size: 21rpx; color: #0066CC; }
 
-/* 「置顶」小标签：沿用请假页 .tag 的四色体系里的 warn（暖黄＝需要注意） */
+/* 右侧「编辑」：只是文字入口，不做按钮（与这一页的阅读气质一致） */
+.r-edit {
+  flex: none;
+  margin-top: 2rpx;
+  font-size: 23rpx;
+  line-height: 1.5;
+  color: #0066CC;
+}
+
+/* 标签：置顶（暖黄＝需要注意）/ 未发布（灰＝不对外） */
 .tag {
   flex: none;
   font-size: 19rpx;
@@ -62,6 +92,7 @@
   white-space: nowrap;
 }
 .tag.top { background: #FDF3DC; color: #B26A00; }
+.tag.hide { background: #F1F1F4; color: #76767E; }
 
 .hint-note { text-align: center; font-size: 23rpx; color: #76767E; padding: 30rpx 0; }
 .pressed { opacity: .72; }

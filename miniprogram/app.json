@@ -80,6 +80,7 @@
         "leave/leave",
         "leave-review/leave-review",
         "notices/notices",
+        "notices/edit/edit",
         "attendance/attendance",
         "roster/roster",
         "rules/rules",
