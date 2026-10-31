@@ -61,15 +61,27 @@ const ROUTES = {
   work: '/pages-partner/work/work',
   slots: '/pages-partner/schedule/slots/slots',
   schedule: '/pages-partner/schedule/index/index',
-  attendance: '/pages-partner/attendance/attendance',
-  'att-overview': '/pages-partner/attendance/attendance',
-  'leave-approve': '/pages-partner/leave/leave',
+  /**
+   * 考勤两条入口都带 `?mode=entry`（2026-11-01）：
+   * 工作台这张卡是「录入点名」，而「我的 · 我的考勤」是只看自己的。
+   * 同一个页面两种用途，靠 mode 区分，两边互不串味。
+   */
+  attendance: '/pages-partner/attendance/attendance?mode=entry',
+  'att-overview': '/pages-partner/attendance/attendance?mode=entry',
+  /**
+   * 请假审批 → 独立页（2026-11-01）
+   * ⚠️ 以前指向 leave/leave 靠 role 分支：社干从「我的 · 请假进度」进去看到的是审批队列，
+   *    自己想请假反而没地方请。现在 leave 只管「我的请假」，审批只在这一页。
+   */
+  'leave-approve': '/pages-partner/leave-review/leave-review',
   leave: '/pages-partner/leave/leave',
   roster: '/pages-partner/roster/roster',
   rules: '/pages-partner/rules/rules',
-  'my-att': '/pages-partner/attendance/attendance',
+  'my-att': '/pages-partner/attendance/attendance?mode=my',
   feedback: '/pages-partner/feedback/feedback',
-  notices: '/pages/notices/notices',
+  // 站内公告：伙伴端自己那一页（admin_token 读 /admin/notice/list）。
+  // ⚠️ 别指回 /pages/notices/notices —— 那是学生端的，社干/超管点进去 40101。
+  notices: '/pages-partner/notices/notices',
   accounts: '/pages-partner/accounts/accounts',
   permissions: '/pages-partner/permissions/permissions',
   'song-schedule': '/pages-partner/song-schedule/song-schedule',
@@ -420,7 +432,7 @@ Page({
         submitPending,
         messagePending,
         sections: this.buildSections(submitPending, messagePending, view),
-        badges: this.buildBadges(submitPending, messagePending),
+        badges: this.buildBadges(view),
       });
     });
   },
@@ -485,6 +497,8 @@ Page({
       this.setData({
         mods,
         sections: this.buildSections(this.data.submitPending, this.data.messagePending, view),
+        // 角标跟着 mods 一起重算：站内协作那三个数变了，工作台红点就得变
+        badges: this.buildBadges(view),
       });
     });
   },
@@ -565,12 +579,26 @@ Page({
     return sections;
   },
 
-  /* 角标与待办同源：审核 tab = 投稿 + 留言；工作台暂无"要你动手"的真值 ⇒ 0（归零即隐）。 */
-  buildBadges(submitPending, messagePending) {
+  /**
+   * 底部角标（2026-11-01 统一口径）
+   *
+   * ⚠️ 工作台那个数原来是写死的 0 —— 陛下报的「角标的计数器是不是坏了」就是它。
+   *    现在的口径：「有要处理的站内协作你都要亮红点，其他不管」
+   *    ⇒ 工作台角标 = 站内协作区右上那句「N 项待处理」= 内部稿件待审 + 请假待批 + 考勤未录入。
+   *    这个数**必须与同一页区块标题右侧显示的数相等**，否则就是自己跟自己打架。
+   *    审核 tab 仍按它自己的口径（投稿待审 + 留言待审）。
+   *    站员没有「站内协作」这一区 ⇒ 恒 0。
+   * ⚠️ 与 utils/partnerTodo.js 同源同口径，改一处要一起改（其它 tab 页读那个函数）。
+   */
+  buildBadges(view) {
+    const s = view || this.data;
+    const m = s.mods || {};
+    const n = (v) => Number(v) || 0;
+    const coop = s.roleKey === 'member' ? 0 : (n(m.drafts) + n(m.leaves) + n(m.unmarked));
     return {
-      desk: 0,
-      home: 0,
-      submissions: submitPending + messagePending,
+      desk: coop,
+      home: coop,
+      submissions: n(s.submitPending) + n(s.messagePending),
       'my-drafts': 0,
       scheduling: 0,
       schedule: 0,

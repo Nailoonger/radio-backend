@@ -1,0 +1,95 @@
+/* pages-partner/feedback/feedback.wxss · v1（2026-10-28 互评） */
+
+.page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(45deg);
+  margin-left: 6rpx;
+}
+.body { flex: 1; padding: 19rpx 35rpx 80rpx; display: flex; flex-direction: column; gap: 23rpx; }
+
+.card { background: #FFFFFF; border-radius: 35rpx; padding: 31rpx; display: flex; flex-direction: column; gap: 18rpx; }
+.sec-h { display: flex; align-items: center; justify-content: space-between; }
+.sec-h2 { padding: 6rpx 6rpx 0; }
+.sec-t { font-size: 25rpx; font-weight: 600; color: #1D1D1F; }
+.sec-s { font-size: 21rpx; color: #B3B3B8; font-variant-numeric: tabular-nums; }
+.link { font-size: 22rpx; color: #0066CC; }
+
+.fb-who {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  background: #F5F5F7;
+  border-radius: 20rpx;
+  padding: 22rpx 24rpx;
+}
+.fb-n { font-size: 29rpx; font-weight: 600; color: #1D1D1F; }
+.fb-m { font-size: 21rpx; color: #76767E; }
+
+.ta {
+  width: 100%;
+  min-height: 180rpx;
+  font-size: 26rpx;
+  line-height: 1.7;
+  color: #1D1D1F;
+  background: #F5F5F7;
+  border-radius: 20rpx;
+  padding: 20rpx 24rpx;
+  box-sizing: border-box;
+}
+.ph { color: #B3B3B8; }
+.cnt { font-size: 19rpx; color: #B3B3B8; text-align: right; }
+
+button.btn {
+  height: 96rpx;
+  border-radius: 9999rpx;
+  font-size: 27rpx;
+  font-weight: 500;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0; margin: 0; border: 0;
+  box-sizing: border-box;
+}
+button.btn::after { border: 0; }
+button.btn.primary { background: #0066CC; color: #FFFFFF; }
+button.btn[disabled] { opacity: .45; }
+
+/* 名单 */
+.fb-list { display: flex; flex-direction: column; }
+.fb-row {
+  display: flex;
+  align-items: center;
+  gap: 19rpx;
+  padding: 26rpx 0;
+}
+.fb-row + .fb-row { border-top: 2rpx solid #E3E3E8; }
+.fb-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6rpx; }
+.fb-name { font-size: 27rpx; font-weight: 500; color: #1D1D1F; }
+.fb-sub { font-size: 21rpx; color: #76767E; }
+.row-hover { opacity: .75; }
+
+/* 我收到的 */
+.rows { background: #FFFFFF; border-radius: 35rpx; padding: 0 31rpx; }
+.row { display: flex; flex-direction: column; gap: 8rpx; padding: 28rpx 0; }
+.row + .row { border-top: 2rpx solid #E3E3E8; }
+.r-text { font-size: 26rpx; line-height: 1.7; color: #1D1D1F; }
+.r-meta { font-size: 19rpx; color: #B3B3B8; font-variant-numeric: tabular-nums; }
+
+.tag {
+  flex: none;
+  font-size: 19rpx;
+  line-height: 1.5;
+  padding: 8rpx 13rpx;
+  border-radius: 13rpx;
+  white-space: nowrap;
+}
+.tag.warn { background: #FDF3DC; color: #B26A00; }
+.tag.done { background: #EAF7EF; color: #1E8E4E; }
+
+.note { font-size: 21rpx; color: #76767E; line-height: 1.7; text-align: center; padding: 0 20rpx; }
+.hint-note { text-align: center; font-size: 23rpx; color: #76767E; padding: 30rpx 0; }
+.pressed { opacity: .72; }

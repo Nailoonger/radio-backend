@@ -1,0 +1,75 @@
+<!-- pages-partner/feedback/feedback.wxml · v1（2026-10-28 互评）
+     事实源：partner-hub/app.html V.feedback ——「不是考核，是当场说一句。评语只按人聚合，不显示谁评的。」
+     两态：名单（本周和我同场次搭班的人）→ 写一句 → 回到名单
+     接口：GET /partner/feedback/pending · POST /partner/feedback · GET /partner/feedback/mine
+     ⚠️ 不打分、不打标签：原型就是一段话（≤200 字）。
+     ⚠️ 我收到的评语只看得到内容与场次，看不到是谁评的（服务端不返回评价人）。 -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">{{target ? '写一句' : '互评'}}</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <!-- ───── 写一句 ───── -->
+    <block wx:if="{{target}}">
+      <view class="card">
+        <view class="sec-h">
+          <text class="sec-t">给 {{target.personName}} 写一句</text>
+          <text class="link" catchtap="backToList">返回 ›</text>
+        </view>
+        <view class="fb-who">
+          <text class="fb-n">{{target.personName}}</text>
+          <text class="fb-m">{{target.dayName}} {{target.slot}}</text>
+        </view>
+        <textarea class="ta" value="{{text}}" bindinput="onText"
+                  placeholder="比如：中午那段过渡句接得很舒服"
+                  placeholder-class="ph" maxlength="200" auto-height show-confirm-bar="{{false}}" />
+        <view class="cnt">{{text.length}} / 200</view>
+        <button class="btn primary" hover-class="pressed" bindtap="onSubmit"
+                disabled="{{submitting}}">提交</button>
+      </view>
+      <!-- 评语说明（写评语那一档）：说清"对方看不到是谁评的"就够，别写成考核 -->
+      <view class="note">评语只按人聚合，对方只看得到内容，看不到是谁评的。</view>
+    </block>
+
+    <!-- ───── 名单 + 我收到的 ───── -->
+    <block wx:else>
+      <view class="card">
+        <view class="sec-h">
+          <text class="sec-t">本周该评谁</text>
+          <text class="sec-s">{{doneCount}} / {{pending.length}}</text>
+        </view>
+        <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
+        <view class="hint-note" wx:elif="{{pending.length === 0}}">这一周没有和你搭班的人</view>
+        <view class="fb-list" wx:else>
+          <view class="fb-row" wx:for="{{pending}}" wx:key="k"
+                hover-class="row-hover" data-idx="{{index}}" bindtap="pick">
+            <view class="fb-main">
+              <text class="fb-name">{{item.personName}}</text>
+              <text class="fb-sub">{{item.dayName}} {{item.slot}}</text>
+            </view>
+            <text class="tag {{item.done ? 'done' : 'warn'}}">{{item.done ? '已评' : '待评'}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 2026-11-01 陛下改：原句「不是考核，是当场说一句。评语只按人聚合，不显示谁评的。」
+           ⇒ 「匿名互评  不作考核」 -->
+      <view class="note">匿名互评  不作考核</view>
+
+      <view class="sec-h2"><text class="sec-t">我收到的</text></view>
+      <view class="hint-note" wx:if="{{received.length === 0}}">还没有人评过你</view>
+      <view class="rows" wx:else>
+        <view class="row" wx:for="{{received}}" wx:key="id">
+          <text class="r-text">{{item.text}}</text>
+          <text class="r-meta">{{item.dayName}} {{item.slot}} · {{item.timeText}}</text>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

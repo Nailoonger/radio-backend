@@ -16,6 +16,7 @@
 const { adminRequest, isConflict } = require('../../utils/request.js');
 const { fmtMd } = require('../../utils/format.js');
 const perm = require('../../utils/perm.js');
+const partnerTodo = require('../../utils/partnerTodo.js');
 
 /* 类型顺序照 v151 .ftags。
    ⚠️ 各类型的三档状态值不一样：
@@ -196,26 +197,21 @@ Page({
     return KINDS[this.data.kindIdx] || KINDS[0];
   },
 
-  /** 审核 tab 的角标 = 投稿待审 + 留言待审（与工作台同一口径，唯一事实源 TODO） */
+  /**
+   * 角标：一律走 utils/partnerTodo.js（2026-11-01 统一，五张 tab 页同一个函数）
+   *
+   * ⚠️ 原来这里把 `desk/home` 写死 0 —— 停在「审核」页时工作台那个红点是灭的，
+   *    和「工作台」页对不上，看着就像计数器坏了。
+   */
   refreshBadges() {
     /* 被关掉审核权限时不要留角标：一个数字在勾着人来点，点进来只有一句「暂无审核权限」 */
     if (this.data.denied) {
-      this.setData({ badges: { desk: 0, home: 0, submissions: 0, 'my-drafts': 0, scheduling: 0, schedule: 0, me: 0 } });
+      this.setData({ badges: partnerTodo.emptyBadges() });
       return Promise.resolve();
     }
-    const one = (url, q) =>
-      adminRequest(url, 'GET', Object.assign({ page: 1, pageSize: 1 }, q))
-        .then((d) => Number((d && d.total) || 0))
-        .catch(() => 0);
-    return Promise.all([
-      one('/admin/submit/list', { reviewStatus: 0 }),
-      one('/admin/message/list', { status: 0 }),
-    ]).then(([a, b]) => this.setData({
-      badges: {
-        desk: 0, home: 0, submissions: a + b,
-        'my-drafts': 0, scheduling: 0, schedule: 0, me: 0,
-      },
-    }));
+    return partnerTodo.fetchBadges(this.data.roleKey)
+      .then((b) => this.setData({ badges: b }))
+      .catch(() => this.setData({ badges: partnerTodo.emptyBadges() }));
   },
 
   /** 底部导航切换：tab 之间一律 reLaunch，不留栈 */

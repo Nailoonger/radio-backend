@@ -115,6 +115,8 @@ function verify(options = {}) {
   node('伙伴端名册手机号', [path.join(root, 'scripts/verify-partner-roster-ui.js')]);
   // 稿件四档 + 内部稿件审核处理台（2026-11-01）：草稿箱不许再被删、内部稿件不许在列表一键通过
   node('伙伴端稿件与内部稿件处理台', [path.join(root, 'scripts/verify-partner-drafts-ui.js')]);
+  // 我的页六卡同序 + 请假审批独立页 + 考勤只看不录 + 工作台角标 + 三处文案（2026-11-01）
+  node('伙伴端我的页与请假审批', [path.join(root, 'scripts/verify-partner-me-leave.js')]);
   if (scope === 'mini') return { scope, miniFiles: miniFiles.length };
 
   const revision = options.revision || env.RELEASE_REVISION;

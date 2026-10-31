@@ -12,6 +12,7 @@
 // ⚠️ AI 找稿 / AI 续写没有服务端能力 ⇒ 不做入口，不编假功能。
 
 const { adminRequest } = require('../../utils/request.js');
+const partnerTodo = require('../../utils/partnerTodo.js');
 
 const TABS = [
   { key: 'draft',    status: 0, label: '草稿箱', cntKey: 'draft' },
@@ -158,22 +159,16 @@ Page({
       .catch(() => this.setData({ latest: null }));
   },
 
-  /** 底栏角标：审核 = 投稿待审 + 留言待审；稿件 tab 给「自己待审 + 被驳」的数量提示 */
+  /**
+   * 底栏角标（2026-11-01 统一）：走 utils/partnerTodo.js，五张 tab 页同一个函数。
+   * ⚠️ 原来这里 desk/home 写死 0 —— 停在稿件页时工作台的红点是灭的，跟工作台页对不上。
+   */
   refreshBadges() {
-    const one = (url, q) =>
-      adminRequest(url, 'GET', Object.assign({ page: 1, pageSize: 1 }, q))
-        .then((d) => Number((d && d.total) || 0))
-        .catch(() => 0);
     return Promise.all([
-      one('/admin/submit/list', { reviewStatus: 0 }),
-      one('/admin/message/list', { status: 0 }),
+      partnerTodo.fetchBadges(this.data.roleKey),
       this.fetchLatest(),
-    ]).then(([a, b]) => this.setData({
-      badges: {
-        desk: 0, home: 0, submissions: a + b,
-        'my-drafts': 0, scheduling: 0, schedule: 0, me: 0,
-      },
-    }));
+    ]).then(([b]) => this.setData({ badges: b }))
+      .catch(() => this.setData({ badges: partnerTodo.emptyBadges() }));
   },
 
   /** AI 找稿：服务未接入，按钮照方案摆着，点了如实告知 */

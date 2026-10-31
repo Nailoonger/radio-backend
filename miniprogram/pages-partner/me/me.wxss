@@ -189,27 +189,38 @@
 }
 .rv + .chev { margin-left: 0; }
 
-button.logout {
+/* 底部两个并排按钮：修改密码 / 退出登录（一左一右，2026-11-01）
+   ⚠️ 样式一律写 `button.act`（元素+类）：app.wxss 的 `button.btn`(0,1,1) 会压掉单类名的宽度设置。
+   白底 + 描边，只有「退出登录」是红字 —— 红色留给真正不可逆的那一个。 */
+.acts {
   position: relative;
   z-index: 3;
   display: flex;
+  gap: 20rpx;
+  width: calc(100% - 69.2308rpx);
+  margin: 25rpx auto 0;
+}
+button.act {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: calc(100% - 69.2308rpx);
   min-height: 100rpx;
-  margin: 25rpx auto 0;
+  margin: 0;
   padding: 18rpx 26rpx;
   border: 1rpx solid #E2E2E7;
   border-radius: 9999rpx;
   box-sizing: border-box;
   background: #FFFFFF;
-  color: #FF3B30;
+  color: #1D1D1F;
   font-size: 28rpx;
   font-weight: 400;
   line-height: 1.5;
 }
-button.logout::after { border: 0; }
-.logout-hover { opacity: .8; }
+button.act::after { border: 0; }
+button.act.danger { color: #FF3B30; }
+.act-hover { opacity: .8; }
 .dock-gap {
   height: 210rpx;
   height: calc(210rpx + env(safe-area-inset-bottom));

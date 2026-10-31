@@ -1,0 +1,82 @@
+<!-- pages-partner/leave-review/leave-review.wxml · v1（2026-11-01 请假审批独立页）
+     两档 tab：待审批（按周，先请先批）/ 已审批（不分周，按处理时间倒序）
+     接口：GET /partner/leave/pending · GET /partner/leave/reviewed · PUT /partner/leave/:id/review
+     ⚠️ 样式与 leave 页同一套（.wk-nav / .rows / .row / .tag / button.sm2），不要另起一套数值。 -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">请假审批</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <!-- 两档 tab（照稿件页 .stabs：文字 + 方块数字 + 蓝下划线） -->
+    <view class="stabs">
+      <view class="stab {{tabIdx === 0 ? 'on' : ''}}" data-i="0" bindtap="onTab">
+        <text>待审批</text>
+        <text class="n" wx:if="{{pendingCount > 0}}">{{pendingCount}}</text>
+      </view>
+      <view class="stab {{tabIdx === 1 ? 'on' : ''}}" data-i="1" bindtap="onTab">
+        <text>已审批</text>
+        <text class="n" wx:if="{{reviewedCount > 0}}">{{reviewedCount}}</text>
+      </view>
+    </view>
+
+    <!-- ───────── 待审批 ───────── -->
+    <block wx:if="{{tabIdx === 0}}">
+      <!-- 周切换（与请假 / 考勤 / 排班工作台四页同一套写法） -->
+      <view class="wk-nav">
+        <text class="wk-b" bindtap="prevWeek">‹ 上一周</text>
+        <view class="wk-mid">
+          <text class="wk-tag {{isThisWeek ? 'on' : 'off'}}">{{isThisWeek ? '本周' : '非本周'}}</text>
+          <text class="wk-c">{{weekText || '加载中'}}</text>
+        </view>
+        <text class="wk-b r {{isThisWeek ? 'off' : ''}}" bindtap="nextWeek">下一周 ›</text>
+      </view>
+
+      <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
+      <view class="hint-note" wx:elif="{{pending.length === 0}}">这一周没有待批的请假</view>
+      <view class="rows" wx:else>
+        <view class="row" wx:for="{{pending}}" wx:key="id">
+          <view class="r-main">
+            <view class="r-top">
+              <text class="r-name">{{item.personName}}</text>
+              <text class="tag warn">{{item.statusText}}</text>
+            </view>
+            <text class="r-note">{{item.dayText}} {{item.slot}}</text>
+            <text class="r-reason">事由：{{item.reason}}</text>
+            <text class="r-time">{{item.timeText}}</text>
+          </view>
+          <view class="r-act">
+            <button class="sm2" catchtap="onApprove" data-id="{{item.id}}">批准</button>
+            <button class="sm2 q" catchtap="onReject" data-id="{{item.id}}">驳回</button>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <!-- ───────── 已审批 ───────── -->
+    <block wx:else>
+      <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
+      <view class="hint-note" wx:elif="{{reviewed.length === 0}}">还没有处理过的请假</view>
+      <view class="rows" wx:else>
+        <view class="row" wx:for="{{reviewed}}" wx:key="id">
+          <view class="r-main">
+            <view class="r-top">
+              <text class="r-name">{{item.personName}}</text>
+              <text class="tag {{item.tagCls}}">{{item.statusText}}</text>
+            </view>
+            <text class="r-note">{{item.dayText}} {{item.slot}}</text>
+            <text class="r-reason">事由：{{item.reason}}</text>
+            <text class="r-reject" wx:if="{{item.rejectReason}}">驳回理由：{{item.rejectReason}}</text>
+            <text class="r-time">{{item.doneText}}{{item.reviewedByName ? ' · ' + item.reviewedByName : ''}}</text>
+          </view>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

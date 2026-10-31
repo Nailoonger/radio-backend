@@ -1,0 +1,138 @@
+/* pages-partner/leave-review/leave-review.wxss · v1（2026-11-01 请假审批独立页）
+   数值与 leave 页同源（.body padding 19/35；卡 r35 p31；tag 四色；sm2 行内按钮），
+   多出的一块只有两档 tab（.stabs / .stab，取自稿件页 work.wxss，同一套实测值）。 */
+
+.page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(45deg);
+  margin-left: 6rpx;
+}
+.body {
+  flex: 1;
+  padding: 19rpx 35rpx 80rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 23rpx;
+}
+
+/* ── 两档 tab（待审批 / 已审批），与稿件页状态条同一套 ── */
+.stabs {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 2rpx solid #E3E3E8;
+  margin: 4rpx 0 8rpx;
+}
+.stab {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  padding: 21rpx 8rpx 25rpx;
+  font-size: 25rpx;
+  color: #76767E;
+  position: relative;
+  box-sizing: border-box;
+}
+.stab .n {
+  min-width: 38rpx;
+  height: 38rpx;
+  padding: 0 12rpx;
+  border-radius: 12rpx;
+  background: #E8E8ED;
+  color: #76767E;
+  font-size: 22rpx;
+  font-weight: 500;
+  line-height: 38rpx;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+}
+.stab.on { color: #0066CC; font-weight: 600; }
+.stab.on .n { background: #EAF3FD; color: #0066CC; }
+.stab.on::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: -2rpx;
+  width: calc(100% - 31rpx);
+  max-width: 165rpx;
+  height: 4rpx;
+  border-radius: 4rpx;
+  background: #0066CC;
+}
+
+/* 周切换（与请假 / 考勤 / 排班工作台四页一致：左右 flex:1、中间 flex:none 真居中） */
+.wk-nav { display: flex; align-items: center; padding: 2rpx 4rpx; }
+.wk-b { flex: 1; font-size: 25rpx; color: #0066CC; }
+.wk-b.r { text-align: right; }
+.wk-b.off { color: #B3B3B8; }
+.wk-mid { flex: none; display: flex; align-items: center; gap: 10rpx; }
+.wk-tag { flex: none; font-size: 20rpx; line-height: 1.6; padding: 2rpx 12rpx; border-radius: 9999rpx; font-weight: 500; }
+.wk-tag.on { background: #B42318; color: #FFF; }
+.wk-tag.off { background: #F1F1F4; color: #76767E; }
+.wk-c { font-size: 28rpx; font-weight: 600; color: #1D1D1F; font-variant-numeric: tabular-nums; }
+
+/* 列表 */
+.rows { background: #FFFFFF; border-radius: 35rpx; padding: 0 31rpx; }
+.row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 19rpx; padding: 31rpx 0; }
+.row + .row { border-top: 2rpx solid #E3E3E8; }
+.r-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.r-top { display: flex; align-items: center; gap: 13rpx; }
+.r-name { font-size: 27rpx; font-weight: 600; color: #1D1D1F; }
+.r-note { font-size: 24rpx; color: #1D1D1F; }
+.r-reason { font-size: 21rpx; color: #76767E; margin-top: 8rpx; line-height: 1.5; }
+.r-reject { font-size: 21rpx; color: #C0392B; margin-top: 8rpx; line-height: 1.5; }
+.r-time { font-size: 21rpx; color: #B3B3B8; margin-top: 6rpx; font-variant-numeric: tabular-nums; }
+.r-act {
+  flex: 0 0 100%;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  gap: 12rpx;
+  justify-content: flex-end;
+}
+
+/* 标签四色（与请假页同一套语义：warn 待批 / done 已批准 / no 已驳回） */
+.tag {
+  flex: none;
+  font-size: 19rpx;
+  line-height: 1.5;
+  padding: 8rpx 13rpx;
+  border-radius: 13rpx;
+  white-space: nowrap;
+}
+.tag.warn { background: #FDF3DC; color: #B26A00; }
+.tag.done { background: #EAF7EF; color: #1E8E4E; }
+.tag.no   { background: #FDECEA; color: #C0392B; }
+
+/* 行内按钮：⚠️ 必须写 `button.sm2`（元素+类），单类会被 app.wxss 的 button 默认样式压掉 */
+button.sm2 {
+  flex: none;
+  display: block;
+  width: auto;
+  min-width: 0;
+  box-sizing: border-box;
+  font-size: 23rpx;
+  font-weight: 500;
+  line-height: 1;
+  padding: 17rpx 27rpx;
+  border-radius: 23rpx;
+  background: #F5F5F7;
+  color: #0066CC;
+  margin: 0;
+  border: 0;
+}
+button.sm2::after { border: 0; }
+button.sm2.q { color: #76767E; font-weight: 400; }
+
+.hint-note { text-align: center; font-size: 23rpx; color: #76767E; padding: 30rpx 0; }
+.pressed { opacity: .72; }

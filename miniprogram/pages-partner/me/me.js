@@ -9,6 +9,7 @@
 //    点进去后端报 40301，用户看到的是「按钮在但点不动」，比直接不显示更困惑。
 //    所以：缓存只用来**首屏不白屏**，随后一律以 `/partner/me` 为准纠正。
 const { adminRequest } = require('../../utils/request.js');
+const partnerTodo = require('../../utils/partnerTodo.js');
 
 const app = getApp();
 
@@ -20,29 +21,30 @@ const ROLES = {
   member:  { tag: '站员', post: '站员' }
 };
 
-// 管理员那套 5 项（站员那套先留着，等站员身份接入再用）。
-// icon = v151 原型 navRow 的图标名（ic-star / ic-cal / ic-clock / ic-chk / ic-ppl，已提取成 PNG）
-const ROWS = {
-  member: [
-    { id: 'people',   icon: 'cal',   label: '可排时间', state: '' },
-    { id: 'my-att',   icon: 'chk',   label: '考勤',     state: '' },
-    { id: 'leave',    icon: 'clock', label: '请假进度', state: '' },
-    // 2026-10-31：名册三端都要有 —— 站员端原来漏了这一行（只有 ROWS.admin 里有）
-    { id: 'roster',   icon: 'ppl',   label: '伙伴名册', state: '' },
-    { id: 'feedback', icon: 'star',  label: '互评',     state: '' },
-    { id: 'notices',  icon: 'mega',  label: '站内公告', state: '' },
-    // 2026-10-31 账号密码统一：站员的密码就是他的学生密码，改这里学生端立刻同步
-    { id: 'pwd',      icon: 'pen',   label: '修改密码', state: '' }
-  ],
-  admin: [
-    { id: 'feedback', icon: 'star',  label: '互评',     state: '' },
-    { id: 'people',   icon: 'cal',   label: '可排时间', state: '' },
-    { id: 'leave',    icon: 'clock', label: '请假进度', state: '' },
-    { id: 'my-att',   icon: 'chk',   label: '我的考勤', state: '' },
-    { id: 'roster',   icon: 'ppl',   label: '伙伴名册', state: '' },
-    { id: 'pwd',      icon: 'pen',   label: '修改密码', state: '' }
-  ]
-};
+/**
+ * 「我的」页六张卡 —— **三个角色同一套、同一个顺序**（2026-11-01 陛下定）
+ *
+ * 原话：「我的页面的卡片排序从上到下为，可排时间，我的考勤，本周互评，请假进度，
+ *        站内公告，伙伴名册，三个角色端都要这样排不要乱排，名字不一样的按照我说的来改。」
+ *
+ * ⚠️ 之前这里是 ROWS.member / ROWS.admin 两套硬编码，顺序还不一样（社干那套互评在第一位），
+ *    每加一次入口都要改两处、必然走样。现在只有一份，靠 `forRole()` 补差异。
+ * ⚠️ 「修改密码」**不在卡片里**了（2026-11-01）：挪到页面底部、和「退出登录」一左一右两个按钮。
+ * icon = v151 原型 navRow 的图标名（ic-cal / ic-chk / ic-star / ic-clock / ic-mega / ic-ppl，已提取成 PNG）
+ */
+const ROWS = [
+  { id: 'people',   icon: 'cal',   label: '可排时间' },
+  { id: 'my-att',   icon: 'chk',   label: '我的考勤' },
+  { id: 'feedback', icon: 'star',  label: '本周互评' },
+  { id: 'leave',    icon: 'clock', label: '请假进度' },
+  { id: 'notices',  icon: 'mega',  label: '站内公告' },
+  { id: 'roster',   icon: 'ppl',   label: '伙伴名册' }
+];
+
+/** 按角色出一份带 state 空位的行（state 由 markRosterState 后填） */
+function rowsForRole() {
+  return ROWS.map((r) => Object.assign({}, r, { state: '' }));
+}
 
 /**
  * 建号到今天的天数（v151 joinedDays 口径：含当天，floor(diff)+1，最少 1）
@@ -115,7 +117,11 @@ Page({
 
   onShow() {
     // 每次回到这一页都重新确认身份：电脑端刚改过角色时，回来就能看到正确的菜单
-    if (this.data.role && this.data.role.account) this.fetchMe();
+    if (this.data.role && this.data.role.account) {
+      this.fetchMe();
+      // 角标也跟着刷：刚在别处批完假 / 审完稿，回来红点就该灭了
+      this.refreshBadges();
+    }
   },
 
   /**
@@ -124,25 +130,17 @@ Page({
    * ⚠️ 为什么不让后端返回 adminInfo 全量：这一页只需要 role / 昵称 / 账号 / 建号时间。
    *    多传的字段（dutyRoles、abilities）在这里没用，反而会让「谁在读什么」变模糊。
    */
-  /** 底栏角标：审核 tab = 投稿待审 + 留言待审（与工作台同一口径） */
+  /**
+   * 底栏角标（2026-11-01 统一）：一律走 utils/partnerTodo.js
+   *
+   * ⚠️ 原来这里写死 `desk: 0` —— 只要停在「我的」页，工作台那个红点就是灭的，
+   *    和别的页对不上；现在五张 tab 页都读同一个函数。
+   */
   refreshBadges() {
     var that = this;
-    var one = function (url, q) {
-      return adminRequest(url, 'GET', Object.assign({ page: 1, pageSize: 1 }, q))
-        .then(function (d) { return Number((d && d.total) || 0); })
-        .catch(function () { return 0; });
-    };
-    return Promise.all([
-      one('/admin/submit/list', { reviewStatus: 0 }),
-      one('/admin/message/list', { status: 0 })
-    ]).then(function (r) {
-      that.setData({
-        badges: {
-          desk: 0, home: 0, submissions: r[0] + r[1],
-          'my-drafts': 0, scheduling: 0, schedule: 0, me: 0
-        }
-      });
-    });
+    return partnerTodo.fetchBadges(this.data.roleKey)
+      .then(function (b) { that.setData({ badges: b }); })
+      .catch(function () { that.setData({ badges: partnerTodo.emptyBadges() }); });
   },
 
   fetchMe() {
@@ -199,7 +197,7 @@ Page({
       },
       // ⚠️ createTime 才是后端字段名（见 daysSince 头注①）；另两种是历史缓存里的写法，只为兼容
       days: daysSince(info.createTime || info.created_at || info.createdAt),
-      rows: roleKey === 'member' ? ROWS.member : ROWS.admin
+      rows: rowsForRole()
     });
   },
 
@@ -220,20 +218,23 @@ Page({
 
   onNav(e) {
     var id = e.currentTarget.dataset.id;
-    // 修改密码：不跳页，就地开弹窗
-    if (id === 'pwd') {
-      this.setData({ pwdOpen: true, pwdOld: '', pwdNew: '', pwdNew2: '', pwdErr: '' });
-      return;
-    }
-    // 已做：people → availability（P1 落地）
-    // 未做：my-att / leave / feedback / roster 属于 P3~P5，这里保留路径，
-    //       navigateTo 失败时由下面的 fail 兜底提示，不会白屏
+    /**
+     * ⚠️ 2026-11-01 三条口径改在这里：
+     *   ① 考勤 —— 从「我的」进的永远是**我自己**的考勤（三个角色一样，只看不录）。
+     *      录入点名走工作台「站内协作 · 考勤录入」，那条链接带 `?mode=entry`，
+     *      两边共用一个页面但互不串味（见 attendance.js#onLoad）。
+     *   ② 请假 —— 这一页对三个角色都是「我请的假」，不是审批队列。
+     *      审批在 workbench 的「请假审批」卡（pages-partner/leave-review/）。
+     *   ③ 站内公告 —— 走伙伴端自己那一页（admin_token 读 /admin/notice/list）。
+     *      原来指着的 /pages/notices/notices 是**学生端**的（/user/notice/list），
+     *      社干/超管没有学生身份，点进去 40101、列表空白。
+     */
     var map = {
       people:   '/pages-partner/availability/availability',
-      'my-att': '/pages-partner/attendance/attendance',
+      'my-att': '/pages-partner/attendance/attendance?mode=my',
       leave:    '/pages-partner/leave/leave',
       feedback: '/pages-partner/feedback/feedback',
-      notices:  '/pages/notices/notices',
+      notices:  '/pages-partner/notices/notices',
       roster:   '/pages-partner/roster/roster'
     };
     var url = map[id];
@@ -256,6 +257,11 @@ Page({
    *    所以接口会回一个新 token，必须当场替换掉 admin_token，
    *    否则这一页下一个请求就 40101，用户以为"改完密码就被踢了"。
    */
+  /** 打开修改密码弹层（2026-11-01 从卡片挪到「退出登录」旁边那个按钮） */
+  openPwd() {
+    this.setData({ pwdOpen: true, pwdOld: '', pwdNew: '', pwdNew2: '', pwdErr: '' });
+  },
+
   onPwdInput(e) {
     var field = e.currentTarget.dataset.field;
     var patch = { pwdErr: '' };

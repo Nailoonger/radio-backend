@@ -1,0 +1,67 @@
+/* pages-partner/notices/notices.wxss · v1（2026-11-01）
+   与请假 / 请假审批同源：.body padding 19/35，白卡 r35，行 padding 31 0，行间 2rpx 分隔。
+   正文默认收 3 行，点行展开（不用弹层：长公告就地读完，退出成本低）。 */
+
+.page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(45deg);
+  margin-left: 6rpx;
+}
+.body {
+  flex: 1;
+  padding: 19rpx 35rpx 80rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 23rpx;
+}
+
+.rows { background: #FFFFFF; border-radius: 35rpx; padding: 0 31rpx; }
+.row { display: flex; align-items: flex-start; gap: 19rpx; padding: 31rpx 0; }
+.row + .row { border-top: 2rpx solid #E3E3E8; }
+.row-hover { background: #FAFAFC; }
+.r-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.r-top { display: flex; align-items: center; gap: 12rpx; }
+.r-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 29rpx;
+  font-weight: 600;
+  line-height: 1.5;
+  color: #1D1D1F;
+}
+.r-time { font-size: 21rpx; color: #B3B3B8; margin-top: 6rpx; font-variant-numeric: tabular-nums; }
+.r-body {
+  margin-top: 12rpx;
+  font-size: 25rpx;
+  line-height: 1.7;
+  color: #76767E;
+  white-space: pre-wrap;
+  word-break: break-all;
+  /* 收起态：3 行；展开态由 .open 去掉限制 */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.r-body.open {
+  display: block;
+  -webkit-line-clamp: 0;
+  overflow: visible;
+}
+
+/* 「置顶」小标签：沿用请假页 .tag 的四色体系里的 warn（暖黄＝需要注意） */
+.tag {
+  flex: none;
+  font-size: 19rpx;
+  line-height: 1.5;
+  padding: 6rpx 12rpx;
+  border-radius: 13rpx;
+  white-space: nowrap;
+}
+.tag.top { background: #FDF3DC; color: #B26A00; }
+
+.hint-note { text-align: center; font-size: 23rpx; color: #76767E; padding: 30rpx 0; }
+.pressed { opacity: .72; }

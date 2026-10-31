@@ -1,5 +1,6 @@
 const { adminRequest } = require('../../../utils/request');
 const perm = require('../../../utils/perm');
+const partnerTodo = require('../../../utils/partnerTodo.js');
 const vm = require('../view-model');
 Page({
   /** 正在查看的周（空串 = 本周，由云函数按北京时间决定，前端不自己算）
@@ -29,6 +30,7 @@ Page({
       });
     }
     this.load();
+    this.refreshBadges();
   },
   onShow() {
     // 切回页面时刷新一次权限（TTL 只有 1 秒）：超管刚关掉就点不进去，不用等重新登录
@@ -38,6 +40,14 @@ Page({
       perm.startPolling('schedule', (pm) => this._applyPerm(pm));
     }
     if (this._loadedOnce && !this.data.loading) this.load();
+    // 角标同上：五张 tab 页都读同一个函数，停在哪一页红点都一样（见 utils/partnerTodo.js）
+    this.refreshBadges();
+  },
+
+  refreshBadges() {
+    return partnerTodo.fetchBadges(this.data.roleKey)
+      .then((b) => { if (!this._gone) this.setData({ badges: b }); })
+      .catch(() => { if (!this._gone) this.setData({ badges: partnerTodo.emptyBadges() }); });
   },
 
   /** 权限可能刚被超管改过 —— 只重问权限，不整页重拉

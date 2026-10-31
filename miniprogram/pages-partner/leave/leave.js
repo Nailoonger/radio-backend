@@ -1,11 +1,15 @@
-// pages-partner/leave/leave.js · v1（2026-10-28 请假）
+// pages-partner/leave/leave.js · v2（2026-11-01 只留「我的请假」）
 //
-// 一个页面两种角色：
-//   站员 —— 从我本周的班次里挑一场 + 写事由 → POST /partner/leave；可撤回待批的
-//   社干 —— 待批队列 → PUT /partner/leave/:id/review（批准 / 驳回必须写理由）
+// ⚠️⚠️ v1 是一页两角色（站员申请 / 社干审批），已拆开：
+//   · 这一页现在**三个角色同一套**：从我本周的班次里挑一场 + 写事由 → POST /partner/leave；
+//     下面是我这周请过的假，待批的可以撤回。
+//   · 审批搬去 pages-partner/leave-review/（工作台「站内协作 · 请假审批」进）。
+//   为什么拆：社干从「我的 · 请假进度」点进来看到的是**别人的待批队列**，
+//   自己想请假反而没地方请 —— 两件事挤一页，两边都别扭（2026-11-01 陛下定）。
 //
 // ⚠️ 一条请假 = 一个「场次」（日期 + 时段），不是整天 —— 站员可能只请午间那一场。
-// ⚠️ 批准只改请假状态，**不动班表**；班表那格变空是生成/修订时按已批请假过滤出来的。
+// ⚠️ 提交只能挑**已发布班表里本人的班次**（服务端二次校验）；批准后那一格会从班表上让开，
+//    整周退回草稿，需补齐人手重新发布（见 cloud/.../partner/leave.js#review）。
 
 const { adminRequest } = require('../../utils/request.js');
 const { addDays, md, rangeText } = require('../../utils/dates.js');
@@ -21,18 +25,10 @@ function dayNameOf(dateStr, weekStart) {
   const i = Math.round((a - b) / 86400000);
   return DAY_NAMES[i] || md(dateStr);
 }
-function fmtTime(v) {
-  if (!v) return '';
-  const d = new Date(typeof v === 'number' ? v : String(v).replace(/-/g, '/'));
-  if (isNaN(d.getTime())) return '';
-  const p = (n) => String(n).padStart(2, '0');
-  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
 
 Page({
   data: {
     statusBarHeight: 20,
-    isManager: true,
     offset: 0,
     weekStart: '',
     weekText: '',
@@ -45,7 +41,6 @@ Page({
     reason: '',
     monthUsed: 0,
     mine: [],
-    pending: [],
   },
 
   onLoad() {
@@ -57,9 +52,6 @@ Page({
     const info = (app.globalData && app.globalData.adminInfo) || {};
     this.setData({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
-      // 站员（role=2）只能看自己的：请假页是"申请 + 我的"，考勤页是"我的考勤"
-      isManager: Number(((app.globalData || {}).adminInfo || {}).role) === 0
-        || Number(((app.globalData || {}).adminInfo || {}).role) === 1,
       myId: Number(info.id) || 0,
     });
     this.load();
@@ -98,28 +90,7 @@ Page({
       weekText: week ? rangeText(week, 5) : this.data.weekText,
     });
 
-    if (this.data.isManager) {
-      return adminRequest('/partner/leave/pending', 'GET', week ? { week } : {})
-        .then((r) => {
-          const ws = (r && r.weekStart) || week;
-          if (offset === 0 && ws) this._baseWeek = ws;
-          const list = ((r && r.list) || []).map((x) => Object.assign({}, x, {
-            dayText: dayNameOf(x.day, ws || this.data.weekStart),
-            timeText: fmtTime(x.createTime),
-          }));
-          this.setData({
-            loading: false,
-            pending: list,
-            ...(ws ? { weekStart: ws, weekText: rangeText(ws, 5) } : {}),
-          });
-        })
-        .catch((err) => {
-          this.setData({ loading: false });
-          wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' });
-        });
-    }
-
-    // 站员视角：我的班次 + 我的请假
+    // 三个角色都是「我的请假」：我的班次 + 我请过的假（2026-11-01 起审批不在这里）
     const q = week ? { week } : {};
     return Promise.all([
       adminRequest('/partner/schedule/mine', 'GET', q).catch(() => ({ list: [] })),
@@ -205,59 +176,6 @@ Page({
             this.load();
           })
           .catch((err) => wx.showToast({ title: (err && err.message) || '撤回失败', icon: 'none' }));
-      },
-    });
-  },
-
-  onApprove(e) {
-    const id = e.currentTarget.dataset.id;
-    wx.showModal({
-      title: '批准请假',
-      content: '批准后这一场从班表里让开（下次生成/修订时生效）。',
-      confirmText: '批准',
-      success: (res) => {
-        if (!res.confirm) return;
-        wx.showLoading({ title: '处理中', mask: true });
-        adminRequest(`/partner/leave/${id}/review`, 'PUT', { approve: true })
-          .then(() => {
-            wx.hideLoading();
-            wx.showToast({ title: '已批准', icon: 'success' });
-            this.load();
-          })
-          .catch((err) => {
-            wx.hideLoading();
-            wx.showToast({ title: (err && err.message) || '操作失败', icon: 'none' });
-          });
-      },
-    });
-  },
-
-  onReject(e) {
-    const id = e.currentTarget.dataset.id;
-    wx.showModal({
-      title: '驳回请假',
-      editable: true,
-      placeholderText: '写清理由（申请人能看到）',
-      confirmText: '驳回',
-      confirmColor: '#C0392B',
-      success: (res) => {
-        if (!res.confirm) return;
-        const reason = (res.content || '').trim();
-        if (!reason) {
-          wx.showToast({ title: '请填写理由', icon: 'none' });
-          return;
-        }
-        wx.showLoading({ title: '处理中', mask: true });
-        adminRequest(`/partner/leave/${id}/review`, 'PUT', { approve: false, reason })
-          .then(() => {
-            wx.hideLoading();
-            wx.showToast({ title: '已驳回', icon: 'success' });
-            this.load();
-          })
-          .catch((err) => {
-            wx.hideLoading();
-            wx.showToast({ title: (err && err.message) || '操作失败', icon: 'none' });
-          });
       },
     });
   },

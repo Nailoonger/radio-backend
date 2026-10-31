@@ -115,10 +115,18 @@ ok('点红字开的是编辑态', /onEditProfile[\s\S]{0,60}openSheet\(true\)/.t
 
 /* ══════════ D. 三端入口 ══════════ */
 out.push('---- D. 三端都有入口 ----');
-const memberBlock = (meJs.match(/member:\s*\[([\s\S]*?)\n\s*\],/) || [])[1] || '';
-const adminBlock = (meJs.match(/admin:\s*\[([\s\S]*?)\n\s*\]/) || [])[1] || '';
-ok('站员 ROWS 里有伙伴名册', /id:\s*'roster'/.test(memberBlock), '站员端漏了 roster —— 这一版就是来补它的');
-ok('社干/超管 ROWS 里有伙伴名册', /id:\s*'roster'/.test(adminBlock));
+/**
+ * 2026-11-01 改：me 页的菜单从「ROWS.member / ROWS.admin 两套」合并成**一份 ROWS 数组**
+ * （陛下要求三个角色端顺序一致，两套必然走样）。所以「三端都有」的判据也改成
+ * 「只有一份 ROWS，且里面有 roster」—— 一份数组 + applyAdmin 不按角色挑，就是三端都有。
+ */
+const rowsBlock = (meJs.match(/const ROWS = \[([\s\S]*?)\n\];/) || [])[1] || '';
+ok('me 页只有一份 ROWS 数组', !!rowsBlock && !/const ROWS = \{/.test(meJs),
+  '又拆回 member/admin 两套了 —— 三端顺序一定会走样');
+ok('这份 ROWS 里有伙伴名册', /id:\s*'roster'/.test(rowsBlock),
+  '漏了 roster —— 2026-10-31 这一版就是来补它的');
+ok('三个角色共用这份 ROWS（applyAdmin 不按角色挑）',
+  /rows: rowsForRole\(\)/.test(meJs));
 ok('roster 的跳转路径已登记', /roster:\s*'\/pages-partner\/roster\/roster'/.test(meJs));
 ok('me 页会用 needPhone 标「待填手机号」',
   /markRosterState/.test(meJs) && /待填手机号/.test(meJs));

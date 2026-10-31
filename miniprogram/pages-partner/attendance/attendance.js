@@ -1,7 +1,14 @@
-// pages-partner/attendance/attendance.js · v2（2026-10-30 按 v151 v72 重做「考勤录入」）
+// pages-partner/attendance/attendance.js · v3（2026-11-01 入口决定形态：点名 / 只看）
 //
-// 社干：五个日期方块挑一天 → 看那天几场 → 每场每人三个按钮（到岗 / 请假 / 缺勤）→ 底部「保存这天的考勤」
-// 站员：我的本周 / 本月场次与到岗情况（只读）
+// **同一个页面两种用途，由 URL 的 `?mode=` 决定，不再由角色决定**：
+//   ?mode=entry（工作台「站内协作 · 考勤录入」、管理区「考勤总览」进）
+//     五个日期方块挑一天 → 看那天几场 → 每场每人三个按钮（到岗 / 请假 / 缺勤）→ 底部「保存这天的考勤」
+//   ?mode=my（「我的 · 我的考勤」进，三个角色一样）
+//     我的本周 / 本月场次与到岗情况（只读）
+//
+// ⚠️⚠️ 原来按角色分（role 0/1 一律进录入态），结果超管/社干从「我的」点进去看到的是全站名单，
+//    而他要看的是自己出勤。陛下 2026-11-01：「超管和社干从我的页面进入考勤是和站员一样
+//    只看考勤的，不是录入考勤，不要搞错了。」
 //
 // 接口：GET /partner/attendance/week · /overview · /mine · PUT /partner/attendance
 //
@@ -73,17 +80,30 @@ Page({
     minePresent: 0,
   },
 
-  onLoad() {
+  /**
+   * @param {object} [options] `?mode=entry` ⇒ 录入点名（社干/超管从工作台「考勤录入」进）
+   *                           缺省 / `?mode=my` ⇒ 只看我自己的考勤（三个角色一样）
+   *
+   * ⚠️⚠️ 2026-11-01 陛下定：「超管和社干从我的页面进入考勤是和站员一样只看考勤的，
+   *    不是录入考勤，不要搞错了。」
+   *    所以**入口决定形态**，不再由角色决定 —— 同一个 admin 既可能来点名、也可能来看自己的出勤，
+   *    按角色一刀切必然错一半（原来 role 0/1 一律进录入态，从「我的」点进来就是别人的名字）。
+   *    工作台/总览那两条链接带 `?mode=entry`（见 desk.js#ROUTES）。
+   */
+  onLoad(options) {
     const app = getApp();
     if (!app || !app.isAdminLoggedIn || !app.isAdminLoggedIn()) {
       wx.reLaunch({ url: '/pages-partner/login/login' });
       return;
     }
+    const info = (app.globalData && app.globalData.adminInfo) || {};
+    const role = Number(info.role);
+    const canEntry = role === 0 || role === 1;
+    const wantEntry = String((options && options.mode) || '') === 'entry';
     this.setData({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
-      // 站员（role=2）只能看自己的：请假页是「申请 + 我的」，考勤页是「我的考勤」
-      isManager: Number(((app.globalData || {}).adminInfo || {}).role) === 0
-        || Number(((app.globalData || {}).adminInfo || {}).role) === 1,
+      // 站员（role=2）没有录入权；`mode=my` 时谁都是「我的考勤」
+      isManager: canEntry && wantEntry,
     });
     this.load();
   },

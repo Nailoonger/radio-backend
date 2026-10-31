@@ -34,7 +34,11 @@
       </view>
     </view>
 
-    <button class="logout" hover-class="logout-hover" bindtap="onLogout">退出登录</button>
+    <!-- 2026-11-01：「修改密码」从卡片里拿出来，和「退出登录」一左一右并排 -->
+    <view class="acts">
+      <button class="act" hover-class="act-hover" bindtap="openPwd">修改密码</button>
+      <button class="act danger" hover-class="act-hover" bindtap="onLogout">退出登录</button>
+    </view>
   </view>
   <view class="dock-gap"></view>
 

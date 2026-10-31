@@ -78,6 +78,8 @@
         "work/versions/versions",
         "schedule/index/index",
         "leave/leave",
+        "leave-review/leave-review",
+        "notices/notices",
         "attendance/attendance",
         "roster/roster",
         "rules/rules",

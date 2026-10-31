@@ -1,0 +1,32 @@
+<!-- pages-partner/notices/notices.wxml · v1（2026-11-01）
+     伙伴端「站内公告」：读 /admin/notice/list（admin_token），只显示 isShow=1。
+     ⚠️ 不要改回 /pages/notices/notices —— 那一页走学生端 token，社干/超管点进来是 40101。 -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">站内公告</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
+    <view class="hint-note" wx:elif="{{list.length === 0}}">还没有公告</view>
+    <view class="rows" wx:else>
+      <view class="row" wx:for="{{list}}" wx:key="k"
+            hover-class="row-hover" data-id="{{item.id}}" bindtap="onToggle">
+        <view class="r-main">
+          <view class="r-top">
+            <text class="tag top" wx:if="{{item.isTop}}">置顶</text>
+            <text class="r-title {{item.isTop ? 'with-top' : ''}}">{{item.title}}</text>
+          </view>
+          <text class="r-time">{{item.timeText}}</text>
+          <text class="r-body {{openId === item.id ? 'open' : ''}}">{{item.content}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
