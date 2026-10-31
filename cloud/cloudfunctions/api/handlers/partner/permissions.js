@@ -34,16 +34,39 @@
  *    这里只做 HTTP 层的编排 —— 放这儿会和 `_kit` 形成循环依赖。
  */
 
-const { C, findOne, findById, insertWithId, updateById, findAllPaged } = require('../../lib/db');
+const { C, db, findOne, findById, insertWithId, updateById, findAllPaged } = require('../../lib/db');
 const { ApiError, Codes } = require('../../lib/response');
 const {
   asPartner, asSuperPartner,
   ROLE_MANAGER, ROLE_SUPER,
   PERM_KEYS, PERM_TEXT, triPerm, readGlobalPerm, readPersonPerm, effectivePerm,
+  isMissingCollection, readOr,
 } = require('./_kit');
 
 const GLOBAL_ID = 'global';
 const personKey = (id) => `p:${Number(id)}`;
+
+/**
+ * 集合不存在时建一次（幂等）
+ *
+ * ⚠️ 为什么要有它：新增集合**必须**跑一次 `/system/init-collections` 或控制台手建，
+ *    漏了就查不到（云开发查不存在的集合是抛错，不是返回空）。
+ *    2026-10-31 就是这样白屏的。这里在**第一次写入**时顺手补齐，
+ *    让超管拨一下开关就把表建出来，不至于卡在「页面能开但保存不了」。
+ * ⚠️ 只在写路径调，读路径绝不建表 —— 读接口不该有副作用。
+ */
+let _ensured = false;
+async function ensureCollection() {
+  if (_ensured) return;
+  try {
+    if (db && typeof db.createCollection === 'function') {
+      await db.createCollection(C.PARTNER_PERMISSION);
+    }
+  } catch (e) {
+    // 「已存在」是最常见的一种，属正常；其它错留给下面真正的 insert 去暴露
+  }
+  _ensured = true;
+}
 
 /**
  * 写一条（业务键当 _id 的 upsert）
@@ -53,7 +76,7 @@ const personKey = (id) => `p:${Number(id)}`;
  */
 async function upsert(id, patch) {
   const data = { ...patch, updateTime: new Date() };
-  const doc = await findById(C.PARTNER_PERMISSION, id);
+  const doc = await readOr(() => findById(C.PARTNER_PERMISSION, id), null);
   if (doc) {
     await updateById(C.PARTNER_PERMISSION, id, data);
     return;
@@ -61,6 +84,12 @@ async function upsert(id, patch) {
   try {
     await insertWithId(C.PARTNER_PERMISSION, id, data);
   } catch (e) {
+    if (isMissingCollection(e)) {
+      // 表还没建：建一次再写。这一支是「第一次拨开关」的正常路径，不是异常
+      await ensureCollection();
+      await insertWithId(C.PARTNER_PERMISSION, id, data);
+      return;
+    }
     await updateById(C.PARTNER_PERMISSION, id, data);
   }
 }
@@ -104,12 +133,21 @@ async function managers() {
 /** GET /partner/permissions —— 超管看板 */
 async function get(ctx) {
   await asSuperPartner(ctx);
-  const [global, list, docs] = await Promise.all([
-    readGlobalPerm(),
-    managers(),
-    // 一次把所有人的按人设置读出来：每人一次 findById 太散，百来条整表扫反而更省
-    findAllPaged(C.PARTNER_PERMISSION, {}),
-  ]);
+  /**
+   * ⚠️ `partner_permissions` 是 2026-10-31 新加的集合，**没建过就查不到**（云开发抛 -502005）。
+   *    这里不把异常抛给前端（那只会看到「服务器繁忙」），而是标一句 `buildNeeded`，
+   *    让页面提示「拨一下开关会自动建好」，而不是白屏。
+   */
+  let docs = [];
+  let buildNeeded = false;
+  try {
+    docs = await findAllPaged(C.PARTNER_PERMISSION, {});
+  } catch (e) {
+    if (!isMissingCollection(e)) throw e;
+    buildNeeded = true;
+  }
+
+  const [global, list] = await Promise.all([readGlobalPerm(), managers()]);
 
   const byId = {};
   docs.forEach((d) => {
@@ -136,6 +174,8 @@ async function get(ctx) {
     global,
     people,
     count,
+    /** true = 权限表还没建（拨任意一个开关会自动建好） */
+    buildNeeded,
     // 前端的标题/说明/拒绝文案都吃这份，改词只改 _kit 的 PERM_TEXT
     meta: PERM_KEYS.map((k) => PERM_TEXT[k]),
   };

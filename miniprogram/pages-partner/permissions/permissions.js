@@ -32,6 +32,11 @@ Page({
     /** 社干名单 */
     people: [],
     count: { managers: 0, scheduleOn: 0, reviewOn: 0, overridden: 0 },
+    /**
+     * 权限表还没建（云开发新集合必须先建，否则查询抛 -502005 → 整页「服务器繁忙」）。
+     * 2026-10-31 实际踩到。页面不白屏，改成一句「拨一下开关会自动建好」。
+     */
+    buildNeeded: false,
   },
 
   onLoad() {
@@ -94,6 +99,7 @@ Page({
             overridden: !!x.overridden,
           })),
           count: (d && d.count) || { managers: 0, scheduleOn: 0, reviewOn: 0, overridden: 0 },
+          buildNeeded: !!(d && d.buildNeeded),
         });
       })
       .catch((err) => {

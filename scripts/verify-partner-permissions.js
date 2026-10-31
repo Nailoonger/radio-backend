@@ -70,6 +70,15 @@ ok('全局缺行视为全开（升级当天不改现状）',
   /const out = \{ schedule: true, review: true, proxy: true \}/.test(kitJs),
   'readGlobalPerm 的默认值漏了一位 —— 那一夜所有人都会「暂无XX权限」，而界面还显示着开');
 ok('三态：null 表示跟随全局', /function triPerm\s*\(/.test(kitJs) && /return null;/.test(kitJs));
+/* 新集合「没建就查不到」的兜底（2026-10-31 线上白屏的真因） */
+ok('_kit 有 isMissingCollection', /function isMissingCollection\s*\(/.test(kitJs));
+ok('_kit 读权限走 readOr 兜底', /await readOr\(\(\) => findById\(C\.PARTNER_PERMISSION/.test(kitJs));
+ok('写路径会自建集合（拨一下开关就建好）',
+  /async function ensureCollection\(\)/.test(permJs) && /await ensureCollection\(\)/.test(permJs),
+  '删了它 ⇒ 表没建时「页面能开但永远保存不了」');
+ok('查不到集合时回 buildNeeded 而不是 50001', /buildNeeded/.test(permJs));
+ok('50001 把真实原因接进 message（别再只显示「服务器繁忙」）',
+  /function decorateServerError/.test(read('miniprogram/utils/request.js')));
 
 /* 填写窗口（2026-10-31）：周一 0 点 ~ 周六 24 点；周日整页只读 */
 ok('_kit 有 availabilityWindow', /function availabilityWindow\s*\(ts\)/.test(kitJs));

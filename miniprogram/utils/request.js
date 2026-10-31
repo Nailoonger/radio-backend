@@ -71,6 +71,29 @@ function handleUnauthorized(app, scope) {
   try { wx.removeStorageSync('token'); } catch (e) {}
 }
 
+/**
+ * 50001 的错误体加工 —— 把**真实原因**从 `data.error` 里接出来
+ *
+ * ═══════════ 为什么必须这么做 ═══════════
+ * 云函数入口的兜底 catch 一律回「服务器繁忙，请稍后再试」，真实异常塞在 `data.error`。
+ * 界面只读 `message`，于是任何未捕获异常看起来都一模一样 —— 排查只能靠猜。
+ * （2026-10-31 踩过：权限管理页白屏报「服务器繁忙」，真因是新建的集合没建，
+ *   而这个原因当时只有翻云函数日志才看得到。）
+ *
+ * ⚠️ 只动 50001：业务错误（40001 / 40301 / 40901…）的 message 本来就是写给人看的，
+ *    拼接只会把话说糊。
+ * ⚠️ 只取首行、截断 80 字：`data.error` 可能是 `Cannot find module '...'`，
+ *    也可能是长栈信息，全塞进 toast 会撑爆一行。
+ */
+function decorateServerError(body) {
+  if (!body || Number(body.code) !== 50001) return body;
+  const err = body.data && body.data.error;
+  if (!err) return body;
+  const reason = String(err).split('\n')[0].slice(0, 80);
+  if (!reason || String(body.message || '').indexOf(reason) >= 0) return body;
+  return Object.assign({}, body, { message: `${body.message}（${reason}）`, raw: body });
+}
+
 // ---------------- direct 模式：wx.request（原逻辑） ----------------
 function directRequest(path, method, data, scope, options) {
   return new Promise((resolve, reject) => {
@@ -97,7 +120,7 @@ function directRequest(path, method, data, scope, options) {
           return reject({ code: 40101, message: '请先登录' });
         }
         if (body.code === 0) return resolve(body.data);
-        reject(body);
+        reject(decorateServerError(body));
       },
       fail: (err) => {
         if (options.sensitive) console.error(`[request:direct FAIL] ${method} ${fullURL}`);
@@ -130,13 +153,24 @@ function cloudRequest(path, method, data, scope, options) {
           return reject({ code: 40101, message: body.message || '请先登录' });
         }
         if (body.code === 0) return resolve(body.data);
-        reject(body);
+        reject(decorateServerError(body));
       },
       fail: (err) => {
         // 云函数执行失败 / 环境未开通 / 冷启动超时都走这里
         if (options.sensitive) console.error(`[request:cloud FAIL] ${method} ${path}`);
         else console.error(`[request:cloud FAIL] ${method} ${path}`, err);
-        reject({ code: -1, message: (err && err.errMsg) || '云函数调用失败' });
+        const raw = (err && err.errMsg) || '';
+        let message = raw || '云函数调用失败';
+        // ⚠️ 把两种最常见的平台侧故障翻译成人话：原来一律"云函数调用失败"，
+        //    排查时根本分不清是没部署、还是环境本身没打通。
+        if (/access_token missing/i.test(raw)) {
+          message = '云开发环境没打通（access_token missing）：云函数 api 未部署，或环境与小程序 AppID 不匹配';
+        } else if (/-501000|FUNCTION_NOT_FOUND|function not found/i.test(raw)) {
+          message = '云函数 api 不存在：请在开发者工具里上传并部署';
+        } else if (/timeout|-504003/i.test(raw)) {
+          message = '云函数超时（冷启动或逻辑过重），稍后重试';
+        }
+        reject({ code: -1, message, raw });
       },
     });
   });
@@ -156,4 +190,23 @@ function adminRequest(url, method = 'GET', data = {}) {
   return request(url, method, data, 'admin');
 }
 
-module.exports = { request, adminRequest, configure, getMode: () => CONFIG.mode };
+/**
+ * 是不是「乐观锁冲突」（40901 = 这条数据刚被别人改过）。
+ *
+ * ═══════════ 为什么单独收一个判定 ═══════════
+ * 40901 和普通业务错误（参数错、无权限）的**后续动作完全不同**：
+ *   普通错误 → 提示一下就完了，列表还是对的
+ *   40901   → 提示**不够**，用户屏幕上那一行已经是旧的了，必须重新拉列表
+ *
+ * 如果各页自己写 `err.code === 40901`，很容易只写了 toast 忘了刷新 ——
+ * 结果就是「弹了红字说被别人处理了，可那一行还杵在那儿」，用户会反复点。
+ *
+ * ⚠️ 这个错误**跟「几个人用几个端」无关**：单人单端也会撞到 ——
+ *    手抖双击、弱网下超时重发、列表开了十几分钟没刷新。
+ *    所以别因为它「听起来像多人场景」就省掉刷新。
+ */
+function isConflict(err) {
+  return !!(err && Number(err.code) === 40901);
+}
+
+module.exports = { request, adminRequest, isConflict, configure, getMode: () => CONFIG.mode };

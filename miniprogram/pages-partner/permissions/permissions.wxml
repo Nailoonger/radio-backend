@@ -18,6 +18,12 @@
     <view class="hint-note" wx:elif="{{loadError}}">{{loadError}}</view>
 
     <block wx:else>
+      <!-- 权限表还没建：不白屏、也不装没事。拨一下开关就会自动建好（见 permissions.js#upsert） -->
+      <view class="intro" wx:if="{{buildNeeded}}">
+        <text class="intro-t">权限表还没初始化</text>
+        <text class="intro-d">不影响用：拨一下下面任意一个开关，会自动把这张表建好并保存。</text>
+      </view>
+
       <view class="intro">
         <text class="intro-t">三个开关：进不进得了排班工作台、审核模块，以及能不能替别人代录。</text>
         <text class="intro-d">关掉之后，班表、考勤、请假照常能看；自己的可排时间也照常能填 —— 只是这几处进不去、替不了别人。</text>

@@ -168,9 +168,37 @@ function triPerm(v) {
   return null;
 }
 
+/**
+ * 「这个集合还没建」的判定
+ *
+ * ⚠️⚠️ 云开发里查一个**没建过**的集合是**抛错**（-502005 / collection not exists），
+ *    **不是**返回空数组。这和 SQL 里「表不存在报错」一个道理，但很容易想当然。
+ *    2026-10-31 实际踩到：新增 `partner_permissions` 忘了跑一次 init-collections，
+ *    权限管理页直接 50001「服务器繁忙」，而本地 harness 的内存库是「查什么都没有就返回 []」，
+ *    所以本地全绿、线上白屏。
+ */
+function isMissingCollection(err) {
+  const msg = String((err && (err.errMsg || err.message)) || err);
+  return /collection not exists|-502005|Db or Table not exist|not exist/i.test(msg);
+}
+
+/**
+ * 读兜底：集合不存在时当成「没有这一行」
+ *
+ * 语义上是自洽的 —— 这套权限本来就是「缺行 = 全开」，表都没建当然更等于缺行。
+ * 宁可让开关显示「开」而实际不生效，也别让人打开页面就看见「服务器繁忙」。
+ */
+async function readOr(fn, fallback) {
+  try {
+    return await fn();
+  } catch (e) {
+    if (isMissingCollection(e)) return fallback;
+    throw e;
+  }
+}
+
 /** 全局总闸；**缺行 = 全开**（与 system_switch 同口径，发版当天不改变任何人的现状） */
 async function readGlobalPerm() {
-  const doc = await findById(C.PARTNER_PERMISSION, 'global');
   /**
    * ⚠️⚠️ 默认值必须把**每一个** PERM_KEYS 都列出来。
    *    只写 `{schedule:true, review:true}` 时，后加的 `proxy` 会取到 undefined
@@ -178,6 +206,8 @@ async function readGlobalPerm() {
    *    这次是测试逮住的；靠肉眼看是看不出来的（界面上开关还显示着「开」）。
    */
   const out = { schedule: true, review: true, proxy: true };
+  // ⚠️ readOr：集合还没建时当「缺行」处理，不让整页 50001（见 isMissingCollection 头注）
+  const doc = await readOr(() => findById(C.PARTNER_PERMISSION, 'global'), null);
   if (doc) {
     PERM_KEYS.forEach((k) => {
       const v = triPerm(doc[k]);
@@ -190,9 +220,9 @@ async function readGlobalPerm() {
 /** 某个 admin.id 的按人设置（null = 没单独设过） */
 async function readPersonPerm(adminId) {
   const id = Number(adminId);
-  const out = { schedule: null, review: null };
+  const out = { schedule: null, review: null, proxy: null };
   if (!Number.isInteger(id) || id <= 0) return out;
-  const doc = await findById(C.PARTNER_PERMISSION, `p:${id}`);
+  const doc = await readOr(() => findById(C.PARTNER_PERMISSION, `p:${id}`), null);
   if (doc) PERM_KEYS.forEach((k) => { out[k] = triPerm(doc[k]); });
   return out;
 }
@@ -586,6 +616,7 @@ module.exports = {
   DUTY_ROLES, DEPARTMENTS, WEEK_DAYS, DEPT_BY_ROLE, deptOfRoles,
   asPartner, asSuperPartner, asManager, asScheduler, asReviewer, asProxyer,
   PERM_KEYS, PERM_TEXT, triPerm, readGlobalPerm, readPersonPerm, effectivePerm, permsOf,
+  isMissingCollection, readOr,
   availabilityWindow, assertWindowWritable,
   assertWeekStart, currentWeekStart, nextWeekStart, weekDates, weekStarted,
   hhmm, normalizeTemplates, templatesToSlots,
