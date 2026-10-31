@@ -105,7 +105,13 @@ function shape(value, expected, at='response') {
   equal('manager cannot withdraw',(await mutate('POST','withdraw',{},2)).code,40301);
   const formal=JSON.stringify(H.dump().duty_assignments);
   r=await mutate('POST','withdraw',{reason:'修订人员'});equal('super withdraw',r.code,0); equal('withdraw returns draft',r.data.week.state,'draft'); equal('withdraw keeps version',r.data.week.version,1);
-  equal('withdraw preserves formal rows',JSON.stringify(H.dump().duty_assignments),formal);equal('withdraw makes originals fixed',r.data.week.summary.fixed,6);
+  equal('withdraw preserves formal rows',JSON.stringify(H.dump().duty_assignments),formal);
+  // 2026-10-31 口径：撤回只退回草稿状态，**不把任何人钉成固定** ——
+  // 全员固定会让「再次生成」一个人都不动，而界面上看不出原因（陛下当天定的）
+  equal('withdraw clears fixed flags',r.data.week.summary.fixed,0);
+  // 撤回后「再次生成」必须真的重排：全员不固定 ⇒ 全部重挑，而不是原样留着
+  r=await mutate('PUT','generate');equal('regenerate after withdraw',r.code,0);
+  equal('regenerate refills every slot',r.data.week.summary.filled,6);equal('regenerate leaves nobody fixed',r.data.week.summary.fixed,0);
   equal('withdraw member hides',(await get(3)).data.total,0);equal('withdraw mine hides',(await call('GET',`/partner/schedule/mine?week=${WEEK}`,{},3)).data.count,0);
   equal('withdraw month hides',(await call('GET',`/partner/schedule/month?month=${WEEK.slice(0,7)}`,{},3)).data.total,0);
   r=await mutate('PUT','cell',{day:DATES[0],slotKey:'0-2',personIds:[1],reason:'老师顶班'});equal('edit preserved draft',r.code,0);

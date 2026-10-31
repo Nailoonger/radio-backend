@@ -337,7 +337,18 @@ async function publish(ctx) {
 async function withdraw(ctx) {
   return mutation(ctx, async (w, p, b) => {
     if (!w.doc || w.doc.state !== 'published') throw new ApiError(Codes.CONFLICT, '本周尚未发布，无需撤回');
-    const rows = w.rows.map((r) => ({ ...r, fixed: true }));
+    /**
+     * 撤回 = 退回草稿，**但不把任何人钉成固定**（2026-10-31 陛下定：
+     * 「改成撤回后不固定、让再次生成真的重排」）。
+     *
+     * ⚠️ 原来这里写 `fixed: true`，结果「撤回 → 再次生成」一个人都不会变：
+     *    generate 只保留固定的，全员固定就等于全员不动，而界面上看不出为什么。
+     *    撤回只是撤销「已发布」这个状态，不是宣布这批人选就是最终人选。
+     * ⚠️ 要冻结某几个人，走换人弹层的「固定当前人员」，那是逐格的显式动作。
+     * ⚠️ 显式写 fixed:false 而不是删字段：isFixed 对 `source==='manual'` 且无 fixed 的行
+     *    仍然判为固定，删字段会让上一版手动选的人继续被钉住。
+     */
+    const rows = w.rows.map((r) => ({ ...r, fixed: false }));
     await writeWeek(w, p, { ...draftPatch(w, rows), publishedAt: null, withdrawnAt: new Date(), withdrawnBy: p.id, withdrawnByName: actorName(p) });
     const saved = await loadWeek(w.weekStart); await log(saved, p, 'withdraw', b.reason, w.doc.version);
     return { week: publicWeek(saved, p) };

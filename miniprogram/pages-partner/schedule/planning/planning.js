@@ -166,7 +166,7 @@ Page({
   },
   onWithdraw() {
     if (!this.data.isSuper || this.data.busy || this.data.state !== 'published') return;
-    wx.showModal({ title: '撤回并保留原安排', content: '伙伴端将显示「本周未发布」。所有人选保留为草稿，可在原基础修改后重新发布；旧版本保留记录。', confirmText: '撤回修改', success: (r) => {
+    wx.showModal({ title: '撤回并保留原安排', content: '伙伴端将显示「本周未发布」。原班底保留在草稿里，但不再算固定 —— 直接「再次生成」会重新挑人；想留住谁，进换人弹层点「固定当前人员」。旧版本保留记录。', confirmText: '撤回修改', success: (r) => {
       if (r.confirm) this.mutate('/partner/schedule/withdraw', 'POST', { reason: '撤回正式班表，在原安排基础修改' }).then((result) => {
         if (!result) return;
         wx.showToast({ title: '已转为修改草稿', icon: 'success' });
