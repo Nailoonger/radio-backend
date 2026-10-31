@@ -160,8 +160,11 @@ const ttl = (permUtil.match(/const TTL_MS = (\d+) \* 1000/) || [])[1];
 ok('TTL ≤ 2 秒（切页面就是新值）', Number(ttl) > 0 && Number(ttl) <= 2,
   `当前 TTL=${ttl}s —— 太长就等于「切回去还是旧的」`);
 const pollMs = (permUtil.match(/const POLL_MS = (\d+) \* 1000/) || [])[1];
-ok('前台轮询 ≤ 15 秒', Number(pollMs) > 0 && Number(pollMs) <= 15,
-  `当前 POLL_MS=${pollMs}s —— 停着不动的人要等这么久才被踢`);
+ok('前台轮询是兜底（≤ 60 秒），主路径是下拉刷新', Number(pollMs) > 0 && Number(pollMs) <= 60,
+  `当前 POLL_MS=${pollMs}s —— 太快会打断人操作；陛下要的是「下拉为主」`);
+ok('POLL_MS 允许设 0 关掉轮询（纯手动模式）',
+  /if \(POLL_MS <= 0\) return;/.test(permUtil),
+  '没这个分支 ⇒ 想关也关不掉，只能改代码逻辑');
 ok('轮询用 key 登记，多页面叠栈不互相踩',
   /const pollers = \{\}/.test(permUtil)
   && /function startPolling\(key, onChange\)/.test(permUtil)
@@ -192,6 +195,24 @@ ok('permissions 页 roleManager 判社干身份比 roleKey 可靠（review 页�
     && (src.match(new RegExp(`stopPolling\\('${key}'\\)`, 'g')) || []).length >= 2,
     `只 startPolling('${key}') 不 stop，或只在一个生命周期里 stop —— onHide 与 onUnload 都要停`);
 });
+
+/* 下拉刷新是主路径（2026-10-31 陛下定）：拉一下必须连权限一起重取 */
+[['排班工作台', 'schedule/planning/planning.js', /perm\.load\(true\)/],
+  ['班表页', 'schedule/index/index.js', /refreshPerm\(true\)/],
+  ['审核页', 'review/review.js', /refreshPermState\(null, true\)/]].forEach(([label, rel, re]) => {
+  const src = read(`miniprogram/pages-partner/${rel}`);
+  const pull = src.slice(src.indexOf('onPullDownRefresh()'), src.indexOf('onPullDownRefresh()') + 600);
+  ok(`${label}：下拉拉一下会连权限一起刷新`, re.test(pull),
+    '下拉只刷数据不刷权限 ⇒「我明明拉了还是旧的」，比不刷更气人');
+});
+ok('工作台首页也能下拉（被限人数跟着变）',
+  /onPullDownRefresh\(\)/.test(read('miniprogram/pages-partner/desk/desk.js')));
+ok('下拉刷新一定收动画（成败都 stopPullDownRefresh）',
+  ['schedule/planning/planning.js', 'schedule/index/index.js', 'review/review.js', 'desk/desk.js'].every((rel) => {
+    const src = read(`miniprogram/pages-partner/${rel}`);
+    return (src.match(/stopPullDownRefresh\(\)/g) || []).length >= 2;
+  }),
+  '只在一个分支里收 ⇒ 出错时那个圈一直转，像卡死');
 ok('取不到权限时放行（fail-open，后端仍会拦）',
   /\.catch\(\(\) => \{[\s\S]{0,300}?return null;/.test(permUtil),
   '改成 fail-closed 了 ⇒ 断网一次就把人锁在门外');

@@ -85,7 +85,26 @@ Page({
     this._gone = true;
     this._request = (this._request || 0) + 1;
   },
-  onPullDownRefresh() { return this.load().finally(() => wx.stopPullDownRefresh()); },
+  /**
+   * 下拉刷新（2026-10-31 陛下指定为主路径）
+   *
+   * ⚠️ 下拉必须**连权限一起强制重取**（`perm.load(true)`），
+   *    否则「我明明拉了，怎么还是旧的」—— 那比不刷还气人。
+   * ⚠️ 权限被关掉时照旧弹窗退回：拉一下发现进不去了，是正常预期，不是 bug。
+   */
+  onPullDownRefresh() {
+    const jobs = [this.load()];
+    if (!this.data.isSuper) {
+      jobs.push(perm.load(true).then((pm) => {
+        if (this._gone || !pm) return;
+        if (pm.schedule === false) this.denySchedule(pm);
+      }));
+    }
+    return Promise.all(jobs).then(
+      () => wx.stopPullDownRefresh(),
+      () => wx.stopPullDownRefresh()
+    );
+  },
   goBack() { if (getCurrentPages().length > 1) wx.navigateBack(); else wx.reLaunch({ url: '/pages-partner/schedule/index/index' }); },
   load(opts) {
     if (!this.data.ready) return Promise.resolve();

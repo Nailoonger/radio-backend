@@ -40,10 +40,11 @@ Page({
     if (this._loadedOnce && !this.data.loading) this.load();
   },
 
-  /** 权限可能刚被超管改过 —— 只重问权限，不整页重拉 */
-  refreshPerm() {
+  /** 权限可能刚被超管改过 —— 只重问权限，不整页重拉
+   *  @param {boolean} force 忽略缓存（下拉刷新用） */
+  refreshPerm(force) {
     if (this.data.roleKey !== 'manager') return Promise.resolve();
-    return perm.load().then((pm) => {
+    return perm.load(force === true).then((pm) => {
       if (this._gone || !pm) return;
       this._applyPerm(pm);
     });
@@ -64,7 +65,18 @@ Page({
     this._gone = true;
     this._request = (this._request || 0) + 1;
   },
-  onPullDownRefresh() { return this.load().finally(() => wx.stopPullDownRefresh()); },
+  /**
+   * 下拉刷新（2026-10-31 陛下指定为主路径）
+   * ⚠️ 权限必须一起强制重取，否则「拉了还是旧的」
+   */
+  onPullDownRefresh() {
+    const jobs = [this.load()];
+    if (this.data.roleKey === 'manager') jobs.push(this.refreshPerm(true));
+    return Promise.all(jobs).then(
+      () => wx.stopPullDownRefresh(),
+      () => wx.stopPullDownRefresh()
+    );
+  },
   load() {
     if (!this.data.ready) return Promise.resolve();
     const request = (this._request || 0) + 1;

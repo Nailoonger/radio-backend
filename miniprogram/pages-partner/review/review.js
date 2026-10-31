@@ -136,10 +136,11 @@ Page({
    * ⚠️ 只在这一页做：它整页就是「能审 / 不能审」两态，
    *    不像班表页那样可以「入口拦住但页面照看」。
    * @param {object} [known] 轮询已经拿到的权限位（传了就不再问一次）
+   * @param {boolean} [force] 忽略缓存（下拉刷新用）
    */
-  refreshPermState(known) {
+  refreshPermState(known, force) {
     if (!this.data.ready || !this.data.roleManager) return Promise.resolve();
-    const get = known ? Promise.resolve(known) : perm.load();
+    const get = known ? Promise.resolve(known) : perm.load(force === true);
     return get.then((pm) => {
       if (this._gone || !pm) return;
       const deniedNow = pm.review === false;
@@ -157,9 +158,19 @@ Page({
     });
   },
 
+  /**
+   * 下拉刷新（2026-10-31 陛下指定为主路径）
+   * ⚠️ 权限必须一起强制重取：不然「审核权限刚被关掉」时拉一下还是旧列表。
+   */
   onPullDownRefresh() {
-    Promise.all([this.fetchCounts(), this.fetchList(true)])
-      .then(() => wx.stopPullDownRefresh());
+    Promise.all([
+      this.refreshPermState(null, true),
+      this.fetchCounts(),
+      this.fetchList(true),
+    ]).then(
+      () => wx.stopPullDownRefresh(),
+      () => wx.stopPullDownRefresh()
+    );
   },
 
   onReachBottom() {

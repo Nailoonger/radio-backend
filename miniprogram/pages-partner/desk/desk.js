@@ -158,6 +158,25 @@ Page({
     this.fetchSongs();
   },
 
+  /**
+   * 下拉刷新（2026-10-31）
+   * 这一页也要能用：超管在别处改完权限，回首页下拉一下，「被限人数」立刻是对的。
+   * ⚠️ 用 Promise.all + 两个分支的 then，保证无论成败都收起刷新动画 ——
+   *    不收的话那个圈会一直转，看着像卡死。
+   */
+  onPullDownRefresh() {
+    if (!this.data.ready) return wx.stopPullDownRefresh();
+    this.fetchCounts();
+    return Promise.all([
+      this.fetchModules(),
+      this.fetchSchedule(),
+      this.fetchSongs(),
+    ]).then(
+      () => wx.stopPullDownRefresh(),
+      () => wx.stopPullDownRefresh()
+    );
+  },
+
   onUnload() { this._gone = true; },
 
   onSwiper(e) {
