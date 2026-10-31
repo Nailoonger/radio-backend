@@ -40,6 +40,7 @@ const attJs = read('miniprogram/pages-partner/attendance/attendance.js');
 const attWxml = read('miniprogram/pages-partner/attendance/attendance.wxml');
 const fbWxml = read('miniprogram/pages-partner/feedback/feedback.wxml');
 const deskJs = read('miniprogram/pages-partner/desk/desk.js');
+const deskWxml = read('miniprogram/pages-partner/desk/desk.wxml');
 const timetableWxml = read('miniprogram/pages-partner/schedule/timetable/index.wxml');
 const scheduleWxml = read('miniprogram/pages-partner/schedule/index/index.wxml');
 const todoJs = read('miniprogram/utils/partnerTodo.js');
@@ -168,6 +169,12 @@ ok('班表删掉底部「排班不使用个人权重…保留缺岗」',
 ok('页面注释不再自称「只改请假状态、不动班表」',
   !/只改请假状态/.test(leaveJs) && !/批准只改请假状态/.test(read('cloud/cloudfunctions/api/handlers/partner/leave.js')),
   '旧口径的注释留着，下一个人就会照着它把逻辑改回去');
+ok('工作台删掉「模块开关 / 系统设置 / 数据看板 / 批量导出…手机端不留入口。」',
+  !/模块开关 \/ 系统设置/.test(deskJs) && !/手机端不留入口/.test(deskJs) && !/cp-note/.test(deskWxml || ''),
+  '这段说明又写回去了 —— 陛下 2026-11-01 10:24 让删（管理区下面那行小字）');
+ok('班表删掉「这一页只能看。生成草稿、换人、校验、发布、撤回都在「排班工作台」里做。」',
+  !/这一页只能看/.test(strip(scheduleWxml)) && !/ts-bar/.test(scheduleWxml),
+  '按钮下面那行说明又回来了 —— 陛下 2026-11-01 10:24 让删');
 
 /* ══════════════ F. 请假审批：周切换贴到 tabs 头上 ══════════════ */
 out.push('\n---- F. 请假审批的周切换 ----');

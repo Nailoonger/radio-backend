@@ -194,9 +194,9 @@
    ⚠️⚠️ `.sc-row` 必须写 `box-sizing: border-box`：WXSS 默认是 content-box，
       这样 `min-height` 只约束内容区，上下 padding 25rpx 会**额外叠上去**，
       每行从 62px 涨到 84.5px，四行整卡凭空高出 90px（陛下 2026-10-29 指出高度不对）。 */
+/* 排班工作台按钮（2026-11-01：按钮下面那句「这一页只能看…」陛下让删，随之把
+   `.ts-bar-h` / `.ts-bar` 两条死样式一并清掉，别留着等下一个人捡回去用） */
 .pl-ops { display: flex; flex-direction: column; gap: 16rpx; }
-.ts-bar-h { font-size: 22rpx; color: #76767E; line-height: 1.7; text-align: center; padding: 0 10rpx; }
-.ts-bar { background: transparent; border-radius: 0; padding: 0; margin-top: 16rpx; padding-bottom: 6rpx; }
 
 .sc-wrap { background: #FFFFFF; border-radius: 36rpx; padding: 0; overflow: hidden; }
 .sc-row {

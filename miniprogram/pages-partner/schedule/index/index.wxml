@@ -19,7 +19,7 @@
       <view class="pl-state {{state === 'published' ? 'pub' : state === 'draft' ? 'draft' : state === 'withdrawn' ? 'wd' : 'none'}}"><text class="ps-b">{{stateText}}</text><text class="ps-s">{{stateSub}}</text></view>
       <duty-timetable week="{{week}}" my-id="{{myId}}" visible-people="{{!isMember || state === 'published'}}" slots="{{slots}}" show-head="{{false}}"/>
       <block wx:if="{{!isMember}}">
-        <view class="pl-ops"><button class="btn primary" bindtap="goPlanning">进入排班工作台（可编辑）</button><text class="ts-bar-h">这一页只能看。生成草稿、换人、校验、发布、撤回都在「排班工作台」里做。</text></view>
+        <view class="pl-ops"><button class="btn primary" bindtap="goPlanning">进入排班工作台（可编辑）</button></view>
         <view class="sc-wrap">
           <view class="sc-row" bindtap="goPlanning" hover-class="row-hover"><image class="ric" src="/assets/partner/ic-chk.png"/><text class="sc-tx">排班工作台</text><text class="sc-st">{{stateText}}{{needText}}</text><text class="sc-ar">›</text></view>
           <view class="sc-row" bindtap="goWorkload" hover-class="row-hover"><image class="ric" src="/assets/partner/ic-star.png"/><text class="sc-tx">人员轮值情况</text><text class="sc-st">本月 {{monthTotal}} 场</text><text class="sc-ar">›</text></view>

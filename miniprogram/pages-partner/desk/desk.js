@@ -573,7 +573,6 @@ Page({
           { go: 'rules', t: '排班规则', d: '场次上限与轮值', n: n(mods.rules), u: '条规则' },
           { go: 'att-overview', t: '考勤总览', d: '全站出勤统计', n: n(mods.recorded), u: '场已录' },
         ],
-        note: '模块开关 / 系统设置 / 数据看板 / 批量导出 只在电脑端后台做，手机端不留入口。',
       });
     }
     return sections;

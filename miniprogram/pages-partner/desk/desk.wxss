@@ -281,16 +281,6 @@
   color: #999DA6;
 }
 
-/* 超管独有：电脑端说明（原型 .cp-note：mt 10、fs 11、lh 1.7、padding 0 4） */
-.cp-note {
-  display: block;
-  font-size: 21rpx;
-  color: #76767E;
-  line-height: 1.7;
-  margin: 19rpx 35rpx 0;
-  padding: 0 8rpx;
-}
-
 /* ── 站员版：需要你处理（v151 home 屏 .need-h / .td） ── */
 .need-h {
   display: flex;

@@ -112,7 +112,6 @@
           </view>
         </view>
       </view>
-      <text wx:if="{{sec.note}}" class="cp-note">{{sec.note}}</text>
     </block>
   </block>
 
