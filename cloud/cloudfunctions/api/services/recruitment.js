@@ -516,7 +516,15 @@ async function deleteBatch(id, body) {
   const row = await requireBatch(S, id);
   const total = await S.count(C.APPLICATION, { batchId: row._id });
   if (total > 0 || row.publishedAt !== null) {
-    if (typeof body.confirm !== 'string' || body.confirm.trim() !== row.title) state('请原样输入批次名称以确认删除');
+    /**
+     * 比对**两边都 trim**：建批次时 `F.batch()` 已经把 title trim 过，
+     * 但历史数据/手工改库可能带首尾空白，那种情况下用户怎么输都不对，
+     * 而且界面上那个空格根本看不见 —— 等于永远删不掉。
+     * ⚠️ 报错文案带上要输的原文：只写「请原样输入」时，用户看不出差在哪。
+     */
+    const typed = typeof body.confirm === 'string' ? body.confirm.trim() : '';
+    const expected = String(row.title === undefined || row.title === null ? '' : row.title).trim();
+    if (typed !== expected) state(`请原样输入批次名称「${expected}」以确认删除`);
   }
   let removed = 0;
   for (let round = 0; round < 500; round += 1) {

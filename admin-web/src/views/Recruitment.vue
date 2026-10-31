@@ -670,20 +670,31 @@ async function batchAction(action) {
 // 删除批次是不可恢复的：一律要求把批次名称原样打一遍（云端也这么校验）。
 async function removeBatch(batch) {
   if (batchActing.value || orderGenerating.value || !batch) return;
+  // ⚠️ 两边都 trim 后比较：历史批次名可能带首尾空白（界面看不出来），
+  //    直接 === 会让用户怎么输都不对，表现就是「输对了还是删不掉」。
+  const expected = String(batch.title ?? '').trim();
   let value;
   try {
     const result = await ElMessageBox.prompt(
       `删除「${batch.title}」会连带清除该批次的全部报名、查询码与面试顺序，且无法恢复。请把批次名称原样输入以确认。`,
       '删除招新批次',
-      { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消', inputPlaceholder: batch.title, inputValidator: (input) => (input || '').trim() === batch.title || '批次名称不一致' },
+      {
+        type: 'warning',
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        inputPlaceholder: expected,
+        // 点遮罩不关闭：这是不可恢复操作，别让一次误点把弹窗关掉、还以为删了
+        closeOnClickModal: false,
+        inputValidator: (input) => (input || '').trim() === expected || '批次名称不一致',
+      },
     );
     value = result.value;
   } catch { return; }
   // 输入校验在弹窗里已做一遍，这里再兜一次：名称不符绝不发删除请求。
-  if ((value || '').trim() !== batch.title) return ElMessage.warning('批次名称不一致，已取消删除。');
+  if ((value || '').trim() !== expected) return ElMessage.warning('批次名称不一致，已取消删除。');
   batchActing.value = true;
   try {
-    const result = await deleteBatch(batch.id, { confirm: (value || '').trim() });
+    const result = await deleteBatch(batch.id, { confirm: expected });
     if (selectedBatch.value?.id === batch.id) { selectedBatch.value = null; applications.value = []; applicationTotal.value = 0; }
     ElMessage.success(`批次「${batch.title}」已删除，连同 ${result?.deletedApplications || 0} 份报名。`);
     await refresh();

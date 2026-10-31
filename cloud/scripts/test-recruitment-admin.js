@@ -169,7 +169,15 @@ async function main() {
     await api.deleteBatch('batch/id?', { confirm: '测试招新' });
     equal(requests.at(-1).method, 'delete', '删除批次使用 DELETE');
     equal(requests.at(-1).args[0], '/admin/recruitment/batches/batch%2Fid%3F', '删除批次标识正确编码');
-    equal(normalized(requests.at(-1).args[1]), { confirm: '测试招新' }, '删除批次携带原文确认');
+    /**
+     * ⚠️⚠️ 必须是 `{ data: { confirm } }` —— axios 的签名是 `delete(url[, config])`，
+     * **第二个参数是配置，不是请求体**。
+     * 这里原来断言的正是 `{ confirm: '测试招新' }`，等于把这个 bug 钉成了"正确行为"，
+     * 所以 2026-11-01 陛下报「批次名输对了还是删不掉」时，测试全绿、一点忙没帮上。
+     * 现在的样子才是真的把 body 发出去了（云通道门面也是取 config.data）。
+     */
+    equal(normalized(requests.at(-1).args[1]), { data: { confirm: '测试招新' } }, '删除批次的 confirm 落在 config.data');
+    equal(requests.at(-1).args[1].confirm, undefined, '业务字段不能直接挂在第二个参数上（会被当 config 吃掉）');
     const direct = createFacade('direct');
     await rejects(() => direct.api.closeBatch('batch-test', 1), (error) => error.code === 'RECRUITMENT_CLOUD_REQUIRED', '直连模式拒绝招新写入');
     equal(direct.requests.length, 0, '直连护栏不调用不存在的 Express 接口');

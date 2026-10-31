@@ -10,7 +10,19 @@ function call(method, path, data, config = {}) {
     error.code = 'RECRUITMENT_CLOUD_REQUIRED';
     return Promise.reject(error);
   }
-  return method === 'get' ? http.get(path, { ...config, params: data }) : http[method](path, data, config);
+  if (method === 'get') return http.get(path, { ...config, params: data });
+  /**
+   * ⚠️⚠️ DELETE 的请求体**只能放在 config.data 里** —— 这是 axios 的签名决定的：
+   *     `axios.delete(url[, config])`，第二个参数是**配置**不是 body。
+   *     写成 `http.delete(url, body)` 的话 body 会被当成 config 吃掉，
+   *     到服务端就是空 body。
+   *     实测代价（2026-11-01 陛下报「删批次输对了名字还是删不掉」）：
+   *     删除批次要求 `body.confirm` 原样等于批次名，body 丢了 ⇒ 服务端永远判
+   *     「请原样输入批次名称」，而界面上输入框里名字明明是对的 —— 看起来就是"点了没反应"。
+   *     云通道门面（utils/http.js makeFacade）也是按 axios 语义取 `config.data`，两边一致。
+   */
+  if (method === 'delete') return http.delete(path, { ...config, data });
+  return http[method](path, data, config);
 }
 
 const base = '/admin/recruitment';
