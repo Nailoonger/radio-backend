@@ -9,7 +9,8 @@
     <view class="pill">
       <view class="iw">
         <image class="ic" src="/assets/partner/tab-{{item.icon}}{{item.on ? '-on' : ''}}.png" mode="aspectFit"/>
-        <text wx:if="{{item.badge}}" class="bg">{{item.badge}}</text>
+        <!-- 角标用 view 不用 text：text 是行内元件，flex 居中在部分基础库上不生效 -->
+        <view wx:if="{{item.badge}}" class="bg {{item.badgeCls}}">{{item.badge}}</view>
       </view>
       <text class="lb">{{item.name}}</text>
     </view>

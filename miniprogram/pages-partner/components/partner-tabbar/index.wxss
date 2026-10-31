@@ -4,7 +4,9 @@
          白底 1px #E6E6EA 圆角 34px 投影 0 6px 20px #00000009
    pill：min-height 54px 圆角 28px 图标 22px 文字 12px
    选中：.on .pill 背景 --tile(#272729) 白字（既有设计系统深色件，合规）
-   角标：锚在图标框右上，#D92D20，min-width 14px 高 14px 圆角 8px 字 9px/600 */
+   角标：锚在图标框右上，#D92D20，min-width 14px 高 14px 圆角 8px 字 9px/600
+   角标里的数字靠 flex 居中（align-items + justify-content），不靠 line-height / text-align，
+   一位数 / 两位数 / 99+ 分别给宽度（见 .bg.s / .m / .l） */
 
 .tb {
   position: fixed;
@@ -65,26 +67,44 @@
   display: block;
 }
 
-/* 角标：向右超出约 8px、向上超 4px，贴图标框右上角（陛下标注的位置） */
+/* 角标：向右超出约 8px、向上超 4px，贴图标框右上角（陛下标注的位置）
+   ⚠️ 数字必须落在红点正中间（2026-11-01 陛下指出「有点移位」）：
+      line-height 等于 height 只能把「行盒」摆正，行盒里还留着 ascender/descender 的空隙，
+      text-align 居中又依赖「内容区宽度 - 字宽」是否对称 —— 位数一变（1 位 / 2 位 / 99+）
+      宽度换一档，字就看着偏一格。这里改成 flex 居中 + 按位数给宽度，三种情形都绝对对称。 */
 .bg {
   position: absolute;
   top: -6rpx;
   left: calc(100% - 2rpx);
   transform: translateX(-50%);
-  min-width: 27rpx;
-  max-width: 46rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   height: 27rpx;
-  border-radius: 15rpx;
+  min-width: 27rpx;
+  border-radius: 9999rpx;
   background: #D92D20;
   color: #FFFFFF;
   font-size: 17rpx;
-  line-height: 27rpx;
-  text-align: center;
-  padding: 0 6rpx;
+  line-height: 1;
   font-weight: 600;
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   box-sizing: border-box;
+}
+/* 一位数：正圆，宽度恰等于高度，左右不留内边距（留了就是「偏一格」的来源） */
+.bg.s {
+  width: 27rpx;
+  padding: 0;
+}
+/* 两位数：左右各 7rpx，对称撑成胶囊 */
+.bg.m {
+  padding: 0 7rpx;
+}
+/* 99+：三个字符，内边距收窄一点，整体别过宽 */
+.bg.l {
+  padding: 0 5rpx;
 }
 
 .ti.on .pill {

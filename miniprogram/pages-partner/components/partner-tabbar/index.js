@@ -36,6 +36,15 @@ function badgeText(n) {
   return v > 99 ? '99+' : String(v);
 }
 
+// 角标宽度档位：一位数正圆、两位数胶囊、99+ 更宽一点（样式在 index.wxss 的 .bg.s/.m/.l）
+// 靠「按位数给宽度 + flex 居中」保证数字落在红点正中间，别再交回 line-height 撑。
+function badgeCls(text) {
+  if (!text) return '';
+  if (text.length === 1) return 's';
+  if (text.length === 2) return 'm';
+  return 'l';
+}
+
 Component({
   properties: {
     // member | manager | super（member 通道就绪前，页面只会传后两种）
@@ -72,13 +81,17 @@ Component({
       const badges = this.data.badges || {};
       const active = this.data.active;
       this.setData({
-        tabs: (TABS[role] || []).map((t) => ({
-          id: t.id,
-          name: t.name,
-          icon: t.icon,
-          on: t.id === active,
-          badge: badgeText(badges[t.id]),
-        })),
+        tabs: (TABS[role] || []).map((t) => {
+          const badge = badgeText(badges[t.id]);
+          return {
+            id: t.id,
+            name: t.name,
+            icon: t.icon,
+            on: t.id === active,
+            badge,
+            badgeCls: badgeCls(badge),
+          };
+        }),
       });
     },
 

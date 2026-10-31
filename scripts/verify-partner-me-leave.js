@@ -208,6 +208,32 @@ ok('输入框用 model:value（别和输入法抢）',
   /model:value="\{\{title\}\}"/.test(editWxml) && /model:value="\{\{content\}\}"/.test(editWxml)
   && !/bindinput="onTitle"/.test(editWxml));
 
+/* ══════════════ H. 底栏角标：数字落在红点正中间 ══════════════ */
+out.push('\n---- H. 底栏角标居中 ----');
+
+const tabWxss = read('miniprogram/pages-partner/components/partner-tabbar/index.wxss');
+const tabWxml = read('miniprogram/pages-partner/components/partner-tabbar/index.wxml');
+const tabJs = read('miniprogram/pages-partner/components/partner-tabbar/index.js');
+const bgBlock = (tabWxss.match(/\.bg\s*\{[\s\S]*?\n\}/) || [''])[0];
+
+ok('红点里的字靠 flex 居中（align-items + justify-content）',
+  /display:\s*flex/.test(bgBlock) && /align-items:\s*center/.test(bgBlock) && /justify-content:\s*center/.test(bgBlock),
+  '又退回 line-height + text-align 了 —— 位数一变宽度换档，字就会偏一格（陛下 2026-11-01 的原话「有点移位」）');
+ok('不再用 line-height 等于 height 去撑居中',
+  /line-height:\s*1;/.test(bgBlock) && !/line-height:\s*27rpx/.test(bgBlock),
+  'line-height:27rpx 只能摆正行盒，行盒里 ascender/descender 的空隙还在，字看着偏上');
+ok('一位数走正圆：固定宽 = 高、左右不留内边距',
+  /\.bg\.s\s*\{[\s\S]{0,80}width:\s*27rpx/.test(tabWxss) && /\.bg\.s\s*\{[\s\S]{0,80}padding:\s*0;/.test(tabWxss),
+  '一位数还留着左右 padding —— 内容区不对称就是「移位」的来源');
+ok('两位数 / 99+ 各自一档，左右内边距对称',
+  /\.bg\.m\s*\{[\s\S]{0,60}padding:\s*0 7rpx/.test(tabWxss) && /\.bg\.l\s*\{[\s\S]{0,60}padding:\s*0 5rpx/.test(tabWxss));
+ok('宽度档位由 badgeCls 按位数算（不在样式里硬撑 max-width）',
+  /function badgeCls\(text\)/.test(tabJs) && /badgeCls:\s*badgeCls\(badge\)/.test(tabJs) && !/max-width:\s*46rpx/.test(tabWxss),
+  'max-width 会在「99+」时把字挤到一边');
+ok('角标用 view 承载（text 是行内元件，flex 居中不可靠）',
+  /<view wx:if="\{\{item\.badge\}\}" class="bg \{\{item\.badgeCls\}\}">/.test(tabWxml),
+  '角标又变回 <text> 了');
+
 console.log(out.join('\n'));
 console.log(failed ? `\n✗ 失败 ${failed} 项` : '\n✓ 我的页六卡同序 · 文字链底栏 · 请假审批独立页 · 考勤只看不录 · 工作台角标 · 站内公告可写');
 process.exit(failed ? 1 : 0);
