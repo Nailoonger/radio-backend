@@ -19,11 +19,10 @@
   </view>
 
   <view class="body">
-    <!-- 2026-10-31：社干被超管关掉「审核权限」时的整页拒绝态。
-         只给一句实话，不给空列表 —— 空列表会让人以为「今天没人投稿」。 -->
+    <!-- 2026-11-01：权限被关掉时**只有「暂无权限」这四个字**，不再写「找超管开通」之类的副句。
+         空列表会让人以为「今天没人投稿」，所以宁可整页就一句实话。 -->
     <view class="deny" wx:if="{{denied}}">
       <text class="deny-t">{{denyReview}}</text>
-      <text class="deny-d">{{denySub}}</text>
     </view>
 
     <block wx:else>
@@ -65,10 +64,12 @@
           <text class="r-time" wx:if="{{item.timeText}}">{{item.timeText}}</text>
         </view>
 
-        <!-- 待审：一行两个动作（原型 flex-basis 100% 换行右对齐） -->
+        <!-- 待审：一行两个动作（原型 flex-basis 100% 换行右对齐）
+             ⚠️ 内部稿件只有**一个**「处理」：列表看不到正文，直接给「通过」就是闭眼批稿
+                （2026-11-01）。点它进审核处理台，全文 + 驳回理由都在那儿。 -->
         <view class="r-act" wx:if="{{item.pending}}">
-          <button class="sm2" hover-class="pressed" catchtap="onApprove" data-id="{{item.id}}">通过</button>
-          <button class="sm2 q" hover-class="pressed" catchtap="onReject" data-id="{{item.id}}">驳回</button>
+          <button class="sm2" hover-class="pressed" catchtap="onApprove" data-id="{{item.id}}">{{item.byDetail ? '处 理' : '通过'}}</button>
+          <button wx:if="{{!item.byDetail}}" class="sm2 q" hover-class="pressed" catchtap="onReject" data-id="{{item.id}}">驳回</button>
         </view>
         <!-- 非待审：只给结论 -->
         <text class="tag {{item.tagCls}}" wx:else>{{item.stateText}}</text>

@@ -113,6 +113,8 @@ function verify(options = {}) {
   node('伙伴端权限分发', [path.join(root, 'scripts/verify-partner-permissions.js')]);
   // 伙伴名册手机号（2026-10-31）：三端入口 / 首次强制弹层没有出口 / 底部红字 / 前后端号码规则一致
   node('伙伴端名册手机号', [path.join(root, 'scripts/verify-partner-roster-ui.js')]);
+  // 稿件四档 + 内部稿件审核处理台（2026-11-01）：草稿箱不许再被删、内部稿件不许在列表一键通过
+  node('伙伴端稿件与内部稿件处理台', [path.join(root, 'scripts/verify-partner-drafts-ui.js')]);
   if (scope === 'mini') return { scope, miniFiles: miniFiles.length };
 
   const revision = options.revision || env.RELEASE_REVISION;

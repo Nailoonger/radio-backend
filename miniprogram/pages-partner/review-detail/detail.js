@@ -1,15 +1,23 @@
 // pages-partner/review-detail/detail.js
 //
-// 审核处理台（2026-10-01）
+// 审核处理台（2026-10-01；2026-11-01 扩到「内部稿件」）
 //
 // 视觉 = v6 的 L1「白卡大投影」：页面底退成羊皮纸灰，卡片浮起来（第 3 档投影），
 // 描边全去；卡内的次级块（名额条、文本域）退回灰底 —— 白卡里嵌灰块。
 // 不引入任何新颜色，投影全是纯黑透明（三通道极差 0，不是彩色投影）。
 //
-// 数据全部来自 GET /admin/submit/:id（含 submitter 统计、statusHistory、card）。
+// 两种来源，同一套壳（`?kind=draft` 切内部稿件）：
+//   学生投稿（点歌 / 文稿）→ GET /admin/submit/:id          · PUT /admin/submit/:id/approve|reject
+//   内部稿件（伙伴自己写的）→ GET /partner/draft/:id        · PUT /partner/draft/:id/review
+//
+// ⚠️⚠️ 为什么内部稿件也要处理台（2026-11-01 陛下：「也要做审核处理台，不能马虎了」）：
+//    原来只有列表里两个按钮 —— 通过是一键，驳回是 showModal 弹个输入框。
+//    **审稿人根本看不到正文**：列表行只有标题/栏目/字数，凭什么判通过？
+//    showModal 那个输入框还收不了长理由、看不到字数时长、看不到这是第几版。
+//    所以并到这里：全文、字数/预计时长/版本、驳回理由预设 + 手写，和投稿走同一套。
 //
 // ⚠️ 两条硬约束决定这里的交互：
-//   ① 驳回理由服务端硬校验必填（admin/submit.js）→ 「驳回」在理由为空时不可点
+//   ① 驳回理由服务端硬校验必填（admin/submit.js、partner/draft.js）→「驳回」在理由为空时不可点
 //   ② 审核通过会进排期 → 通过后 reload 才是最终态，这里以列表刷新为准（emit 给上一页）
 
 const { adminRequest, isConflict } = require('../../utils/request.js');
@@ -24,6 +32,19 @@ const PRESETS = [
   '该曲一周内已点过',
 ];
 
+/**
+ * 内部稿件的驳回理由。
+ * ⚠️ 不能沿用上面那套：那是给学生投稿用的（重复投稿 / 该曲一周内已点过），
+ *    对站内稿件完全不成立。审稿人驳回伙伴的稿，说的是「篇幅」「栏目」「表述」。
+ */
+const PRESETS_DRAFT = [
+  '内容不适合播出',
+  '信息不完整',
+  '篇幅超时，需压缩',
+  '与栏目定位不符',
+  '表述需修改',
+];
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -31,6 +52,9 @@ Page({
     loading: true,
     submitting: false,
     notFound: false,
+
+    // 'submit' | 'draft'（内部稿件）
+    isDraft: false,
 
     // 待审队列定位（「第 N / M 条待处理」与上一条 / 下一条）
     pos: 0,
@@ -41,7 +65,8 @@ Page({
     kindText: '点歌',
 
     person: null,     // 投稿人卡
-    rows: [],         // 投稿内容 kv 行
+    stats: [],        // 投稿人卡下面那三格（投稿看历史通过/驳回，稿件看版本/字数/时长）
+    rows: [],         // 内容 kv 行
     quota: null,      // 本周名额（仅点歌）
     recordLines: [],  // 审核记录
 
@@ -59,10 +84,13 @@ Page({
     }
     const id = Number((options && options.id) || 0);
     const focus = (options && options.focus) || '';
+    const isDraft = (options && options.kind) === 'draft';
 
     this.setData({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
       id,
+      isDraft,
+      presets: isDraft ? PRESETS_DRAFT : PRESETS,
     });
 
     // 先拿待审队列（用于「第 N / M 条」和翻页），再拉详情
@@ -80,7 +108,12 @@ Page({
 
   /** 待审队列的 id 列表（只用于定位与翻页，不进 UI 数据） */
   loadQueue() {
-    return adminRequest('/admin/submit/list', 'GET', { reviewStatus: 0, page: 1, pageSize: 100 })
+    // ⚠️ 内部稿件走自己的审稿队列（/partner/draft/review，status=1 是待审；
+    //    它和 submit 的 reviewStatus 不是同一套数字，别混）
+    const req = this.data.isDraft
+      ? adminRequest('/partner/draft/review', 'GET', { status: 1, page: 1, pageSize: 100 })
+      : adminRequest('/admin/submit/list', 'GET', { reviewStatus: 0, page: 1, pageSize: 100 });
+    return req
       .then((d) => {
         const ids = ((d && d.list) || []).map((x) => x.id);
         this.setData({ ids, queueTotal: ids.length });
@@ -99,13 +132,17 @@ Page({
     }
     this.setData({ loading: true, notFound: false, presetIndex: -1, reason: '', canReject: false });
 
-    return adminRequest(`/admin/submit/${id}`, 'GET')
+    const req = this.data.isDraft
+      ? adminRequest(`/partner/draft/${id}`, 'GET')
+      : adminRequest(`/admin/submit/${id}`, 'GET');
+
+    return req
       .then((d) => {
         if (!d || !d.id) {
           this.setData({ loading: false, notFound: true });
           return;
         }
-        const view = decorate(d);
+        const view = decorate(d, this.data.isDraft);
         const idx = this.data.ids.indexOf(id);
         this.setData({
           id: d.id,
@@ -114,6 +151,7 @@ Page({
           isSong: view.isSong,
           kindText: view.kindText,
           person: view.person,
+          stats: view.stats,
           rows: view.rows,
           quota: view.quota,
           recordLines: view.recordLines,
@@ -159,7 +197,12 @@ Page({
     this.setData({ submitting: true });
     wx.showLoading({ title: '处理中', mask: true });
 
-    adminRequest(`/admin/submit/${this.data.id}/approve`, 'PUT')
+    // 内部稿件走自己那条审稿接口（没有 approve/reject 两个路由，是一个 review 带 approve 布尔）
+    const req = this.data.isDraft
+      ? adminRequest(`/partner/draft/${this.data.id}/review`, 'PUT', { approve: true })
+      : adminRequest(`/admin/submit/${this.data.id}/approve`, 'PUT');
+
+    req
       .then(() => this.afterDone('已通过'))
       .catch((err) => {
         wx.hideLoading();
@@ -179,7 +222,11 @@ Page({
     this.setData({ submitting: true });
     wx.showLoading({ title: '处理中', mask: true });
 
-    adminRequest(`/admin/submit/${this.data.id}/reject`, 'PUT', { reason })
+    const req = this.data.isDraft
+      ? adminRequest(`/partner/draft/${this.data.id}/review`, 'PUT', { approve: false, reason })
+      : adminRequest(`/admin/submit/${this.data.id}/reject`, 'PUT', { reason });
+
+    req
       .then(() => this.afterDone('已驳回'))
       .catch((err) => {
         wx.hideLoading();
@@ -242,7 +289,58 @@ Page({
 /* ---------------------------------------------------------------- *
  * 接口 → 视图
  * ---------------------------------------------------------------- */
-function decorate(d) {
+
+/** 秒 → m:ss（稿件卡上「预计时长」，与稿件页同一口径） */
+function mmssOf(sec) {
+  const s = Math.max(0, Math.round(Number(sec) || 0));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+
+/**
+ * 内部稿件（伙伴自己写的稿）：没有投稿人统计，但有版本 / 字数 / 预计时长。
+ * ⚠️ 正文必须整段给出来 —— 审稿人要看的就是它，截断就等于回到「看不到正文」的老问题。
+ */
+function decorateDraft(d) {
+  const name = d.authorName || '站内作者';
+  const words = Number(d.wordCount) || 0;
+  const person = {
+    initial: String(name).slice(0, 1),
+    name,
+    sub: [d.columnName || '未选栏目', `${words} 字`, mmssOf(d.seconds)].join(' · '),
+    chip: '内部稿件',
+  };
+  const stats = [
+    { l: '版本', n: `第 ${Number(d.version) || 1} 版` },
+    { l: '字数', n: String(words) },
+    { l: '预计时长', n: mmssOf(d.seconds) },
+  ];
+  const rows = [
+    { k: '标题', v: d.title || '（无标题）', strong: true },
+    { k: '栏目', v: d.columnName || '未选栏目' },
+    { k: '正文', v: d.body || '（空）' },
+  ];
+
+  // 审核记录：草稿表没有 statusHistory，就用 submittedAt / reviewedAt / reviewedByName 说清楚
+  const recordLines = [];
+  const st = Number(d.status) || 0;
+  if (st === 1) {
+    const at = d.submittedAt || d.updateTime;
+    recordLines.push(`${at ? fmtIso(at) + ' ' : ''}作者提交，等待审核。`);
+  } else if (st === 2) {
+    recordLines.push(`${d.reviewedAt ? fmtIso(d.reviewedAt) + ' ' : ''}由 ${d.reviewedByName || '—'} 通过。`);
+  } else if (st === 3) {
+    recordLines.push(`${d.reviewedAt ? fmtIso(d.reviewedAt) + ' ' : ''}由 ${d.reviewedByName || '—'} 驳回。`);
+    if (d.rejectReason) recordLines.push(`驳回原因：${d.rejectReason}`);
+  } else {
+    recordLines.push('这篇还是草稿，作者尚未提交审核。');
+  }
+
+  return { isSong: false, kindText: '内部稿件', person, stats, rows, quota: null, recordLines };
+}
+
+function decorate(d, isDraft) {
+  if (isDraft) return decorateDraft(d);
+
   const isSong = Number(d.type) === 1;
   const sub = d.submitter || {};
 
@@ -317,6 +415,12 @@ function decorate(d) {
     isSong,
     kindText: isSong ? '点歌' : '文稿',
     person,
+    // 投稿看「历史通过 / 历史驳回 / 首次投稿」（与上面 person 里的三个字段同一份数据）
+    stats: [
+      { l: '历史通过', n: String(person.approved) },
+      { l: '历史驳回', n: String(person.rejected) },
+      { l: '首次投稿', n: person.firstAt },
+    ],
     rows,
     quota,
     recordLines,

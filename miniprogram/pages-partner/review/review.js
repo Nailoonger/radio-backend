@@ -52,9 +52,11 @@ Page({
     hasMore: false,
     /* 2026-10-31：社干被超管关掉「审核权限」时整页置灰态（只说这一句，不给假列表） */
     denied: false,
-    denyReview: '暂无审核权限',
-    /** 拒绝态的第二行说明 —— 社干（权限被关）与站员（本来就没这角色）说的不是同一句话 */
-    denySub: '超管没有给你开审核模块的权限。要用，找超管在「权限管理」里开一下。',
+    /**
+     * 拒绝态**只有这一句**：后端三档权限的 deny 统一是「暂无权限」四个字（2026-11-01 陛下定）。
+     * ⚠️ 别再往上加「找超管开通」之类的副文案 —— 被关掉的人不需要被指点去找谁。
+     */
+    denyReview: '暂无权限',
     /**
      * 是不是 role=1 的社干 —— **只有他吃「审核权限」这道开关**。
      * ⚠️ 不能用 roleKey 判：roleKey 是给底栏用的呈现值（super / manager / member），
@@ -88,21 +90,16 @@ Page({
     });
 
     /**
-     * 2026-10-31：社干被关掉「审核权限」⇒ 整页就一句「暂无审核权限」，**一个请求都不发**。
+     * 2026-10-31：社干被关掉「审核权限」⇒ 整页就一句「暂无权限」，**一个请求都不发**。
      * 只靠列表接口返回空是骗人的（看着像「今天没人投稿」），所以做成显式的拒绝态。
      * 超管恒放行。
      *
      * ⚠️ 站员（role=2）同样不发请求：审核是社干的活，站员底栏里根本没有这一格
      *    （原来 roleKey 只判 0，站员会被当成社干渲染出「审核」tab，点进来才被拦 —— 已修）。
-     *    这里兜的是「绕过底栏直接进这页」的情况：给一句实话，别让他看页面转圈或报 40301。
+     *    这里兜的是「绕过底栏直接进这页」的情况：给同样一句话，不额外解释谁该找谁。
      */
     if (Number(info.role) === 2) {
-      this.setData({
-        loading: false,
-        denied: true,
-        denyReview: '暂无审核权限',
-        denySub: '审核是社干的活，你的底栏里没有这一格。写稿、改稿去「稿件」页。',
-      });
+      this.setData({ loading: false, denied: true, denyReview: '暂无权限' });
       return;
     }
     if (Number(info.role) === 1) {
@@ -112,7 +109,7 @@ Page({
           this.setData({
             loading: false,
             denied: true,
-            denyReview: (pm.text && pm.text.review) || '暂无审核权限',
+            denyReview: (pm.text && pm.text.review) || '暂无权限',
           });
           return;
         }
@@ -164,7 +161,7 @@ Page({
       if (deniedNow === this.data.denied) return;
       this.setData({
         denied: deniedNow,
-        denyReview: (pm.text && pm.text.review) || '暂无审核权限',
+        denyReview: (pm.text && pm.text.review) || '暂无权限',
       });
       // 从只读恢复成可用：把数据补上（之前一个请求都没发）
       if (!deniedNow) {
@@ -334,11 +331,18 @@ Page({
   onApprove(e) {
     const id = e.currentTarget.dataset.id;
     const kind = this.currentKind();
+    /**
+     * 内部稿件**不许在列表里一键通过**（2026-11-01 陛下：「也要做审核处理台，不能马虎了」）。
+     * 列表行只有标题/栏目/字数，看不到正文 —— 从这个位置点「通过」等于闭着眼睛批稿。
+     * 所以稿件统一进处理台，在那儿看全文、写理由、再决定。
+     */
+    if (kind.key === 'draft') {
+      this.openDetail(id, '', 'draft');
+      return;
+    }
     let req;
     if (kind.key === 'message') {
       req = adminRequest(`/admin/message/${id}/approve`, 'PUT');
-    } else if (kind.key === 'draft') {
-      req = adminRequest(`/partner/draft/${id}/review`, 'PUT', { approve: true });
     } else {
       req = adminRequest(`/admin/submit/${id}/approve`, 'PUT');
     }
@@ -366,22 +370,21 @@ Page({
   },
 
   /**
-   * 驳回：提交表跳处理台（理由必填，列表页放不下）；
-   * 留言表 / 内部稿件没有处理台 ⇒ 就地用可输入的 modal 收理由。
+   * 驳回：点歌 / 文稿 / **内部稿件** 一律跳处理台（理由必填 + 要能看着正文写）；
+   * 只有留言表没有处理台 ⇒ 就地用可输入的 modal 收理由（留言本身就在列表里看全了）。
    */
   onReject(e) {
     const id = e.currentTarget.dataset.id;
     const kind = this.currentKind();
-    if (kind.key === 'song' || kind.key === 'article') {
-      this.openDetail(id, 'reject');
+    if (kind.key !== 'message') {
+      this.openDetail(id, 'reject', kind.key);
       return;
     }
-    const isDraft = kind.key === 'draft';
     wx.showModal({
-      title: isDraft ? '驳回稿件' : '屏蔽留言',
+      title: '屏蔽留言',
       editable: true,
-      placeholderText: '请填写驳回理由（作者能看到）',
-      confirmText: '驳回',
+      placeholderText: '请填写屏蔽理由',
+      confirmText: '屏蔽',
       confirmColor: '#C0392B',
       success: (res) => {
         if (!res.confirm) return;
@@ -391,13 +394,11 @@ Page({
           return;
         }
         wx.showLoading({ title: '处理中', mask: true });
-        const req = isDraft
-          ? adminRequest(`/partner/draft/${id}/review`, 'PUT', { approve: false, reason })
-          : adminRequest(`/admin/message/${id}/reject`, 'PUT', { reason });
+        const req = adminRequest(`/admin/message/${id}/reject`, 'PUT', { reason });
         req
           .then(() => {
             wx.hideLoading();
-            wx.showToast({ title: isDraft ? '已驳回' : '已屏蔽', icon: 'success' });
+            wx.showToast({ title: '已屏蔽', icon: 'success' });
             this.setData({
               list: this.data.list.filter((x) => x.id !== id),
               total: Math.max(0, this.data.total - 1),
@@ -418,9 +419,17 @@ Page({
     });
   },
 
-  openDetail(idOrEvent, focus) {
+  /**
+   * 打开审核处理台
+   * @param {number|Event} idOrEvent
+   * @param {string} [focus] 'reject' = 进去直接滚到理由箱
+   * @param {string} [kindKey] 'draft' = 内部稿件（处理台按它换接口与文案）
+   */
+  openDetail(idOrEvent, focus, kindKey) {
     const id = typeof idOrEvent === 'object' ? idOrEvent.currentTarget.dataset.id : idOrEvent;
-    const url = `/pages-partner/review-detail/detail?id=${id}${focus ? `&focus=${focus}` : ''}`;
+    const url = `/pages-partner/review-detail/detail?id=${id}`
+      + (focus ? `&focus=${focus}` : '')
+      + (kindKey === 'draft' ? '&kind=draft' : '');
     wx.navigateTo({
       url,
       // 处理台里审完一条 → 回来时列表与计数都要最新
@@ -436,11 +445,9 @@ Page({
   /** 点整行进详情：内部稿件没有处理台 ⇒ 去版本页看全文；其余进审核处理台 */
   onItemTap(e) {
     const id = e.currentTarget.dataset.id;
-    if (this.currentKind().key === 'draft') {
-      wx.navigateTo({ url: `/pages-partner/work/versions/versions?id=${id}` });
-      return;
-    }
-    this.openDetail(id);
+    // 内部稿件也进处理台（看全文再批）；版本/原稿留给作者自己的「稿件」页去看
+    const kind = this.currentKind();
+    this.openDetail(id, '', kind.key);
   },
 });
 
@@ -479,6 +486,11 @@ function decorate(r, kind, state) {
   return {
     id: r.id,
     pending,
+    /**
+     * 这一行的「通过/驳回」是不是要先进处理台看一眼。
+     * 内部稿件必须看全文（列表只有标题/栏目/字数），所以它不出两个按钮，只出一个「处理」。
+     */
+    byDetail: isDraft,
     kindText: kind.label,
     tagCls: pending ? kind.tagCls : (approved ? 'done' : 'no'),
     stateText: approved ? '已通过' : (isMessage ? '已屏蔽' : '已驳回'),

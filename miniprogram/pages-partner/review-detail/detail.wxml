@@ -20,7 +20,7 @@
   </view>
 
   <view class="body" wx:elif="{{notFound}}">
-    <view class="hint-note">这条投稿不存在，或已被删除</view>
+    <view class="hint-note">这条{{isDraft ? '稿件' : '投稿'}}不存在，或已被删除</view>
   </view>
 
   <block wx:else>
@@ -43,26 +43,20 @@
           </view>
           <text class="pod-chip">{{person.chip}}</text>
         </view>
+        <!-- ⚠️ 三格由 js 的 stats 驱动：学生投稿是「历史通过/驳回/首次投稿」，
+             内部稿件是「版本/字数/预计时长」—— 两套数据一样宽，模板只认数组，不写死三项。 -->
         <view class="pod-stats">
-          <view class="pod-stat">
-            <view class="pod-stat-l">历史通过</view>
-            <view class="pod-stat-n">{{person.approved}}</view>
-          </view>
-          <view class="pod-stat">
-            <view class="pod-stat-l">历史驳回</view>
-            <view class="pod-stat-n">{{person.rejected}}</view>
-          </view>
-          <view class="pod-stat">
-            <view class="pod-stat-l">首次投稿</view>
-            <view class="pod-stat-d">{{person.firstAt}}</view>
+          <view class="pod-stat" wx:for="{{stats}}" wx:key="l">
+            <view class="pod-stat-l">{{item.l}}</view>
+            <view class="{{item.l === '首次投稿' ? 'pod-stat-d' : 'pod-stat-n'}}">{{item.n}}</view>
           </view>
         </view>
       </view>
 
-      <!-- 投稿内容（白卡 + 大投影） -->
+      <!-- 内容（白卡 + 大投影） -->
       <view class="card-sec">
         <view class="sec-head">
-          <text class="sh-t">投稿内容（{{kindText}}）</text>
+          <text class="sh-t">内容（{{kindText}}）</text>
           <text class="sh-m">完整内容，不做截断</text>
         </view>
         <view class="kv" wx:for="{{rows}}" wx:key="k">
@@ -96,11 +90,11 @@
                 data-idx="{{index}}" bindtap="tapPreset">{{item}}</view>
         </view>
         <textarea class="ta" value="{{reason}}" bindinput="inputReason"
-                  placeholder="或直接写明原因，会原样展示给投稿人"
+                  placeholder="{{isDraft ? '或直接写明原因，会原样展示给作者' : '或直接写明原因，会原样展示给投稿人'}}"
                   placeholder-class="ta-ph" maxlength="200" auto-height />
         <view class="warnline">
           <view class="warn-dot"></view>
-          <text>原因会原样展示给投稿人（小程序「我的投稿」里可见），写清理由再驳回。未填原因时「驳回」不可点。</text>
+          <text>{{isDraft ? '原因会原样展示给作者' : '原因会原样展示给投稿人（小程序「我的投稿」里可见）'}}，写清理由再驳回。未填原因时「驳回」不可点。</text>
         </view>
       </view>
 

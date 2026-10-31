@@ -144,8 +144,19 @@ async function reviewList(ctx) {
   return { list: rows.map((r) => dto(r, { body: false })), total, page, pageSize, status };
 }
 
+/**
+ * GET /partner/draft/:id
+ *
+ * ⚠️ 2026-11-01：审稿处理台要读**别人的**稿（看全文才批得了），所以这里不能锁死作者；
+ *    但也**不能对所有人放开** —— 站员拿个 id 就能看别人未发布的稿，等于越权读。
+ *    规则：作者本人随便看；不是作者就必须有审核权限（asReviewer，社干看开关、超管恒通）。
+ */
 async function detail(ctx) {
-  const { doc } = await loadOne(ctx, false);
+  const p = await asPartner(ctx);
+  const id = pickId(ctx);
+  const doc = await findOne(C.PARTNER_DRAFT, { id });
+  if (!doc) throw new ApiError(Codes.NOT_FOUND, '稿件不存在');
+  if (Number(doc.personId) !== p.id) await asReviewer(ctx);
   return dto(doc);
 }
 

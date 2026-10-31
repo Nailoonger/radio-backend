@@ -68,6 +68,9 @@ const SUITE = [
   // 伙伴名册 · 手机号（2026-10-31）：名册三端都能读、me 那一行、自助改号码的清洗与边界。
   // 标 true —— 源码与打包产物各跑一遍，防止 sync 漏带 me.js 的新导出 saveMyProfile。
   ['test-partner-roster-phone.js', true],
+  // 内部稿件审核处理台（2026-11-01）：详情鉴权 / 队列先交先审 / 驳回必填理由 / 权限开关四件事。
+  // 标 true —— 处理台的接口散在 draft.js 与 _kit.js 两处，sync 漏一个就整页打不开。
+  ['test-partner-draft-review.js', true],
   ['test-http-bridge.js', true],
   // ⚠️ 标 false：它测的是 **admin-web 前端**那一层（`admin-web/src/utils/http.js` 的上传适配），
   //    跟「云函数源码 vs 打包产物」无关，跑两遍没意义。
