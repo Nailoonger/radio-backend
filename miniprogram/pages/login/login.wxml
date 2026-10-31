@@ -35,7 +35,6 @@
     <block wx:if="{{step === 'login'}}">
       <view class="glass">
         <view class="card-title">学生登录</view>
-        <view class="card-sub">使用学校分发的学号进入广播站</view>
 
         <view class="field">
           <view class="field-label">学号</view>
@@ -64,12 +63,6 @@
                 bindtap="doAccountLogin" disabled="{{loading}}">
           {{loading ? '登录中……' : '登 录'}}
         </button>
-
-        <view class="card-divider"></view>
-        <view class="card-foot">
-          <text class="foot-txt">不收集头像与手机号</text>
-          <text class="foot-txt">头像由姓名生成</text>
-        </view>
       </view>
     </block>
 

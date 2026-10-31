@@ -67,8 +67,7 @@
       </button>
 
       <view class="card-divider"></view>
-      <view class="card-foot">
-        <text class="foot-txt">账号由站内管理员开通</text>
+      <view class="card-foot foot-end">
         <text class="foot-txt" hover-class="pressed" bindtap="showLoginHelp">忘记密码？</text>
       </view>
     </view>
