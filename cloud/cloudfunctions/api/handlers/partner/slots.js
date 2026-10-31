@@ -31,6 +31,7 @@ const { ApiError, Codes } = require('../../lib/response');
 const {
   asPartner, asSuperPartner,
   normalizeTemplates, templatesToSlots,
+  currentWeekStart,
 } = require('./_kit');
 
 /**
@@ -112,6 +113,12 @@ async function get(ctx) {
       : versionDto({ version: 1, state: 'draft', templates: defaultTemplates() }));
 
   return {
+    /**
+     * 这一版时段**生效的那一周**（值班周口径：周日 0 点起算下周）。
+     * ⚠️ 2026-10-31：时段页顶部「第 N 周 10/26 – 10/30」原来是小程序端 `getDay()` 自己算的，
+     *    与后端周日切周的口径对不上（周日会显示成上一周）。现在由这里给，前端只渲染。
+     */
+    weekStart: currentWeekStart(),
     canEdit,
     canPublish: canEdit,
     published: versionDto(published),

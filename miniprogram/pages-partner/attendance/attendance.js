@@ -19,21 +19,9 @@
 // ⚠️ 天的键是日期字符串，周几只在展示层补（与后端一致）。
 
 const { adminRequest } = require('../../utils/request.js');
+const { addDays, md, rangeText } = require('../../utils/dates.js');
 
 const DAY_NAMES = ['周一', '周二', '周三', '周四', '周五'];
-
-function mondayOf(offset) {
-  const now = new Date();
-  const dow = now.getDay() === 0 ? 7 : now.getDay();
-  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dow - 1) + offset * 7);
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-
-function md(s) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
-  return m ? `${m[2]}/${m[3]}` : '';
-}
 
 /** 默认落在今天那一格（周末不在周一到周五里，就落周一） */
 function todayIndex() {
@@ -102,8 +90,8 @@ Page({
 
   onPullDownRefresh() { this.load(true).then(() => wx.stopPullDownRefresh()); },
 
-  prevWeek() { this.setData({ offset: this.data.offset - 1, attDay: 0 }, () => this.load()); },
-  nextWeek() { this.setData({ offset: this.data.offset + 1, attDay: 0 }, () => this.load()); },
+  prevWeek() { if (!this._baseWeek) return; this.setData({ offset: this.data.offset - 1, attDay: 0 }, () => this.load()); },
+  nextWeek() { if (!this._baseWeek) return; this.setData({ offset: this.data.offset + 1, attDay: 0 }, () => this.load()); },
 
   goBack() {
     const pages = getCurrentPages();
@@ -111,22 +99,29 @@ Page({
     else wx.reLaunch({ url: '/pages-partner/desk/desk' });
   },
 
+  /**
+   * 当前查看的周（offset=0 不传 week，让云函数按北京时间给「本周」）。
+   *
+   * ⚠️⚠️ 2026-10-31 改：原来前端用 `new Date().getDay()` 自己算周一（mondayOf），
+   *    与后端「周日 0 点就算下一周」的新口径对不上 —— 周日打开这一页会看到一周前那一周，
+   *    而标签还写着「本周」。现在 offset=0 一律不传 week，其它周以服务端回的 weekStart 为基准 ±7 天。
+   */
+  _baseWeek: '',
+
   load(keepDay) {
-    const weekStart = mondayOf(this.data.offset);
-    const p = (n) => String(n).padStart(2, '0');
-    const d = new Date(weekStart.replace(/-/g, '/'));
-    const end = new Date(d.getTime() + 4 * 86400000);
+    const offset = Number(this.data.offset) || 0;
+    const known = this._baseWeek || '';
+    const week = offset === 0 ? '' : (known ? addDays(known, offset * 7) : '');
     this.setData({
       loading: true,
-      weekStart,
-      isThisWeek: this.data.offset === 0,
-      // ⚠️ 不再拼「本周」两个字：本周 / 非本周由 .wk-tag 胶囊显示（2026-10-30 统一口径），
-      //    这里拼进去就会出现「非本周 11/02 – 11/06 本周」自相矛盾的双重标注。
-      weekText: `${md(weekStart)} – ${md(`${end.getFullYear()}-${p(end.getMonth() + 1)}-${p(end.getDate())}`)}`,
+      isThisWeek: offset === 0,
+      // 翻到旧周时先用本地推算的日期顶着，服务端回来后以它的 weekStart 为准
+      weekStart: week || this.data.weekStart,
+      weekText: week ? rangeText(week, 5) : this.data.weekText,
     });
 
     if (!this.data.isManager) {
-      return adminRequest('/partner/attendance/mine', 'GET', { week: weekStart })
+      return adminRequest('/partner/attendance/mine', 'GET', week ? { week } : {})
         .then((r) => {
           const rows = (r && r.list) || [];
           const list = rows.map((x, i) => ({
@@ -152,17 +147,22 @@ Page({
     }
 
     return Promise.all([
-      adminRequest('/partner/attendance/week', 'GET', { week: weekStart }),
-      adminRequest('/partner/attendance/overview', 'GET', { week: weekStart }).catch(() => ({ people: [] })),
+      adminRequest('/partner/attendance/week', 'GET', week ? { week } : {}),
+      adminRequest('/partner/attendance/overview', 'GET', week ? { week } : {}).catch(() => ({ people: [] })),
     ]).then(([w, o]) => {
+      // 服务端回的才是权威周一（offset=0 时顺便记成翻周基准）
+      const ws = (w && w.weekStart) || week;
+      if (offset === 0 && ws) this._baseWeek = ws;
       const days = this.decorateDays(w);
       // 切周时落到周一；同一周刷新（保存后复核）保留当前选中的那天
-      const fallback = this.data.offset === 0 ? todayIndex() : 0;
+      const fallback = offset === 0 ? todayIndex() : 0;
       const attDay = keepDay && days.length
         ? Math.min(this.data.attDay, days.length - 1)
         : Math.min(fallback, Math.max(0, days.length - 1));
       this.setData({
         loading: false,
+        weekStart: ws,
+        weekText: rangeText(ws, 5),
         days,
         attDay,
         dirty: {},                       // 服务端结果回来了，之前攒的改动已经落库/作废

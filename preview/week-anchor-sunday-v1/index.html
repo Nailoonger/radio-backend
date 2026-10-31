@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>周日 0 点切下周 · 逐页影响 v1</title>
+<style>
+  :root { --accent:#0066CC; --ink:#1D1D1F; --muted:#76767E; --red:#B42318; --parchment:#F5F5F7; --hairline:#E2E2E7; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:40px 32px 56px; background:var(--parchment); color:var(--ink);
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif; }
+  .wrap { max-width:920px; margin:0 auto; }
+  h1 { margin:0 0 8px; font-size:20px; letter-spacing:-.3px; }
+  .lead { margin:0 0 24px; font-size:13px; line-height:1.9; color:#6B6B73; }
+  .lead b { color:var(--ink); }
+  code { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; background:#fff;
+    border:1px solid var(--hairline); border-radius:5px; padding:1px 5px; }
+
+  .card { background:#fff; border-radius:16px; padding:20px 22px; margin-bottom:16px; }
+  .card h2 { margin:0 0 14px; font-size:13.5px; }
+
+  /* 时间轴 */
+  .tl { display:flex; align-items:stretch; gap:0; }
+  .tl-col { flex:1; padding:14px 16px; }
+  .tl-col + .tl-col { border-left:1px dashed var(--hairline); }
+  .tl-day { font-size:12px; color:var(--muted); margin-bottom:6px; }
+  .tl-week { font-size:17px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .tl-tag { display:inline-block; margin-left:6px; font-size:10.5px; line-height:1.6; padding:1px 7px;
+    border-radius:9999px; background:#F1F1F4; color:var(--muted); font-weight:500; }
+  .tl-tag.on { background:var(--red); color:#fff; }
+  .tl-note { margin-top:8px; font-size:11.5px; line-height:1.75; color:#8A8A92; }
+  .cut { align-self:center; font-size:11px; color:var(--red); font-weight:600; padding:0 10px; white-space:nowrap; }
+
+  table { width:100%; border-collapse:collapse; font-size:12.5px; background:#fff; border-radius:14px; overflow:hidden; }
+  th,td { text-align:left; padding:10px 14px; border-bottom:1px solid #F0F0F0; vertical-align:top; line-height:1.7; }
+  th { color:var(--muted); font-weight:600; background:#FAFAFC; }
+  td.k { font-weight:600; white-space:nowrap; }
+  .ok { color:#166534; font-weight:600; }
+  .warn { color:var(--red); font-weight:600; }
+  .mono { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11.5px; }
+  ul { margin:6px 0 0; padding-left:18px; font-size:12.5px; line-height:1.95; color:#6B6B73; }
+  li b { color:var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>周日 0 点切下周 · 逐页影响 v1</h1>
+  <p class="lead">陛下原话：<b>「每周周一零点到周六 24 点为可排时间填写的时间段……班表更新时间为周日晚上 0 点，即可查看最新周班表」</b>。
+    落地口径就一句：<b>周日 00:00 起，「本周」自动变成明天开始的那一周</b>。改动只有一处
+    （<code>_kit.js#currentWeekStart()</code> → <code>bj.dutyWeekStart()</code>），但它管着全站五六个页面的默认周，
+    所以下面把每一页挨个过一遍。</p>
+
+  <div class="card">
+    <h2>切点长什么样（以 2026 年 11 月这一周为例）</h2>
+    <div class="tl">
+      <div class="tl-col">
+        <div class="tl-day">周六 11/07 23:59</div>
+        <div class="tl-week">11/02 – 11/06 <span class="tl-tag on">本周</span></div>
+        <div class="tl-note">还是旧周。点周六那一格的考勤、看这张班表，都还是 11/02。</div>
+      </div>
+      <div class="cut">00:00 切</div>
+      <div class="tl-col">
+        <div class="tl-day">周日 11/08 00:00</div>
+        <div class="tl-week">11/09 – 11/13 <span class="tl-tag on">本周</span></div>
+        <div class="tl-note">立刻变成下周。班表周日 0 点更新，这时候点开就能看到新一周；想补看旧周用「‹ 上一周」。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>逐页核对（8 个页面 / 接口）</h2>
+    <table>
+      <tr><th style="width:130px">页面</th><th style="width:210px">周从哪来</th><th>周日 0 点之后会怎样</th></tr>
+      <tr><td class="k">考勤</td><td class="mono">不传 week → 服务端</td><td>显示新一周（周一~周五）。周六那天的考勤要补，点「‹ 上一周」回去点。默认选中「今天」那格，周日落在周一。</td></tr>
+      <tr><td class="k">请假</td><td class="mono">不传 week → 服务端</td><td>能直接给「明天（周一）」请假。以前周日打开是上一周，得手动翻一格才能请下周的假。</td></tr>
+      <tr><td class="k">排班工作台</td><td class="mono">服务端 weekStart</td><td>打开就是新一周的草稿，正好是周日定稿那一刻。<code>generate</code> 的「这一周已经过去了」判据不变。</td></tr>
+      <tr><td class="k">我的班表</td><td class="mono">服务端 weekStart</td><td>周日 0 点起显示新一周（已发布的话）。站员周日打开看到的就是下周自己的班。</td></tr>
+      <tr><td class="k">大白卡</td><td class="mono">/partner/schedule/mine</td><td>「本周 N 个班次」跟着变成新一周。四态（已发布 / 草稿 / 撤回 / 未生成）口径不变。</td></tr>
+      <tr><td class="k">值班时间代录</td><td class="mono">nextWeekStart（下一个周一）</td><td>不受影响：周一到周日算出来永远是同一个答案。<b>周日它正好等于「本周」</b>，所以胶囊那天写「本周」而不是「下一周」，跟其它页一致。</td></tr>
+      <tr><td class="k">值班时段</td><td class="mono">服务端 weekStart</td><td>顶部「第 N 周 10/26 – 10/30」跟着新周走（原来是小程序端 <code>getDay()</code> 自己算）。</td></tr>
+      <tr><td class="k">意见反馈</td><td class="mono">服务端 weekStart</td><td>反馈挂到新一周的场次上（原来周日会挂到上一周，评错场）。</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>顺带清掉的「前端自己算周一」</h2>
+    <ul>
+      <li><b>考勤 / 请假</b>：原来各有 <code>mondayOf(offset)</code>，用 <code>new Date().getDay()</code> 推周一。
+        现在 <code>offset=0</code> 一律<b>不传 week</b>，让云函数给；翻周以服务端回的 <code>weekStart</code> 为基准 ±7 天。</li>
+      <li><b>值班时段 / 意见反馈</b>：同样删掉本地推周一，改读接口返回的 <code>weekStart</code>。</li>
+      <li><b>保留的 <code>getDay()</code></b>：只有考勤「默认选中今天那一格」这种当场判断——那不是算周，不算违例。</li>
+      <li><b>守卫</b>：<code>verify-partner-weeknav.js</code> 新增三条 —— 分包里不许再有 <code>mondayOf</code>、
+        考勤/请假首次加载必须不传 week、可排时间默认周不许回退到本周。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>判据</h2>
+    <table>
+      <tr><th style="width:280px">项</th><th>结果</th></tr>
+      <tr><td class="mono">test-partner-week-anchor.js（新增）</td><td class="ok">21 项 / 0 失败（切点精确到毫秒 + 跨月）</td></tr>
+      <tr><td class="mono">云函数全量回归</td><td class="ok">2187 项 / 0 失败</td></tr>
+      <tr><td class="mono">test-partner-duty.js</td><td class="ok">256 项 / 0 失败</td></tr>
+      <tr><td class="mono">test-partner-schedule-v151.js</td><td class="ok">705 项 / 0 失败</td></tr>
+      <tr><td class="mono">verify --scope mini</td><td class="ok">exit 0（53 pass）</td></tr>
+      <tr><td class="mono">周切换 / 可排时间 / 登录 守卫</td><td class="ok">全绿</td></tr>
+    </table>
+  </div>
+</div>
+</body>
+</html>

@@ -58,6 +58,10 @@ const SUITE = [
   ['test-admin-routes.js', false],
   ['test-gateway.js', true],
   ['test-migration.js', true],
+  // 值班周锚点（2026-10-31 周日 0 点切下周）：纯日期单测，只依赖 lib/bjTime，没有产物轮。
+  // ⚠️ 它守的是**全局口径** —— currentWeekStart 一改，考勤/请假/工作台/我的班表/大白卡五处默认周全跟着变，
+  //    而错了不会报错，只会静默少看一周。切点 / 前后一天 / 跨月 都在里面钉着。
+  ['test-partner-week-anchor.js', false],
   ['test-http-bridge.js', true],
   // ⚠️ 标 false：它测的是 **admin-web 前端**那一层（`admin-web/src/utils/http.js` 的上传适配），
   //    跟「云函数源码 vs 打包产物」无关，跑两遍没意义。

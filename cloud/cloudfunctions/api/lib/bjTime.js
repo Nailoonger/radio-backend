@@ -63,6 +63,28 @@ function nextWeekRange(ts) {
   return { start: new Date(r.start.getTime() + 7 * DAY_MS), end: new Date(r.end.getTime() + 7 * DAY_MS) };
 }
 
+/**
+ * **值班周**的起止 —— 周日 00:00 起就算下一周（2026-10-31 陛下定）
+ *
+ * 为什么不能用 weekRange 了：站里的值班日只有周一到周五（`WEEK_DAYS = 5`），
+ * 周日既没有班次，又正好是「下周班表已经能看」的时候（班表周日 0 点更新，
+ * 也是给没填可排时间的人代录的窗口）。让周日仍算上一周，会出现
+ * 「周日打开考勤 / 我的班表，看到的是一周前那一周」，而界面上完全看不出错。
+ *
+ * ⚠️ 周日 00:00:00 这一毫秒就是切点：周六 23:59 → 旧周，周日 00:00 → 新周。
+ * ⚠️ 只影响「哪一周算本周」，不影响 weekRange / nextWeekRange 这两个日历周定义 ——
+ *    那两只是算日期的地板，被别处复用着。
+ */
+function dutyWeekRange(ts) {
+  const t = ts === undefined ? Date.now() : ts;
+  return shifted(t).getUTCDay() === 0 ? nextWeekRange(t) : weekRange(t);
+}
+
+/** 值班周周一的北京日历日（YYYY-MM-DD） */
+function dutyWeekStart(ts) {
+  return dayKey(dutyWeekRange(ts).start.getTime());
+}
+
 /** 北京时间某个日期是周几（0=周日 … 6=周六） */
 function weekdayOf(d) {
   return shifted(d).getUTCDay();
@@ -81,6 +103,8 @@ module.exports = {
   dayRange,
   weekRange,
   nextWeekRange,
+  dutyWeekRange,
+  dutyWeekStart,
   weekdayOf,
   WEEKDAY_CN,
 };

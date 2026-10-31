@@ -37,13 +37,9 @@ function toHHMM(min) {
   return `${pad2(Math.floor(n / 60))}:${pad2(n % 60)}`;
 }
 
-/** 本周周一（日历日）。与 schedule/index 同口径，别拿裸 new Date() 算周 */
-function mondayOf(offWeeks) {
-  const now = new Date();
-  const day = (now.getDay() + 6) % 7;              // 周一=0
-  const mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + (offWeeks || 0) * 7);
-  return `${mon.getFullYear()}-${pad2(mon.getMonth() + 1)}-${pad2(mon.getDate())}`;
-}
+/* ⚠️ 2026-10-31：本页不再自带 mondayOf。
+   后端口径是「周日 00:00 就算下一周」，前端 getDay() 算出来周日会差一周；
+   周锚点改为读 /partner/slots 返回的 weekStart（见 fetch）。 */
 
 function addDays(ymd, n) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd || '');
@@ -178,17 +174,23 @@ Page({
 
 
   fetch() {
-    const monday = mondayOf(0);
-    const friday = addDays(monday, 4);
-    this.setData({
-      loading: true,
-      loadError: '',
-      weekNo: `第 ${weekNo(monday)} 周`,
-      weekRange: `${monday.slice(5, 7)}/${monday.slice(8, 10)} – ${friday.slice(5, 7)}/${friday.slice(8, 10)}`,
-    });
+    this.setData({ loading: true, loadError: '' });
     return adminRequest('/partner/slots', 'GET', {})
       .then((d) => {
         const data = d || {};
+        /**
+         * ⚠️ 周锚点由服务端给（`data.weekStart`），本页**不再** `getDay()` 自己算周一：
+         *    后端自 2026-10-31 起周日 00:00 就算下一周，前端算出来会差一周，
+         *    而这里只影响「第 N 周 10/26 – 10/30」这行字 —— 错了不会报错，只会静默显示错的周。
+         */
+        const monday = data.weekStart || this.data.weekStart || '';
+        const friday = monday ? addDays(monday, 4) : '';
+        this.setData({
+          loading: true,
+          weekStart: monday,
+          weekNo: monday ? `第 ${weekNo(monday)} 周` : '',
+          weekRange: monday ? `${monday.slice(5, 7)}/${monday.slice(8, 10)} – ${friday.slice(5, 7)}/${friday.slice(8, 10)}` : '',
+        });
         const editing = data.editing || { templates: [] };
         this._templates = (editing.templates || []).map((t) => Object.assign({}, t));
         const cards = rowsToCards(this._templates, monday);

@@ -68,6 +68,34 @@ ok('云函数：可排时间默认周是下一周',
   /q\.week \? assertWeekStart\(q\.week\) : nextWeek\b/.test(avSrc) && /body\.week \|\| nextWeekStart\(\)/.test(avSrc),
   'availability 的默认周又回到 currentWeekStart 了');
 
+/* ══════════ 前端不许自己算周一（2026-10-31 周日切周之后） ══════════
+   后端 currentWeekStart 改成「周日 0 点起算下周」之后，小程序端任何一处
+   `new Date().getDay()` 推周一都会在周日差一周 —— 而界面不会报错，只是内容不对。
+   这里扫一遍分包：只允许「今天是周几」这种当场判断（考勤默认选中今天那格），
+   不允许再出现 mondayOf 那种「按 offset 推周一」的函数。 */
+const partnerDir = path.join(ROOT, 'miniprogram/pages-partner');
+const jsFiles = [];
+(function walk(dir) {
+  for (const name of fs.readdirSync(dir)) {
+    const p = path.join(dir, name);
+    const st = fs.statSync(p);
+    if (st.isDirectory()) walk(p);
+    else if (name.endsWith('.js')) jsFiles.push(p);
+  }
+}(partnerDir));
+
+ok('前端：没有任何页面再自己定义 mondayOf',
+  jsFiles.every((f) => !/function\s+mondayOf\s*\(/.test(fs.readFileSync(f, 'utf8'))),
+  '有页面又在自己推周一 ⇒ 周日会差一周：' + jsFiles.filter((f) => /function\s+mondayOf\s*\(/.test(fs.readFileSync(f, 'utf8'))).map((f) => path.relative(ROOT, f).replace(/\\/g, '/')).join(', '));
+
+// 考勤 / 请假：offset=0 必须不传 week（让云函数给锚点），只保留「今天是周几」的默认选中
+for (const [label, rel] of [['考勤', 'attendance/attendance'], ['请假', 'leave/leave']]) {
+  const src = read(path.join(ROOT, 'miniprogram/pages-partner', rel + '.js'));
+  ok(`${label}：首次加载不传 week，由云函数定本周`,
+    /offset === 0 \? '' :/.test(src),
+    '又变成前端自己算周一传过去了（周日会打开上一周）');
+}
+
 // 时间表组件标题也不许恒写「本周」（工作台能翻周）
 const tt = read(path.join(ROOT, 'miniprogram/pages-partner/schedule/timetable/index.wxml'));
 ok('班表组件：标题按本周/该周切换', /\{\{isThisWeek \? '本周' : '该周'\}\}/.test(tt), '标题还写死「本周」');

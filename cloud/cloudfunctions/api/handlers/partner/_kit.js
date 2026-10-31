@@ -167,22 +167,31 @@ function assertWeekStart(raw) {
   return s;
 }
 
-/** 北京时间「本周周一」的 YYYY-MM-DD */
+/** 北京时间「本周周一」的 YYYY-MM-DD（**值班周口径**：周日 00:00 起算下一周） */
 function currentWeekStart(ts) {
-  const r = bj.weekRange(ts === undefined ? Date.now() : ts);
-  // weekRange 返回的是真实 UTC 时刻（周一 00:00 北京时间），转回北京日历日即可
-  return bj.dayKey(r.start.getTime());
+  /**
+   * ⚠️⚠️ 2026-10-31 改：周日 0 点就切到下一周（陛下定）。
+   *
+   * 原来直接用 bj.weekRange（日历周，周一起算），于是周日打开任何一个带「本周」的页面 ——
+   * 考勤 / 请假 / 排班工作台 / 大白卡 / 我的班表 —— 看到的都是**一周前那一周**，
+   * 而周日恰恰是「下周班表已经发布、还没填可排时间的人要被代录」的那一天。
+   * 现在走 bj.dutyWeekStart：周一 0 点到周六 24 点 = 本周，周日 0 点起 = 下周。
+   *
+   * ⚠️ 这是一个**全局口径**，所有「不传 week 时默认哪一周」的地方都吃它。
+   *    改这里等于同时改五个页面；改完必须逐页看一眼（见 test-partner-week-anchor.js）。
+   */
+  return bj.dutyWeekStart(ts === undefined ? Date.now() : ts);
 }
 
 /**
- * 北京时间「下一周周一」的 YYYY-MM-DD
+ * 北京时间「下一周周一」的 YYYY-MM-DD —— **站员要填的那一周**
  *
  * ⚠️ 可排时间的默认周锚点（2026-10-31 陛下定：「当然是本周填下一周的啊」）。
- *    站员周一 0 点到周六 24 点填的是**还没开始**的那一周，所以不给 week 时
- *    一律落到这里，而不是本周 —— 落到本周会让「填了没用」：
- *    下周排班读的是下周的填报，本周那份早就用过一次了。
- * ⚠️ 用 bj.nextWeekRange 而不是 currentWeekStart + 7 的字符串拼接：
- *    时刻一律由 lib/bjTime 算，跨月 / 跨年由它兜住，不在业务层自己做日期算术。
+ *    站员周一 0 点到周六 24 点填的是**还没开始**的那一周。
+ * ⚠️ 走 bj.nextWeekRange（**日历**周 +7，不含周日切周的那套）：
+ *    它是「今天之后的下一个周一」，周一到周日算出来永远是同一个答案 ——
+ *    周日算出来正好等于 currentWeekStart（周日已经算下周了），这是对的，不是 bug。
+ * ⚠️ 别改成 currentWeekStart + 7：周日会算成再下一周，代录就会落到用户没打算填的那一周。
  */
 function nextWeekStart(ts) {
   const r = bj.nextWeekRange(ts === undefined ? Date.now() : ts);

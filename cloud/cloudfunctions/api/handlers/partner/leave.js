@@ -66,21 +66,29 @@ async function mine(ctx) {
   };
 }
 
-/** 社干待批队列：按周，先请先批 */
+/**
+ * 社干待批队列：按周，先请先批
+ *
+ * ⚠️ 2026-10-31：**列表按周**（不传 week 就是本周，周日 0 点起算下周），
+ *    但 `counts` 仍是**全站**的 —— 大白卡角标读的是「还有多少事没处理」，
+ *    按周过滤会让周日一过角标突然归零，看着像全批完了。
+ * ⚠️ 返回值里带上 `weekStart`：请假页 offset=0 不传 week，靠它标「本周 / 非本周」和日期区间，
+ *    前端自己算周一在周日会差一周（后端 10-31 起改了切周口径）。
+ */
 async function pending(ctx) {
   await asManager(ctx);
   const q = ctx.query || {};
-  const where = { status: STATUS.PENDING };
-  if (q.week) where.weekStart = assertWeekStart(q.week);
+  const weekStart = q.week ? assertWeekStart(q.week) : currentWeekStart();
+  const where = { status: STATUS.PENDING, weekStart };
   const rows = await findMany(C.DUTY_LEAVE, where, {
     orderBy: [['createTime', 'asc'], ['id', 'asc']], limit: 100,
   });
   const [total, approved, rejected] = await Promise.all([
-    count(C.DUTY_LEAVE, where),
+    count(C.DUTY_LEAVE, { status: STATUS.PENDING }),
     count(C.DUTY_LEAVE, { status: STATUS.APPROVED }),
     count(C.DUTY_LEAVE, { status: STATUS.REJECTED }),
   ]);
-  return { list: rows.map(dto), total, counts: { pending: total, approved, rejected } };
+  return { weekStart, list: rows.map(dto), total: rows.length, counts: { pending: total, approved, rejected } };
 }
 
 async function create(ctx) {

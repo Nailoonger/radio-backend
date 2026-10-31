@@ -337,13 +337,17 @@ Page({
         const nextWs = data.nextWeekStart || '';
         // 云函数还是老版本（不回这两个字段）时，按「默认就是下一周」理解，
         // 免得把默认页标成「往期」——那会让人以为打开错了页面。
-        const isNext = nextWs ? ws === nextWs : true;
-        let weekTag = '下一周';
-        if (!isNext) {
-          if (thisWs && ws === thisWs) weekTag = '本周';
-          else if (thisWs && ws < thisWs) weekTag = '往期';
-          else weekTag = '后续周';
-        }
+        const isThis = !!(thisWs && ws === thisWs);
+        const isNext = nextWs ? ws === nextWs : !thisWs;
+        /**
+         * ⚠️ 先判「本周」再判「下一周」：**周日 0 点起两者是同一周**（后端口径）。
+         *    那天整站都把它叫「本周」（考勤 / 班表 / 大白卡），这里再写「下一周」就成了孤例。
+         */
+        let weekTag;
+        if (isThis) weekTag = '本周';
+        else if (isNext) weekTag = '下一周';
+        else if (thisWs && ws < thisWs) weekTag = '往期';
+        else weekTag = '后续周';
         this._fetchWeek = o.week || '';
 
         this.setData({
