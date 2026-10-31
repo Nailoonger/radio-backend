@@ -291,6 +291,24 @@ ok('没有 var(--tile)', permWxss.indexOf('var(--tile') < 0);
 ok('没有深色底 #272729 / #3A3A3C', !/#272729|#3A3A3C/i.test(permWxss));
 ok('用了 accent 强调', permWxss.indexOf('var(--accent') >= 0);
 
+/* ══════════════ E. 角色三档（站员不能被当成社干）══════════════
+ *
+ * 2026-10-31 真踩：站员点「稿件」，底栏冒出「审核」格，点进去才被拦「暂无审核权限」。
+ * 根因是 work.js / review.js 只写了 `role===0 ? 'super' : 'manager'` —— 少了站员那一档。
+ * 这条守的是「以后再有人只判两档」：凡是要算 roleKey 的页，必须能认出 role=2。 */
+section('E. 角色三档');
+
+const ROLE_FILES = [
+  'desk/desk.js', 'me/me.js', 'review/review.js', 'schedule/index/index.js', 'work/work.js',
+];
+ROLE_FILES.forEach((rel) => {
+  const src = read(`miniprogram/pages-partner/${rel}`);
+  // 认这一档的写法：「=== 2 ... 'member'」（desk 是 `if (r === 2) return 'member';`）
+  ok(`角色三档：${rel} 把 role=2 认成站员`,
+    /(===|==)\s*2[^\n]{0,40}'member'/.test(src),
+    '只判了超管/社干 ⇒ 站员会看到社干的入口（2026-10-31 底栏冒出「审核」就是这么来的）');
+});
+
 /* 输出 */
 console.log(out.join('\n'));
 console.log(failed ? `\n✗ 失败 ${failed} 项` : '\n✓ 权限分发 + 填写窗口口径一致（3 个开关 · 4 个接口 · 前端 4 处拦截 · 1 个新页）');
