@@ -1,11 +1,17 @@
 // pages-partner/login/login.js
 //
 // 管理端登录（2026-10-01）
-// 与学生登录页同一套视觉家族，但走的是**管理员账号体系**：
+// 走的是**管理员账号体系**：
 //   POST /api/admin/login  { username, password } → { token, admin }
 // 落库分键存 admin_token（app.adminLogin 里做），同机双登不会互相顶掉。
 //
 // ⚠️ 这里没有「微信一键登录」：管理员账号是独立体系，不绑定微信。
+//
+// 2026-10-31（陛下：伙伴端登录页复用学生端的设计）：
+//   视觉层整份换成学生端那一套 —— wxml 结构照 pages/login/login，wxss 直接
+//   @import 学生端那份。**本文件的方法名全部保持原样**（inputUsername / inputPassword /
+//   togglePwd / doLogin / goBack / goStudentLogin / showLoginHelp 都已经对得上），
+//   所以换视觉没有动一行登录逻辑。
 
 Page({
   data: {
@@ -22,9 +28,9 @@ Page({
     this.setData({
       statusBarHeight: (app && app.globalData && app.globalData.statusBarHeight) || 20,
     });
-    // 已经登过的直接进待办台（登录态长期保持，不必每次输入）
+    // 已经登过的直接进工作台（登录态长期保持，不必每次输入）
     if (app && app.isAdminLoggedIn && app.isAdminLoggedIn()) {
-      wx.reLaunch({ url: '/pages-partner/todo/todo' });
+      wx.reLaunch({ url: '/pages-partner/desk/desk' });
     }
   },
 
@@ -77,8 +83,8 @@ Page({
     const app = getApp();
     app.adminLogin(username, password)
       .then(() => {
-        // 管理端是独立链路，登录后直接落在待办台（不回学生端 tab）
-        wx.reLaunch({ url: '/pages-partner/todo/todo' });
+        // 伙伴端是独立链路，登录后直接落工作台（不回学生端 tab）
+        wx.reLaunch({ url: '/pages-partner/desk/desk' });
       })
       .catch((err) => {
         // 后端业务错误一律 HTTP 200 + { code, message }，message 已是给用户看的文案：

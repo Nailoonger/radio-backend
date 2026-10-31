@@ -1,73 +1,82 @@
-<!-- 菁悠伙伴端·小程序登录。账号仍使用现有 adminLogin，视觉与手机预览保持一致。 -->
-<view class="partner-login-page">
-  <view class="login-backdrop" aria-hidden="true">
-    <image class="login-backdrop-image" src="/assets/me-bg.jpg" mode="aspectFill"></image>
-  </view>
+<!-- 伙伴端登录（2026-10-31：整页复用学生端设计）
+     结构与学生端 pages/login/login 完全一致：顶栏（返回 + 徽章 + 站名）→ 收音机线条插画
+     → 玻璃卡（标题 + 字段 + 登录按钮 + 卡底注）→ 卡片下方一行灰字入口。
+     样式不复制：wxss 里 @import 学生端那份，改视觉只改学生端一处。
 
-  <view class="login-status-space" style="height: {{statusBarHeight}}px"></view>
-  <view class="login-nav">
-    <button class="login-back" bindtap="goBack" aria-label="返回" hover-class="login-control-pressed">‹</button>
-    <text class="login-nav-title">伙伴登录</text>
-  </view>
+     ⚠️ 这里**没有「微信一键登录」**：伙伴走 admin 表账号体系（POST /api/admin/login），不绑微信。
+     ⚠️ 底部灰字是两个页面互相跳的入口：学生端写「伙伴端登录 →」，这里写「切换至学生端 →」。 -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
-  <view class="login-brand">
-    <image class="login-badge" src="/assets/station-badge.png" mode="aspectFit"></image>
-    <view class="login-brand-copy">
-      <text class="login-station">菁悠广播站</text>
-      <text class="login-brand-en">JINGYOU RADIO</text>
+  <view class="topbar">
+    <view class="back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
     </view>
-    <text class="login-partner-tag">伙伴端</text>
+    <view class="topbar-brand">
+      <image class="badge" src="/assets/station-badge.png" mode="aspectFit" />
+      <text class="topbar-name">菁悠广播站</text>
+    </view>
+    <view class="topbar-spacer"></view>
   </view>
 
-  <view class="login-panel">
-    <view class="login-kicker"><view class="login-kicker-dot"></view><text>菁悠伙伴端</text></view>
-    <text class="login-title">欢迎回来。</text>
-    <text class="login-subtitle">登录，接好今天的声音。</text>
-
-    <view class="login-form">
-      <view class="login-field">
-        <text class="login-label">伙伴账号</text>
-        <input class="login-input"
-          value="{{username}}"
-          placeholder="请输入伙伴账号"
-          placeholder-class="login-placeholder"
-          maxlength="80"
-          confirm-type="next"
-          adjust-position="{{true}}"
-          bindinput="inputUsername"
-          aria-label="伙伴账号" />
+  <view class="body">
+    <!-- 品牌区：与学生端同一台收音机（SVG 1 单位 = 1rpx 直接映射，全绝对定位） -->
+    <view class="brand">
+      <view class="radio-art">
+        <view class="wave w1"></view>
+        <view class="wave w2"></view>
+        <view class="wave w3"></view>
+        <view class="radio-body"></view>
+        <view class="sp-outer"></view>
+        <view class="sp-inner"></view>
+        <view class="sp-dot"></view>
+        <view class="knob k1"><view class="tick"></view></view>
+        <view class="knob k2"><view class="tick"></view></view>
       </view>
+      <text class="tagline">和伙伴一起，把每一场准备好</text>
+    </view>
 
-      <view class="login-field">
-        <text class="login-label">密码</text>
-        <view class="login-password-row">
-          <input class="login-input login-password-input"
-            password="{{!showPwd}}"
-            value="{{password}}"
-            placeholder="请输入密码"
-            placeholder-class="login-placeholder"
-            maxlength="128"
-            confirm-type="done"
-            adjust-position="{{true}}"
-            bindinput="inputPassword"
-            bindconfirm="doLogin"
-            aria-label="密码" />
-          <button class="login-password-toggle" bindtap="togglePwd" aria-label="{{showPwd ? '隐藏密码' : '显示密码'}}" hover-class="login-control-pressed">{{showPwd ? '隐藏' : '显示'}}</button>
+    <view class="glass">
+      <view class="card-title">伙伴登录</view>
+      <view class="card-sub">用站内分配的伙伴账号进入</view>
+
+      <view class="field">
+        <view class="field-label">学号 / 伙伴账号</view>
+        <view class="input {{loginError ? 'err' : ''}}">
+          <input class="ipt" type="text" placeholder="站员填学号，社干填伙伴账号"
+                 placeholder-class="ph" value="{{username}}"
+                 bindinput="inputUsername" confirm-type="next" />
         </view>
       </view>
 
-      <view class="login-help-row">
-        <text>和伙伴一起，把每一场准备好。</text>
-        <button class="login-help" bindtap="showLoginHelp" hover-class="login-control-pressed">登录帮助</button>
+      <view class="field">
+        <view class="field-label">密码</view>
+        <view class="input {{loginError ? 'err' : ''}}">
+          <input class="ipt" password="{{!showPwd}}" placeholder="请输入密码"
+                 placeholder-class="ph" value="{{password}}"
+                 bindinput="inputPassword" confirm-type="done"
+                 bindconfirm="doLogin" />
+          <text class="eye" hover-class="pressed" bindtap="togglePwd">{{showPwd ? '隐藏' : '显示'}}</text>
+        </view>
       </view>
 
-      <text class="login-error" wx:if="{{loginError}}" role="alert">{{loginError}}</text>
-      <button class="login-submit" bindtap="doLogin" loading="{{loading}}" disabled="{{loading}}" hover-class="login-submit-pressed">{{loading ? '登录中……' : '登录'}}</button>
-      <text class="login-account-note">账号由站内管理员开通</text>
+      <view class="error-bar" wx:if="{{loginError}}">{{loginError}}</view>
+
+      <button class="submit" hover-class="pressed"
+              bindtap="doLogin" disabled="{{loading}}">
+        {{loading ? '登录中……' : '登 录'}}
+      </button>
+
+      <view class="card-divider"></view>
+      <view class="card-foot">
+        <text class="foot-txt">账号由站内管理员开通</text>
+        <text class="foot-txt" hover-class="pressed" bindtap="showLoginHelp">忘记密码？</text>
+      </view>
     </view>
-    <view class="login-panel-footer">
-      <text>菁菁校园情，悠悠广播声。</text>
-      <button class="login-student" bindtap="goStudentLogin" hover-class="login-control-pressed">切换至学生端</button>
+
+    <view class="admin-entry" hover-class="pressed" bindtap="goStudentLogin">
+      <text>切换至学生端</text>
+      <text class="arw">→</text>
     </view>
   </view>
 </view>
