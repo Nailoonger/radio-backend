@@ -248,7 +248,9 @@ const TPL = [
     // ⚠️ 契约：0 = 自己。曾经无条件回自己的 id，前端 `isProxy = !!targetId` 恒真，
     //    导致「自己填自己」被当成代录（说明强制必填、还回填上次的原因）。
     eq('本人时 targetId=0（不是自己的 id）', r.data.targetId, 0);
-    eq('汇总总数=人员池', r.data.summary.total, 3);
+    // ⚠️ 2026-10-31：指导老师（超管）**不参与排班** ⇒ 不进这张汇总表。
+    //    人池 3 人（老师 + 小周 + 小吴），能排的是 2 人；留着老师会把完成度拉低。
+    eq('汇总总数=可排人员池（不含老师）', r.data.summary.total, 2);
     eq('已确认 0', r.data.summary.confirmed, 0);
   }
   {
@@ -303,7 +305,7 @@ const TPL = [
     eq('回读 picks 带时段信息', r.data.me.picks[0].slot.title, '早间开台');
     eq('stale=false（时段版本一致）', r.data.me.stale, false);
     eq('汇总已确认 1', r.data.summary.confirmed, 1);
-    eq('汇总待确认 2', r.data.summary.pending, 2);
+    eq('汇总待确认 1（另一人是老师，不计入）', r.data.summary.pending, 1);
   }
   {
     const r = await call('PUT', '/partner/availability', {
@@ -527,6 +529,11 @@ const TPL = [
       'POST /partner/accounts/import',
       // 超管替别人配值班岗位（2026-10-30）—— 改的是别人的资格，社干不能碰
       'PUT /partner/people/:id/duty',
+      // 权限分发（2026-10-31）—— 三条都只给超管：
+      //   社干能改权限，就等于自己给自己开权限，这套开关立刻失效
+      'GET /partner/permissions',
+      'PUT /partner/permissions',
+      'PUT /partner/permissions/person/:id',
     ]);
 
     for (const [key] of PARTNER_ROUTES) {

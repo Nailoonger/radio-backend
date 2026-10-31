@@ -30,11 +30,6 @@
         <text class="intro-d">不影响用：拨一下下面任意一个开关，会自动把这张表建好并保存。</text>
       </view>
 
-      <view class="intro">
-        <text class="intro-t">三个开关：进不进得了排班工作台、审核模块，以及能不能替别人代录。</text>
-        <text class="intro-d">关掉之后，班表、考勤、请假照常能看；自己的可排时间也照常能填 —— 只是这几处进不去、替不了别人。</text>
-      </view>
-
       <!-- ① 全局总开关：一刀切，所有人先吃它 -->
       <view class="sh"><text class="t">总开关</text><text class="n">对全体社干</text></view>
       <view class="rows">
@@ -89,11 +84,6 @@
       </view>
 
       <view class="hint-note" wx:else>还没有社干账号。去「账号」里从学生名册把人拉进来。</view>
-
-      <view class="note">
-        总开关是默认值；单独拨过的社干以他自己那一格为准。
-        被关掉的人会分别看到「{{denySchedule}}」「{{denyReview}}」「{{denyProxy}}」。
-      </view>
     </block>
   </view>
 </view>
