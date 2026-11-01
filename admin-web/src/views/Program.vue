@@ -120,7 +120,17 @@
           <el-date-picker v-model="form.broadcastDate" type="date" value-format="YYYY-MM-DD" style="width:100%;" />
         </el-form-item>
         <el-form-item label="简介"><el-input v-model="form.desc" type="textarea" :rows="3" /></el-form-item>
-        <el-form-item label="封面 URL"><el-input v-model="form.cover" /></el-form-item>
+        <!-- 封面：上传为主（2026-11-02）
+             ⚠️ 原来只有个「封面 URL」文本框，而且小程序端至今没有渲染 cover
+                （programs / programDetail 里 0 处引用，/user/program 也没下发）—— 填了也看不见。
+                现在换成真上传，图存云存储 fileID；上不上屏等陛下定，见 memory 2026-11-02。
+             ⚠️ 上传接口是超管专属（requireSuperAdmin），节目排期这一页普通管理员也能进
+                ⇒ 非超管只读展示，别让他点出一个 403。 -->
+        <el-form-item label="封面">
+          <ImageUpload v-model="form.cover" shape="rect" :max-edge="900" :budget-bytes="70 * 1024"
+            :disabled="!canUploadCover" :allow-url="canUploadCover"
+            :hint="canUploadCover ? 'jpg/png/webp，16:9 横图最好；选填' : '封面由超管上传'" />
+        </el-form-item>
         <el-form-item label="排序"><el-input-number v-model="form.sort" :min="0" /></el-form-item>
         <el-form-item label="是否展示">
           <el-switch v-model="form.isShow" :active-value="1" :inactive-value="0" />
@@ -141,8 +151,14 @@ import http from '@/utils/http';
 import dayjs from 'dayjs';
 import { IconSearch, IconPlus, IconEdit, IconTrash } from '@/components/icons';
 import EmptyState from '@/components/EmptyState.vue';
+import ImageUpload from '@/components/ImageUpload.vue';
+import { useAuthStore } from '@/stores/auth';
 
 const query = reactive({ page: 1, pageSize: 20, keyword: '' });
+/* 封面图只能超管传（/admin/upload/avatar 挂了 requireSuperAdmin），
+   而节目排期这一页普通管理员也能进 ⇒ 非超管那张图只读，别让他点出 403。 */
+const auth = useAuthStore();
+const canUploadCover = computed(() => !!auth.isSuperAdmin);
 const rows = ref([]);
 const allRows = ref([]);
 const total = ref(0);

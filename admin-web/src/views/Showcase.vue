@@ -63,7 +63,7 @@
         class="mcard" :class="{ 'is-hidden': Number(item.isShow) !== 1 }"
       >
         <span class="av av-56">
-          <img v-if="item.avatar" :src="item.avatar" :alt="item.name" />
+          <img v-if="item.avatar" :src="avatarSrc(item.avatar)" :alt="item.name" />
           <template v-else>{{ (item.name || '?').charAt(0) }}</template>
         </span>
         <div class="nm">{{ item.name }}</div>
@@ -152,8 +152,12 @@
         <el-form-item label="年级班级">
           <el-input v-model="form.grade" placeholder="如：2024 级 1 班" />
         </el-form-item>
-        <el-form-item label="照片 URL（可选）">
-          <el-input v-model="form.avatar" placeholder="留空则该成员用姓名首字头像展示" />
+        <!-- 照片：上传为主，URL 只是兜底（2026-11-02）
+             ⚠️ 原来这行只有个 URL 输入框 —— 校园里没人有图片链接，等于填不了。
+               留空仍可保存，小程序用姓名首字头像兜底（口径不变）。 -->
+        <el-form-item label="照片">
+          <ImageUpload v-model="form.avatar" shape="circle"
+            hint="jpg/png/webp，选图后自动压到 400px；留空则用姓名首字头像" />
         </el-form-item>
         <el-form-item label="座右铭">
           <el-input v-model="form.motto" maxlength="200" placeholder="选填" />
@@ -248,6 +252,10 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import http from '@/utils/http';
 import { IconSearch, IconPlus } from '@/components/icons';
+import ImageUpload from '@/components/ImageUpload.vue';
+// ⚠️ 库里存的是云存储 fileID（cloud://…），浏览器不认 —— 列表卡片必须过 avatarSrc 换算。
+//    2026-11-02：原来这页是直接 `:src="item.avatar"`，图片上传成功也只会显示一张坏图。
+import { avatarSrc } from '@/utils/avatar';
 import { setPageHeader, clearPageHeader, setRefreshHandler, clearRefreshHandler } from '@/utils/pageHeader';
 
 const HEADER_TITLE = '风采展示';

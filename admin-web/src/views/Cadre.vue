@@ -73,13 +73,10 @@
   <el-dialog v-model="dialog" :title="form.id?'编辑社干':'新增社干'" width="540px" destroy-on-close>
     <el-form :model="form" label-width="84px" :rules="rules" ref="formRef">
       <el-form-item label="头像" prop="avatar">
-        <el-upload class="avatar-uploader" :show-file-list="false" :http-request="uploadAvatar"
-          :before-upload="beforeAvatarUpload" accept="image/jpeg,image/png,image/webp">
-          <img v-if="form.avatar" :src="avatarSrc(form.avatar)" class="avatar-preview" />
-          <el-icon v-else class="avatar-uploader-icon"><IconPlus :size="24" /></el-icon>
-        </el-upload>
-        <div class="hint">支持 jpg/png/webp，≤ 2MB</div>
-        <el-input v-model="form.avatar" placeholder="或粘贴图片 URL" style="margin-top:8px;" />
+        <!-- 2026-11-02：换成共用上传组件 —— 原来的 el-upload **没压图**，
+             手机原图 2MB → base64 2.7MB → HTTP 访问服务 100KB 上限直接 413。 -->
+        <ImageUpload v-model="form.avatar" shape="circle"
+          hint="jpg/png/webp，选图后自动压到 400px" />
       </el-form-item>
       <el-form-item label="姓名" prop="name">
         <el-input v-model="form.name" maxlength="32" show-word-limit />
@@ -116,6 +113,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import http from '@/utils/http';
 // 头像可能是云存储 fileID（cloud://…），浏览器不认 → 统一走 avatarSrc 换算成 https
 import { avatarSrc } from '@/utils/avatar';
+import ImageUpload from '@/components/ImageUpload.vue';
 import {
   IconSearch, IconPlus, IconEdit, IconTrash,
 } from '@/components/icons';
@@ -169,26 +167,6 @@ async function remove(row) {
   await http.delete(`/admin/cadre/${row.id}`);
   ElMessage.success('已删除');
   fetch();
-}
-
-function beforeAvatarUpload(file) {
-  const ok = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type);
-  const lt2M = file.size / 1024 / 1024 < 2;
-  if (!ok) ElMessage.error('仅支持 jpg/png/webp');
-  if (!lt2M) ElMessage.error('文件超过 2MB');
-  return ok && lt2M;
-}
-
-async function uploadAvatar(option) {
-  const fd = new FormData();
-  fd.append('file', option.file);
-  try {
-    const data = await http.post('/admin/upload/avatar', fd, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    form.avatar = data.url;
-    ElMessage.success('上传成功');
-  } catch { /* 拦截器已提示 */ }
 }
 
 onMounted(fetch);
