@@ -5,6 +5,7 @@
 // ⚠️ 关掉开关 = 不限制（服务端按 99 处理），不是「设为 0」。
 
 const { adminRequest } = require('../../utils/request.js');
+const partnerRole = require('../../utils/partnerRole.js');
 
 Page({
   data: {
@@ -23,10 +24,20 @@ Page({
       return;
     }
     const info = (app.globalData && app.globalData.adminInfo) || {};
+    /* ⚠️ 能不能改 = 是不是超管（三档写满），角色现读 `utils/partnerRole`。
+       下面还留了一次「问服务端」的兜底：缓存缺 role 时先按不可改渲染，
+       确认是超管再把加减号/开关/保存打开 —— 否则超管会看到一条
+       「只有超管能改这两条。」，等于被自己的页面锁在门外。 */
+    const roleNum = partnerRole.known(partnerRole.role()) ? partnerRole.role() : Number(info.role);
     this.setData({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
-      canEdit: Number(info.role) === 0,
+      canEdit: roleNum === 0,
     });
+    if (!partnerRole.known(partnerRole.role())) {
+      partnerRole.ensure().then((r) => {
+        if (r === 0 && !this.data.canEdit) this.setData({ canEdit: true });
+      });
+    }
     this.load();
   },
 

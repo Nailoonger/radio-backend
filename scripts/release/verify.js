@@ -135,6 +135,8 @@ function verify(options = {}) {
   node('伙伴端审核记录可读性', [path.join(root, 'scripts/verify-partner-review-record.js')], {
     env: Object.assign({}, env, { VERIFY_SCOPE: scope }),
   });
+  // 排班规则入口：超管必须进编辑页（只有那一页能改），社干/站员才走只读弹层（2026-11-02）
+  node('伙伴端排班规则入口', [path.join(root, 'scripts/verify-partner-rules-entry.js')]);
   if (scope === 'mini') return { scope, miniFiles: miniFiles.length };
 
   const revision = options.revision || env.RELEASE_REVISION;

@@ -1,5 +1,6 @@
 const { adminRequest } = require('../../../utils/request');
 const perm = require('../../../utils/perm');
+const partnerRole = require('../../../utils/partnerRole');
 const partnerTodo = require('../../../utils/partnerTodo.js');
 const vm = require('../view-model');
 Page({
@@ -19,7 +20,10 @@ Page({
     const app = getApp();
     if (!app.isAdminLoggedIn()) return wx.reLaunch({ url: '/pages-partner/login/login' });
     const info = app.globalData.adminInfo || {};
-    const roleKey = Number(info.role) === 0 ? 'super' : (Number(info.role) === 2 ? 'member' : 'manager');
+    /* ⚠️ 角色现读 `utils/partnerRole`（globalData → storage → 兜底问接口）；
+       只认 globalData 那份快照的话，缓存缺 role 的超管会被当成社干。 */
+    const roleNum = partnerRole.known(partnerRole.role()) ? partnerRole.role() : Number(info.role);
+    const roleKey = roleNum === 0 ? 'super' : (roleNum === 2 ? 'member' : 'manager');
     this.setData({ ready: true, statusBarHeight: app.globalData.statusBarHeight || 20, roleKey, isMember: roleKey === 'member', tabId: roleKey === 'member' ? 'schedule' : 'scheduling', myId: Number(info.id) || 0 });
     // 社干才查权限：超管恒放行、站员根本进不了工作台
     if (roleKey === 'manager') {
@@ -180,12 +184,32 @@ Page({
   },
   goWorkload() { if (!this.data.isMember) wx.navigateTo({ url: '/pages-partner/schedule/workload/workload' }); },
   /**
-   * 排班规则（2026-11-02 陛下）：
-   * 站员也能看「目前生效的两条上限」，但是**弹层**，不进规则编辑页
-   * —— 那一页是超管的编辑页，开关是原生组件，非超管拨得动、存不了。
-   * 社干走排班工作台那一行（同一个弹层组件），这里只给站员开。
+   * 排班规则（2026-11-02 陛下）
+   *
+   * 三档写满，别只留一个「弹层」：
+   *   超管      → 进**编辑页**（加减号 / 开关 / 保存都在那一页，这是唯一能改的地方）
+   *   社干/站员 → **只读弹层**，不进超管的编辑页（那边开关是原生组件，拨得动、存不了）
+   *
+   * ⚠️ 2026-11-02 陛下：「你把超管的排班工作台里面的排班规则也做成弹窗干啥，
+   *    那这样超管怎么修改排班规则」—— 判身份一律现读 `utils/partnerRole`，
+   *    不只看本页 data 里那份进页快照（缓存缺 role 时会把超管判成社干，见该文件头注）。
    */
-  openRules() { this.setData({ ruleOpen: true }); },
+  openRules() {
+    if (this.data.roleKey === 'super' || partnerRole.role() === 0) {
+      wx.navigateTo({ url: '/pages-partner/rules/rules' });
+      return;
+    }
+    if (!partnerRole.known(partnerRole.role())) {
+      return partnerRole.ensure().then((r) => {
+        if (r === 0) {
+          wx.navigateTo({ url: '/pages-partner/rules/rules' });
+          return;
+        }
+        this.setData({ ruleOpen: true });
+      });
+    }
+    this.setData({ ruleOpen: true });
+  },
   closeRules() { this.setData({ ruleOpen: false }); },
   goHistory() { if (!this.data.isMember) wx.navigateTo({ url: '/pages-partner/schedule/history/history?week=' + this.data.week.weekStart }); },
   onExport() {

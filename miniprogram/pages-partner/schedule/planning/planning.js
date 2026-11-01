@@ -1,5 +1,6 @@
 const { adminRequest } = require('../../../utils/request');
 const perm = require('../../../utils/perm');
+const partnerRole = require('../../../utils/partnerRole');
 const vm = require('../view-model');
 Page({
   data: {
@@ -22,8 +23,11 @@ Page({
     const app = getApp();
     if (!app.isAdminLoggedIn()) return wx.reLaunch({ url: '/pages-partner/login/login' });
     const info = app.globalData.adminInfo || {};
-    if (Number(info.role) === 2) return wx.reLaunch({ url: '/pages-partner/schedule/index/index' });
-    this.setData({ ready: true, isSuper: Number(info.role) === 0, myId: Number(info.id) || 0, statusBarHeight: app.globalData.statusBarHeight || 20 });
+    /* ⚠️ 角色现读 `utils/partnerRole`（globalData → storage → 兜底问接口），
+       不要只认 globalData 里那份快照：缓存缺 role 时它会把超管判成社干。 */
+    const roleNum = partnerRole.known(partnerRole.role()) ? partnerRole.role() : Number(info.role);
+    if (roleNum === 2) return wx.reLaunch({ url: '/pages-partner/schedule/index/index' });
+    this.setData({ ready: true, isSuper: roleNum === 0, myId: Number(info.id) || 0, statusBarHeight: app.globalData.statusBarHeight || 20 });
 
     /**
      * ⚠️ 2026-10-31：社干进工作台前先过「排班权限」这道开关（超管分发的）。
@@ -31,7 +35,7 @@ Page({
      *    先拉数据再弹窗会让人看见一闪而过的班表，比直接拒绝更像坏了。
      *    超管恒放行（他自己就是总闸），所以只有 role=1 才查。
      */
-    if (Number(info.role) === 1) {
+    if (roleNum === 1) {
       return perm.load().then((pm) => {
         if (pm && pm.schedule === false) return this.denySchedule(pm);
         this.load();
@@ -329,15 +333,31 @@ Page({
   /**
    * 排班规则（2026-11-02 陛下改）
    *
-   * 超管 → 进编辑页（加减号 / 开关 / 保存，那是唯一能改的地方）。
-   * 社干 → **只读弹层**，不进页面。原来一律 navigateTo：非超管进去看到的开关
-   *       是原生组件，手指一拨自己会动，但数据没变、保存按钮是灰的 ⇒ 看着就是「坏了」。
+   * 超管 → **进编辑页**（加减号 / 开关 / 保存，那是唯一能改的地方）。
+   *        这一页对超管绝不能弹只读层，否则他没有任何入口改规则。
+   * 社干 / 站员 → **只读弹层**，不进页面。原来一律 navigateTo：非超管进去看到的开关
+   *        是原生组件，手指一拨自己会动，但数据没变、保存按钮是灰的 ⇒ 看着就是「坏了」。
    * 原型 v151 也是这么分的（`isSuper?'rules':'ro:rules'` → roSheet）。
+   *
+   * ⚠️ 判身份用 `utils/partnerRole` 现读，不只看 data.isSuper
+   *    （data 里那份是**进页那一刻**的快照；缓存缺 role 时快照会把超管判成社干 —— 见该文件头注）。
+   *    本地角色不可信时先问一次 /partner/me，问不到再退回只读弹层（宁可少个入口，也不给错的）。
    */
   goRules() {
-    if (this.data.isSuper) {
+    if (this.data.isSuper === true || partnerRole.role() === 0) {
+      this.setData({ isSuper: true });
       wx.navigateTo({ url: '/pages-partner/rules/rules' });
       return;
+    }
+    if (!partnerRole.known(partnerRole.role())) {
+      return partnerRole.ensure().then((r) => {
+        if (r === 0) {
+          this.setData({ isSuper: true });
+          wx.navigateTo({ url: '/pages-partner/rules/rules' });
+          return;
+        }
+        this.setData({ ruleOpen: true });
+      });
     }
     this.setData({ ruleOpen: true });
   },
