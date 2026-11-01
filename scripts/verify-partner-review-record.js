@@ -76,6 +76,11 @@ ok('排期侧把 opId 透传到 applyChange（initialAllocate / reschedule）',
   && /reason: S\.SYSTEM_REASON\.initial, opId \}/.test(cloudSchedule)
   && /reason: isSame \? S\.SYSTEM_REASON\.rescheduleOk : ASSIGN_REASON\.originalFull,\s*\n\s*opId,/.test(cloudSchedule),
   '排期那段没接 opId —— 「分配了播出时段」还是会单独占一行');
+ok('老流水没有 opId 时兜一层（同一人 + 同一动作 + 3 秒内）',
+  /sameLegacyOp/.test(cloudStatus) && /LEGACY_WINDOW_MS = 3000/.test(cloudStatus),
+  '老数据那两条一模一样的「撤销」会原样显示两遍 —— 正是陛下说的"重复"');
+ok('兜底只并同名动作，不同动作宁可两行',
+  /String\(a\.reason \|\| ''\) === String\(b\.reason\)/.test(cloudStatus));
 
 /* ══════════════ C. 接口：把「谁」查出来 ══════════════ */
 out.push('\n---- C. 谁通过的、谁撤销的 ----');

@@ -317,12 +317,27 @@ async function describeHistory(rows) {
     } catch (e) { /* 查不到就退回常量名，不影响记录本身 */ }
   }
 
+  // 分组：新数据按 opId；老数据没有 opId，用「同一人 + 同一动作 + 3 秒内」兜一层
+  // （一次「撤销」按维度各写一条，界面上就是两行一模一样的「撤销」）。不同动作不并。
+  const LEGACY_WINDOW_MS = 3000;
+  const toMs = (v) => (v ? new Date(v).getTime() || 0 : 0);
+  const sameLegacyOp = (a, b) => !!b.reason
+    && String(a.reason || '') === String(b.reason)
+    && String(a.operatorId || '') === String(b.operatorId || '')
+    && String(a.operatorName || '') === String(b.operatorName || '')
+    && Math.abs(toMs(b.createTime) - toMs(a.createTime)) <= LEGACY_WINDOW_MS;
+
   const groups = [];
   list.forEach((r, i) => {
-    const key = r.opId ? String(r.opId) : `legacy-${i}`;
     const last = groups[groups.length - 1];
-    if (last && last.key === key) last.rows.push(r);
-    else groups.push({ key, rows: [r] });
+    const key = r.opId ? String(r.opId) : null;
+    let join = false;
+    if (last) {
+      if (key) join = !last.legacy && last.key === key;
+      else if (last.legacy) join = sameLegacyOp(last.rows[0], r);
+    }
+    if (join) last.rows.push(r);
+    else groups.push({ key: key || `legacy-${i}`, legacy: !key, rows: [r] });
   });
 
   return groups.map((g) => {

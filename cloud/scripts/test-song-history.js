@@ -188,7 +188,22 @@ async function main() {
     log({ operatorId: 2, reason: 'REVIEW_APPROVED' }),
     log({ operatorId: 2, reason: 'INITIAL_ALLOCATION', dimension: 'schedule' }),
   ]);
-  eq('老数据没有 opId：不硬并（宁可两行也不错并）', h.length, 2);
+  eq('老数据没有 opId、动作也不同：不硬并（宁可两行也不错并）', h.length, 2);
+
+  // 老数据里一次「撤销」按维度写了两条一模一样的 REVOKED —— 界面上看着像撤了两次，
+  // 这正是陛下说的「重复」。老数据没有 opId，靠「同一人 + 同一动作 + 3 秒内」兜住。
+  const t0 = new Date('2026-10-31T08:37:00.000Z');
+  h = await S.describeHistory([
+    log({ operatorId: 1, reason: 'REVOKED', dimension: 'review', toStatus: 'PENDING_REVIEW', createTime: t0 }),
+    log({ operatorId: 1, reason: 'REVOKED', dimension: 'schedule', toStatus: 'UNASSIGNED', createTime: new Date(t0.getTime() + 800) }),
+  ]);
+  eq('老数据的两条 REVOKED 并成一条（不再显示两行「撤销」）', [h.length, h[0].text], [1, '撤销，退回待审核']);
+
+  h = await S.describeHistory([
+    log({ operatorId: 1, reason: 'REVOKED', dimension: 'review', toStatus: 'PENDING_REVIEW', createTime: t0 }),
+    log({ operatorId: 1, reason: 'REVOKED', dimension: 'schedule', toStatus: 'UNASSIGNED', createTime: new Date(t0.getTime() + 60000) }),
+  ]);
+  eq('相隔一分钟的两次同名动作：不并（真的是两次）', h.length, 2);
 
   /* ══════════════ C. 真接口：approve 落出来的流水 ══════════════ */
   section('C. 真接口（approve / revoke）');
