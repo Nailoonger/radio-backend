@@ -41,14 +41,21 @@
         </view>
       </view>
 
-      <!-- 栏目：从本周节目名去重得来；拉不到就只留自定义输入 -->
-      <view class="card" wx:if="{{columns.length}}">
-        <view class="sec-h"><text class="sec-t">栏目</text></view>
-        <view class="chips">
+      <!-- 栏目：候选取自全站节目名（GET /partner/draft/columns，最多 12 个）
+           ⚠️ 选填 —— 一个都不选也能存稿/提交；选错了再点一次胶囊就取消。
+           ⚠️⚠️ 这块卡**不随候选为空而消失**（以前 `wx:if="{{columns.length}}"`，本周没排期就整块不见，
+              看着像没做接口）。现在卡常驻，没有候选时如实说一句「暂无栏目」。 -->
+      <view class="card">
+        <view class="sec-h">
+          <text class="sec-t">栏目</text>
+          <text class="sec-opt">选填</text>
+        </view>
+        <view class="chips" wx:if="{{columns.length}}">
           <view class="chip {{columnName === item ? 'on' : ''}}"
                 wx:for="{{columns}}" wx:key="*this"
                 data-v="{{item}}" bindtap="pickColumn">{{item}}</view>
         </view>
+        <view class="col-empty" wx:else>暂无栏目</view>
       </view>
 
       <!-- 时长尺：字数 / 语速 = 时长，蓝游标对黄刻线 -->
@@ -110,7 +117,6 @@
         <button class="btn primary" hover-class="pressed" bindtap="onSubmit"
                 disabled="{{readonly || saving}}">提交审核</button>
       </view>
-      <view class="note">提交后进社干的待办台；驳回会带理由，你能在原处看到为什么。</view>
     </view>
   </block>
 </view>

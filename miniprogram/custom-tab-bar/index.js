@@ -1,24 +1,34 @@
 // custom-tab-bar/index.js
 // 胶囊浮动底部导航（设计稿「01/02/03/04」底部）
 //
-// ==================== 动画契约（v9 定稿，改这里之前先读完） ====================
-// 微信 custom-tab-bar 的机制：每个 tab 页有自己独立的 tabBar 组件实例。
-// 跨页滑动的全部翻车（冷启动没动画 / 方向错 / 两次动画 / 动画像被删了）都源于：
-//   「渲染过的实例」才能演 transition；没渲染过的实例只有初始位置（第 1 格）。
-//
-// v9 方案：滑动发生在【目标页】，起点是【来源格】，用 setData 的渲染完成回调
-// 替代猜时间的 setTimeout（回调 = 该次渲染已完成，元素已真实停在起点，transition 必生效）。
-//
-//   1) switchTab（用户点按）：不演动画、不延迟，只记录来源格到 globalData.tabFrom，
-//      然后立刻 wx.switchTab —— 切页与点按同步（用户拍板，不要滑完再切）。
-//   2) setSelected（页面到达）：两步——
-//      ① setData({noanim:true, selected:来源格, revealed:true}) 瞬移到起点并显影
-//      ② setData 的渲染完成回调里 setData({noanim:false, selected:目标格}) 滑向终点
-//      只此一次滑动，起点=来源格，冷启动同样生效（首次渲染即按起点就位）。
-//   3) 来源页不做任何预动画 —— 它的 selected 永远等于自己的格位，不存在毒化，
-//      也就不存在「回到该页又滑一次」的两次动画。
-//   4) revealed：指示器在第一次 setSelected 落位前不渲染（初始值不可信）。
-// ==============================================================================
+// 动画契约 v10：沿用 v9 的「立即切页、目标页起点落位、渲染回调后播放」。
+// 每页有独立实例；来源页不预播。selected 始终是真实页，visualSelected 只控制外观。
+// 胶囊四段形变共 400ms；hide 与版本号阻止旧回调覆盖后续切换。
+
+function pose(animation, left, width, height, duration) {
+  return animation.left(`${left * 25}%`).width(`${width * 25}%`)
+    .scaleY(height).step({ duration, timingFunction: 'ease-out' });
+}
+
+function resting(index) {
+  const animation = wx.createAnimation();
+  pose(animation, index, 1, 1, 0);
+  return animation.export();
+}
+
+function flowing(from, to) {
+  const animation = wx.createAnimation();
+  const distance = Math.abs(to - from);
+  const direction = Math.sign(to - from);
+  // 前沿先行、后沿滞后；向左时镜像两端位置。
+  pose(animation, direction > 0 ? from + distance * 0.12 : from - distance * 0.72,
+    1 + distance * 0.60, 0.90, 120);
+  pose(animation, direction > 0 ? from + distance * 0.80 : to,
+    1 + distance * 0.20, 0.94, 120);
+  pose(animation, to + direction * 0.035, 1, 1.02, 100);
+  pose(animation, to, 1, 1, 60);
+  return animation.export();
+}
 
 Component({
   options: {
@@ -28,9 +38,12 @@ Component({
 
   data: {
     selected: 0,
-    // 指示器显影开关：第一次 setSelected 落位前不渲染（契约 4）
+    visualSelected: 0,
+    indicatorAnimation: {},
+    motionClass: false,
+    // 第一次 setSelected 落位前隐藏指示器。
     revealed: false,
-    // 瞬移开关：落位到起点时同帧禁用过渡（契约 2①）
+    // 起点落位时禁用文字和图标颜色过渡；胶囊用 0ms 动画落位。
     noanim: false,
     // 启动动画期间由首页通过 getTabBar() 驱动：
     //   hidden —— 胶囊退到屏幕外（容器无底色，不会有白板出现）
@@ -45,6 +58,10 @@ Component({
     ],
   },
 
+  pageLifetimes: {
+    hide() { this._motionVersion = (this._motionVersion || 0) + 1; },
+  },
+
   methods: {
     /**
      * 【契约 1】用户点按 tab：只记录来源格 + 立刻切页，不演动画、不延迟。
@@ -55,8 +72,15 @@ Component({
       if (!item || index === this.data.selected) return;
 
       const app = getApp();
-      if (app) app.globalData.tabFrom = this.data.selected;
-      wx.switchTab({ url: item.pagePath });
+      const global = app.globalData;
+      const request = global.tabRequest = (global.tabRequest || 0) + 1;
+      global.tabFrom = this.data.selected;
+      wx.switchTab({
+        url: item.pagePath,
+        fail: () => {
+          if (global.tabRequest === request) global.tabFrom = undefined;
+        },
+      });
     },
 
     /**
@@ -65,20 +89,25 @@ Component({
      */
     setSelected(index) {
       const app = getApp();
-      const from = (app && app.globalData && app.globalData.tabFrom !== undefined)
-        ? app.globalData.tabFrom
-        : this.data.selected;
-      if (app && app.globalData) app.globalData.tabFrom = undefined;
+      const global = app && app.globalData;
+      const source = global && global.tabFrom;
+      const from = Number.isInteger(source) && source >= 0 && source < 4 ? source : index;
+      if (global) global.tabFrom = undefined;
+      const version = this._motionVersion = (this._motionVersion || 0) + 1;
+      const direction = Math.sign(index - from);
 
-      if (from === index) {
-        this.setData({ selected: index, revealed: true });
-        return;
-      }
-
-      // ① 瞬移到起点（同帧禁过渡）+ 显影；② 渲染完成回调里恢复过渡滑向终点
-      this.setData({ noanim: true, selected: from, revealed: true }, () => {
-        this.setData({ noanim: false, selected: index });
+      // 真实选中态立即更新，避免起点渲染期间快速点按误判。
+      this.setData({
+        selected: index, visualSelected: from, revealed: true,
+        noanim: true, motionClass: false, indicatorAnimation: resting(from),
+      }, () => {
+        if (version !== this._motionVersion) return;
+        this.setData({
+          noanim: false, visualSelected: index, motionClass: direction !== 0,
+          indicatorAnimation: direction ? flowing(from, index) : resting(index),
+        });
       });
+      return direction;
     },
   },
 });

@@ -1,3 +1,4 @@
+const tabMotion = require('../../utils/tabMotion.js');
 // pages/submit/submit.js
 //
 // 点歌前置四件事（v8 方案落地 / 2026-09-20 点歌规则 v2）：
@@ -21,6 +22,7 @@ const ACK_HINT = '确认后不会重复弹出；内容更新后会再提醒一�
 
 Page({
   data: {
+    tabMotion: '',
     statusBarHeight: 20,
     navBarHeight: 44,
     type: 1,                // 1=点歌 2=文稿
@@ -95,15 +97,14 @@ Page({
       this.resetSongForm();
       if (wx.pageScrollTo) wx.pageScrollTo({ scrollTop: 0, duration: 0 });
     }
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setSelected(1);
-    }
+    tabMotion.show(this, 1);
     this.checkLogin();
     this.loadSwitches();
     this.prepareSong();
   },
 
   onHide() {
+    tabMotion.hide(this);
     this._visible = false;
     this._pageVersion = (this._pageVersion || 0) + 1;
     this._quotaRequestId = (this._quotaRequestId || 0) + 1;
@@ -328,7 +329,8 @@ Page({
     const d = Object.assign({}, this.data, over || {});
     const closed = d.type === 1 && d.winEnabled && !d.winOpen;
     let hint = '';
-    if (!d.loggedIn) hint = '首次提交将自动登录，不收集手机号';
+    // 未登录时不再提示「首次提交将自动登录，不收集手机号」（2026-11-01 陛下要求删掉）
+    if (!d.loggedIn) hint = '';
     else if (closed) hint = '现在不在点歌时间段';
     // ⚠️ 协议版口径：提交只进审核队列，**不占位**。
     //    v2 那句「提交后即占住该时段」会让学生以为已经排上了，是最容易误解的一处。

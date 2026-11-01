@@ -15,6 +15,7 @@ const { adminRequest } = require('../../../utils/request.js');
 
 const RATE = 240;              // 字/分钟
 const SCALE = 1.6;             // 刻度带满量程 = 目标 × 1.6（超了也看得见）
+const MAX_COLUMN = 30;         // 与服务端 partner/draft.js 的 MAX_COLUMN 同一口径
 
 function countWords(s) {
   return String(s || '').replace(/\s/g, '').length;
@@ -73,19 +74,35 @@ Page({
     this.fetchOne(id);
   },
 
-  /** 栏目候选：本周节目名去重（公开接口；拉不到就不显示这一块，不报错） */
+  /**
+   * 栏目候选：GET /partner/draft/columns（全站可见节目名去重，最多 12 个）
+   *
+   * ⚠️⚠️ 以前这里是拿 /user/program/weekly 的**本周**节目名去重凑候选 —— 本周没排期就一个都凑不出来，
+   *    「栏目」整块跟着 `wx:if="{{columns.length}}"` 一起消失，看起来就像「根本没做接口」
+   *    （2026-11-01 陛下指出的就是这件事）。现在候选来自全站节目，与本周排期解耦。
+   */
   loadColumns() {
-    adminRequest('/user/program/weekly', 'GET', {})
+    adminRequest('/partner/draft/columns', 'GET', {})
       .then((d) => {
         const list = (d && d.list) || [];
-        const names = [];
-        list.forEach((p) => {
-          const t = (p && p.title) || '';
-          if (t && names.indexOf(t) < 0) names.push(t);
-        });
-        if (names.length) this.setData({ columns: names.slice(0, 8) });
+        this.setData({ columns: list.slice(0, 12) }, () => this.syncColumnChip());
       })
       .catch(() => { /* 栏目是加分项，拿不到就算了 */ });
+  },
+
+  /**
+   * 已保存的栏目若不在候选里（老稿子的栏目、或栏目已从节目表下架），把它补成第一个胶囊。
+   * ⚠️ 不补的话那个值**既看不见也取消不掉** —— 页面上没有任何一个胶囊是选中态，
+   *    点哪个都会把原来的值顶掉，等于改不回去。
+   * loadColumns 与 fetchOne 谁先回来都可能，所以两边都调一次（幂等）。
+   */
+  syncColumnChip() {
+    const cur = String(this.data.columnName || '').trim();
+    if (!cur) return;
+    const cols = this.data.columns.slice();
+    if (cols.indexOf(cur) >= 0) return;
+    cols.unshift(cur);
+    this.setData({ columns: cols });
   },
 
   fetchOne(id) {
@@ -107,7 +124,7 @@ Page({
           lockText: st === 1
             ? '这篇在社干那里排队审着，审完才能改。'
             : (st === 2 ? '这篇已经通过了，不能再改（要改就新建一版）。' : ''),
-        }, () => this.recalc());
+        }, () => { this.recalc(); this.syncColumnChip(); });
       })
       .catch((err) => {
         this.setData({ loading: false, notFound: true });
@@ -173,9 +190,14 @@ Page({
   /** 存草稿：新建走 POST，已有走 PUT（带 baseVersion 做乐观锁） */
   persist() {
     const d = this.data;
+    // 栏目选填；但写太长服务端会拦（MAX_COLUMN = 30），这里先说清楚，别让人白等一次请求
+    const col = String(d.columnName || '').trim();
+    if (col.length > MAX_COLUMN) {
+      return Promise.reject(new Error(`栏目名最多 ${MAX_COLUMN} 个字`));
+    }
     const payload = {
       title: d.title.trim(),
-      columnName: d.columnName,
+      columnName: col,
       body: d.body,
       rate: RATE,
     };

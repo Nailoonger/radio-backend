@@ -66,7 +66,9 @@ Page({
 
     person: null,     // 投稿人卡
     stats: [],        // 投稿人卡下面那三格（投稿看历史通过/驳回，稿件看版本/字数/时长）
-    rows: [],         // 内容 kv 行
+    rows: [],         // 内容 kv 行（学生投稿）
+    doc: null,        // 内容整块（内部稿件：{ title, body }）
+    docCol: '',       // 内部稿件的栏目（放在「内容」标题右侧）
     quota: null,      // 本周名额（仅点歌）
     recordLines: [],  // 审核记录
 
@@ -153,6 +155,8 @@ Page({
           person: view.person,
           stats: view.stats,
           rows: view.rows,
+          doc: view.doc,
+          docCol: view.docCol,
           quota: view.quota,
           recordLines: view.recordLines,
         });
@@ -299,25 +303,34 @@ function mmssOf(sec) {
 /**
  * 内部稿件（伙伴自己写的稿）：没有投稿人统计，但有版本 / 字数 / 预计时长。
  * ⚠️ 正文必须整段给出来 —— 审稿人要看的就是它，截断就等于回到「看不到正文」的老问题。
+ *
+ * ⚠️⚠️ 正文不走 kv 行（2026-11-01 陛下：「正文那一块白色空区太大你把它利用上，
+ *    正文在第一行粗体第二行开始显示是内容」）：
+ *    kv 行是「160rpx 左标签列 + 右内容列」，正文越长、左边那条白条就越刺眼，
+ *    右边内容列也被挤窄。所以稿件的正文单独一块 `doc` —— 整块占满卡宽，
+ *    第一行标题（粗体），第二行起是正文。
  */
 function decorateDraft(d) {
   const name = d.authorName || '站内作者';
   const words = Number(d.wordCount) || 0;
+  const column = d.columnName || '未选栏目';
+
+  const doc = {
+    title: d.title || '（无标题）',
+    body: d.body || '（空）',
+  };
+
   const person = {
     initial: String(name).slice(0, 1),
     name,
-    sub: [d.columnName || '未选栏目', `${words} 字`, mmssOf(d.seconds)].join(' · '),
+    // 栏目已经挪到「内容」那一行标题右侧，这里不再重复
+    sub: [`${words} 字`, mmssOf(d.seconds)].join(' · '),
     chip: '内部稿件',
   };
   const stats = [
     { l: '版本', n: `第 ${Number(d.version) || 1} 版` },
     { l: '字数', n: String(words) },
     { l: '预计时长', n: mmssOf(d.seconds) },
-  ];
-  const rows = [
-    { k: '标题', v: d.title || '（无标题）', strong: true },
-    { k: '栏目', v: d.columnName || '未选栏目' },
-    { k: '正文', v: d.body || '（空）' },
   ];
 
   // 审核记录：草稿表没有 statusHistory，就用 submittedAt / reviewedAt / reviewedByName 说清楚
@@ -335,7 +348,7 @@ function decorateDraft(d) {
     if (d.rejectReason) recordLines.push({ name: '', role: '', tx: `驳回原因：${d.rejectReason}`, tm: '' });
   }
 
-  return { isSong: false, kindText: '内部稿件', person, stats, rows, quota: null, recordLines };
+  return { isSong: false, kindText: '内部稿件', person, stats, doc, docCol: column, rows: [], quota: null, recordLines };
 }
 
 function decorate(d, isDraft) {
@@ -411,6 +424,9 @@ function decorate(d, isDraft) {
     isSong,
     kindText: isSong ? '点歌' : '文稿',
     person,
+    // doc 只给内部稿件用；学生投稿继续走 kv 行（歌曲 / 时段 / 想说的话都是短字段，左标签列不吃亏）
+    doc: null,
+    docCol: '',
     // 投稿看「历史通过 / 历史驳回 / 首次投稿」（与上面 person 里的三个字段同一份数据）
     stats: [
       { l: '历史通过', n: String(person.approved) },

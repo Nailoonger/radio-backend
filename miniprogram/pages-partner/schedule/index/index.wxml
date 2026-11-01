@@ -27,6 +27,11 @@
           <view class="sc-row" bindtap="onExport" hover-class="row-hover"><image class="ric" src="/assets/partner/ic-pen.png"/><text class="sc-tx">导出本周班表</text><text class="sc-st">复制文本</text><text class="sc-ar">›</text></view>
         </view>
       </block>
+      <!-- 站员：排班规则只读入口（2026-11-02）—— 弹层看当前生效的两条上限，
+           不进超管的规则编辑页（那边有开关，拨得动存不了）。 -->
+      <view class="sc-wrap" wx:if="{{isMember}}">
+        <view class="sc-row" bindtap="openRules" hover-class="row-hover"><image class="ric" src="/assets/partner/ic-star.png"/><text class="sc-tx">排班规则</text><text class="sc-st">当前生效</text><text class="sc-ar">›</text></view>
+      </view>
       <view class="blk" wx:if="{{myLeaves.length}}"><view class="blk-h"><text class="t">我的请假</text><text class="more">{{leavePending}} 条待批</text></view><view class="row" wx:for="{{myLeaves}}" wx:key="id"><text class="r-text">{{item.label}}</text><text class="tag {{item.tagCls}}">{{item.statusText}}</text></view></view>
       <view class="blk" wx:if="{{isMember}}"><view class="blk-h"><text class="t">本月场次</text><text class="more">{{monthLabel}}</text></view><view class="hint-note" wx:if="{{!monthList.length && !personalError}}">本月还没有正式值班安排</view><view class="row" wx:for="{{monthList}}" wx:key="personId"><text class="r-text {{item.mine ? 'mine' : ''}}">{{item.personName}}{{item.mine ? '（我）' : ''}}</text><text class="rv">{{item.count}} 场</text></view></view>
       <!-- 2026-11-01 陛下让删：「排班不使用个人权重：先满足硬条件…保留缺岗。」这句底部说明 -->
@@ -34,3 +39,4 @@
   </view>
 </view>
 <partner-tabbar wx:if="{{ready}}" role="{{roleKey}}" active="{{tabId}}" badges="{{badges}}" bind:switch="onTab"/>
+<rules-sheet open="{{ruleOpen}}" bind:close="closeRules" />

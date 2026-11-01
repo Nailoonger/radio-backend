@@ -1,0 +1,24 @@
+<!-- pages-partner/components/rules-sheet/index.wxml · v1（2026-11-02）
+     排班规则只读弹层。照原型 v151 v109 roSheet() 的形态：标题 + 清单 + 「关闭」。
+     ⚠️ 一个可控件都没有 —— 非超管没有写权限，摆开关只会「能拨、存不了」。
+     ⚠️ 不深色：白底 + 深字 + 羊皮纸遮罩。 -->
+<view class="ro-mask" wx:if="{{open}}" catchtap="close" catchtouchmove="noop">
+  <view class="ro-sheet" catchtap="noop">
+    <view class="ro-hd">
+      <text class="ro-t">排班规则</text>
+      <text class="ro-x" catchtap="close">关闭</text>
+    </view>
+
+    <view class="ro-list" wx:if="{{rows.length}}">
+      <view class="ro-row" wx:for="{{rows}}" wx:key="key">
+        <view class="ro-tx">
+          <text class="ro-nm">{{item.name}}</text>
+          <text class="ro-st">{{item.sub}}</text>
+        </view>
+        <text class="ro-v {{item.on ? '' : 'off'}}">{{item.text}}</text>
+      </view>
+    </view>
+
+    <view class="ro-empty" wx:else>{{loading ? '正在加载……' : (error || '暂时没有规则')}}</view>
+  </view>
+</view>

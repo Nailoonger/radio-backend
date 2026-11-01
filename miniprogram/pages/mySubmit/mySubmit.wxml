@@ -3,14 +3,13 @@
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
   <view class="navreserve" style="height: {{navBarHeight}}px"></view>
 
-  <view class="body">
+  <view class="body {{tabMotion}}">
 
     <!-- 未登录 -->
     <block wx:if="{{!loggedIn}}">
       <view class="nologin">
         <image class="nologin-logo" src="/assets/station-badge.png" mode="aspectFit" />
         <view class="t-title">登录后查看你的投稿</view>
-        <view class="t-sub" style="text-align: center;">不收集头像与手机号，头像由姓名生成</view>
         <button class="btn btn-primary nologin-btn" hover-class="pressed" bindtap="doLogin">使用学号登录</button>
       </view>
     </block>

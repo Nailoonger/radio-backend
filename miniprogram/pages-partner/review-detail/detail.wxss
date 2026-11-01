@@ -135,6 +135,26 @@
 .kv .v { flex: 1; min-width: 0; font-size: 23rpx; line-height: 1.6; color: var(--ink-2); }
 .kv .v.strong { font-weight: 600; color: var(--ink); }
 
+/* ── 内部稿件的正文块（整块占满卡宽） ──
+   ⚠️ 这里刻意不回 kv 那套左标签列：审稿人是在**读一篇稿**，不是在看字段表。
+      第一行标题粗体，第二行起正文；正文 27rpx ≈ 14px（原来是 kv 里的 23rpx ≈ 12px，读长文太细）。
+   ⚠️ 段落靠 <text> 自己保留 \n，别再按 \n 切数组 —— 切了反而会吃掉连续空行。 */
+.doc { padding: 2rpx 0 30rpx; }
+.doc-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.45;
+  letter-spacing: -0.2rpx;
+}
+.doc-body {
+  margin-top: 16rpx;
+  font-size: 27rpx;
+  line-height: 1.85;
+  color: var(--ink-2);
+  word-wrap: break-word;
+}
+
 /* ── 名额条：白卡里嵌灰块 ── */
 .quota { border-radius: 22rpx; background: var(--parchment); padding: 22rpx 26rpx; }
 .quota-row {

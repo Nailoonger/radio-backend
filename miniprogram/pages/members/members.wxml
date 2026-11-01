@@ -3,7 +3,7 @@
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
   <view class="navreserve" style="height: {{navBarHeight}}px"></view>
 
-  <view class="body">
+  <view class="body {{tabMotion}}">
 
     <!-- 页面标题 -->
     <view class="stack">
@@ -76,7 +76,6 @@
             <text class="mgrade" wx:if="{{item.grade}}">{{item.grade}}</text>
           </view>
         </view>
-        <view class="t-micro footnote">广播站领导团队</view>
       </block>
     </block>
 

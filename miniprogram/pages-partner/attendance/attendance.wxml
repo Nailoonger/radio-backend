@@ -127,6 +127,5 @@
   <!-- 底部固定保存条（v151 .actbar）：不改位置，只在社干视角出现 -->
   <view class="actionbar" wx:if="{{isManager}}">
     <button class="save-btn" hover-class="pressed" bindtap="onSave" disabled="{{saving}}">保存这天的考勤</button>
-    <view class="ab-note">考勤全站公开：站员能看自己的，也能看别人的——所以录入只交社干。</view>
   </view>
 </view>

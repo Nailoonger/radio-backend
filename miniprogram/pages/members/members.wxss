@@ -103,8 +103,6 @@
 }
 .mcard-hover { opacity: 0.72; }
 
-.footnote { text-align: center; }
-
 /* 部门小标题 + 人数 */
 .t-section-meta {
   font-size: 22rpx;

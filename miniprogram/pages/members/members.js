@@ -1,8 +1,10 @@
+const tabMotion = require('../../utils/tabMotion.js');
 // pages/members/members.js - 风采展示（二层 tab：社干 / 部门人员）
 const { request } = require('../../utils/request.js');
 
 Page({
   data: {
+    tabMotion: '',
     statusBarHeight: 20,
     loading: true,
 
@@ -34,10 +36,10 @@ Page({
     // 取数统一放 onShow（tab 页首次显示必定 onLoad → onShow，放两处会重复请求一次）
   },
 
+  onHide() { tabMotion.hide(this); },
+
   onShow() {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setSelected(2);
-    }
+    tabMotion.show(this, 2);
     // 先定「开关开没开」再取数：关闭时 fetch 直接走空数据分支
     this.loadSwitch().then(() => this.fetch());
   },

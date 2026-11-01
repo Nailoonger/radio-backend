@@ -79,7 +79,7 @@
       <button class="btn primary pub" bindtap="onPublish" disabled="{{publishing}}">发布本周值班时段</button>
       <view class="act-note">当前这些改动只是草稿，发布后站员端的「可排时间」才会按它显示。</view>
     </view>
-    <view class="act-note ro-note" wx:if="{{!canEdit}}">时段由超管发布；你在这里只能看。</view>
+    <!-- 2026-11-02 陛下让删：「时段由超管发布；你在这里只能看。」——只读态不再挂一句解释 -->
 
     <!-- 危险区：重置全部时段（回到「从未配置」）
          有了已发布版本之后，界面上没有任何办法把它清干净（发布拒绝空配置），

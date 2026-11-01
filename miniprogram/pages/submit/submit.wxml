@@ -7,7 +7,7 @@
        协议版提交只进审核队列、不当场占位，所以必须在这里把「接下来会发生什么」
        讲清楚，否则学生会反复刷新等「已排期」。 -->
   <block wx:if="{{receipt}}">
-    <view class="body">
+    <view class="body {{tabMotion}}">
       <view class="receipt">
         <view class="rc-mark">
           <!-- 内嵌源：assets/receipt-check.svg；使用 SVG Base64 图片保持小程序兼容。 -->
@@ -57,7 +57,7 @@
 
   <!-- ══════════ 表单态 ══════════ -->
   <block wx:else>
-    <view class="body">
+    <view class="body {{tabMotion}}">
 
       <!-- 页面标题 -->
       <view class="stack">

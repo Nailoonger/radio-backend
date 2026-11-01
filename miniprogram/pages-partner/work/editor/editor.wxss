@@ -58,6 +58,8 @@
 /* 小节头 */
 .sec-h { display: flex; align-items: center; justify-content: space-between; }
 .sec-t { font-size: 25rpx; font-weight: 600; color: #1D1D1F; }
+/* 「选填」标记：灰字不加底（不够重才要提示，够重就别加装饰） */
+.sec-opt { font-size: 21rpx; color: #B3B3B8; }
 
 /* 栏目 chips */
 .chips { display: flex; flex-wrap: wrap; gap: 15rpx; }
@@ -70,6 +72,8 @@
   line-height: 1;
 }
 .chip.on { background: #EAF3FD; color: #0066CC; font-weight: 600; }
+/* 候选为空时的一句实话（卡不能只剩个标题，否则像坏了） */
+.col-empty { font-size: 23rpx; color: #B3B3B8; line-height: 1.5; }
 
 /* 目标时长 */
 .targets { display: flex; gap: 10rpx; }
@@ -120,12 +124,13 @@
 .dial-tgt { font-size: 21rpx; color: #76767E; font-variant-numeric: tabular-nums; }
 .dial-hint { font-size: 21rpx; color: #76767E; line-height: 1.5; }
 
-/* 正文 */
+/* 正文 —— 写字的正文按「能长时间看」给字号：32rpx ≈ 16.5px
+   （原来是 27rpx ≈ 14px，写长稿时眼睛吃力，2026-11-01 陛下要求放大） */
 .ta {
   width: 100%;
   min-height: 480rpx;
-  font-size: 27rpx;
-  line-height: 1.85;
+  font-size: 32rpx;
+  line-height: 1.8;
   color: #1D1D1F;
   box-sizing: border-box;
 }

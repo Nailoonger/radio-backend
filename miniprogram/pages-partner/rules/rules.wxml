@@ -23,19 +23,21 @@
             <text class="r-name">{{item.name}}</text>
             <text class="r-sub">{{item.on ? '生效中' : '已关闭（不限制）'}}</text>
           </view>
-          <view class="stepper">
+          <!-- ⚠️ 非超管：加减号与开关一律不出现 / 不可拨（2026-11-02）
+               原生 switch 手指一拨自己会动，数据却没变、保存又是灰的 —— 看着就是坏了。
+               所以 disabled 是必须的，光在 onToggle 里 return 挡不住那个视觉。 -->
+          <view class="stepper" wx:if="{{canEdit}}">
             <view class="st-b" hover-class="pressed" data-key="{{item.key}}" data-d="-1" bindtap="step">−</view>
             <text class="st-v">{{item.value}}</text>
             <view class="st-b" hover-class="pressed" data-key="{{item.key}}" data-d="1" bindtap="step">+</view>
           </view>
-          <switch class="sw" checked="{{item.on}}" color="#0066CC"
+          <text class="st-ro" wx:else>{{item.on ? item.value + ' 场' : '不限'}}</text>
+          <switch class="sw" checked="{{item.on}}" color="#0066CC" disabled="{{!canEdit}}"
                   data-key="{{item.key}}" bindchange="onToggle" />
         </view>
       </view>
 
-      <view class="note">硬约束优先：到了上限的人不会再被排进来，凑不齐就留缺岗，不硬凑。</view>
-
-      <view class="acts">
+      <view class="acts" wx:if="{{canEdit}}">
         <button class="btn primary" hover-class="pressed" bindtap="onSave" disabled="{{saving || !dirty}}">保存</button>
       </view>
       <view class="note" wx:if="{{!canEdit}}">只有超管能改这两条。</view>

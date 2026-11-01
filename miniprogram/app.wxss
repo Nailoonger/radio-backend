@@ -388,3 +388,16 @@ button.btn-block,
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
+
+/* Tab 内容轻推淡入；只挂 body，避免移动固定导航、弹层和启动遮罩。 */
+.tab-content-prepare { opacity: .6; }
+.tab-content-right { animation: tabContentRight 400ms cubic-bezier(.22,.61,.36,1) both; }
+.tab-content-left { animation: tabContentLeft 400ms cubic-bezier(.22,.61,.36,1) both; }
+@keyframes tabContentRight {
+  from { opacity: .6; transform: translateX(20rpx); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes tabContentLeft {
+  from { opacity: .6; transform: translateX(-20rpx); }
+  to { opacity: 1; transform: translateX(0); }
+}

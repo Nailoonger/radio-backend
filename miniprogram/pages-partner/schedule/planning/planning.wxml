@@ -30,7 +30,8 @@
         <view class="link" bindtap="goProxy"><image src="/assets/partner/ic-chk.png"/><text>值班时间代录</text><text class="hint">{{availabilityHint}}</text><text>›</text></view>
         <view class="link" bindtap="goHistory"><image src="/assets/partner/ic-refresh.png"/><text>发布与调整记录</text><text class="hint">谁调整、为什么</text><text>›</text></view>
       </view>
-      <text class="note">排班不使用个人权重；先满足硬条件（时间冲突 / 请假 / 资格 / 场次上限），再按轮值均衡安排。</text>
+      <!-- 2026-11-02 陛下让删：「排班不使用个人权重；先满足硬条件…按轮值均衡安排。」
+           —— 同 index 底部、timetable 行头那两句是一回事，三份副本一起收掉 -->
     </block>
   </view>
 </view>
@@ -85,3 +86,7 @@
     </view>
   </scroll-view>
 </view>
+
+<!-- 排班规则只读弹层（2026-11-02 陛下）：社干点「排班规则」看当前生效值，
+     **不进**超管那个编辑页 —— 那边有开关，非超管拨得动、存不了。 -->
+<rules-sheet open="{{ruleOpen}}" bind:close="closeRules" />

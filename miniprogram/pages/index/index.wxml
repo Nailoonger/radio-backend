@@ -2,51 +2,33 @@
 <launch-mask id="launch" />
 
 <view class="page">
+  <!-- 顶部校舍线稿：与伙伴端 desk 欢迎带同一张图（campus-faded.png，渐隐已烘进 alpha），
+       位置按调节台定稿：宽 542rpx / 上 35rpx / 右溢出 13rpx，不叠遮罩、不调亮度 -->
+  <image class="brand-wm" src="/assets/campus-faded.png" mode="widthFix" aria-hidden="true" />
+
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
   <view class="navreserve" style="height: {{navBarHeight}}px"></view>
 
-  <view class="body">
+  <view class="body {{tabMotion}}">
 
-    <!-- 品牌头部 -->
-    <view class="between">
-      <view class="brand-head">
-        <image class="brand-logo" src="/assets/station-badge.png" mode="aspectFit" />
-        <view class="stack">
-          <view class="brand-name">菁悠广播站</view>
-          <view class="brand-slogan">菁菁校园情，悠悠广播声</view>
-        </view>
-      </view>
-      <view class="icon-btn" hover-class="pressed" bindtap="goAbout" aria-label="关于广播站">
-        <view class="stack" style="align-items: center; gap: 6rpx;">
-          <view class="i-dot"></view>
-          <view class="i-stem"></view>
-        </view>
+    <!-- 品牌头部（2026-11-01 去掉右上角「关于」i 按钮；「关于广播站」入口仍在「我的」页那条） -->
+    <view class="brand-head">
+      <image class="brand-logo" src="/assets/station-badge.png" mode="aspectFit" />
+      <view class="stack">
+        <view class="brand-name">菁悠广播站</view>
+        <view class="brand-slogan">菁菁校园情，悠悠广播声</view>
       </view>
     </view>
 
-    <!-- 正在直播 -->
-    <view class="tile" wx:if="{{currentProgram}}">
-      <view class="tile-status">
-        <view class="dot-live"></view>
-        <text>正在直播·{{currentProgram.broadcastTime}}</text>
-      </view>
-      <view class="tile-title">{{currentProgram.title}}</view>
-      <view class="tile-meta" wx:if="{{currentProgram.host}}">主持人 {{currentProgram.host}}</view>
-      <view class="tile-desc" wx:if="{{currentProgram.desc}}">{{currentProgram.desc}}</view>
-      <view class="tile-actions">
-        <button class="btn btn-on-tile" hover-class="pressed" bindtap="goSubmit">我要投稿</button>
-        <button class="btn btn-ghost" hover-class="pressed" bindtap="goCurrent">查看节目</button>
-      </view>
-    </view>
-
-    <view class="tile" wx:elif="{{!loading}}">
-      <view class="tile-status">
-        <view class="dot-live" style="background: #8E8E93;"></view>
-        <text>暂无直播</text>
-      </view>
-      <view class="tile-title">点歌或投稿，被选中即可播出</view>
-      <view class="tile-actions">
-        <button class="btn btn-on-tile" hover-class="pressed" bindtap="goSubmit">立即投稿</button>
+    <!-- 欢迎卡（2026-11-01）：纯问候，不再显示直播状态。
+         副行只说"下一次什么时候见"，四种情形由 index.js#nextLine 按节目数据算出来：
+         在播 / 今天还有 / 明天还有 / 本周播完（→ 下周见） -->
+    <view class="well">
+      <view class="well-hi">{{welcomeHi}}</view>
+      <view class="well-line" wx:if="{{welcomeLine}}">{{welcomeLine}}</view>
+      <view class="well-foot" hover-class="pressed" bindtap="goSubmit" role="button" aria-label="去投稿">
+        <text class="well-go">立即投稿</text>
+        <text class="well-ar">→</text>
       </view>
     </view>
 

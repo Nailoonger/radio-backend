@@ -19,6 +19,10 @@
 
 
 ## 铁律
+- ⚠️⚠️ **role 三档（0 超管 / 1 社干 / 2 站员）任何一处判定必须写满三档**：
+  少一档就是「某个角色看到别的角色的入口」。2026-10-31 站员进「稿件」页时底栏冒出「审核」格、
+  点进去被拦「暂无审核权限」，就是 `work.js`/`review.js` 只写了 `role===0?'super':'manager'`。
+  正确写法抄 `desk.js#roleKeyOf` / `me.js` / `schedule/index.js`；改完 `grep -rn "=== 0 ?"` 扫一遍。
 - **只做加法**：`src/`+`admin-web/`+Docker 一行不删，保留 `requestMode:'direct'|'cloud'`。**绝不用 `git checkout --`**。
 - ⚠️⚠️ **本地绿 ≠ CI 绿**：`.gitignore` 有条 `_*`，会吃掉下划线开头的**正式源码**
   （`handlers/partner/_kit.js`、`_published.js` 就这样从没进过仓库 ⇒ CI 里每个 partner handler
@@ -34,6 +38,11 @@
   中文拼音字母数远大于汉字数，「午间」= wujian = 6 个字母 —— maxlength=6 会**在第 6 个字母截断，汉字永远上不了屏**
   （2026-10-29 时段名称"打不进去"连踩两次的真凶）。业务限制写在校验里。
   同一坑的连带解：**input 用 `model:value` 双向绑定，别手写 `value`+`bindinput`+`setData`**（会跟输入法 composition 抢）。
+- ⚠️ **要靠 flex 居中的小件（角标、胶囊、圆圈）一律用 `<view>`，别拿 `<text>` 当盒子**：
+  text 是行内元件，`display:flex` 在部分基础库上不生效 ⇒ 退回行盒排版、字看着偏；
+  居中再**别靠 `line-height` = `height`**（那只摆正行盒，行盒里还有 ascender/descender 的空隙）。
+  宽度随内容变的件（角标 1 位 / 2 位 / 99+）**按位数给档位**，别靠 padding + `text-align` 的边缘行为
+  （2026-11-01 陛下指「角标数字没在红点正中间，有点移位」；探针 `_opfit/_badge_probe.html`，实测偏差 ≤0.12px）。
 - UI/视觉**先出带版本号的静态预览，点头前不写业务代码**；版本只增不删；被否先问清形态，别偷偷捡回。
   ⚠️⚠️ **复制目录做新版本后第一件事：改"页面上给人看的版本号"**（title + 页内文案），否则陛下判定"没更新"。
   判据 `grep -o "v<N-1>" 新目录/*.html` = 0（⚠️ SVG path 里的 `v14` 画线指令会误报，要人工看一眼）。
@@ -97,6 +106,10 @@ token 源：`miniprogram/app.wxss` → `admin-web/src/styles/theme.css`。`--acc
 
 ## 本机坑
 ⚠️⚠️ **给陛下的命令**：本机 PowerShell（`C:\` 路径、无 `&&`、无 `tail`）与服务器 bash 必须**两个独立代码块**；**不给需要交互输入的命令**；**必须给判据**。
+⚠️⚠️ **测试不许依赖"今天是星期几"**：可排时间的填写窗口是「周一 0 点~周六 24 点、周日只读」，
+凡是要 `PUT /partner/availability` 的用例在周日夜跑必崩（2026-11-01 凌晨实际踩到：
+同一份代码周六 266/0 全绿、周日整段 `r.data.availability` undefined）。
+写法：文件顶部 `Date.now = () => FROZEN_NOW`（钉周三 10:00），见 `test-partner-duty.js`。
 同一文件多处改动**串行 Edit**（并发静默吞前一个）。vite 构建到"已存在"目录会被 safe-delete 垫片拦 ⇒ 构建到新目录。`admin-web/package.json` 有 `type:module` ⇒ 临时脚本用 `.cjs`。
 不开 Docker 整链路：`DB_STORAGE=./data/_shot.db` + `db:init` + `seed` + `node src/app.js`；`_shot.db` schema 变过要先 `rm`。
 jest 基线：56 条里 15 条失败全是已删 member 模块，别当新回归。

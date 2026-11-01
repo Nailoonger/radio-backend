@@ -90,9 +90,21 @@ ok('通过：draft 走 /review 且 approve:true',
   /adminRequest\(`\/partner\/draft\/\$\{this\.data\.id\}\/review`, 'PUT', \{ approve: true \}\)/.test(detailJs));
 ok('驳回：draft 走 /review 且带 reason',
   /adminRequest\(`\/partner\/draft\/\$\{this\.data\.id\}\/review`, 'PUT', \{ approve: false, reason \}\)/.test(detailJs));
+/* 正文必须整段给出来，且整块占满卡宽（2026-11-02 改版）：
+   原来正文挂在 kv 行里 —— 左边 160rpx 的标签列只放「正文」两个字，右边内容列被挤窄，一整片白。
+   现在走 doc 块：第一行标题（粗体），第二行起正文，不再有左标签列。 */
 ok('正文整段渲染（不做截断）',
-  /\{ k: '正文', v: d\.body \|\| '（空）' \}/.test(detailJs)
-  && /完整内容，不做截断/.test(detailWxml));
+  /const doc = \{[\s\S]{0,120}body: d\.body \|\| '（空）'/.test(detailJs)
+  && !/\.slice\(0,/.test((detailJs.match(/const doc = \{[\s\S]{0,160}?\};/) || [''])[0]));
+// ⚠️ 只查「内部稿件」那一段：学生文稿（articleContent）仍是 kv 行，那是短字段，不该一起改掉
+const draftFn = (detailJs.match(/function decorateDraft\(d\) \{[\s\S]*?\n\}/) || [''])[0];
+ok('内部稿件正文不再挂 kv 行（左标签列已去掉）',
+  draftFn.length > 0 && !/k: '正文'/.test(draftFn)
+  && /<view class="doc" wx:if="\{\{isDraft && doc\}\}">/.test(detailWxml),
+  '正文又被塞回 kv 行 —— 左边那条 160rpx 白条会把正文挤窄');
+ok('标题粗体第一行、正文第二行起（模板结构）',
+  /class="doc-title"><text>\{\{doc\.title\}\}<\/text>/.test(detailWxml)
+  && /class="doc-body"><text>\{\{doc\.body\}\}<\/text>/.test(detailWxml));
 ok('稿件有自己的一套驳回理由预设（不是学生投稿那套）',
   /const PRESETS_DRAFT = \[/.test(detailJs) && /篇幅超时，需压缩/.test(detailJs),
   '还在用「重复投稿 / 该曲一周内已点过」去驳回伙伴自己的稿');

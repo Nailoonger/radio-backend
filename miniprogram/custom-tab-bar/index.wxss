@@ -45,33 +45,30 @@
   overflow: hidden;            /* 指示器滑出胶囊范围时裁掉 */
 }
 
-/* 滑动指示器：一块深色胶囊，随 selected 在四格之间平移。
- * 宽度 = 胶囊内宽的 1/4（与每个 flex:1 的 tab 等宽），
- * 用 translateX(selected × 100%) 位移，一格正好是一倍自身宽。 */
-.indicator {
+/* 定位空间与四个 flex Tab 的内容区域一致。 */
+.indicator-track {
   position: absolute;
   top: 8rpx;
   bottom: 8rpx;
   left: 8rpx;
-  width: calc((100% - 16rpx) / 4);
-  border-radius: 52rpx;
+  right: 8rpx;
+  pointer-events: none;
+}
+.indicator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 25%;
+  border-radius: 999rpx;
   background: #1D1D1F;
-  /* 320ms 近似临界阻尼弹簧（damping 1.0 / response 0.32s）：前快后缓、无回弹。
-   * 依旧只动 transform，配合 v9 契约的「起点瞬移 → 渲染回调内滑向终点」不变 */
-  transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 160ms ease;
-  will-change: transform;
+  transform-origin: center;
 }
 
 /* 首次落位前隐藏：实例初渲染时 selected 恒为 0（初始值不可信），
  * 若直接画出来，用户会看到指示器"闪回第一格再滑向目标"——跨格时像方向错了 */
 .indicator-off {
   opacity: 0;
-}
-
-/* 【契约 3】瞬移落位：页面到达时同帧禁用过渡，
- * 指示器从毒化位置直接跳到正确格位，物理上不可能产生第二次动画 */
-.tabbar.noanim .indicator {
-  transition: none;
 }
 
 .tab {
@@ -106,7 +103,7 @@
 
 .tab-icon-on {
   opacity: 0;
-  transition: opacity 200ms ease;
+  transition: opacity 400ms cubic-bezier(.22,.61,.36,1);
 }
 
 .tab-icon-on.show {
@@ -124,9 +121,22 @@
   line-height: 1;
   letter-spacing: 1rpx;
   color: #7A7A7A;
-  transition: color 200ms ease;
+  transition: color 400ms cubic-bezier(.22,.61,.36,1);
 }
 
 .tab.on .tab-label {
   color: #FFFFFF;
+}
+
+/* 起点落位不做颜色过渡，渲染完成后再切到新选中项。 */
+.tabbar.noanim .tab-label,
+.tabbar.noanim .tab-icon-on { transition: none; }
+.tab-icon-bounce {
+  animation: tabIconBounce 400ms cubic-bezier(.22,.61,.36,1) both;
+}
+@keyframes tabIconBounce {
+  0% { transform: scale(1); }
+  22% { transform: scale(.82); }
+  65% { transform: scale(1.08); }
+  100% { transform: scale(1); }
 }

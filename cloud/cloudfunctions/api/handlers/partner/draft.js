@@ -5,6 +5,7 @@
  *
  *   GET  /partner/draft/list            我的稿件（按状态筛，带各状态计数）
  *   GET  /partner/draft/review          社干审稿队列（全站待审，不限作者）
+ *   GET  /partner/draft/columns         写稿页的栏目候选（2026-11-02 新增）
  *   GET  /partner/draft/:id             详情
  *   GET  /partner/draft/:id/versions    版本记录（全文快照）
  *   POST /partner/draft                 新建草稿
@@ -38,6 +39,7 @@ const STATUS_TEXT = { 0: '草稿', 1: '待审核', 2: '已通过', 3: '已驳回
 const DEFAULT_RATE = 240;        // 字/分钟（播音语速，前端也按这个折算，服务端为准）
 const MAX_VERSIONS = 20;
 const MAX_BODY = 20000;
+const MAX_COLUMN = 30;           // 栏目名上限（选填，空串 = 未选）
 
 /** 去空白后的字数（中文按字算，空行不算字） */
 function countWords(body) {
@@ -145,6 +147,31 @@ async function reviewList(ctx) {
 }
 
 /**
+ * GET /partner/draft/columns —— 写稿页的栏目候选
+ *
+ * ⚠️ 为什么要有这个接口（2026-11-02）：以前前端拿 `/user/program/weekly` 的**本周节目名**
+ *    去重来凑候选。只要这一周还没排期，候选就是空的 ⇒ 写稿页整块栏目消失，
+ *    稿子永远落成「未选栏目」，而作者根本没地方填。
+ *    现在改成"全站可见节目名去重"，与本周排不排期无关。
+ *
+ * 栏目本身是**选填**：返回空数组时前端只留自定义输入，不拦存稿和提交。
+ */
+async function columns(ctx) {
+  await asPartner(ctx);
+  const rows = await findMany(
+    C.PROGRAM,
+    { isShow: 1 },
+    { orderBy: [['sort', 'asc'], ['id', 'desc']], limit: 200 }
+  );
+  const names = [];
+  rows.forEach((r) => {
+    const t = String((r && r.title) || '').trim();
+    if (t && names.indexOf(t) < 0) names.push(t);
+  });
+  return { list: names.slice(0, 12) };
+}
+
+/**
  * GET /partner/draft/:id
  *
  * ⚠️ 2026-11-01：审稿处理台要读**别人的**稿（看全文才批得了），所以这里不能锁死作者；
@@ -206,12 +233,14 @@ async function create(ctx) {
   const words = countWords(body);
   const now = new Date();
   const id = await nextId(C.PARTNER_DRAFT);
+  const columnName = String(b.columnName || '').trim();
+  if (columnName.length > MAX_COLUMN) throw new ApiError(Codes.PARAM_ERROR, `栏目最多 ${MAX_COLUMN} 字`);
   const doc = {
     id,
     personId: p.id,
     personName: (p.admin && (p.admin.nickname || p.admin.username)) || '',
     title: title || '未命名稿件',
-    columnName: String(b.columnName || '').trim(),
+    columnName,
     body,
     wordCount: words,
     seconds: secondsOf(words, rate),
@@ -250,6 +279,7 @@ async function save(ctx) {
   const columnName = b.columnName === undefined ? doc.columnName : String(b.columnName || '').trim();
   const body = b.body === undefined ? doc.body : String(b.body || '');
   if (body.length > MAX_BODY) throw new ApiError(Codes.PARAM_ERROR, '正文过长');
+  if (columnName.length > MAX_COLUMN) throw new ApiError(Codes.PARAM_ERROR, `栏目最多 ${MAX_COLUMN} 字`);
   const rate = Number(b.rate) > 0 ? Number(b.rate) : (Number(doc.rate) || DEFAULT_RATE);
 
   const changed = title !== doc.title || columnName !== doc.columnName || body !== doc.body;
@@ -383,4 +413,4 @@ async function restore(ctx) {
   return dto(Object.assign({}, doc, patch, { personId: doc.personId }));
 }
 
-module.exports = { list, reviewList, detail, versions, create, save, submit, review, restore };
+module.exports = { list, reviewList, columns, detail, versions, create, save, submit, review, restore };

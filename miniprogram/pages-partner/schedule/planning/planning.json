@@ -1,6 +1,9 @@
 {
   "navigationStyle": "custom",
-  "usingComponents": { "duty-timetable": "../timetable/index" },
+  "usingComponents": {
+    "duty-timetable": "../timetable/index",
+    "rules-sheet": "../../components/rules-sheet/index"
+  },
   "enablePullDownRefresh": true,
   "backgroundTextStyle": "dark"
 }

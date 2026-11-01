@@ -43,10 +43,6 @@
                   data-key="{{item.key}}" bindchange="onGlobal" />
         </view>
       </view>
-      <view class="note">
-        {{global.schedule ? '社干可以进排班工作台' : '社干进不去排班工作台'}} ·
-        {{global.review ? '可以进审核' : '进不去审核'}}
-      </view>
 
       <!-- ② 按人分发：拨一下就是单独设，跟回全局要点右边那行小字 -->
       <view class="sh">

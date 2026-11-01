@@ -1,3 +1,4 @@
+const tabMotion = require('../../utils/tabMotion.js');
 // pages/mySubmit/mySubmit.js
 const { request } = require('../../utils/request.js');
 const { submitStatusText, submitStatusClass, fmtDate, fmtIso, fmtSlot, fmtMd } = require('../../utils/format.js');
@@ -22,6 +23,7 @@ function bucketOf(status) {
 
 Page({
   data: {
+    tabMotion: '',
     statusBarHeight: 20,
     navBarHeight: 44,
     userInfo: {},
@@ -54,8 +56,14 @@ Page({
     });
   },
 
-  onHide() { if (this.wb) this.wb.stopTimer(); },
-  onUnload() { if (this.wb) this.wb.stopTimer(); },
+  onHide() {
+    tabMotion.hide(this);
+    if (this.wb) this.wb.stopTimer();
+  },
+  onUnload() {
+    tabMotion.hide(this);
+    if (this.wb) this.wb.stopTimer();
+  },
 
   /** 从昵称里取一个字当头像兜底（WXML 不支持 (a||b)[0] 这种取下标写法，只能在 js 里算好） */
   initialOf(nickname) {
@@ -64,9 +72,7 @@ Page({
   },
 
   onShow() {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setSelected(3);
-    }
+    tabMotion.show(this, 3);
     const info = app.globalData.userInfo || {};
     this.setData({
       loggedIn: !!app.globalData.token,

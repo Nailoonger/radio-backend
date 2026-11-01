@@ -27,7 +27,7 @@
           <text class="fb-m">{{target.dayName}} {{target.slot}}</text>
         </view>
         <textarea class="ta" value="{{text}}" bindinput="onText"
-                  placeholder="比如：中午那段过渡句接得很舒服"
+                  placeholder="点评一下，我们一起进步"
                   placeholder-class="ph" maxlength="200" auto-height show-confirm-bar="{{false}}" />
         <view class="cnt">{{text.length}} / 200</view>
         <button class="btn primary" hover-class="pressed" bindtap="onSubmit"

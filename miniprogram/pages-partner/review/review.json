@@ -1,6 +1,8 @@
 {
   "navigationStyle": "custom",
-  "usingComponents": {},
+  "usingComponents": {
+    "partner-tabbar": "../components/partner-tabbar/index"
+  },
   "enablePullDownRefresh": true,
   "backgroundTextStyle": "dark",
   "onReachBottomDistance": 80

@@ -9,6 +9,8 @@ Page({
     // 结果就是「替下一周代录完，回来点再次生成，一点变化都没有」——两边不是同一周。
     weekText: '', isThisWeek: true,
     slotHint: '', ruleHint: '', availabilityHint: '', preparationError: '', checked: false, checkText: '', issues: [], missing: [],
+    // 排班规则只读弹层（2026-11-02）：非超管不进编辑页，弹层里看当前生效值
+    ruleOpen: false,
     sheetOpen: false, candidateLoading: false, candidateError: '', candidates: [], selectedCount: 0, edit: {}, editTitle: '', editTime: '', curText: '空缺', reason: '', fixed: true,
   },
 
@@ -324,7 +326,22 @@ Page({
   goSlots() { wx.navigateTo({ url: '/pages-partner/schedule/slots/slots' }); },
   // 原型社干按钮「查看时段准备情况」：同一页，进去就是只读
   goSlotsRo() { this.goSlots(); },
-  goRules() { wx.navigateTo({ url: '/pages-partner/rules/rules' }); },
+  /**
+   * 排班规则（2026-11-02 陛下改）
+   *
+   * 超管 → 进编辑页（加减号 / 开关 / 保存，那是唯一能改的地方）。
+   * 社干 → **只读弹层**，不进页面。原来一律 navigateTo：非超管进去看到的开关
+   *       是原生组件，手指一拨自己会动，但数据没变、保存按钮是灰的 ⇒ 看着就是「坏了」。
+   * 原型 v151 也是这么分的（`isSuper?'rules':'ro:rules'` → roSheet）。
+   */
+  goRules() {
+    if (this.data.isSuper) {
+      wx.navigateTo({ url: '/pages-partner/rules/rules' });
+      return;
+    }
+    this.setData({ ruleOpen: true });
+  },
+  closeRules() { this.setData({ ruleOpen: false }); },
   // ⚠️ 把「正在看哪一周」和「本周是哪一周」一起带过去：
   //    不传的话代录页永远打开本周，在工作台翻到下一周再点进来又对不上了
   goProxy() {

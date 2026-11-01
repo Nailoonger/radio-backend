@@ -145,7 +145,7 @@ button.btn {
   margin-top: 18rpx; text-align: center;
   font-size: 21rpx; line-height: 1.7; color: var(--muted, #7A7A7A);
 }
-.ro-note { padding: 30rpx 0 10rpx; }
+/* .ro-note 已随「时段由超管发布；你在这里只能看。」一起删除（2026-11-02） */
 
 /* ── 弹层（原型 slotNewSheet / sn-body） ── */
 .sheet { position: fixed; inset: 0; z-index: 300; }

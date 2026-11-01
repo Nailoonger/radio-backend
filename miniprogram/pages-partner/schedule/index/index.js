@@ -12,7 +12,9 @@ Page({
   data: { statusBarHeight: 20, ready: false, loading: true, loadError: '', roleKey: 'member', isMember: true, tabId: 'schedule', myId: 0, badges: {}, week: {}, state: 'empty', stateText: '', stateSub: '', needText: '', weekStart: '', weekText: '', isThisWeek: true, monthLabel: '', monthList: [], monthTotal: 0, myLeaves: [], leavePending: 0,
     /* 2026-10-31：社干能不能进排班工作台（超管分发）。true 是默认值，只有确知被关掉才变 false
        —— 权限接口挂了不该把人锁在门外（后端 asScheduler 还会再拦一次）。 */
-    canPlan: true, denyPlan: '暂无权限' },
+    canPlan: true, denyPlan: '暂无权限',
+    /* 2026-11-02：排班规则只读弹层。站员看当前生效的两条上限 —— 弹层，不进规则编辑页。 */
+    ruleOpen: false },
   onLoad() {
     const app = getApp();
     if (!app.isAdminLoggedIn()) return wx.reLaunch({ url: '/pages-partner/login/login' });
@@ -177,6 +179,14 @@ Page({
     wx.navigateTo({ url: '/pages-partner/schedule/planning/planning' });
   },
   goWorkload() { if (!this.data.isMember) wx.navigateTo({ url: '/pages-partner/schedule/workload/workload' }); },
+  /**
+   * 排班规则（2026-11-02 陛下）：
+   * 站员也能看「目前生效的两条上限」，但是**弹层**，不进规则编辑页
+   * —— 那一页是超管的编辑页，开关是原生组件，非超管拨得动、存不了。
+   * 社干走排班工作台那一行（同一个弹层组件），这里只给站员开。
+   */
+  openRules() { this.setData({ ruleOpen: true }); },
+  closeRules() { this.setData({ ruleOpen: false }); },
   goHistory() { if (!this.data.isMember) wx.navigateTo({ url: '/pages-partner/schedule/history/history?week=' + this.data.week.weekStart }); },
   onExport() {
     if (!this._week || this._week.state !== 'published') return wx.showToast({ title: '本周未发布', icon: 'none' });

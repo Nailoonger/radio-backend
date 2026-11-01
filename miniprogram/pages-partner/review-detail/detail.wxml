@@ -57,12 +57,25 @@
       <view class="card-sec">
         <view class="sec-head">
           <text class="sh-t">内容（{{kindText}}）</text>
-          <text class="sh-m">完整内容，不做截断</text>
+          <!-- 内部稿件的栏目挪到这儿：正文那块已经不再挂「栏目」这一行了 -->
+          <text class="sh-m" wx:if="{{isDraft}}">{{docCol}}</text>
         </view>
-        <view class="kv" wx:for="{{rows}}" wx:key="k">
-          <text class="k">{{item.k}}</text>
-          <text class="v {{item.strong ? 'strong' : ''}}">{{item.v}}</text>
+
+        <!-- 内部稿件：正文整块占满卡宽
+             ⚠️ 不用 kv 行 —— 那是「160rpx 左标签列 + 右内容列」，正文越长左边白条越刺眼，
+                右边内容列还被挤窄。这里第一行标题（粗体、字号大一点），第二行起是正文。 -->
+        <view class="doc" wx:if="{{isDraft && doc}}">
+          <view class="doc-title"><text>{{doc.title}}</text></view>
+          <view class="doc-body"><text>{{doc.body}}</text></view>
         </view>
+
+        <!-- 学生投稿：歌曲 / 希望播出时段 / 想说的话，短字段，继续用 kv 行 -->
+        <block wx:else>
+          <view class="kv" wx:for="{{rows}}" wx:key="k">
+            <text class="k">{{item.k}}</text>
+            <text class="v {{item.strong ? 'strong' : ''}}">{{item.v}}</text>
+          </view>
+        </block>
       </view>
 
       <!-- 处理结果：本周名额（仅点歌） -->

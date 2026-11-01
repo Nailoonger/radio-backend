@@ -2,7 +2,8 @@
   "navigationStyle": "custom",
   "usingComponents": {
     "partner-tabbar": "../../components/partner-tabbar/index",
-    "duty-timetable": "../timetable/index"
+    "duty-timetable": "../timetable/index",
+    "rules-sheet": "../../components/rules-sheet/index"
   },
   "enablePullDownRefresh": true,
   "backgroundTextStyle": "dark"

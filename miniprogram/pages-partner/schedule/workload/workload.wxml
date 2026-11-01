@@ -12,7 +12,6 @@
     <block wx:elif="{{ready}}">
       <view class="hero">
         <text class="hero-title">{{monthLabel}}轮值 {{total}} 场·{{peopleCount}} 人</text>
-        <text class="hero-desc">轮值均衡用来判断是否需要手动调整；人员可用性优先，没有合格人选就保留缺岗。</text>
       </view>
       <view class="block">
         <view class="block-head">
@@ -26,7 +25,6 @@
           <text class="count">{{item.count}} 场</text>
         </view>
       </view>
-      <text class="note">只统计已发布班表，按周一归属月份，包含 0 场成员。轮值情况仅供参考，不计入考核，也不影响互评。</text>
     </block>
   </view>
 </view>

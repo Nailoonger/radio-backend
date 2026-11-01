@@ -49,7 +49,5 @@
         </view>
       </view>
     </block>
-
-    <view class="note">这一屏社干只读：排期规则、全局名额由超管在电脑端管；点歌的名额占用走的是点歌那一套。</view>
   </view>
 </view>

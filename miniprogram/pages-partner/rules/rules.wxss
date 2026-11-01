@@ -29,6 +29,17 @@
 }
 .sw { transform: scale(.8); transform-origin: right center; }
 
+/* 非超管看到的只读数值（代替加减号那一组）：2026-11-02
+   ⚠️ 只读态连开关也不给拨 —— 这一行是「值」不是控件，所以用深字不用强调色 */
+.st-ro {
+  flex: none;
+  font-size: 29rpx;
+  font-weight: 600;
+  color: #1D1D1F;
+  font-variant-numeric: tabular-nums;
+  margin-right: 8rpx;
+}
+
 .note { font-size: 21rpx; color: #76767E; line-height: 1.7; text-align: center; padding: 0 20rpx; }
 .acts { display: flex; }
 button.btn {

@@ -226,9 +226,10 @@ const PARTNER_ROUTES = [
   ['PUT /partner/availability', 'partner.availability.save'],
   ['DELETE /partner/availability', 'partner.availability.reset'],
 
-  // ⚠️ 字面量段（/list、/review）必须排在 /:id 之前，否则 /list 会被当成 id
+  // ⚠️ 字面量段（/list、/review、/columns）必须排在 /:id 之前，否则会被当成 id
   ['GET /partner/draft/list', 'partner.draft.list'],
   ['GET /partner/draft/review', 'partner.draft.reviewList'],
+  ['GET /partner/draft/columns', 'partner.draft.columns'],
   ['GET /partner/draft/:id/versions', 'partner.draft.versions'],
   ['GET /partner/draft/:id', 'partner.draft.detail'],
   ['POST /partner/draft', 'partner.draft.create'],
