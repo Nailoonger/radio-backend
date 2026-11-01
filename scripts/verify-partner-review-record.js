@@ -28,6 +28,8 @@ const ok = (name, cond, detail) => {
   if (!cond) failed++;
   out.push(`${cond ? 'OK  ' : 'FAIL'} ${name}${cond || !detail ? '' : '\n      ' + detail}`);
 };
+/** 跳过（不算失败）：只在「本来就不该有这个文件」的前提下用，比如 mini 范围不构建产物 */
+const skip = (name, why) => out.push(`SKIP ${name}\n      ${why}`);
 
 const cloudStatus = read('cloud/cloudfunctions/api/services/songStatus.js');
 const cloudSubmit = read('cloud/cloudfunctions/api/handlers/admin/submit.js');
@@ -100,9 +102,22 @@ ok('直连模式（src）同源同口径',
   /function describeHistory/.test(srcStatus) && /REASON_TEXT/.test(srcStatus)
   && /history = await S\.describeHistory\(statusHistory\)/.test(srcSubmit),
   '只改了云端 —— 直连模式下还是英文代号');
-ok('云端产物已重新打包（index.js 里有 describeHistory）',
-  /describeHistory/.test(bundle) && /REASON_TEXT/.test(bundle),
-  '改了源码没跑 node cloud/scripts/sync.js ⇒ 部署上去的还是旧产物，界面上看不到变化');
+/**
+ * 产物断言：只在「该有产物」的范围里算数。
+ * ⚠️ miniprogram/cloudfunctions/api/ 在 .gitignore 里，mini 范围的契约是「不构建线上产物」
+ *    ⇒ 干净检出里没有这个文件是**正常**的，不能判红（2026-11-02 CI #43 就是被这一条误杀的）。
+ *    产物不存在且不是 full 范围 ⇒ SKIP，说明白为什么不查。
+ */
+if (!bundle && process.env.VERIFY_SCOPE !== 'full') {
+  skip('云端产物已重新打包（index.js 里有 describeHistory）',
+    'mini 范围不构建云函数产物；要不要查产物由 full 范围的 verify 负责');
+} else {
+  ok('云端产物已重新打包（index.js 里有 describeHistory）',
+    /describeHistory/.test(bundle) && /REASON_TEXT/.test(bundle),
+    bundle
+      ? '改了源码没跑 node cloud/scripts/sync.js ⇒ 部署上去的还是旧产物，界面上看不到变化'
+      : '读不到 miniprogram/cloudfunctions/api/index.js —— full 范围里产物必须先于校验生成');
+}
 
 /* ══════════════ D. 前端只排版，不再自己拼 ══════════════ */
 out.push('\n---- D. 界面 ----');

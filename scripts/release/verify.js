@@ -103,6 +103,16 @@ function verify(options = {}) {
   const miniFiles = sourceJsFiles(path.join(root, 'miniprogram'));
   if (!miniFiles.length) throw new Error('小程序源码缺失。');
   for (const file of miniFiles) node('小程序语法 ' + path.relative(root, file), ['--check', file]);
+
+  // ⚠️⚠️ 先把云函数产物重建出来，再做所有"读产物"的校验（2026-11-02 CI #43 红的真因）。
+  //   `miniprogram/cloudfunctions/api/` 在 .gitignore 第 42 行里 —— CI 的干净检出**根本没有这个目录**，
+  //   而「伙伴端审核记录可读性」要 grep index.js 里的 describeHistory。原来这一步排在那些校验之后
+  //   ⇒ 干净树必红（文件不存在）、本机必绿（目录一直在、还是上次打的包）。
+  //   顺序改到最前面，本机与 CI 才是同一件事；顺手也堵住「改了 cloud 源没 sync，本地校验照样过」。
+  //   ⚠️ 只在 full 里重建：mini 范围的契约是「不构建线上产物」。
+  //     mini 下那条读产物的断言由脚本自己跳过（VERIFY_SCOPE=mini），不装死也不误红。
+  if (scope === 'full') node('重新生成云函数产物', [path.join(root, 'cloud/scripts/sync.js')]);
+
   // 伙伴端「周切换」四页口径统一（2026-10-30 陛下要求）：结构/胶囊/配色/文案一起校验
   node('伙伴端周切换一致性', [path.join(root, 'scripts/verify-partner-weeknav.js')]);
   // 工作台大白卡必须跟着本周班表四态走（发布完回首页还是「未发布」就红）
@@ -117,14 +127,21 @@ function verify(options = {}) {
   node('伙伴端稿件与内部稿件处理台', [path.join(root, 'scripts/verify-partner-drafts-ui.js')]);
   // 我的页六卡同序 + 请假审批独立页 + 考勤只看不录 + 工作台角标 + 三处文案（2026-11-01）
   node('伙伴端我的页与请假审批', [path.join(root, 'scripts/verify-partner-me-leave.js')]);
+  // 班表辅助页（记录 / 快照 / 轮值）：2026-11-02 补进流水 —— 这个脚本原来是孤立文件，
+  // 谁都没调它，等于"写了不跑"，本地绿 CI 也绿、坏了没人知道。
+  node('伙伴端班表辅助页', [path.join(root, 'scripts/verify-partner-schedule-records-ui.js')]);
   // 审核记录：代号翻人话 + 一次操作一行 + 谁通过的谁撤销的写实名 + 时间右对齐（2026-11-02）
-  node('伙伴端审核记录可读性', [path.join(root, 'scripts/verify-partner-review-record.js')]);
+  // ⚠️ 带 VERIFY_SCOPE 进去：这条脚本要读云函数产物，mini 范围不构建产物 ⇒ 那一条断言由它自己跳过
+  node('伙伴端审核记录可读性', [path.join(root, 'scripts/verify-partner-review-record.js')], {
+    env: Object.assign({}, env, { VERIFY_SCOPE: scope }),
+  });
   if (scope === 'mini') return { scope, miniFiles: miniFiles.length };
 
   const revision = options.revision || env.RELEASE_REVISION;
   if (!/^[a-f0-9]{40}$/i.test(revision || '')) throw new Error('发布校验需要完整的 40 位提交 SHA。');
   const apiUrl = resolveApiUrl(options.apiUrl || env.VITE_CLOUD_API_URL, options.production);
-  node('重新生成云函数产物', [path.join(root, 'cloud/scripts/sync.js')]);
+  // （「重新生成云函数产物」已挪到本函数开头，见那里的注释：产物不先建出来，
+  //   上面那几条读产物的校验在干净检出里会误红。）
   node('云函数源码回归', [path.join(root, 'cloud/scripts/regression.js'), '--source'], { timeout: 10 * 60 * 1000 });
   const bundleDir = path.join(root, 'miniprogram/cloudfunctions/api');
   const command = npmCommand(['ci', '--omit=dev', '--no-audit', '--no-fund']);
