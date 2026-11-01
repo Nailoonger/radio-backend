@@ -340,9 +340,11 @@ exports.detail = async (req, res, next) => {
 
     // 协议：处理台要能看到「这首歌为什么现在是这个状态」+ 换过几次时段
     let statusHistory = [];
+    let history = [];        // 已翻成人话的流水（谁 · 干了什么 · 什么时候）
     let assignments = [];
     if (Number(submit.type) === 1) {
       try { statusHistory = await S.historyOf(submit.id, 50); } catch (e) { statusHistory = []; }
+      try { history = await S.describeHistory(statusHistory); } catch (e) { history = []; }
       try {
         const { AssignmentLog } = require('../../models');
         assignments = await AssignmentLog.findAll({ where: { requestId: submit.id }, order: [['id', 'ASC']], raw: true });
@@ -361,6 +363,7 @@ exports.detail = async (req, res, next) => {
         ? await songQueue.cardFor(submit).catch(() => null)
         : null,
       statusHistory,
+      history,             // 给人看的记录，界面只渲染这一份
       assignments,
     });
   } catch (e) {

@@ -207,7 +207,7 @@ async function conflictOf(submit, targetReview, actionText) {
  * 协议 §14：这里的 approve **只是审核通过**，不等于拿到位置。
  *   审核通过 → review=APPROVED / schedule=UNASSIGNED → 进排期候选池
  */
-async function approveOne(submit, adminId) {
+async function approveOne(submit, adminId, opId) {
   const review = Number(submit.reviewStatus) || 0;
   const schedule = Number(submit.scheduleStatus) || 0;
 
@@ -235,7 +235,7 @@ async function approveOne(submit, adminId) {
   }
 
   const r = await S.applyChange(submit, changes, {
-    operatorId: adminId, operatorName: 'ADMIN', reason: 'REVIEW_APPROVED',
+    operatorId: adminId, operatorName: 'ADMIN', reason: 'REVIEW_APPROVED', opId,
   });
   // 文件头 ⑨：抢晚了（影响 0 行）→ 回读真实状态后按结论分流（见 conflictOf）
   if (r.conflict) return conflictOf(submit, S.REVIEW.APPROVED, '通过了');
@@ -246,7 +246,7 @@ async function approveOne(submit, adminId) {
  * 审核驳回：review → REJECTED，位子随之释放（占位要求 review=APPROVED）
  * schedule 维度**保留原值**，用来回答「他当时排到了哪一格」
  */
-async function rejectOne(submit, adminId, reason) {
+async function rejectOne(submit, adminId, reason, opId) {
   const review = Number(submit.reviewStatus) || 0;
   if (review === S.REVIEW.REJECTED) {
     throw new ApiError(Codes.PARAM_ERROR, '这条已是驳回状态，无需重复操作');
@@ -258,7 +258,7 @@ async function rejectOne(submit, adminId, reason) {
     reviewTime: new Date(),
     rejectReason: reason,
     autoRejected: 0,
-  }, { operatorId: adminId, operatorName: 'ADMIN', reason: 'REVIEW_REJECTED' });
+  }, { operatorId: adminId, operatorName: 'ADMIN', reason: 'REVIEW_REJECTED', opId });
 
   if (r.conflict) {
     // 与入口判断同口径：别人也驳回了 → 和「连点两次」一个语义，不报冲突
@@ -446,9 +446,11 @@ async function detail(ctx) {
 
   // 协议：处理台要能看到「这首歌为什么现在是这个状态」+ 换过几次时段
   let statusHistory = [];
+  let history = [];        // 已翻成人话的流水（谁 · 干了什么 · 什么时候）
   let assignments = [];
   if (Number(submit.type) === 1) {
     try { statusHistory = await S.historyOf(submit.id, 50); } catch (e) { statusHistory = []; }
+    try { history = await S.describeHistory(statusHistory); } catch (e) { history = []; }
     try {
       assignments = await findMany(C.ASSIGNMENT_LOG, { requestId: Number(submit.id) }, { orderBy: [['id', 'asc']] });
     } catch (e) { assignments = []; }
@@ -467,7 +469,8 @@ async function detail(ctx) {
     autoRejected: Number(submit.autoRejected) === 1,
     submitter,
     card,
-    statusHistory,
+    statusHistory,       // 原始流水（代号），留作排查用
+    history,             // 给人看的记录，界面只渲染这一份
     assignments,
   };
 }
@@ -481,14 +484,17 @@ async function approve(ctx) {
   const submit = await submitOf(ctx);
   await assertWeekOpen(submit);                 // 已锁定的周不允许再审批
 
-  const result = await approveOne(submit, ctx.admin.id);
+  const opId = S.newOpId();                     // 这一次点击的标识（审核 + 排期共用）
+  const result = await approveOne(submit, ctx.admin.id, opId);
   let fresh = result.submit;
 
   // 审核通过 → 进排期候选池 → 立刻跑一次该周的排期（幂等）
   // 这样管理员点完「通过」就能在矩阵上看到位置变化，不用额外点「执行排期」。
+  // ⚠️ opId 一起带下去：排期写的那条流水要和「通过」归成同一次操作，
+  //    否则审核记录里会拆成「通过」「分配了播出时段」两行（2026-11-02）。
   let rel = null;
   if (result.changed && Number(fresh.type) === 1) {
-    rel = await runWeekSchedule(fresh, { operatorId: ctx.admin.id });
+    rel = await runWeekSchedule(fresh, { operatorId: ctx.admin.id, opId });
     // ⚠️ 排期会**再改一次这条记录**（schedule_status 0 → 1/2）→ 必须回读（文件头 ⑦）
     fresh = await reread(fresh);
   }
@@ -511,11 +517,12 @@ async function reject(ctx) {
   const submit = await submitOf(ctx);
   await assertWeekOpen(submit);                 // 已锁定的周不允许再驳回
 
-  const { submit: fresh, wasSeated } = await rejectOne(submit, ctx.admin.id, reason);
+  const opId = S.newOpId();
+  const { submit: fresh, wasSeated } = await rejectOne(submit, ctx.admin.id, reason, opId);
 
   // 驳回使 review 离开 APPROVED → 位子释放 → 立刻让候补重新对齐
   if (wasSeated && Number(fresh.type) === 1) {
-    const rel = await runWeekSchedule(fresh, { operatorId: ctx.admin.id });
+    const rel = await runWeekSchedule(fresh, { operatorId: ctx.admin.id, opId });
     void releaseMsg('已驳回，位子已释放', rel);
   }
   return withStatus(await reread(fresh));

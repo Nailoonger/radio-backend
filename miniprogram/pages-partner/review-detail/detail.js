@@ -321,18 +321,18 @@ function decorateDraft(d) {
   ];
 
   // 审核记录：草稿表没有 statusHistory，就用 submittedAt / reviewedAt / reviewedByName 说清楚
+  // 行结构统一成 { name, role, tx, tm }：name/role 是「谁」，tx 是「干了什么」，tm 靠右对齐
   const recordLines = [];
   const st = Number(d.status) || 0;
+  const draftState = ['还没提交', '待审核', '已通过', '已驳回'][st] || '还没提交';
+  recordLines.push({ name: '', role: '', tx: `当前${draftState}`, tm: '' });
   if (st === 1) {
-    const at = d.submittedAt || d.updateTime;
-    recordLines.push(`${at ? fmtIso(at) + ' ' : ''}作者提交，等待审核。`);
+    recordLines.push({ name: '作者', role: '', tx: '提交，等待审核', tm: d.submittedAt ? fmtIso(d.submittedAt) : '' });
   } else if (st === 2) {
-    recordLines.push(`${d.reviewedAt ? fmtIso(d.reviewedAt) + ' ' : ''}由 ${d.reviewedByName || '—'} 通过。`);
+    recordLines.push({ name: d.reviewedByName || '管理员', role: '', tx: '通过', tm: d.reviewedAt ? fmtIso(d.reviewedAt) : '' });
   } else if (st === 3) {
-    recordLines.push(`${d.reviewedAt ? fmtIso(d.reviewedAt) + ' ' : ''}由 ${d.reviewedByName || '—'} 驳回。`);
-    if (d.rejectReason) recordLines.push(`驳回原因：${d.rejectReason}`);
-  } else {
-    recordLines.push('这篇还是草稿，作者尚未提交审核。');
+    recordLines.push({ name: d.reviewedByName || '管理员', role: '', tx: '驳回', tm: d.reviewedAt ? fmtIso(d.reviewedAt) : '' });
+    if (d.rejectReason) recordLines.push({ name: '', role: '', tx: `驳回原因：${d.rejectReason}`, tm: '' });
   }
 
   return { isSong: false, kindText: '内部稿件', person, stats, rows, quota: null, recordLines };
@@ -387,28 +387,24 @@ function decorate(d, isDraft) {
     };
   }
 
-  // 审核记录：用真实 statusHistory；没有就直说“尚未处理”，不编造
+  // 审核记录（2026-11-02 陛下要「谁通过的谁撤回的清楚一点」）
+  //
+  // ⚠️⚠️ 以前这里干的事是错的：拿 `statusHistory[].reason` 当人话直接上屏，而后端存的是
+  //    动作代号（REVIEW_APPROVED / REVOKED / INITIAL_ALLOCATION）⇒ 审核记录里全是英文，
+  //    而且一次「通过」会连带分配时段写两条，看着像重复。
+  //     现在：**翻译和合并都在后端**（services/songStatus.js#describeHistory，措辞只有一份），
+  //    这里只排版 —— { name, role, text, time } → 一行「谁（岗位） 干了什么 …… 时间」。
+  //     老数据没有 opId 的仍然一条一组，不猜；查不到操作人的退回「管理员」，不瞎编名字。
   const recordLines = [];
-  if (Number(d.reviewStatus) === 0) {
-    recordLines.push('本条目尚未处理。');
-  } else {
-    const when = d.reviewTime ? fmtIso(d.reviewTime) : '';
-    const who = d.reviewerName || (d.autoRejected ? '系统自动驳回' : '—');
-    const what = Number(d.reviewStatus) === 1 ? '通过' : '驳回';
-    recordLines.push(`${when ? when + ' ' : ''}由 ${who} ${what}。`);
-    if (Number(d.reviewStatus) === 2 && d.rejectReason) {
-      recordLines.push(`驳回原因：${d.rejectReason}`);
-    }
-  }
-  // ⚠️ 只渲染 h.reason（人写的"为什么"）—— toStatus/fromStatus 是常量名
-  //    （PENDING_REVIEW / WAITING…），翻中文就得在前端维护一份和后端同步的映射表，
-  //    后端一改这里就静默漂移。为这点信息量不值得，只取可读的那部分。
-  (d.statusHistory || []).slice(-4).forEach((h) => {
-    if (!h.reason) return;
-    const when = fmtIso(h.createTime || '');
-    const who = h.operatorName === 'SYSTEM' ? '系统'
-      : (h.operatorName === 'USER' ? '学生' : '管理员');
-    recordLines.push(`${when ? when + ' ' : ''}${h.reason}（${who}）`);
+  const stText = d.statusText || '待审核';
+  recordLines.push({ name: '', role: '', tx: `当前${stText}`, tm: '' });
+  (d.history || []).forEach((h) => {
+    recordLines.push({
+      name: h.name || '',
+      role: h.role || '',
+      tx: h.text || '状态变更',
+      tm: h.time ? fmtIso(h.time) : '',
+    });
   });
 
   return {

@@ -382,7 +382,7 @@ async function logAssignment(requestId, fromSlot, toSlot, type, reason, operator
  *    这批行从内存喂过去。非 dryRun 时恒为空数组。
  * @returns {Promise<{assigned:number, waiting:number, weekId:number, actions:Array, waitingRows:Array}>}
  */
-async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = null, dryRun = false } = {}) {
+async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = null, dryRun = false, opId = null } = {}) {
   const week = await ensureWeek(weekStartMs, { now });
   const values = await slotValuesOfWeek(weekStartMs);
   const capacity = await getCapacity();
@@ -414,7 +414,7 @@ async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = nul
             scheduleStatus: S.SCHEDULE.APPROVED,
             scheduledSlot: value,
             assignedAt: new Date(now),
-          }, { operatorId, operatorName: operatorId ? 'ADMIN' : 'SYSTEM', reason: S.SYSTEM_REASON.initial });
+          }, { operatorId, operatorName: operatorId ? 'ADMIN' : 'SYSTEM', reason: S.SYSTEM_REASON.initial, opId });
           if (r.logs.length) await logAssignment(row.id, null, value, ASSIGN.INITIAL, ASSIGN_REASON.INITIAL, operatorId);
         }
         res.assigned += 1;
@@ -485,7 +485,7 @@ async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = nul
  */
 async function reschedule(weekStartMs, {
   now = Date.now(), operatorId = null, crossSlot = null, dryRun = false,
-  extraWaiting = null, seatedOverride = null,
+  extraWaiting = null, seatedOverride = null, opId = null,
 } = {}) {
   const week = await ensureWeek(weekStartMs, { now });
   const values = await slotValuesOfWeek(weekStartMs);
@@ -589,6 +589,7 @@ async function reschedule(weekStartMs, {
         operatorId,
         operatorName: operatorId ? 'ADMIN' : 'SYSTEM',
         reason: isSame ? S.SYSTEM_REASON.rescheduleOk : ASSIGN_REASON.originalFull,
+        opId,
       });
       if (!r.logs.length) continue;              // 并发被别人改过 → 跳过
 

@@ -27,7 +27,7 @@
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-const { Submit, RequestStatusLog } = require('../models');
+const { Submit, RequestStatusLog, Admin } = require('../models');
 const logger = require('../utils/logger');
 
 /* ------------------------------------------------------------------ *
@@ -249,6 +249,103 @@ async function historyOf(requestId, limit = 50) {
   });
 }
 
+/* ------------------------------------------------------------------ *
+ * 状态流水 → 人话（2026-11-02，与云函数 services/songStatus.js 同源同口径）
+ *
+ * `request_status_log.reason` 存的是动作代号（REVIEW_APPROVED / REVOKED …），
+ * 不是给人看的句子。措辞只在这一处，前端直接渲染，别在前端再维护一份映射表。
+ * ⚠️ 站里这个动作一律叫「撤销」，不叫「撤回」。
+ *
+ * ⚠️⚠️ 与云端唯一的差异：`op_id` 这一列直连库还没建（云端是文档字段，加了就能用）。
+ *    所以这里没有 opId ⇒ 一次「通过」连带分配时段会显示成两行（不合并），
+ *    但**仍然是中文、仍然有操作人**。线上走云函数，看到的是合并后的两行。
+ *    要直连也合并，先按 skill `sequelize-schema-rollout` 加列再打开分组。
+ * ------------------------------------------------------------------ */
+const REASON_TEXT = {
+  REVIEW_APPROVED: '通过',
+  REVIEW_REJECTED: '驳回',
+  REVOKED: '撤销，退回待审核',
+  INITIAL_ALLOCATION: '分配了播出时段',
+  ORIGINAL_SLOT_FULL: '原时段满额，转入候补',
+  ORIGINAL_SLOT_CAPACITY_RELEASED: '换回原时段',
+  USER_CANCEL: '自己取消',
+  USER_LEAVE_QUEUE: '放弃候补',
+  SCHEDULE_LOCKED_NO_AVAILABLE_SLOT: '系统驳回（排期已锁定，没有空位）',
+  WEEK_UNLOCKED_RESTORE_WAITING: '恢复候补',
+};
+
+const STATE_CN = {
+  review: { PENDING_REVIEW: '待审核', APPROVED: '已通过', REJECTED: '已驳回', CANCELLED: '已取消' },
+  schedule: { UNASSIGNED: '未分配', APPROVED: '已排期', WAITING: '候补中', AUTO_REJECTED: '系统驳回' },
+  play: { NOT_PLAYED: '未播放', PLAYED: '已播放' },
+};
+const DIM_CN = { review: '审核', schedule: '排期', play: '播放' };
+const ROLE_CN = { 0: '超管', 1: '社干' };
+
+/** 一次操作的来源（云端同款；直连这边暂时只用于接口对齐） */
+function newOpId() {
+  return `op${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/** 没有代号映射时，退回「维度：原状态 → 新状态」，绝不把英文代号甩到界面上 */
+function fallbackPhrase(row) {
+  const dim = DIM_CN[row.dimension] || '状态';
+  const map = STATE_CN[row.dimension] || {};
+  return `${dim}：${map[row.fromStatus] || '—'} → ${map[row.toStatus] || '—'}`;
+}
+
+function reasonPhrase(row) {
+  const reason = String(row.reason || '');
+  if (reason === 'MANUAL') return row.toStatus === 'PLAYED' ? '标记为已播放' : '取消已播放标记';
+  return REASON_TEXT[reason] || fallbackPhrase(row);
+}
+
+/**
+ * 把一坨 status_log 翻成人话（谁 · 干了什么 · 什么时候）
+ * @returns {Promise<Array<{name, role, text, time, at}>>} time 是原始值，格式化交给前端
+ */
+async function describeHistory(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) return [];
+
+  const ids = [...new Set(list.map((r) => Number(r.operatorId) || 0).filter(Boolean))];
+  const actors = {};
+  for (const id of ids) {
+    try {
+      const a = await Admin.findOne({ where: { id }, raw: true });
+      if (a) actors[id] = { name: a.nickname || a.username || `#${id}`, role: ROLE_CN[Number(a.role)] || '' };
+    } catch (e) { /* 查不到就退回常量名，不影响记录本身 */ }
+  }
+
+  const groups = [];
+  list.forEach((r, i) => {
+    const key = r.opId ? String(r.opId) : `legacy-${i}`;
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) last.rows.push(r);
+    else groups.push({ key, rows: [r] });
+  });
+
+  return groups.map((g) => {
+    const first = g.rows[0];
+    const act = actors[Number(first.operatorId) || 0] || null;
+    const name = act ? act.name
+      : (first.operatorName === 'SYSTEM' ? '系统' : first.operatorName === 'USER' ? '本人' : '管理员');
+    const role = act ? act.role : (first.operatorName === 'USER' ? '投稿人' : '');
+    const texts = [];
+    g.rows.forEach((r) => {
+      const t = reasonPhrase(r);
+      if (t && texts.indexOf(t) < 0) texts.push(t);
+    });
+    return {
+      name,
+      role,
+      text: texts.join('，') || '状态变更',
+      time: first.createTime || null,
+      at: first.createTime || null,
+    };
+  });
+}
+
 module.exports = {
   REVIEW,
   SCHEDULE,
@@ -267,6 +364,11 @@ module.exports = {
   applyChange,
   patchWithDerivedStatus,
   historyOf,
+  REASON_TEXT,
+  STATE_CN,
+  newOpId,
+  reasonPhrase,
+  describeHistory,
   /** 兼容 v2 的常量名：占正式位的**镜像**状态码（已排期 / 已播放） */
   SEATED_STATUS: [ST.SCHEDULED, ST.PLAYED],
 };

@@ -201,9 +201,18 @@
 }
 .warnline > text { flex: 1; font-size: 22rpx; color: var(--muted); line-height: 1.6; }
 
-/* ── 审核记录 ── */
-.record { font-size: 24rpx; color: var(--muted); line-height: 1.75; }
-.rec-line { word-break: break-all; }
+/* ── 审核记录 ──
+   一行 = 左边「谁（岗位） 干了什么」+ 右边时间。
+   ⚠️ 时间右对齐成一列（tabular-nums），否则四条记录的时间长短不同会参差；
+      名字用 ink-2 + 600 加重 —— 陛下要的是「谁通过的、谁撤销的一眼看清」。 */
+.record { font-size: 24rpx; color: var(--muted); }
+.rec-line { display: flex; align-items: baseline; gap: 20rpx; line-height: 1.8; }
+.rec-tx { flex: 1; min-width: 0; word-break: break-all; }
+.rec-name { color: var(--ink-2); font-weight: 600; }
+.rec-role { color: #A6A6AB; }
+.rec-body { color: inherit; }
+.rec-tm { flex: none; font-size: 23rpx; color: #A6A6AB; font-variant-numeric: tabular-nums; }
+.rec-line.now .rec-tx { color: var(--ink-2); }
 
 /* ══════════ 底部固定操作条 ══════════
    v151 的 `.actbar` 是「贴底 + 上边缘渐隐到羊皮纸」，**不是**白条加一条分隔线：

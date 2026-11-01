@@ -102,7 +102,14 @@
       <view class="card-sec">
         <view class="sec-head"><text class="sh-t">审核记录</text></view>
         <view class="record">
-          <view class="rec-line" wx:for="{{recordLines}}" wx:key="*this">{{item}}</view>
+          <view class="rec-line {{item.tm ? '' : 'now'}}" wx:for="{{recordLines}}" wx:key="index">
+            <view class="rec-tx">
+              <text wx:if="{{item.name}}" class="rec-name">{{item.name}}</text>
+              <text wx:if="{{item.role}}" class="rec-role">（{{item.role}}）</text>
+              <text class="rec-body">{{item.name ? ' ' : ''}}{{item.tx}}</text>
+            </view>
+            <text class="rec-tm">{{item.tm}}</text>
+          </view>
         </view>
       </view>
     </view>

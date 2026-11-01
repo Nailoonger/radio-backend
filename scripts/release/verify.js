@@ -117,6 +117,8 @@ function verify(options = {}) {
   node('伙伴端稿件与内部稿件处理台', [path.join(root, 'scripts/verify-partner-drafts-ui.js')]);
   // 我的页六卡同序 + 请假审批独立页 + 考勤只看不录 + 工作台角标 + 三处文案（2026-11-01）
   node('伙伴端我的页与请假审批', [path.join(root, 'scripts/verify-partner-me-leave.js')]);
+  // 审核记录：代号翻人话 + 一次操作一行 + 谁通过的谁撤销的写实名 + 时间右对齐（2026-11-02）
+  node('伙伴端审核记录可读性', [path.join(root, 'scripts/verify-partner-review-record.js')]);
   if (scope === 'mini') return { scope, miniFiles: miniFiles.length };
 
   const revision = options.revision || env.RELEASE_REVISION;

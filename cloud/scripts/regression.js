@@ -75,6 +75,10 @@ const SUITE = [
   // 标 true —— 这条链路横跨 leave.js 与 schedule.js 两个模块（releaseCell 是跨模块调用），
   // sync 漏打包其中一个，批准就只改请假、班表纹丝不动，而那正是陛下报的那个错。
   ['test-partner-leave-flow.js', true],
+  // 审核记录（2026-11-02）：状态流水从「英文代号」翻成人话 —— 谁通过的 / 谁撤销的写实名 + 岗位，
+  // 一次操作（通过 + 分配时段）靠 opId 并成一条。标 true：describeHistory 在 services/songStatus 里，
+  // 但 opId 要 admin/submit.js 与 scheduling.js 一起串，sync 漏一个就退化成"两行"。
+  ['test-song-history.js', true],
   ['test-http-bridge.js', true],
   // ⚠️ 标 false：它测的是 **admin-web 前端**那一层（`admin-web/src/utils/http.js` 的上传适配），
   //    跟「云函数源码 vs 打包产物」无关，跑两遍没意义。

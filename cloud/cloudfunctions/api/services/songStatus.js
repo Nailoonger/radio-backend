@@ -23,7 +23,7 @@
  * （云数据库不支持跨文档事务，但这条路径本来也不需要：单条条件 UPDATE 本身就是原子操作。）
  */
 
-const { C, insertOne, updateWhere, findMany, nextId } = require('../lib/db');
+const { C, insertOne, updateWhere, findMany, findOne, nextId } = require('../lib/db');
 
 /* ------------------------------------------------------------------ *
  * 维度定义
@@ -120,18 +120,133 @@ const REVIEWER_TRACE_KEYS = new Set([
   'reviewerId', 'reviewTime', 'rejectReason', 'autoRejected',
 ]);
 
+/* ------------------------------------------------------------------ *
+ * 状态流水 → 人话（2026-11-02）
+ *
+ * ⚠️⚠️ 为什么要在这里做：`status_log.reason` 里存的是**动作代号**（REVIEW_APPROVED /
+ *    REVOKED / INITIAL_ALLOCATION …），不是给人看的句子。以前前端直接把它当文案显示，
+ *    于是审核记录里冒出「10-31 16:36 REVOKED（管理员）」这种谁也看不懂的行
+ *    （2026-11-02 陛下问「这些是什么意思」）。措辞属于业务语义，**只能在这里有一份**，
+ *    前端不再自己拼 —— 后端加一个新动作时，界面不会静默显示英文代号。
+ *
+ * ⚠️ 站里这个动作一律叫「撤销」（按钮、提示、错误文案都是这个词），别写成「撤回」。
+ * ------------------------------------------------------------------ */
+const REASON_TEXT = {
+  REVIEW_APPROVED: '通过',
+  REVIEW_REJECTED: '驳回',
+  REVOKED: '撤销，退回待审核',
+  INITIAL_ALLOCATION: '分配了播出时段',
+  ORIGINAL_SLOT_FULL: '原时段满额，转入候补',
+  ORIGINAL_SLOT_CAPACITY_RELEASED: '换回原时段',
+  USER_CANCEL: '自己取消',
+  USER_LEAVE_QUEUE: '放弃候补',
+  SCHEDULE_LOCKED_NO_AVAILABLE_SLOT: '系统驳回（排期已锁定，没有空位）',
+  WEEK_UNLOCKED_RESTORE_WAITING: '恢复候补',
+};
+
+/** 三维状态名（前端不再各自维护一份，跟着流水一起下发） */
+const STATE_CN = {
+  review: { PENDING_REVIEW: '待审核', APPROVED: '已通过', REJECTED: '已驳回', CANCELLED: '已取消' },
+  schedule: { UNASSIGNED: '未分配', APPROVED: '已排期', WAITING: '候补中', AUTO_REJECTED: '系统驳回' },
+  play: { NOT_PLAYED: '未播放', PLAYED: '已播放' },
+};
+const DIM_CN = { review: '审核', schedule: '排期', play: '播放' };
+const ROLE_CN = { 0: '超管', 1: '社干' };
+
+/** 一次操作的来源（同一次点击里连带发生的多维度变化，共用这个 id） */
+function newOpId() {
+  return `op${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/** 没有代号映射时，退回「维度：原状态 → 新状态」，绝不把英文代号甩到界面上 */
+function fallbackPhrase(row) {
+  const dim = DIM_CN[row.dimension] || '状态';
+  const map = STATE_CN[row.dimension] || {};
+  const from = map[row.fromStatus] || '—';
+  const to = map[row.toStatus] || '—';
+  return `${dim}：${from} → ${to}`;
+}
+
+/** 单条流水的短语（同一次操作里多维度会各出一条，由 describeHistory 去重合并） */
+function reasonPhrase(row) {
+  const reason = String(row.reason || '');
+  if (reason === 'MANUAL') return row.toStatus === 'PLAYED' ? '标记为已播放' : '取消已播放标记';
+  return REASON_TEXT[reason] || fallbackPhrase(row);
+}
+
+/**
+ * 把一坨 status_log 翻成人话（谁 · 干了什么 · 什么时候）
+ *
+ * 规则：
+ *   ① 同一次操作按 opId 归成一组（一次「通过」会连带分配时段 ⇒ 两条不同维度的流水）；
+ *      老数据没有 opId 的，一行一组，不猜。
+ *   ② 组内短语去重后按发生顺序拼起来：「通过，分配了播出时段」。
+ *   ③ 谁干的：operatorId 查 admin 表拿真名 + 岗位（超管/社干）；没有 id 的按
+ *      operatorName 常量：SYSTEM→系统、USER→本人（投稿人）。查不到人也不瞎编，退回「管理员」。
+ *
+ * @returns {Promise<Array<{name, role, text, time, at}>>}
+ *          `time` 是原始 ISO，**格式化交给前端**（时区/机器时间以设备为准，服务端不掺和）
+ */
+async function describeHistory(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) return [];
+
+  // ① 人名（只查不同的那几个，别一条流水查一次）
+  const ids = [...new Set(list.map((r) => Number(r.operatorId) || 0).filter(Boolean))];
+  const actors = {};
+  for (const id of ids) {
+    try {
+      const a = await findOne(C.ADMIN, { id });
+      if (a) actors[id] = { name: a.nickname || a.username || `#${id}`, role: ROLE_CN[Number(a.role)] || '' };
+    } catch (e) { /* 查不到就退回常量名，不影响记录本身 */ }
+  }
+
+  // ② 按 opId 连续分组（老数据没 opId ⇒ 每行独立）
+  const groups = [];
+  list.forEach((r, i) => {
+    const key = r.opId ? String(r.opId) : `legacy-${i}`;
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) last.rows.push(r);
+    else groups.push({ key, rows: [r] });
+  });
+
+  // ③ 每组一句话
+  return groups.map((g) => {
+    const first = g.rows[0];
+    const act = actors[Number(first.operatorId) || 0] || null;
+    const name = act ? act.name
+      : (first.operatorName === 'SYSTEM' ? '系统' : first.operatorName === 'USER' ? '本人' : '管理员');
+    const role = act ? act.role : (first.operatorName === 'USER' ? '投稿人' : '');
+    const texts = [];
+    g.rows.forEach((r) => {
+      const t = reasonPhrase(r);
+      if (t && texts.indexOf(t) < 0) texts.push(t);
+    });
+    return {
+      name,
+      role,
+      text: texts.join('，') || '状态变更',
+      time: first.createTime || null,
+      at: first.createTime || null,
+    };
+  });
+}
+
 /**
  * 改状态 + 落状态日志（唯一入口）
  *
  * @param {object} submit    云文档对象（含数字 id 与三维）
  * @param {object} changes   要改的字段（驼峰），只白名单字段生效
- * @param {object} [opts]    { operatorId, operatorName, reason }
+ * @param {object} [opts]    { operatorId, operatorName, reason, opId }
  * @returns {Promise<{row, status, logs, conflict?}>}
  *          ⚠️ `logs` 为空 = **没抢到**（并发冲突）。调用方必须判 `if (r.logs.length)`，
  *             不能只看 status —— 冲突时 status 是旧值。
  */
 async function applyChange(submit, changes, opts = {}) {
   const { operatorId = null, reason = null } = opts;
+  // 同一次点击连带产生的多维度变化共用一个 opId（调用方显式传；不传就自成一组）
+  const opId = opts.opId || newOpId();
+
   const operatorName = opts.operatorName || (operatorId ? 'ADMIN' : 'SYSTEM');
 
   const before = {
@@ -190,6 +305,7 @@ async function applyChange(submit, changes, opts = {}) {
       fromStatus: dim === 'review' ? reviewName(from) : dim === 'schedule' ? scheduleName(from) : playName(from),
       toStatus: dim === 'review' ? reviewName(to) : dim === 'schedule' ? scheduleName(to) : playName(to),
       reason: reason || null,
+      opId,               // 同一次操作的多维度变化共用一个 id（见 describeHistory）
     });
   });
 
@@ -242,6 +358,12 @@ module.exports = {
   applyChange,
   patchWithDerivedStatus,
   historyOf,
+  // 状态流水 → 人话（2026-11-02）：措辞只在这里有一份，前端直接渲染，不再自己拼
+  REASON_TEXT,
+  STATE_CN,
+  newOpId,
+  reasonPhrase,
+  describeHistory,
   /** 兼容 v2 的常量名：占正式位的**镜像**状态码（已排期 / 已播放） */
   SEATED_STATUS: [ST.SCHEDULED, ST.PLAYED],
 };

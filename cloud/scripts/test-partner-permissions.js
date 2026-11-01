@@ -190,7 +190,7 @@ const setPerson = (pid, patch, id = 1) => call('PUT', `/partner/permissions/pers
     await setGlobal({ proxy: false });
     r = await call('PUT', '/partner/availability', body, 2);
     equal('关掉代录权限后代录被拦', r.code, 40301);
-    equal('代录被拦的文案', r.message, '暂无代录权限');
+    equal('代录被拦的文案', r.message, '暂无权限');
 
     // 按人开回来
     await setPerson(3, { proxy: true });
