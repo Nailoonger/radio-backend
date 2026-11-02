@@ -251,12 +251,32 @@ function closeSearch() {
   searchInputRef.value?.blur();
 }
 
+/* ---------------- 角色实时同步（2026-11-02） ----------------
+   ⚠️ 路由守卫只在「跳转」时对账，停在某一页不动时菜单一直是旧的。
+      这里 30 秒补一次：超管在「账号管理」把某人改成社干/站员，
+      那个人最多 30 秒后菜单自己收起，不用重新登录（陛下报的「不同步」）。
+   ⚠️ 当前页已经不该给他看了（降权后还停在 /account），立刻退回数据概览，
+      否则他会停在一个点什么都 40301 的页面上。
+   ⚠️ 定时器必须成对清（onBeforeUnmount），否则退出登录后还在打接口。 */
+const ROLE_TEXT = { 0: '超级管理员', 1: '社干', 2: '站员' };
+let roleTimer = null;
+async function syncRole() {
+  const r = await auth.ensureFresh(true).catch(() => null);
+  if (!r || !r.changed) return;
+  ElMessage.info(`权限已同步：你现在是${ROLE_TEXT[r.to] || '普通账号'}`);
+  if (route.meta && route.meta.superAdmin && !auth.isSuperAdmin) {
+    router.replace('/dashboard');
+  }
+}
+
 onMounted(() => {
   window.addEventListener('keydown', onKeydown);
   loadPending();
+  roleTimer = setInterval(syncRole, 30000);
 });
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown);
+  if (roleTimer) { clearInterval(roleTimer); roleTimer = null; }
 });
 </script>
 

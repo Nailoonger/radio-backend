@@ -100,11 +100,32 @@ async function update(ctx) {
   const patch = { updateTime: new Date() };
   if (body.nickname !== undefined) patch.nickname = body.nickname;
   if (body.status !== undefined) patch.status = body.status ? 1 : 0;
-  if (body.role !== undefined && [0, 1, 2].includes(Number(body.role))) {
-    const nextRole = Number(body.role);
+  /**
+   * 角色：三档写满，非法值**报错**而不是静默忽略（2026-11-02）
+   * ⚠️ `Number('')` 等于 0 —— 空字符串会被算成「超级管理员」，这是最危险的一种静默漂移，
+   *    所以先挡空值再 Number。
+   */
+  if (body.role !== undefined) {
+    const rawRole = body.role;
+    const nextRole = Number(rawRole);
+    if (rawRole === '' || rawRole === null || ![0, 1, 2].includes(nextRole)) {
+      throw new ApiError(Codes.PARAM_ERROR, '角色必须为 0(超管) / 1(社干) / 2(站员)');
+    }
     // 站员的身份必须挂在学生档案上，否则排班/考勤查不到这个人
     if (nextRole === 2 && !admin.userId) {
       throw new ApiError(Codes.PARAM_ERROR, '改成站员前，这个账号必须先关联学生档案');
+    }
+    /**
+     * ⚠️ 最后一位超管不许被降级（2026-11-02）：与 remove 的「系统至少保留一个超管」
+     *    是同一道保护。原来是「能改不能删」—— 唯一超管把自己改成社干，
+     *    系统就再没人能进系统管理（账号 / 开关 / 设置全部锁死，且无法自救）。
+     * ⚠️ 与直连侧 `src/controllers/admin/adminController.js#update` 逐条对齐。
+     */
+    if (Number(admin.role) === 0 && nextRole !== 0) {
+      const others = await count(C.ADMIN, { role: 0, id: _.neq(admin.id) });
+      if (others === 0) {
+        throw new ApiError(Codes.FORBIDDEN, '系统至少保留一个超级管理员，不能把最后一位超管改成别的角色');
+      }
     }
     patch.role = nextRole;
   }

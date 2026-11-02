@@ -213,7 +213,26 @@ exports.main = async (event = {}, context) => {
         pl = null;   // ② 无效 token：交给后面的 handler
       }
       // ③ 有效 token 才强校验。⚠️ 走的是不带缓存的严格版，30 秒窗口不存在
-      if (pl) await require('./services/studentAccount').assertTokenFreshStrict(pl);
+      if (pl) {
+        await require('./services/studentAccount').assertTokenFreshStrict(pl);
+
+        /**
+         * ③-b 管理端：**角色以库为准**（2026-11-02 陛下报的「切角色不实时同步、权限错乱」）
+         *
+         * JWT 里的 role 是签发那一刻的快照，改角色不会改它 ⇒
+         * 降权的人旧 token 还能调 asSuper（能改账号、能改开关），升权的人永远进不来。
+         * 这里按 token 的 id 查一次 admin 表，把最新 role / status 放进 ctx.adminLive，
+         * `lib/auth.requireAdmin` 会用它覆盖 payload.role —— 45 处 asAdmin()/asSuper() 一行不用改。
+         *
+         * ⚠️ 判定条件必须是「admin token」：有 id、无 openid。学生 token 的 openid 字段是学号，
+         *    拿它去查 admin 表既无意义又会多一次查询。
+         * ⚠️ 查不到行时不抛（resolve 返回 null），保持既有「存量 admin token 例外」口径；
+         *    查到了但已停用 → 40101（停用即失效，原来停用只拦登录、拦不住已登录的会话）。
+         */
+        if (pl.id && !pl.openid) {
+          ctx.adminLive = await require('./services/adminLive').resolve(pl);
+        }
+      }
     }
 
     const data = await hit.handler(ctx);

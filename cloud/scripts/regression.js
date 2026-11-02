@@ -79,6 +79,10 @@ const SUITE = [
   // 一次操作（通过 + 分配时段）靠 opId 并成一条。标 true：describeHistory 在 services/songStatus 里，
   // 但 opId 要 admin/submit.js 与 scheduling.js 一起串，sync 漏一个就退化成"两行"。
   ['test-song-history.js', true],
+  // 管理端「切角色实时同步」（2026-11-02 陛下报的权限错乱）：角色以库为准 —— 降权/升权/停用
+  // 都立刻生效，不再等 token 过期；update 三档都能写、非法值报错、最后一位超管不许降级。
+  // 标 true：入口查 admin 表（index.js）+ requireAdmin 取覆盖值（lib/auth）+ handler 校验，三处都要串。
+  ['test-admin-role-sync.js', true],
   ['test-http-bridge.js', true],
   // ⚠️ 标 false：它测的是 **admin-web 前端**那一层（`admin-web/src/utils/http.js` 的上传适配），
   //    跟「云函数源码 vs 打包产物」无关，跑两遍没意义。

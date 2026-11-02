@@ -457,13 +457,20 @@ async function save() {
 
   saving.value = true;
   try {
+    const editingSelf = form.id === auth.admin?.id;
     await http.put(`/admin/admin/${form.id}`, {
       nickname: form.nickname,
       password: form.password || undefined,    // 留空 = 不改
       role: form.role,
       status: form.status,
     });
-    ElMessage.success('已保存');
+    /**
+     * 改的是**自己**（本人行正常没有编辑按钮，这里兜住双击本人行的情况）：
+     * store 里的 role 必须立刻刷新，否则顶栏身份、菜单、路由守卫要等 30 秒轮询才变。
+     * 改的是别人：那个人下一次操作/下一次跳转就按新角色走（后端 requireAdmin 已改成以库为准）。
+     */
+    if (editingSelf) await auth.fetchProfile();
+    ElMessage.success(editingSelf ? '已保存' : '已保存 · 对方下一次操作即按新角色生效');
     dialog.value = false;
     await fetch();
   } finally { saving.value = false; }

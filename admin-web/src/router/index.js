@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import { ElMessage } from 'element-plus';
 import { useAuthStore } from '@/stores/auth';
 
 const routes = [
@@ -45,11 +46,29 @@ const router = createRouter({
   routes,
 });
 
-router.beforeEach((to, from, next) => {
+/**
+ * 路由守卫（2026-11-02 改异步）
+ *
+ * ⚠️ 为什么要 `await ensureFresh()`：
+ *    原来只读 localStorage 里的 `admin.role`。超管在「账号管理」把某人降权/升权后，
+ *    那个人那边一直是旧角色 —— 降权的人还能点进系统管理，升权的人看不到菜单，
+ *    必须重新登录才变（陛下报的「切换账号角色无法实时同步、导致权限错乱」）。
+ *    这里每次跳转前和服务器对一次账（store 里有 5 秒 TTL，不会每跳一次都打接口），
+ *    角色一变 store 就更新，菜单与下面的 superAdmin 判定立刻跟着变。
+ * ⚠️ 对账失败不阻断导航：`.catch(() => null)` 之后按本地旧角色继续（断网也能用后台）。
+ */
+router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore();
   if (to.meta.public) return next();
   if (!auth.isLoggedIn) return next({ name: 'Login', query: { redirect: to.fullPath } });
+
+  const fresh = await auth.ensureFresh().catch(() => null);
+
   if (to.meta.superAdmin && !auth.isSuperAdmin) {
+    // 角色刚被改掉：明说一句，别让人以为是页面坏了
+    if (fresh && fresh.changed) {
+      ElMessage.warning('你的权限已被调整，系统管理那组菜单已收起');
+    }
     return next({ name: 'Dashboard' });
   }
   next();

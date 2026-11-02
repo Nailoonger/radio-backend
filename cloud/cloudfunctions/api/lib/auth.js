@@ -60,13 +60,25 @@ async function requireUser(ctx) {
   return ctx.user;
 }
 
-/** 管理态：等价于原 adminAuth */
+/**
+ * 管理态：等价于原 adminAuth
+ *
+ * ⚠️ 角色**以库为准**（2026-11-02 修「切角色不同步」）：
+ *    token 里的 `role` 只是签发那一刻的快照，超管在「账号管理」改完角色，
+ *    旧 token 里还是老值 —— 降权的人照样能调 asSuper，升权的人永远进不去。
+ *    入口（index.js）已经查好一份最新的行放进 `ctx.adminLive`，这里优先用它；
+ *    没有（直接调 handler 的测试 / 存量 token）就退回 payload 里的旧口径，行为不变。
+ */
 function requireAdmin(ctx) {
   const payload = decodeToken(ctx);
   if (!payload.id || !payload.username) throw new ApiError(Codes.UNAUTHORIZED, '请先登录');
-  ctx.admin = payload;
+  const live = ctx && ctx.adminLive;
+  const fresh = live && Number(live.id) === Number(payload.id)
+    ? Object.assign({}, payload, { role: live.role, status: live.status })
+    : payload;
+  ctx.admin = fresh;
   ctx.payload = payload;
-  return ctx.admin;
+  return fresh;
 }
 
 /** 仅超管：等价于原 requireSuperAdmin（role!==0 → 40301） */

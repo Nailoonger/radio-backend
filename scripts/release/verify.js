@@ -137,6 +137,8 @@ function verify(options = {}) {
   });
   // 排班规则入口：超管必须进编辑页（只有那一页能改），社干/站员才走只读弹层（2026-11-02）
   node('伙伴端排班规则入口', [path.join(root, 'scripts/verify-partner-rules-entry.js')]);
+  // 管理端切角色实时同步（2026-11-02）：角色以库为准 + 前端 store 对账 + update 三档写满
+  node('管理端角色同步', [path.join(root, 'scripts/verify-admin-role-sync.js')]);
   if (scope === 'mini') return { scope, miniFiles: miniFiles.length };
 
   const revision = options.revision || env.RELEASE_REVISION;

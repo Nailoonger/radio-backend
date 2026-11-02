@@ -3,6 +3,7 @@
 const { verify } = require('../utils/jwt');
 const { fail, Codes } = require('../utils/response');
 const accountService = require('../services/studentAccountService');
+const adminLive = require('../services/adminLiveService');
 
 /**
  * 解析 Authorization: Bearer <token>
@@ -89,11 +90,19 @@ async function adminAuth(req, res, next) {
   try {
     // 不走缓存：30 秒窗口在「改密即失效」面前是不允许的
     await accountService.assertTokenFreshStrict(payload);
+    /**
+     * 角色**以库为准**（2026-11-02 修「切角色不同步」，与云端 lib/auth + services/adminLive 同口径）：
+     * token 里的 role 是签发那一刻的快照，超管在「账号管理」改完角色后它不会变 ⇒
+     * 降权的人旧 token 照样过 requireSuperAdmin，升权的人永远进不去。
+     * 查不到行时不覆盖（保持既有「存量 admin token 例外」口径）。
+     */
+    const live = await adminLive.resolve(payload);
+    req.admin = live
+      ? Object.assign({}, payload, { role: live.role, status: live.status })
+      : payload;
   } catch (e) {
     return fail(res, Codes.UNAUTHORIZED, (e && e.message) || '登录已失效，请重新登录', 401);
   }
-
-  req.admin = payload;
   return next();
 }
 

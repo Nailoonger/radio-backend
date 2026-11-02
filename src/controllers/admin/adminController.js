@@ -87,9 +87,44 @@ exports.update = async (req, res, next) => {
     if (!admin) throw new ApiError(Codes.NOT_FOUND, '账号不存在');
     if (req.body.nickname !== undefined) admin.nickname = req.body.nickname;
     if (req.body.status !== undefined) admin.status = req.body.status ? 1 : 0;
-    if (req.body.role !== undefined && [0, 1].includes(req.body.role)) {
-      admin.role = req.body.role;
+
+    /**
+     * 角色：**三档写满**（0 超管 / 1 社干 / 2 站员），且必须先 `Number()`。
+     *
+     * ⚠️⚠️ 2026-11-02 陛下报「账号管理里切角色不实时同步、权限错乱」——
+     *    这里原来写的是 `[0, 1].includes(req.body.role)`，两个错叠在一起：
+     *      ① **站员（2）不在白名单里** ⇒ 界面上选了「站员」、提示保存成功，
+     *         但后端一个字段都没写，刷新还是原来的角色。这就是「切了没反应」；
+     *      ② 没做 `Number()` ⇒ 前端若传字符串 `"1"`（JSON 里合法）也匹配不上，
+     *         同样静默丢弃、不报错。
+     *    云端 `handlers/admin/adminMgr.js` 一直是对的（`[0,1,2].includes(Number(...))`），
+     *    只有直连这一份漏了 —— 两份必须逐字对齐。
+     */
+    if (req.body.role !== undefined) {
+      const rawRole = req.body.role;
+      const nextRole = Number(rawRole);
+      // ⚠️ `Number('')` 等于 0 —— 空字符串会被算成「超级管理员」，先挡空值再 Number
+      if (rawRole === '' || rawRole === null || ![0, 1, 2].includes(nextRole)) {
+        throw new ApiError(Codes.PARAM_ERROR, '角色必须为 0(超管) / 1(社干) / 2(站员)');
+      }
+      // 站员的身份必须挂在学生档案上，否则排班/考勤查不到这个人（云端同口径）
+      if (nextRole === 2 && !admin.userId) {
+        throw new ApiError(Codes.PARAM_ERROR, '改成站员前，这个账号必须先关联学生档案');
+      }
+      /**
+       * ⚠️ 最后一位超管不许被降级：与 remove 的「系统至少保留一个超管」是同一道保护。
+       *    原来是「能改不能删」—— 唯一超管把自己（或把另一个唯一超管）改成社干，
+       *    系统就再没人能进系统管理（账号 / 开关 / 设置全部锁死，且无法自救）。
+       */
+      if (Number(admin.role) === 0 && nextRole !== 0) {
+        const others = await Admin.count({ where: { role: 0, id: { [Op.ne]: admin.id } } });
+        if (others === 0) {
+          throw new ApiError(Codes.FORBIDDEN, '系统至少保留一个超级管理员，不能把最后一位超管改成别的角色');
+        }
+      }
+      admin.role = nextRole;
     }
+
     if (req.body.password) {
       if (req.body.password.length < 6) {
         throw new ApiError(Codes.PARAM_ERROR, '密码长度不能少于6位');
