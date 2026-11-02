@@ -11,7 +11,9 @@
 2. **小程序管理端 `pages-admin/`（分包 5 页：login/todo/review/review-detail/message，走 admin 表账号）—— 决定退役**，
    由伙伴端接位、改**学号登录**。
 3. 伙伴端（66 屏原型）—— 新端，取代第 2 条。
-4. **管理端 web `admin-web/`（Vue3，13 页）—— 保留，只管电脑端**（导入/导出/开关/设置/看板）。
+4. **管理端 web `admin-web/`（Vue3，14 页）—— 保留，只管电脑端**（导入/导出/开关/设置/看板/权限管理）。
+   ⚠️ 权限管理页 2026-11-02 补上：路由 `/permissions`（`meta.superAdmin`）+ 系统管理组菜单（`IconKey`）。
+   **只加这一条**，2026-10-31 摘掉的 9 条 `/partner/*` 仍保持摘掉；后端接口一直是 `/partner/permissions` 那三个口子。
 ⚠️ 曾把第 2 条和第 4 条当成一个东西、以为要下线 admin-web → 被纠正「不是一个东西」。
 ⚠️ 退役连带：app.json subpackages · app.js adminToken/adminInfo/adminLogin/adminLogout/isAdminLoggedIn · `utils/request.js#adminRequest` ·
 `pages/login/login.js:142` · `login.wxml:87-91`「管理员登录」。**云函数 `/admin/login` 不能删**（admin-web 还在用）。
