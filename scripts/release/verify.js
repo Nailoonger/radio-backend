@@ -141,6 +141,9 @@ function verify(options = {}) {
   node('管理端角色同步', [path.join(root, 'scripts/verify-admin-role-sync.js')]);
   // 伙伴端角色实时同步（2026-11-02）：电脑端改完角色，小程序各 tab 页 onShow 就对账并重排底栏
   node('伙伴端角色同步', [path.join(root, 'scripts/verify-partner-role-sync.js')]);
+  // 管理端权限管理页（2026-11-02 陛下要求补上）：路由/菜单不能被摘、文案只吃后端 meta、
+  // 每格一把小锁、失败要回滚 —— 这四条坏了页面照常打开，只有真点下去才发现不对
+  node('管理端权限管理页', [path.join(root, 'scripts/verify-admin-permissions-page.js')]);
   if (scope === 'mini') return { scope, miniFiles: miniFiles.length };
 
   const revision = options.revision || env.RELEASE_REVISION;

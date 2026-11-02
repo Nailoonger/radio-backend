@@ -118,7 +118,7 @@ import http from '@/utils/http';
 import {
   IconTrend, IconArticle, IconCalendar, IconMegaphone, IconChat,
   IconStar, IconSwitch, IconUsers, IconSettings, IconUserPlus,
-  IconSearch, IconClose, IconChevronDown,
+  IconSearch, IconClose, IconChevronDown, IconKey,
 } from '@/components/icons';
 import { pageHeader } from '@/utils/pageHeader';
 
@@ -152,6 +152,8 @@ const NAV_GROUPS = [
       { path: '/showcase', title: '风采展示', icon: IconStar, superAdmin: true },
       { path: '/switch', title: '模块开关', icon: IconSwitch, superAdmin: true },
       { path: '/account', title: '账号管理', icon: IconUsers, superAdmin: true },
+      // 2026-11-02 新增：超管给社干分发「排班 / 审核 / 代录」三档权限（小程序端同一张表）
+      { path: '/permissions', title: '权限管理', icon: IconKey, superAdmin: true },
       { path: '/setting', title: '系统设置', icon: IconSettings, superAdmin: true },
     ],
   },

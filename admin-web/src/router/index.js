@@ -28,6 +28,9 @@ const routes = [
       { path: 'staff', name: 'Staff', component: () => import('@/views/Staff.vue'), meta: { title: '风采展示 - 部门人员', superAdmin: true } },
       { path: 'switch', name: 'Switch', component: () => import('@/views/Switch.vue'), meta: { title: '模块开关', superAdmin: true } },
       { path: 'account', name: 'Account', component: () => import('@/views/Account.vue'), meta: { title: '账号管理', superAdmin: true } },
+      /* ⚠️ 2026-11-02：恢复的只有「权限管理」这一条（陛下点名要的）。
+         下面注释里那 9 条 /partner/* 仍然保持摘掉状态，别顺手一起加回来。 */
+      { path: 'permissions', name: 'PartnerPermissions', component: () => import('@/views/PartnerPermissions.vue'), meta: { title: '权限管理', superAdmin: true } },
       /**
        * ⚠️ 伙伴端那组路由（/partner/*，9 条）已摘掉 —— 2026-10-31 陛下明确要求
        *    「管理端 web 的伙伴端先删掉，我还没喊你做」。
