@@ -30,6 +30,7 @@
 //    member 态的 UI 按 v151 全量写好，等站员通道定了自动生效；在那之前页面只会以 manager/super 出现。
 
 const { adminRequest } = require('../../utils/request.js');
+const partnerRole = require('../../utils/partnerRole.js');
 
 /* v151 greetWord()：逐时段问候，原样搬 */
 function greetWord() {
@@ -162,12 +163,43 @@ Page({
 
   onShow() {
     if (!this.data.ready) return;
+    // 角色实时对账（2026-11-02 陛下：电脑端改完角色，伙伴端要跟上）
+    this.syncRole();
     // 大白卡写的是「本周班表」的状态，在排班工作台发布 / 撤回之后回首页必须跟着变，
     // 所以这里和待办数字一起重拉（只拉数字会出现「已发布，首页还写着未发布」）。
     this.fetchCounts();
     this.fetchModules();
     this.fetchSchedule();
     this.fetchSongs();
+  },
+
+  /**
+   * 角色对账（2026-11-02）
+   *
+   * 管理端 web「账号管理」把人从社干改成站员之后，那人切回小程序：
+   * 原来 roleKey 是 onLoad 时从缓存抄的 ⇒ 底栏还是 5 格、审核入口还在，
+   * 点进去才被后端拦（接口侧已经以库为准了，见 cloud/lib/auth.requireAdmin）。
+   * 这里每次显示都对一次，变了就地重排底栏 + 重算分区（管理区 / 站内协作）。
+   *
+   * ⚠️ 三档都要能进这一页（站员也叫「工作台」），所以不跳转，只重排。
+   * ⚠️ 不管成败都不能阻塞后面的 fetch —— 断网时照常显示旧内容。
+   * @param {boolean} force 忽略 15 秒 TTL（下拉刷新用）
+   */
+  syncRole(force) {
+    return partnerRole.sync(force === true)
+      .then((r) => {
+        if (this._gone || !r || !r.changed) return null;
+        const roleKey = partnerRole.roleKeyOf(r.next) || this.data.roleKey;
+        partnerRole.toastChanged();
+        this.setData({
+          roleKey,
+          roleTag: roleTagOf(roleKey),
+          // 站员的底栏第一个 tab 是 home，社干/超管是 desk
+          tabActive: roleKey === 'member' ? 'home' : 'desk',
+        }, () => { this.fetchModules(); this.fetchCounts(); });
+        return null;
+      })
+      .catch(() => null);
   },
 
   /**
@@ -178,6 +210,9 @@ Page({
    */
   onPullDownRefresh() {
     if (!this.data.ready) return wx.stopPullDownRefresh();
+    /* 下拉 = 「我现在就要看到最新的」：角色强制对一次账（跳过 15 秒 TTL）。
+       不改界面也行，但那样「我明明下拉了，怎么还是旧角色」就说不清了。 */
+    this.syncRole(true);
     this.fetchCounts();
     return Promise.all([
       this.fetchModules(),

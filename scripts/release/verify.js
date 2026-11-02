@@ -139,6 +139,8 @@ function verify(options = {}) {
   node('伙伴端排班规则入口', [path.join(root, 'scripts/verify-partner-rules-entry.js')]);
   // 管理端切角色实时同步（2026-11-02）：角色以库为准 + 前端 store 对账 + update 三档写满
   node('管理端角色同步', [path.join(root, 'scripts/verify-admin-role-sync.js')]);
+  // 伙伴端角色实时同步（2026-11-02）：电脑端改完角色，小程序各 tab 页 onShow 就对账并重排底栏
+  node('伙伴端角色同步', [path.join(root, 'scripts/verify-partner-role-sync.js')]);
   if (scope === 'mini') return { scope, miniFiles: miniFiles.length };
 
   const revision = options.revision || env.RELEASE_REVISION;

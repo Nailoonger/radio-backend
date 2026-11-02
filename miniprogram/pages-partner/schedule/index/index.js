@@ -39,6 +39,8 @@ Page({
     this.refreshBadges();
   },
   onShow() {
+    // 角色实时对账（2026-11-02）：电脑端改完角色，切回来底栏与页面形态立刻跟着变
+    this.syncRole();
     // 切回页面时刷新一次权限（TTL 只有 1 秒）：超管刚关掉就点不进去，不用等重新登录
     this.refreshPerm();
     // 停在这一页不动时也要收到权限变化（10 秒一轮）
@@ -54,6 +56,34 @@ Page({
     return partnerTodo.fetchBadges(this.data.roleKey)
       .then((b) => { if (!this._gone) this.setData({ badges: b }); })
       .catch(() => { if (!this._gone) this.setData({ badges: partnerTodo.emptyBadges() }); });
+  },
+
+  /**
+   * 角色对账（2026-11-02 陛下：电脑端改完角色，伙伴端要跟上）
+   *
+   * roleKey 原来是 onLoad 时从缓存抄的 ⇒ 超管把社干改成站员，那人翻到「班表」页
+   * 底栏还是 5 格，页面还按「班表管理」渲染（其实是站员的「我的班表」）。
+   * 这里每次显示对一次，变了就地重排：roleKey / isMember / tabId 全跟着换，再整页重拉。
+   *
+   * ⚠️ 三档都能进这一页，不跳转。
+   * ⚠️ 变了要顺带把权限位也重问（超管 ⇒ 恒放行；变社干才需要看开关）。
+   * @param {boolean} force 忽略 15 秒 TTL（下拉刷新用）
+   */
+  syncRole(force) {
+    return partnerRole.sync(force === true)
+      .then((r) => {
+        if (this._gone || !r || !r.changed) return null;
+        const roleKey = partnerRole.roleKeyOf(r.next);
+        if (!roleKey) return null;
+        partnerRole.toastChanged();
+        this.setData({
+          roleKey,
+          isMember: roleKey === 'member',
+          tabId: roleKey === 'member' ? 'schedule' : 'scheduling',
+        });
+        return Promise.all([this.refreshPerm(true), this.load()]);
+      })
+      .catch(() => null);
   },
 
   /** 权限可能刚被超管改过 —— 只重问权限，不整页重拉
@@ -86,6 +116,8 @@ Page({
    * ⚠️ 权限必须一起强制重取，否则「拉了还是旧的」
    */
   onPullDownRefresh() {
+    // 下拉 = 立刻要最新：角色跳过 TTL 强制对一次，权限位也强制重取
+    this.syncRole(true);
     const jobs = [this.load()];
     if (this.data.roleKey === 'manager') jobs.push(this.refreshPerm(true));
     return Promise.all(jobs).then(

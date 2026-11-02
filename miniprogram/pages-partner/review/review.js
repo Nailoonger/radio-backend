@@ -17,6 +17,7 @@ const { adminRequest, isConflict } = require('../../utils/request.js');
 const { fmtMd } = require('../../utils/format.js');
 const perm = require('../../utils/perm.js');
 const partnerTodo = require('../../utils/partnerTodo.js');
+const partnerRole = require('../../utils/partnerRole.js');
 
 /* 类型顺序照 v151 .ftags。
    ⚠️ 各类型的三档状态值不一样：
@@ -131,6 +132,10 @@ Page({
   },
 
   onShow() {
+    /* 角色可能刚被超管在电脑端改过（2026-11-02）：先用服务端把 roleKey 对一遍，
+       站员根本没有「审核」这一格 —— 留在原地只会在点每个按钮时被 40301。
+       ⚠️ 放在权限位刷新之前：角色变了，下面那套 perm 判定整体就不成立。 */
+    this.syncRole();
     /* 权限可能刚被超管改过：切回来先对一次，再决定要不要刷角标
        （2026-10-31：原来只在 onLoad 判一次，改完不重新登录就一直是旧状态） */
     this.refreshPermState().then(() => {
@@ -141,6 +146,29 @@ Page({
     if (this.data.roleManager) {
       perm.startPolling('review', (pm) => this.refreshPermState(pm));
     }
+  },
+
+  /**
+   * 角色对账（2026-11-02）：站员被降权 / 社干升超管，都把界面按新角色重排
+   * ⚠️ 降到站员时**必须离开这一页**：底栏 5 格变 4 格，页面本身也不属于站员，
+   *    留在原地等于给了一个每点都 40301 的空壳。
+   */
+  syncRole() {
+    return partnerRole.sync()
+      .then((r) => {
+        if (this._gone || !r || !r.changed) return null;
+        const roleKey = partnerRole.roleKeyOf(r.next);
+        if (!roleKey) return null;
+        partnerRole.toastChanged();
+        if (roleKey === 'member') {
+          perm.stopPolling('review');
+          wx.reLaunch({ url: '/pages-partner/desk/desk' });
+          return null;
+        }
+        this.setData({ roleKey, roleManager: Number(r.next) === 1 });
+        return this.refreshPermState(null, true);
+      })
+      .catch(() => null);
   },
 
   onHide() { perm.stopPolling('review'); },

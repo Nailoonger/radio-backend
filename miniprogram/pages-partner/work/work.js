@@ -13,6 +13,7 @@
 
 const { adminRequest } = require('../../utils/request.js');
 const partnerTodo = require('../../utils/partnerTodo.js');
+const partnerRole = require('../../utils/partnerRole.js');
 
 const TABS = [
   { key: 'draft',    status: 0, label: '草稿箱', cntKey: 'draft' },
@@ -77,9 +78,26 @@ Page({
   onShow() {
     // 从编辑器 / 版本页回来要刷新（状态可能变了）
     if (this.data.ready) {
+      this.syncRole();
       this.fetchList(true);
       this.refreshBadges();
     }
+  },
+
+  /**
+   * 角色对账（2026-11-02）：电脑端改完角色，切回来底栏就跟着变
+   * ⚠️ 这一页三档都能进（站员也叫「稿件」），所以只重排不跳转。
+   */
+  syncRole() {
+    return partnerRole.sync()
+      .then((r) => {
+        if (this._gone || !r || !r.changed) return;
+        const roleKey = partnerRole.roleKeyOf(r.next);
+        if (!roleKey) return;
+        partnerRole.toastChanged();
+        this.setData({ roleKey });
+      })
+      .catch(() => null);
   },
 
   onPullDownRefresh() {

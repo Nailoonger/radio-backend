@@ -66,7 +66,7 @@ test('policy 与 mini 范围只执行对应校验，不构建或安装线上产�
   // 10 = 班表辅助页（2026-11-02 补进流水：记录 / 快照 / 轮值 —— 这个脚本原来没人调，等于"写了不跑"）
   // 11 = 审核记录可读性（2026-11-02 新增：代号翻人话 / 一次操作一行 / 实名 + 岗位 / 时间右对齐）
   // 12 = 排班规则入口（2026-11-02 新增：超管进编辑页、社干/站员才弹只读层、缓存缺 role 先问服务端）
-  assert.equal(stages.length, 13);
+  assert.equal(stages.length, 14);
   assert.ok(stages[1].args.includes('--check'));
   assert.ok(stages[2].args[0].endsWith('verify-partner-weeknav.js'));
   assert.ok(stages[3].args[0].endsWith('verify-partner-home-cards.js'));
@@ -79,6 +79,7 @@ test('policy 与 mini 范围只执行对应校验，不构建或安装线上产�
   assert.ok(stages[10].args[0].endsWith('verify-partner-review-record.js'));
   assert.ok(stages[11].args[0].endsWith('verify-partner-rules-entry.js'));
   assert.ok(stages[12].args[0].endsWith('verify-admin-role-sync.js'));
+  assert.ok(stages[13].args[0].endsWith('verify-partner-role-sync.js'));
   // mini 不构建产物（2026-11-02 CI #43 的修法：重建产物只在 full 里做）
   assert.ok(!stages.some((s) => s.args.some((a) => String(a).endsWith('cloud/scripts/sync.js'))),
     'mini 范围不该跑 sync.js：产物重建属于 full');
