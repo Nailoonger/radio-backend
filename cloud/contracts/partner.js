@@ -119,8 +119,10 @@ const ABILITIES = {
  * ⚠️ 这两个别合成一个：合起来的那一刻，前端就分不清「没设」和「设成了关」，
  *    「跟回全局」这个动作也就没法做了。
  */
-const PERM_SET = { schedule: 'boolean', review: 'boolean', proxy: 'boolean' };
-const PERM_TRI = { schedule: 'boolean|null', review: 'boolean|null', proxy: 'boolean|null' };
+const PERM_SET = { schedule: 'boolean', review: 'boolean', proxy: 'boolean', clubkey: 'boolean' };
+const PERM_TRI = {
+  schedule: 'boolean|null', review: 'boolean|null', proxy: 'boolean|null', clubkey: 'boolean|null',
+};
 
 const contract = {
   // ─────────────────────────── 身份 ───────────────────────────
@@ -344,7 +346,7 @@ const contract = {
       }],
       count: {
         managers: 'number', scheduleOn: 'number', reviewOn: 'number',
-        proxyOn: 'number', overridden: 'number',
+        proxyOn: 'number', clubkeyOn: 'number', overridden: 'number',
       },
       meta: [{ key: 'string', name: 'string', short: 'string', desc: 'string', deny: 'string' }],
     },
@@ -354,8 +356,8 @@ const contract = {
     method: 'PUT',
     path: '/partner/permissions',
     auth: 'super',
-    desc: '改全局总闸。三位只能是布尔 —— 「跟随」只属于按人那层，全局没有「跟随」可言。',
-    req: { schedule: 'boolean?', review: 'boolean?', proxy: 'boolean?' },
+    desc: '改全局总闸。四位只能是布尔 —— 「跟随」只属于按人那层，全局没有「跟随」可言。',
+    req: { schedule: 'boolean?', review: 'boolean?', proxy: 'boolean?', clubkey: 'boolean?' },
     resp: { global: PERM_SET, changed: 'string[]' },
   },
 
@@ -364,7 +366,7 @@ const contract = {
     path: '/partner/permissions/person/:id',
     auth: 'super',
     desc: '给某个社干单独设置。传 null = 撤销单独设置、跟回全局。只能对社干，超管与站员一律 40001。',
-    req: { schedule: 'boolean|null', review: 'boolean|null', proxy: 'boolean|null' },
+    req: { schedule: 'boolean|null', review: 'boolean|null', proxy: 'boolean|null', clubkey: 'boolean|null' },
     resp: { personId: 'number', name: 'string', over: PERM_TRI, eff: PERM_SET, overridden: 'boolean' },
   },
 
@@ -375,8 +377,8 @@ const contract = {
     desc: '我自己的生效权限。超管恒 true（总闸锁不住自己），站员一律 false（角色层面就不是他的人）。',
     req: {},
     resp: {
-      isSuper: 'boolean', schedule: 'boolean', review: 'boolean', proxy: 'boolean',
-      text: { schedule: 'string', review: 'string', proxy: 'string' },
+      isSuper: 'boolean', schedule: 'boolean', review: 'boolean', proxy: 'boolean', clubkey: 'boolean',
+      text: { schedule: 'string', review: 'string', proxy: 'string', clubkey: 'string' },
     },
   },
 };

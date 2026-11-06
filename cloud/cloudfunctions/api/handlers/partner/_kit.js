@@ -230,10 +230,21 @@ async function readGlobalPerm() {
   return out;
 }
 
+/**
+ * 「一位都不覆盖」的空表 —— ⚠️ 必须由 PERM_KEYS 生成，别手写对象字面量。
+ *    手写就会在加第四位时漏掉它（`clubkey` 差点又被漏）：漏掉的那位在
+ *    readPersonPerm 的返回里是 undefined，写回库里就成了空，按人设置从此对那位无效。
+ */
+function emptyOver() {
+  const out = {};
+  PERM_KEYS.forEach((k) => { out[k] = null; });
+  return out;
+}
+
 /** 某个 admin.id 的按人设置（null = 没单独设过） */
 async function readPersonPerm(adminId) {
   const id = Number(adminId);
-  const out = { schedule: null, review: null, proxy: null };
+  const out = emptyOver();
   if (!Number.isInteger(id) || id <= 0) return out;
   const doc = await readOr(() => findById(C.PARTNER_PERMISSION, `p:${id}`), null);
   if (doc) PERM_KEYS.forEach((k) => { out[k] = triPerm(doc[k]); });

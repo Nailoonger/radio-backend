@@ -60,20 +60,40 @@ const kitJs = read('cloud/cloudfunctions/api/handlers/partner/_kit.js');
 ok('_kit 有 asScheduler', /async function asScheduler\s*\(/.test(kitJs));
 ok('_kit 有 asReviewer', /async function asReviewer\s*\(/.test(kitJs));
 ok('_kit 有 asProxyer', /async function asProxyer\s*\(/.test(kitJs));
-ok('三个权限位齐全（schedule / review / proxy）',
-  /const PERM_KEYS = \['schedule', 'review', 'proxy'\]/.test(kitJs),
-  'PERM_KEYS 不是三位：代录又要跟别的开关挤在一起了');
-/* 2026-11-01 陛下定：三档权限被关，页面/弹窗只留**四个字**「暂无权限」，
+/* ⚠️⚠️ 这一段**不写死位数**：从 PERM_KEYS 里解出来再逐项对。
+ *    2026-11-07 加第四位 `clubkey` 时，这三条硬编码「三位」的断言一起红 —— 说明它们
+ *    本来是「防漏一位」的护栏。改成按 PERM_KEYS 自对齐后，护栏还在，但加位不用再改脚本。 */
+const PERM_KEYS = (() => {
+  const m = kitJs.match(/const PERM_KEYS = \[([^\]]*)\]/);
+  return m ? m[1].split(',').map((s) => s.trim().replace(/['"]/g, '')).filter(Boolean) : [];
+})();
+const PERM_ALL_KEYS = (() => {
+  const m = kitJs.match(/const PERM_ALL = \{([^}]*)\}/);
+  return m ? m[1].split(',').map((s) => s.split(':')[0].trim().replace(/['"]/g, '')).filter(Boolean) : [];
+})();
+const PERM_EXPECT = ['schedule', 'review', 'proxy', 'clubkey'];
+ok('权限位齐全（schedule / review / proxy / clubkey）',
+  PERM_EXPECT.every((k) => PERM_KEYS.indexOf(k) >= 0) && PERM_KEYS.length === PERM_EXPECT.length,
+  `PERM_KEYS = [${PERM_KEYS.join(', ')}] —— 少一位就是那个功能没有开关，多一位要同步 PERM_ALL`);
+ok('PERM_ALL 与 PERM_KEYS 每一位都对得上',
+  PERM_KEYS.length > 0 && PERM_ALL_KEYS.length === PERM_KEYS.length
+  && PERM_KEYS.every((k) => PERM_ALL_KEYS.indexOf(k) >= 0),
+  `PERM_ALL = [${PERM_ALL_KEYS.join(', ')}] 对不上 PERM_KEYS —— 缺的那位是 undefined，`
+  + '`!!undefined === false` ⇒ 上线那一夜所有人「暂无权限」，而界面上开关还显示着开');
+ok('按人空表也由 PERM_KEYS 生成（emptyOver）',
+  /function emptyOver\(\)\s*\{[\s\S]{0,120}PERM_KEYS\.forEach/.test(kitJs) && /const out = emptyOver\(\);/.test(kitJs),
+  'readPersonPerm 又手写对象字面量了 —— 加位时必漏（2026-11-07 差点漏掉 clubkey）');
+/* 2026-11-01 陛下定：任何一档权限被关，页面/弹窗只留**四个字**「暂无权限」，
    不许出现「暂无审核权限」「暂无代录权限」，更不许写「找超管申请」这类话。 */
 const denyLines = kitJs.split('\n').filter((l) => /deny:/.test(l) && !/^\s*\*/.test(l));
-ok('拒绝文案：三档都是「暂无权限」四个字',
-  denyLines.length === 3 && denyLines.every((l) => l.indexOf("deny: '暂无权限'") >= 0),
-  '有一档又写了别的字 —— 被关掉的人只该看到这四个字');
+ok('拒绝文案：每一档都是「暂无权限」四个字',
+  denyLines.length === PERM_KEYS.length && denyLines.every((l) => l.indexOf("deny: '暂无权限'") >= 0),
+  `有 ${denyLines.length} 条 deny、PERM_KEYS 有 ${PERM_KEYS.length} 位；或有一档又写了别的字 —— 被关掉的人只该看到这四个字`);
 ok('拒绝文案不再出现「暂无审核权限 / 暂无代录权限」',
   kitJs.indexOf('暂无审核权限') < 0 && kitJs.indexOf('暂无代录权限') < 0);
 ok('全局缺行视为全开（升级当天不改现状）',
-  /const out = \{ schedule: true, review: true, proxy: true \}/.test(kitJs),
-  'readGlobalPerm 的默认值漏了一位 —— 那一夜所有人都会「暂无XX权限」，而界面还显示着开');
+  /const out = \{ \.\.\.PERM_ALL \}/.test(kitJs),
+  'readGlobalPerm 的默认值绕开了 PERM_ALL —— 那一夜所有人都会「暂无XX权限」，而界面还显示着开');
 ok('三态：null 表示跟随全局', /function triPerm\s*\(/.test(kitJs) && /return null;/.test(kitJs));
 /* 新集合「没建就查不到」的兜底（2026-10-31 线上白屏的真因） */
 ok('_kit 有 isMissingCollection', /function isMissingCollection\s*\(/.test(kitJs));
@@ -281,8 +301,11 @@ const contractJs = read('cloud/contracts/partner.js');
   'PUT /partner/permissions/person/:id', 'GET /partner/permissions/mine'].forEach((k) => {
   ok(`契约登记：${k}`, contractJs.indexOf(`'${k}'`) >= 0);
 });
-ok('契约：PERM_SET 三位齐全',
-  /const PERM_SET = \{ schedule: 'boolean', review: 'boolean', proxy: 'boolean' \}/.test(contractJs));
+ok('契约：PERM_SET 与 PERM_KEYS 位数一致（生效值全布尔）',
+  PERM_EXPECT.every((k) => new RegExp(`\\b${k}: 'boolean'`).test(contractJs.slice(
+    contractJs.indexOf('const PERM_SET'), contractJs.indexOf('const PERM_TRI')
+  ))),
+  '契约里少登记一位 ⇒ 前端按契约取字段会拿到 undefined');
 ok('契约：可排时间给了 window 形状（open / readonly 分开）',
   /window: \{[\s\S]{0,200}readonly: 'boolean'/.test(contractJs));
 ok('契约：ABILITIES 补了 canReview / canManagePermissions',
@@ -316,5 +339,5 @@ ROLE_FILES.forEach((rel) => {
 
 /* 输出 */
 console.log(out.join('\n'));
-console.log(failed ? `\n✗ 失败 ${failed} 项` : '\n✓ 权限分发 + 填写窗口口径一致（3 个开关 · 4 个接口 · 前端 4 处拦截 · 1 个新页）');
+console.log(failed ? `\n✗ 失败 ${failed} 项` : '\n✓ 权限分发 + 填写窗口口径一致（4 个开关 · 4 个接口 · 前端 4 处拦截 · 1 个新页）');
 process.exit(failed ? 1 : 0);
