@@ -6,7 +6,8 @@
 //   ② 我的提交（全部状态，最新在前）
 //   ③ 再提一条
 //
-// ⚠️ 票据失效（2 小时到期 / 社团被作废）统一由 40101 兜住 → 清票据 → 回输码页。
+// ⚠️ 票据失效（2 小时到期 / 社团被作废）统一由 40102 兜住 → 清票据 → 回输码页。
+//    40102 而不是 40101：后者会让 utils/request.js 清掉学生登录态（这模块不要求登录）。
 //    不在这里猜原因：到期和被作废对用户是同一句话「重新输一次」。
 
 const { request } = require('../../utils/request.js');
@@ -71,7 +72,7 @@ Page({
       }),
     ])
       .catch((err) => {
-        if (err && err.code === 40101) {
+        if (err && (err.code === 40102 || err.code === 40101)) {   // 40102 = 社团票据过期（会用 40101 是旧部署）
           clubTicket.clear();
           wx.redirectTo({ url: '/pages/club-code/club-code' });
           return;
@@ -128,7 +129,7 @@ Page({
             wx.showToast({ title: '已更换' });
           })
           .catch((err) => {
-            if (err && err.code === 40101) {
+            if (err && (err.code === 40102 || err.code === 40101)) {   // 40102 = 社团票据过期（会用 40101 是旧部署）
               clubTicket.clear();
               wx.redirectTo({ url: '/pages/club-code/club-code' });
               return;

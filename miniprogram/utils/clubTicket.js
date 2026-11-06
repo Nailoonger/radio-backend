@@ -17,7 +17,7 @@ function getTicket() {
     const t = wx.getStorageSync(K_TICKET) || '';
     if (!t) return '';
     const at = Number(wx.getStorageSync(K_EXPIRE) || 0);
-    // 本地也判一次过期：省得每次都拿死票据去打接口、白挨一个 40101
+    // 本地也判一次过期：省得每次都拿死票据去打接口、白挨一个 40102
     if (at && Date.now() > at) {
       clear();
       return '';

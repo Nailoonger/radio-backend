@@ -245,7 +245,9 @@ async function create(club, user, input) {
     body,
     hope_text: text(input && input.hopeText, 40),
     note: text(input && input.note, 100),
-    submit_by_name: club.owner_name || (user && user.username) || '',
+    // 落款：负责人 → （有登录就退到学号）→ 「社长」
+    // ⚠️ 提报**不要求登录**，所以 user 常常是 null；空着的话伙伴端会看到一片空白
+    submit_by_name: club.owner_name || (user && user.username) || '社长',
     submit_by_user_id: Number(user && user.uid) || 0,
     status: ST.WAIT,
     reject_reason: '',

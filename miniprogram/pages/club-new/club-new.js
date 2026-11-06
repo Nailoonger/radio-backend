@@ -50,7 +50,7 @@ Page({
       // 缓存丢了（清过缓存 / 换设备）就现拉一次，落款要用
       request('/user/club-key/me', 'GET', { ticket })
         .then((d) => {
-          if (!d.club) throw { code: 40101 };
+          if (!d.club) throw { code: 40102 };   // 票据没了（不是没登录）
           clubTicket.saveClub(d.club);
           this.setData({ club: d.club, submitName: d.club.ownerName || '社团负责人' });
         })
@@ -132,7 +132,7 @@ Page({
       })
       .catch((err) => {
         this.setData({ submitting: false });
-        if (err && err.code === 40101) {
+        if (err && (err.code === 40102 || err.code === 40101)) {   // 40102 = 社团票据过期（会用 40101 是旧部署）
           clubTicket.clear();
           wx.redirectTo({ url: '/pages/club-code/club-code' });
           return;

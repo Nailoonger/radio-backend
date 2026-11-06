@@ -72,9 +72,21 @@ const BODY2 = '摄影社招新面试定于本周三 17:30 在艺术楼 302 进�
 
   /* ═══════════ ① 两道鉴权 ═══════════ */
   section('① 鉴权');
-  eq('没票据不能提报', (await save({ body: BODY })).code, 40101);
-  eq('假票据不能提报', (await save({ body: BODY, ticket: 'deadbeef' })).code, 40101);
-  eq('有票据但没登录也不能提报', (await call('POST', '/user/club-notice', { body: BODY, ticket }, '')).code, 40101);
+  eq('没票据不能提报', (await save({ body: BODY })).code, 40102);   // 40102 = 社团票据失效，不是「没登录」
+  eq('假票据不能提报', (await save({ body: BODY, ticket: 'deadbeef' })).code, 40102);
+  // ⚠️ 反过来的那一条（2026-11-07 陛下定）：**有票据、不登录，必须能提报**。
+  //    这一句之前写的是「不能提报」，正是把模块绑死在学生账号上的证据，别再改回去。
+  //    用第 2 家社团的票据，免得干扰后面按第 1 家算的那些计数断言。
+  const t2 = await ticketOf(2);
+  const anon = await call('POST', '/user/club-notice', { body: BODY, ticket: t2 }, '');
+  eq('有票据、没登录，照样能提报', anon.code, 0);
+  eq('落款退到「社长」（没有登录用户可退）', anon.data.record.submitByName, '社长');
+  eq('撤回同样不要求登录',
+    (await call('POST', `/user/club-notice/${anon.data.record.id}/withdraw`, { ticket: t2 }, '')).code, 0);
+  // 把这条从假库里清掉：撤回只是改状态，仍会出现在「第 2 家」的列表里，
+  // 而后面有「别家社团看不到我的」这类按家计数的断言，留着会把它们带红。
+  Array.from(H.store.get('club_notices').entries())
+    .forEach(([k, v]) => { if (v.id === anon.data.record.id) H.store.get('club_notices').delete(k); });
 
   /* ═══════════ ② 提报 ═══════════ */
   section('② 提报');
@@ -236,8 +248,8 @@ const BODY2 = '摄影社招新面试定于本周三 17:30 在艺术楼 302 进�
   section('⑭ 社团被作废');
   eq('作废前还能提报', (await save({ ticket, body: '作废前最后一条，用来对照。' })).code, 0);
   await call('PUT', '/partner/club-keys/1/status', { status: 0 }, T_SUPER);
-  eq('作废后旧票据提不了报', (await save({ ticket, body: '作废之后应该进不来了。' })).code, 40101);
-  eq('也看不了自己的列表', (await myList(ticket)).code, 40101);
+  eq('作废后旧票据提不了报', (await save({ ticket, body: '作废之后应该进不来了。' })).code, 40102);
+  eq('也看不了自己的列表', (await myList(ticket)).code, 40102);
   eq('文案是「请重新输入密钥」', (await myList(ticket)).message.indexOf('重新输入') >= 0, true);
 
   /* ═══════════ ⑮ 单据表还没建（新环境第一次提报） ═══════════

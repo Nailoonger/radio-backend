@@ -8,6 +8,14 @@
  *   GET  /user/club-key/me             凭票据换回当前社团 query: { ticket }
  *   PUT  /user/club-key/avatar         换本社团头像 body: { ticket, fileBase64 }
  *
+ * ═══════════ 整个模块**不需要学生账号**（2026-11-07 陛下定） ═══════════
+ * 「广播通知」是社团的事，不是某个学生的事：社长可能没注册过小程序账号，或者换人接手。
+ * 所以这四条**一律不做 requireUser**，唯一的凭证就是密钥换来的票据。
+ * 一开始我按「学生登录 + 社团票据」两道闸写，结果没登录的学生一进输码页就被踢去登录 ——
+ * 那是把两件无关的事绑在一起了。
+ * ⚠️ 代价：拿到票据就等于是这家社团。所以票据只有 2 小时、库里只存哈希、且
+ *    **社团归属只认票据里的 clubId**，不接受前端传的。
+ *
  * ═══════════ 为什么「校验密钥」要发一张票据，而不是让前端每次带明文 ═══════════
  * 明文只有 6 位，一旦进了 localStorage / 请求日志 / 剪贴板历史，就等于公开了。
  * 校验一次换一张 2 小时的 ticket，后续接口只认 ticket：
@@ -23,7 +31,6 @@
  */
 
 const { ApiError, Codes } = require('../../lib/response');
-const { requireUser } = require('../../lib/auth');
 const { MAX_BYTES, MIME_EXT, sniffMime, monthDir, toBuffer } = require('../../lib/image');
 const clubKey = require('../../services/clubKey');
 
@@ -56,10 +63,12 @@ async function clubs() {
  * 返回: { ticket, expireAt, club: { id, name, avatar } }
  */
 async function verify(ctx) {
-  const user = await requireUser(ctx);
-
-  // 试错闸：按来源（云通道是 openid，网页通道是 IP）。⚠️ 必须在查库之前，别先查再限速
-  await clubKey.guardTry(ctx.source || `cloud:${user.openid}`);
+  // 试错闸：按来源限速。⚠️ 必须在查库之前，别先查再限速。
+  // ⚠️ 来源不靠登录态：`ctx.source` 由平台注入（`cloud:<openid>` / `http:<ip>`），
+  //    没登录的小程序调用也带着 openid。两者都没有才退到 anon（所有匿名共用一个桶）。
+  //    ⚠️ 别改成「按登录用户」—— 这模块本来就不要求登录。
+  const source = ctx.source || (ctx.openid ? `cloud:${ctx.openid}` : '');
+  await clubKey.guardTry(source);
 
   const plain = clubKey.normalize((ctx.body || {}).key);
   if (!plain) throw new ApiError(Codes.PARAM_ERROR, '请输入社团密钥');
@@ -73,7 +82,7 @@ async function verify(ctx) {
     throw new ApiError(Codes.NOT_FOUND, '密钥不对，或这个社团的密钥已作废');
   }
 
-  await clubKey.clearTry(ctx.source || `cloud:${user.openid}`);
+  await clubKey.clearTry(source);
   const s = await clubKey.issueSession(row);
   return {
     ticket: s.ticket,
@@ -88,7 +97,6 @@ async function verify(ctx) {
  * 返回: { club } 或 { club: null }（票据没有/过期/被伪造 —— 统一按「该重新输入」处理）
  */
 async function me(ctx) {
-  await requireUser(ctx);
   const ticket = (ctx.query || {}).ticket || (ctx.body || {}).ticket;
   // readSessionClub：票据过期、伪造、或社团已被作废，都返回 null（前端据此回输码页）
   const row = await clubKey.readSessionClub(ticket);
@@ -106,11 +114,10 @@ async function me(ctx) {
  *    前置条件同 admin/upload.js：云开发控制台存储权限要设「所有用户可读」。
  */
 async function avatar(ctx) {
-  await requireUser(ctx);
-
   const b = ctx.body || {};
   const s = await clubKey.readSession(b.ticket);
-  if (!s) throw new ApiError(Codes.UNAUTHORIZED, '登录已过期，请重新输入社团密钥');
+  // ⚠️ 40102 而不是 40101：后者会让 request.js 清掉学生登录态（这模块不要求登录）
+  if (!s) throw new ApiError(Codes.TICKET_EXPIRED, '社团密钥已过期，请重新输入');
 
   if (!b.fileBase64) throw new ApiError(Codes.PARAM_ERROR, '未收到图片');
 

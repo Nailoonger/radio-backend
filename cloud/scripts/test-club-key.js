@@ -145,7 +145,11 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
 
   /* ═══════════ ⑤ 学生输密钥 ═══════════ */
   section('⑤ POST /user/club-key/verify');
-  eq('没登录不能验', (await verifyKey(plain, '')).code, 40101);
+  // ⚠️ 这个模块**不要求登录**（2026-11-07 陛下定）：社长可能压根没注册过小程序账号。
+  //    唯一的凭证就是密钥换来的票据 —— 这里钉死「不带 token 也能验」，别又被人加回去。
+  r = await verifyKey(plain, '');
+  eq('没登录也能验（这个模块不要求学生账号）', r.code, 0);
+  ok('照样出票', /^[0-9a-f]{48}$/.test(r.data.ticket), r.data.ticket);
   eq('空密钥', (await verifyKey('', T_STU)).code, 40001);
   eq('位数不对', (await verifyKey(plain.slice(0, 3), T_STU)).code, 40001);
   eq('不存在的码', (await verifyKey('ZZZZZZ', T_STU)).code, 40401);
@@ -171,7 +175,10 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
   ok('但仍然没有密钥哈希', !/key_hash/.test(JSON.stringify(r.data)));
   eq('假票据 → null（不报错，前端据此回输密钥页）', (await meOf('deadbeef', T_STU)).data.club, null);
   eq('不带票据 → null', (await meOf('', T_STU)).data.club, null);
-  eq('没登录 → 40101', (await meOf(ticket, '')).code, 40101);
+  // 同上：只要票据有效，登不登录都认
+  r = await meOf(ticket, '');
+  eq('没登录凭票据照样认社团', r.code, 0);
+  eq('社团名对得上', r.data.club.name, '摄影协会');
 
   /* ═══════════ ⑦ 换社团头像 ═══════════ */
   section('⑦ PUT /user/club-key/avatar');
@@ -182,7 +189,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
   ok('学生换头像不需要 clubkey 位（社干被关掉也能换）',
     (await call('PUT', '/user/club-key/avatar', { ticket, fileBase64: PNG }, T_STU)).code === 0);
 
-  eq('假票据 → 40101', (await call('PUT', '/user/club-key/avatar', { ticket: 'x', fileBase64: PNG }, T_STU)).code, 40101);
+  eq('假票据 → 40102（不是 40101：那个码会清登录态）', (await call('PUT', '/user/club-key/avatar', { ticket: 'x', fileBase64: PNG }, T_STU)).code, 40102);
   eq('非图片 → 40001', (await call('PUT', '/user/club-key/avatar', { ticket, fileBase64: Buffer.from('hello world, not an image').toString('base64') }, T_STU)).code, 40001);
   eq('没带图 → 40001', (await call('PUT', '/user/club-key/avatar', { ticket }, T_STU)).code, 40001);
 
@@ -222,6 +229,9 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
   section('⑩ 试错闸');
   reset();
   await doReset(first.id, T_SUPER);   // 给一家发钥匙，确保「错」是错在码上而不是没钥匙
+  // ⚠️ 限速按**来源**（平台注入的 openid / IP），不按登录用户 —— 这模块不要求登录。
+  //    所以这里用 setOpenid 模拟两台手机，而不是换 token。
+  H.setOpenid('openid-phone-a');
   let last = null;
   for (let i = 0; i < clubKeySvc.MAX_TRIES_PER_MIN; i += 1) {
     last = await verifyKey('ZZZZZZ', T_STU2);
@@ -230,7 +240,8 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
   last = await verifyKey('ZZZZZZ', T_STU2);
   eq(`第 ${clubKeySvc.MAX_TRIES_PER_MIN + 1} 次被闸住`, last.code, 40301);
   ok('闸的文案说实话（不是「密钥错误」）', /频繁/.test(last.message), last.message);
-  eq('换一个学生不受影响（按来源限速）', (await verifyKey('ZZZZZZ', T_STU)).code, 40401);
+  H.setOpenid('openid-phone-b');
+  eq('换一台手机不受影响（按来源限速）', (await verifyKey('ZZZZZZ', T_STU)).code, 40401);
 
   /* ═══════════ ⑪ 表还没建（新环境第一次打开） ═══════════
    *

@@ -72,7 +72,7 @@ Page({
         });
       })
       .catch((err) => {
-        if (err && err.code === 40101) {
+        if (err && (err.code === 40102 || err.code === 40101)) {   // 40102 = 社团票据过期（会用 40101 是旧部署）
           clubTicket.clear();
           wx.redirectTo({ url: '/pages/club-code/club-code' });
           return;

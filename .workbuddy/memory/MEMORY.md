@@ -74,6 +74,11 @@ token 源：`miniprogram/app.wxss` → `admin-web/src/styles/theme.css`。`--acc
 ⚠️ 为什么 sha256 不用 bcrypt：学生输码时服务端**不知道是哪个社团**，bcrypt 要全表逐个比（N×25ms），sha256 直接等值查一条。
 ⚠️ **作废必须清 `key_hash`**，只改 status 是假作废（列表显示已作废、旧钥匙照样能进）。
 ⚠️ 学生凭票据（48 hex，`SESSION_TTL_MS=2h`，库里只存 `ticket_hash`）；**重置不踢已发票据**（重置是给新人，不是赶在校生）。
+⚠️⚠️ **整条线不要求学生登录**（2026-11-07 陛下当面纠正）：`verify/me/avatar` 与提报 5 个接口一律没有 `requireUser`，
+唯一凭证是票据。试错闸按 `ctx.source`（openid/IP）限速，**不按登录用户**。
+落款 `optionalUser()`：有 token 用学号，没有退「社长」。
+⚠️ 票据失效报 **40102** 不是 40101 —— `utils/request.js` 见 40101 会清学生登录态，
+两小时一次过期就把人踢下线。前端判断写 `40102 || 40101`。
 ⚠️ 试错闸必须**落库**（`club_key_tries`，一份来源一文档，只存 `{minute,count}`）：云函数无状态，内存计数等于没有。
 ⚠️ 种子用业务键 `_id='club:<社团名>'`（自动 `_id` 挡不住并发 ⇒ 轮播出现两个「电视台」）。
 ⚠️ 并发控制靠条件更新 `updateWhere({_id, status: ST.WAIT}, patch)`，0 行 ⇒ 40901「这条已经处理过了」。
