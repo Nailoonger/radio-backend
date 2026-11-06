@@ -41,6 +41,10 @@ const REGISTRY = {
   'user.submit': () => require('./user/submit'),
   'user.switch': () => require('./user/switch'),
   'user.recruitment': () => require('./user/recruitment'),
+  // 社团密钥（学生侧，2026-11-07）：输入密钥换票据 / 凭票据换社团 / 换本社团头像
+  'user.clubKey': () => require('./user/clubKey'),
+  // 社团提报通知（学生侧，2026-11-07）：提报 / 我的提交 / 进度 / 未审修改 / 撤回
+  'user.clubNotice': () => require('./user/clubNotice'),
 
   // ---- 管理端（阶段 7）----
   'admin.auth': () => require('./admin/auth'),
@@ -73,6 +77,10 @@ const REGISTRY = {
   'partner.feedback': () => require('./partner/feedback'),
   'partner.accounts': () => require('./partner/accounts'),
   'partner.permissions': () => require('./partner/permissions'),
+  // 社团密钥（2026-11-07）：列表 / 详情 / 改社团信息 / 重置（唯一一次给明文）/ 启用作废
+  'partner.clubKeys': () => require('./partner/clubKeys'),
+  // 广播通知处理台（2026-11-07）：队列 / 详情 / 通过驳回 / 标记已播出
+  'partner.clubNotice': () => require('./partner/clubNotice'),
 };
 
 const cache = new Map();

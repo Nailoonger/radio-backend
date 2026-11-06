@@ -152,7 +152,7 @@ async function asManager(ctx) {
  *    这两件事的语义本来就不同 —— 排班是「排谁上班」，代录是「替别人说自己能不能来」。
  *    一个人可以只会收时间、不会排班（宣传口的人常常这样）。
  */
-const PERM_KEYS = ['schedule', 'review', 'proxy'];
+const PERM_KEYS = ['schedule', 'review', 'proxy', 'clubkey'];
 const PERM_TEXT = {
   // ⚠️ `short` 给人少的胶囊用（一行要塞三个，写全名会挤成两三行）
   // ⚠️⚠️ `deny` 三档一律「暂无权限」四个字（2026-11-01 陛下定）：
@@ -161,7 +161,17 @@ const PERM_TEXT = {
   schedule: { key: 'schedule', name: '排班权限', short: '排班', desc: '进入排班工作台', deny: '暂无权限' },
   review: { key: 'review', name: '审核权限', short: '审核', desc: '进入审核模块', deny: '暂无权限' },
   proxy: { key: 'proxy', name: '代录权限', short: '代录', desc: '替别人填可排时间', deny: '暂无权限' },
+  // 2026-11-07：社团密钥（查看、生成、重置、作废）。缺这一位时社干打不开密钥管理页。
+  clubkey: { key: 'clubkey', name: '社团密钥权限', short: '密钥', desc: '查看、生成、重置各社团密钥', deny: '暂无权限' },
 };
+/**
+ * 全开快照 —— 超管恒全开，以及「缺行」时的默认值都取这个
+ *
+ * ⚠️⚠️ 加了新的 PERM_KEYS 就必须在这里同步加一位（曾经因为只写死
+ *    `{schedule,review,proxy}` 让后加的位永远 undefined ⇒ !!undefined === false）。
+ *    现在统一走这个常量，别再在别处手写对象字面量。
+ */
+const PERM_ALL = { schedule: true, review: true, proxy: true, clubkey: true };
 
 /** 三态归一：true / false / null（null = 跟随全局；脏值一律当跟随，不当作 true） */
 function triPerm(v) {
@@ -208,7 +218,7 @@ async function readGlobalPerm() {
    *    ⇒ `!!undefined === false` ⇒ 所有社干一夜之间被关在代录门外。
    *    这次是测试逮住的；靠肉眼看是看不出来的（界面上开关还显示着「开」）。
    */
-  const out = { schedule: true, review: true, proxy: true };
+  const out = { ...PERM_ALL };
   // ⚠️ readOr：集合还没建时当「缺行」处理，不让整页 50001（见 isMissingCollection 头注）
   const doc = await readOr(() => findById(C.PARTNER_PERMISSION, 'global'), null);
   if (doc) {
@@ -257,7 +267,7 @@ async function permsOf(admin) {
 async function asScheduler(ctx) {
   const p = ctx.partner || (await asPartner(ctx));
   if (p.isSuper) {
-    p.perms = { schedule: true, review: true, proxy: true };
+    p.perms = { ...PERM_ALL };
     return p;
   }
   if (p.role !== ROLE_MANAGER) throw new ApiError(Codes.FORBIDDEN, '站员没有这个权限');
@@ -271,7 +281,7 @@ async function asScheduler(ctx) {
 async function asReviewer(ctx) {
   const p = ctx.partner || (await asPartner(ctx));
   if (p.isSuper) {
-    p.perms = { schedule: true, review: true, proxy: true };
+    p.perms = { ...PERM_ALL };
     return p;
   }
   if (p.role !== ROLE_MANAGER) throw new ApiError(Codes.FORBIDDEN, '站员没有这个权限');
@@ -290,13 +300,33 @@ async function asReviewer(ctx) {
 async function asProxyer(ctx) {
   const p = ctx.partner || (await asPartner(ctx));
   if (p.isSuper) {
-    p.perms = { schedule: true, review: true, proxy: true };
+    p.perms = { ...PERM_ALL };
     return p;
   }
   if (p.role !== ROLE_MANAGER) throw new ApiError(Codes.FORBIDDEN, '只能填自己的可排时间');
   const perms = await permsOf(p.admin);
   p.perms = perms;
   if (!perms.proxy) throw new ApiError(Codes.FORBIDDEN, PERM_TEXT.proxy.deny);
+  return p;
+}
+
+/**
+ * 社团密钥权限（查看、生成、重置、作废）
+ *
+ * ⚠️ 与排班/审核/代录不同，密钥是**全站级凭据**，不按部门分。
+ *    站员在这里是「角色上就没有这件事」，所以文案和别的位不一样；
+ *    社干看超管分发的 clubkey 位，关掉就是统一那四个字。
+ */
+async function asClubKeyer(ctx) {
+  const p = ctx.partner || (await asPartner(ctx));
+  if (p.isSuper) {
+    p.perms = { ...PERM_ALL };
+    return p;
+  }
+  if (p.role !== ROLE_MANAGER) throw new ApiError(Codes.FORBIDDEN, '站员不能管理社团密钥');
+  const perms = await permsOf(p.admin);
+  p.perms = perms;
+  if (!perms.clubkey) throw new ApiError(Codes.FORBIDDEN, PERM_TEXT.clubkey.deny);
   return p;
 }
 
@@ -617,8 +647,8 @@ function notYet(name) {
 module.exports = {
   ROLE_SUPER, ROLE_MANAGER, ROLE_MEMBER,
   DUTY_ROLES, DEPARTMENTS, WEEK_DAYS, DEPT_BY_ROLE, deptOfRoles,
-  asPartner, asSuperPartner, asManager, asScheduler, asReviewer, asProxyer,
-  PERM_KEYS, PERM_TEXT, triPerm, readGlobalPerm, readPersonPerm, effectivePerm, permsOf,
+  asPartner, asSuperPartner, asManager, asScheduler, asReviewer, asProxyer, asClubKeyer,
+  PERM_KEYS, PERM_TEXT, PERM_ALL, triPerm, readGlobalPerm, readPersonPerm, effectivePerm, permsOf,
   isMissingCollection, readOr,
   availabilityWindow, assertWindowWritable,
   assertWeekStart, currentWeekStart, nextWeekStart, weekDates, weekStarted,

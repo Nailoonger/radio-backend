@@ -1,0 +1,89 @@
+/* pages/club-code/club-code.wxss */
+@import "../../styles/club.wxss";
+
+.code-body { padding-top: 40rpx; }
+
+/* ══════ 社团轮播 ══════ */
+.car { height: 260rpx; }
+.car-i {
+  height: 260rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: scale(0.72);
+  opacity: 0.5;
+  transition: transform 0.34s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.34s;
+}
+/* 居中那枚放大、不透明：与原型 coverflow 的观感一致，只是不做 3D 旋转
+   （小程序 swiper 的 3D 只能靠 transform 逐项插值，滚动时会抖） */
+.car-i.on { transform: scale(1); opacity: 1; }
+
+.car-img { width: 176rpx; height: 176rpx; border-radius: 44rpx; display: block; }
+.car-txt {
+  width: 176rpx; height: 176rpx; border-radius: 44rpx;
+  background: var(--accent-tint); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 62rpx; font-weight: 700;
+}
+
+.car-nm {
+  height: 40rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: var(--muted);
+  letter-spacing: 0.6rpx;
+}
+
+.car-title {
+  text-align: center;
+  font-size: 36rpx;
+  font-weight: 600;
+  letter-spacing: -0.4rpx;
+  margin: 34rpx 0 30rpx;
+}
+
+/* ══════ 六格 ══════ */
+.codebox {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  gap: 16rpx;
+}
+.cell {
+  width: 88rpx; height: 108rpx;
+  border-radius: 22rpx;
+  background: var(--parchment);
+  color: var(--ink);
+  font-size: 40rpx; font-weight: 700;
+  letter-spacing: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+/* 当前格：描边是「光标在这儿」的状态含义，不是装饰 */
+.cell.cur { box-shadow: inset 0 0 0 3rpx var(--accent); }
+
+.codeinput {
+  position: absolute;
+  left: 0; right: 0; top: 0; bottom: 0;
+  width: 100%; height: 100%;
+  opacity: 0;
+  font-size: 40rpx;
+}
+
+/* ══════ 粘贴 ══════ */
+.pastebar { display: flex; justify-content: flex-end; margin-top: 16rpx; }
+.paste {
+  font-size: 23rpx;
+  color: var(--accent);
+  padding: 10rpx 6rpx;
+}
+
+.hintline {
+  font-size: 23rpx;
+  color: var(--red-fg);
+  text-align: center;
+  margin-top: 8rpx;
+  min-height: 34rpx;
+}
+
+.enter { margin-top: 26rpx; }

@@ -1,0 +1,90 @@
+<!-- pages/club-new/club-new.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
+    </view>
+    <view class="navbar-title">{{editing ? '修改通知' : '提报通知'}}</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body new-body">
+
+    <view class="loading" wx:if="{{loading}}">加载中……</view>
+
+    <view class="form">
+      <view class="frow col">
+        <text class="fk">通知内容</text>
+        <textarea
+          class="ta"
+          value="{{body}}"
+          maxlength="{{maxBody}}"
+          placeholder="要念的那段话，尽量一句话说清时间、地点、找谁"
+          placeholder-class="ta-ph"
+          bindinput="onBody"
+          auto-height
+          show-confirm-bar="{{false}}"
+          cursor-spacing="140"
+        ></textarea>
+        <view class="cnt">{{charCount}} / {{maxBody}}</view>
+      </view>
+
+      <view class="frow col">
+        <text class="fk">希望播出</text>
+        <input
+          class="line-input"
+          value="{{hopeText}}"
+          maxlength="40"
+          placeholder="如：11月7日 周五 · 午间"
+          placeholder-class="ta-ph"
+          bindinput="onHope"
+        />
+        <view class="chips">
+          <view class="chip" data-v="明天午间" bindtap="pickHope">明天午间</view>
+          <view class="chip" data-v="明天傍晚" bindtap="pickHope">明天傍晚</view>
+          <view class="chip" data-v="本周内都行" bindtap="pickHope">本周内都行</view>
+        </view>
+      </view>
+
+      <view class="frow">
+        <text class="fk">提报人</text>
+        <text class="fv">{{submitName}}{{club.name ? ' · ' + club.name : ''}}</text>
+      </view>
+
+      <view class="frow">
+        <text class="fk">附言</text>
+        <input
+          class="line-input"
+          value="{{note}}"
+          maxlength="100"
+          placeholder="给站里的说明，选填"
+          placeholder-class="ta-ph"
+          bindinput="onNote"
+        />
+      </view>
+    </view>
+
+    <view class="hintcard">
+      <view class="hint-t">提交之后</view>
+      <view class="hint-li">社干审核内容，通过后排进播出单</view>
+      <view class="hint-li">审核通过前，你可以随时在「我的提交」里修改或撤回</view>
+      <view class="hint-li">播出当天点「已播出」，你这边会同步看到</view>
+      <view class="hint-li">来不及排播的会被驳回，写明原因</view>
+    </view>
+
+  </view>
+
+  <view class="footbar">
+    <button
+      class="btn btn-primary btn-block"
+      hover-class="pressed"
+      bindtap="submit"
+      disabled="{{submitting || charCount === 0}}"
+    >{{submitting ? '正在提交…' : (editing ? '保存修改' : '提交给广播站')}}</button>
+    <view class="footnote">审核通过前都能改、能撤</view>
+  </view>
+
+  <view class="foot-hold"></view>
+</view>

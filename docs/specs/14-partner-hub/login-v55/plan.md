@@ -1,5 +1,14 @@
 # 伙伴端小程序登录 v55 实施
 
+## 2026-10-28 v56 参数落实
+
+用户最新限定只做预览，不修改原生 WXML/WXSS/JS/JSON。预览 login.html 移除品牌与 badge，将空的 wel 放入可滚动内容首部、导航保持白底；login.css 用用户提供的伪元素与 cards 参数替换旧背景及卡片规则，定义 liquid-warp，不改变登录 JS。预览现有验证关于旧图片的断言按当前资源更新，其余登录行为断言保持。单轮独立审查后直接实施；只运行现有预览相关验证及实屏检查，不为纯样式增加镜像测试。
+
+v57 追加：删除预览 .wel::after 的白纱布遮罩，背景完整通栏；更新预览 CSS 缓存。保留背景 390px auto、226px 高及登录卡的 -18px/.24/20px 与三层阴影。原生四文件校验值保持，预览登录 20 项已在 v56 通过；此次纯样式只做 CSS 解析和真实页面无遮罩／无横向溢出核对，保存最终预览。
+
+<!-- review-fix: V56-HISTORY -->
+## 以下为 v55 历史实施，不属于 v56／v57 本轮改动
+
 1. 重写原生伙伴登录的 WXML/WXSS 为通栏园林、顶部返回与标题、品牌、浅色悬浮表单。保留 username/password/showPwd/loading/loginError 及原有登录处理，只加帮助交互及必要文案修正；JSON 允许原生页面纵向滚动。复用 /assets/me-bg.jpg 与 station-badge.png，不改 app.json、app.js、学生页面或后端。
 2. 重写 preview/partner-hub-codex-v2/login.html 为现有 portal-shell.css 的手机壳，手机内部单列登录；新增或重写 login.css 只包含登录与外部预览布局，彻底删除桌面产品分栏。保留表单 ID 便于沿用验证。壳外演示身份按钮填入虚构账号，壳内保留伙伴账号、密码、帮助和登录；旧 demo-toggle/demo-accounts/back-workspace 改置于壳外。login.js 保留 QA 白名单、凭据解析和 setRole，不引入原生页的真实凭据。
 3. 两端采用同一信息顺序和近似比例：顶部风景约 320px，品牌约 34px，表单卡从约 270px 开始；原生尺寸用 rpx 对应，导航区额外让出 statusBarHeight。输入框高约 50px，按钮 52px，触区至少 44px。图像使用 image/aspectFill，浏览器使用背景 cover；不靠浏览器断点改变产品布局。CSS 所有作用域限于此独立登录预览。

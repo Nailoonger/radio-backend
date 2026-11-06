@@ -70,6 +70,16 @@ const C = {
   // ⚠️ 两条 _id 口径：`global` = 全局总闸；`p:<adminId>` = 按人覆盖。
   //    与 setting:/switch:/ack:/week: 同一套「业务键当 _id」写法，不加索引。
   PARTNER_PERMISSION: 'partner_permissions',
+
+  // 社团提报线（2026-11-07）
+  // ⚠️ 密钥表**只存哈希和掩码**，不存明文（明文只在重置的那一次返回给操作人）。
+  //    `club_sessions` 是学生输对密钥后拿到的票据，2 小时过期，过期就要重新输。
+  //    `club_key_tries` 是试错闸（一份来源一个文档，只存 { minute, count }）。
+  CLUB_KEY: 'club_keys',
+  CLUB_SESSION: 'club_sessions',
+  CLUB_KEY_TRY: 'club_key_tries',
+  // 社团提报单据（2026-11-07）：一条 = 一段要在广播里念的话 + 它的审核 / 播出状态。
+  CLUB_NOTICE: 'club_notices',
 };
 
 const coll = (name) => db.collection(name);

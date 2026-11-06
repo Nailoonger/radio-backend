@@ -1,0 +1,72 @@
+/* pages-partner/club-keys/edit.wxss */
+@import "../../../styles/club.wxss";
+
+.ke-body { padding-top: 2rpx; }
+
+/* 导航右上「保存」—— app.wxss 只有 navbar-back / navbar-spacer，
+   宽度取 72rpx（与返回键同宽）让标题保持居中 */
+.navbar-right {
+  min-width: 72rpx;
+  text-align: right;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.denied { padding: 200rpx 40rpx; text-align: center; }
+.denied-t { font-size: 30rpx; color: var(--muted); }
+
+/* ══════ 六格明文（只在刚重置后出现） ══════ */
+.codebox { display: flex; justify-content: center; gap: 16rpx; margin-top: 34rpx; }
+.cell {
+  width: 88rpx; height: 108rpx;
+  border-radius: 22rpx;
+  background: var(--parchment);
+  color: var(--ink);
+  font-size: 40rpx; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.keyops { display: flex; justify-content: center; gap: 16rpx; margin-top: 24rpx; }
+.keyops .qa { background: var(--parchment); padding: 16rpx 34rpx; }
+
+.once-tip {
+  text-align: center;
+  font-size: 21rpx;
+  color: var(--muted);
+  line-height: 1.6;
+  padding: 18rpx 30rpx 0;
+}
+
+/* ══════ 平时的掩码块 ══════ */
+.maskbox {
+  margin-top: 34rpx;
+  background: var(--parchment);
+  border-radius: 34rpx;
+  padding: 36rpx 30rpx;
+  text-align: center;
+}
+.mask-v {
+  font-size: 40rpx;
+  font-weight: 700;
+  letter-spacing: 3rpx;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.mask-s { font-size: 21rpx; color: var(--muted); margin-top: 14rpx; line-height: 1.6; }
+
+/* ══════ 分享段 ══════ */
+.sharebox { background: var(--parchment); border-radius: 34rpx; padding: 28rpx 30rpx 22rpx; margin-top: 30rpx; }
+.sharebox .st-t { font-size: 21rpx; color: var(--muted); letter-spacing: 1rpx; font-weight: 600; margin-bottom: 16rpx; }
+.sharebox .st-b {
+  background: #fff; border-radius: 22rpx; padding: 22rpx 24rpx;
+  font-size: 23rpx; line-height: 1.85; color: var(--ink-2);
+  white-space: pre-wrap;
+}
+.sharebox .st-a { display: flex; justify-content: flex-end; margin-top: 18rpx; }
+
+/* 表单里的裸 input */
+.fv-input { flex: 1; min-width: 0; font-size: 26rpx; color: var(--ink); height: 44rpx; }
+.ph { color: var(--soft); }
+.fv.muted { color: var(--muted); }

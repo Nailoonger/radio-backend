@@ -152,13 +152,20 @@ async function get(ctx) {
   const byId = {};
   docs.forEach((d) => {
     if (d && typeof d._id === 'string' && d._id.indexOf('p:') === 0) {
-      byId[d._id.slice(2)] = { schedule: triPerm(d.schedule), review: triPerm(d.review) };
+      /* ⚠️⚠️ 这里必须遍历 PERM_KEYS，不能手写几个字段。
+       *    原来的写法只写了 schedule / review，`proxy`（2026-10-31 加的）就静默丢了
+       *    ⇒ 按人设过代录的人，看板上 `overridden` 永远是 false，看着像没保存。
+       *    2026-11-07 加 clubkey 时一并改成遍历，以后再加位子这里不用动。 */
+      const over = {};
+      PERM_KEYS.forEach((k) => { over[k] = triPerm(d[k]); });
+      byId[d._id.slice(2)] = over;
     }
   });
 
   const people = list.map((m) => {
-    const over = byId[String(m.personId)] || { schedule: null, review: null };
-    const overridden = over.schedule !== null || over.review !== null;
+    const over = byId[String(m.personId)] || PERM_KEYS.reduce((acc, k) => { acc[k] = null; return acc; }, {});
+    // 「单独设过」= 任意一位不是 null
+    const overridden = PERM_KEYS.some((k) => over[k] !== null);
     return { ...m, over, eff: effectivePerm(global, over), overridden };
   });
 
@@ -167,6 +174,7 @@ async function get(ctx) {
     scheduleOn: people.filter((x) => x.eff.schedule).length,
     reviewOn: people.filter((x) => x.eff.review).length,
     proxyOn: people.filter((x) => x.eff.proxy).length,
+    clubkeyOn: people.filter((x) => x.eff.clubkey).length,
     overridden: people.filter((x) => x.overridden).length,
   };
 
@@ -210,7 +218,7 @@ async function savePerson(ctx) {
   await upsert(personKey(id), { personId: id, ...next, by: p.id });
 
   const global = await readGlobalPerm();
-  const overridden = next.schedule !== null || next.review !== null;
+  const overridden = PERM_KEYS.some((k) => next[k] !== null);
   // 全都「跟回全局」时把这行删掉更干净，但云库删文档要额外一次调用；
   // 保留一行全 null 不影响任何判定（effectivePerm 会回落全局），省一次写。
   return {
@@ -234,14 +242,15 @@ async function mine(ctx) {
     schedule: PERM_TEXT.schedule.deny,
     review: PERM_TEXT.review.deny,
     proxy: PERM_TEXT.proxy.deny,
+    clubkey: PERM_TEXT.clubkey.deny,
   };
 
   // 超管恒 true：他自己就是总闸，不该被自己关的开关锁在门外
-  if (p.isSuper) return { isSuper: true, schedule: true, review: true, proxy: true, text };
+  if (p.isSuper) return { isSuper: true, schedule: true, review: true, proxy: true, clubkey: true, text };
 
   // 站员：这几处本来就不属于他，权限位一律 false（这是角色，不是开关）
   if (Number(p.role) !== ROLE_MANAGER) {
-    return { isSuper: false, schedule: false, review: false, proxy: false, text };
+    return { isSuper: false, schedule: false, review: false, proxy: false, clubkey: false, text };
   }
 
   const [global, over] = await Promise.all([readGlobalPerm(), readPersonPerm(p.id)]);

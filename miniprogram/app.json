@@ -13,7 +13,11 @@
     "pages/notices/notices",
     "pages/recruitment/index",
     "pages/recruitment-form/index",
-    "pages/recruitment-result/index"
+    "pages/recruitment-result/index",
+    "pages/club-code/club-code",
+    "pages/club-desk/club-desk",
+    "pages/club-new/club-new",
+    "pages/club-notice/club-notice"
   ],
   "window": {
     "navigationStyle": "custom",
@@ -90,7 +94,11 @@
         "song-schedule/song-schedule",
         "schedule/planning/planning",
         "schedule/workload/workload",
-        "schedule/history/history"
+        "schedule/history/history",
+        "club-notice/queue",
+        "club-notice/detail",
+        "club-keys/keys",
+        "club-keys/edit"
       ]
     }
   ]

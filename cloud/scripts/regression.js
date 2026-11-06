@@ -75,6 +75,13 @@ const SUITE = [
   // 标 true —— 这条链路横跨 leave.js 与 schedule.js 两个模块（releaseCell 是跨模块调用），
   // sync 漏打包其中一个，批准就只改请假、班表纹丝不动，而那正是陛下报的那个错。
   ['test-partner-leave-flow.js', true],
+  // 社团密钥（2026-11-07）：生成 / 校验 / 作废 / 票据 / 换头像 + 试错闸。
+  // 标 true —— 这条链路横跨 services/clubKey、handlers/partner/clubKeys、handlers/user/clubKey
+  // 三个新文件，sync 漏任何一个都会让整条提报线在线上 50001（本地源码却全绿）。
+  ['test-club-key.js', true],
+  // 社团提报通知（2026-11-07）：提报 / 未审可改可撤 / 通过并排期 / 驳回必写理由 / 标记已播出。
+  // 标 true —— 状态机横跨 services/clubNotice 与两个 handler，sync 漏一个就整页 50001。
+  ['test-club-notice.js', true],
   // 审核记录（2026-11-02）：状态流水从「英文代号」翻成人话 —— 谁通过的 / 谁撤销的写实名 + 岗位，
   // 一次操作（通过 + 分配时段）靠 opId 并成一条。标 true：describeHistory 在 services/songStatus 里，
   // 但 opId 要 admin/submit.js 与 scheduling.js 一起串，sync 漏一个就退化成"两行"。

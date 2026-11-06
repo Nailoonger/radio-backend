@@ -152,8 +152,17 @@
       </view>
     </block>
 
-    <!-- 公开招新入口，独立于学生登录状态 -->
+    <!-- 公开入口，独立于学生登录状态。
+         ⚠️「广播通知」在前：它要**社团密钥**才进得去，与学生登录是两件事
+            （未登录也能先看轮播、输密钥；真正提报时会要求登录）。 -->
     <view class="card-flush">
+      <view class="card-row" hover-class="row-hover" bindtap="goClubCode">
+        <view class="grow stack">
+          <text class="t-strong t-link">广播通知</text>
+          <text class="t-cap">社团提报与播出进度</text>
+        </view>
+        <view class="chev-r"></view>
+      </view>
       <view class="card-row" hover-class="row-hover" bindtap="goRecruitment">
         <view class="grow stack">
           <text class="t-strong t-link">加入我们</text>

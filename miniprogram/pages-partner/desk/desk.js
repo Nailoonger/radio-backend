@@ -84,6 +84,8 @@ const ROUTES = {
   // ⚠️ 别指回 /pages/notices/notices —— 那是学生端的，社干/超管点进去 40101。
   notices: '/pages-partner/notices/notices',
   accounts: '/pages-partner/accounts/accounts',
+  // 广播通知处理台（2026-11-07）：社团提报的审核 / 排播 / 标记已播出，密钥入口在其页底
+  'club-notice': '/pages-partner/club-notice/queue',
   permissions: '/pages-partner/permissions/permissions',
   'song-schedule': '/pages-partner/song-schedule/song-schedule',
   planning: '/pages-partner/schedule/planning/planning',
@@ -557,6 +559,10 @@ Page({
       { go: 'work', t: '内部稿件', d: '站内伙伴来稿', n: n(mods.drafts), u: '待审' },
       { go: 'leave-approve', t: '请假审批', d: '等待你确认', n: n(mods.leaves), u: '条' },
       { go: 'attendance', t: '考勤录入', d: '按节目场点名', n: n(mods.unmarked), u: '未录入' },
+      /* 广播通知（2026-11-07）：社团提报进来的通知，审核 → 排播 → 标记已播出。
+         ⚠️ 不给角标：待审数要单拉一次 /partner/club-notice/queue，为一个红点
+            让工作台多一个请求不划算（这条线一天也就几条）。 */
+      { go: 'club-notice', t: '广播通知', d: '社团提报 · 审核 · 播出', n: null, u: '' },
     ];
     /* ⚠️ 2026-10-28 陛下拍板：第三块「排班协作」（可排时间 / 值班时段）去掉 ——
        v151 社干工作台就只有"听众投稿 / 站内协作"两块，这两项原型挂在「班表」tab。

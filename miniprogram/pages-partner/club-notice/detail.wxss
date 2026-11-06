@@ -1,0 +1,53 @@
+/* pages-partner/club-notice/detail.wxss */
+@import "../../../styles/club.wxss";
+
+.pd-body { padding-top: 2rpx; gap: 24rpx; }
+
+.head { display: flex; align-items: center; gap: 14rpx; }
+.head-t { font-size: 22rpx; color: var(--muted); }
+.sp { flex: 1; }
+
+.denied { padding: 200rpx 40rpx; text-align: center; }
+.denied-t { font-size: 30rpx; color: var(--muted); }
+
+.note-line {
+  font-size: 22rpx;
+  color: var(--muted);
+  line-height: 1.7;
+  margin-top: 16rpx;
+}
+
+/* 表单里的裸 input（外面已经有一层 .frow 的横线分隔） */
+.fv-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 26rpx;
+  color: var(--ink);
+  height: 44rpx;
+}
+.ph { color: var(--soft); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 14rpx; }
+.chip {
+  font-size: 22rpx;
+  color: var(--accent);
+  background: #fff;
+  border-radius: 999rpx;
+  padding: 12rpx 22rpx;
+}
+.chip:active { opacity: 0.66; }
+
+.reason-ta {
+  width: 100%;
+  min-height: 110rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: var(--ink);
+  background: transparent;
+}
+
+.foot-hold {
+  flex: none;
+  height: calc(220rpx + constant(safe-area-inset-bottom));
+  height: calc(220rpx + env(safe-area-inset-bottom));
+}

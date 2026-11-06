@@ -1,0 +1,85 @@
+<!-- pages/club-notice/club-notice.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
+    </view>
+    <view class="navbar-title">通知进度</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body detail-body">
+
+    <view class="loading" wx:if="{{loading && !record}}">加载中……</view>
+
+    <block wx:if="{{record}}">
+
+      <!-- 状态 + 时刻 -->
+      <view class="head">
+        <view class="st {{stCls}}">{{record.statusText}}</view>
+        <text class="head-t">{{statusTime}}</text>
+      </view>
+
+      <!-- 正文纸 -->
+      <view class="paper">
+        <view class="paper-t">{{record.title}}</view>
+        <view class="paper-b">{{record.body}}</view>
+        <view class="paper-m">
+          <text>{{record.clubName}}</text>
+          <text>{{record.charCount}} 字</text>
+          <text wx:if="{{record.submitByName}}">{{record.submitByName}}</text>
+        </view>
+      </view>
+
+      <!-- 驳回理由：只在被驳回时出现，红块，不折叠（学生要看的就是它） -->
+      <view class="reasonbox bad" wx:if="{{record.rejectReason}}" style="margin-top:24rpx">
+        <view class="rb-t">驳回理由 · {{record.reviewByName || '社干'}}</view>
+        <view class="rb-v">{{record.rejectReason}}</view>
+      </view>
+
+      <!-- 待审核：说清接下来会发生什么（原型那块蓝底提示） -->
+      <view class="reasonbox tip" wx:elif="{{record.status === 0}}" style="margin-top:24rpx">
+        <view class="rb-t">接下来会怎样</view>
+        <view class="rb-v">{{hopeTip}}</view>
+      </view>
+
+      <!-- 时间线 -->
+      <view class="grp-t">走到哪一步了</view>
+      <view class="tl">
+        <view class="tl-i {{item.cls}}" wx:for="{{timeline}}" wx:key="key">
+          <view class="tl-dot"></view>
+          <view class="tl-tt">{{item.title}}</view>
+          <view class="tl-ss">{{item.text}}</view>
+        </view>
+      </view>
+
+      <!-- 附言（有才显示） -->
+      <view class="note-line" wx:if="{{record.note}}">附言：{{record.note}}</view>
+
+    </block>
+
+  </view>
+
+  <!-- 底部：按状态给不同的组合，但判据全部来自后端下发的 canXxx -->
+  <view class="footbar" wx:if="{{record}}">
+    <view class="foot-pair" wx:if="{{record.canEdit}}">
+      <button class="btn btn-ghost" hover-class="pressed" bindtap="withdraw">撤回这条</button>
+      <button class="btn btn-primary" hover-class="pressed" bindtap="copy">复制内容</button>
+    </view>
+    <view class="foot-pair" wx:elif="{{record.status === 3}}">
+      <button class="btn btn-ghost" hover-class="pressed" bindtap="copy">复制内容</button>
+      <button class="btn btn-primary" hover-class="pressed" bindtap="again">再提一条</button>
+    </view>
+    <view wx:elif="{{record.canResubmit}}">
+      <button class="btn btn-block btn-primary" hover-class="pressed" bindtap="edit">按这个理由改一版重新提报</button>
+    </view>
+    <view class="foot-pair" wx:else>
+      <button class="btn btn-ghost" hover-class="pressed" bindtap="copy">复制内容</button>
+      <button class="btn btn-ghost" hover-class="pressed" bindtap="goBack">返回</button>
+    </view>
+  </view>
+
+  <view class="foot-hold"></view>
+</view>

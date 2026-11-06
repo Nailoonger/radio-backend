@@ -14,6 +14,20 @@
 
 // ---- 用户端 /user ----
 const USER_ROUTES = [
+  // 社团密钥（2026-11-07）。⚠️ `/clubs` 免登录（首屏轮播），其余三个要学生 token
+  ['GET /user/club-key/clubs', 'user.clubKey.clubs'],
+  ['POST /user/club-key/verify', 'user.clubKey.verify'],
+  ['GET /user/club-key/me', 'user.clubKey.me'],
+  ['PUT /user/club-key/avatar', 'user.clubKey.avatar'],
+
+  // 社团提报通知（2026-11-07）。
+  // ⚠️ `/my` 必须排在 `/:id` 之前 —— 段数相同，靠顺序区分，晚了就被当成 id 吞掉。
+  ['GET /user/club-notice/my', 'user.clubNotice.myList'],
+  ['POST /user/club-notice', 'user.clubNotice.create'],
+  ['GET /user/club-notice/:id', 'user.clubNotice.detail'],
+  ['PUT /user/club-notice/:id', 'user.clubNotice.update'],
+  ['POST /user/club-notice/:id/withdraw', 'user.clubNotice.withdraw'],
+
   ['GET /user/recruitment/current', 'user.recruitment.current'],
   ['POST /user/recruitment/apply', 'user.recruitment.apply'],
   ['POST /user/recruitment/query', 'user.recruitment.query'],
@@ -280,6 +294,22 @@ const PARTNER_ROUTES = [
   ['GET /partner/permissions', 'partner.permissions.get'],
   ['PUT /partner/permissions/person/:id', 'partner.permissions.savePerson'],
   ['PUT /partner/permissions', 'partner.permissions.saveGlobal'],
+
+  // 社团密钥（2026-11-07）：列表 / 详情 / 改社团信息 / 重置 / 启用作废
+  // ⚠️ 路径是 `club-keys`（带连字符），handlerKey 是 `clubKeys`（驼峰）——
+  //    两者刻意不同：URL 跟别的接口保持 kebab-case，handler 名字用 JS 习惯。
+  ['GET /partner/club-keys', 'partner.clubKeys.list'],
+  ['GET /partner/club-keys/:id', 'partner.clubKeys.detail'],
+  ['PUT /partner/club-keys/:id', 'partner.clubKeys.saveInfo'],
+  ['POST /partner/club-keys/:id/reset', 'partner.clubKeys.reset'],
+  ['PUT /partner/club-keys/:id/status', 'partner.clubKeys.setStatus'],
+
+  // 广播通知处理台（2026-11-07）
+  // ⚠️ `/queue` 字面量必须在 `/:id` 之前
+  ['GET /partner/club-notice/queue', 'partner.clubNotice.queue'],
+  ['GET /partner/club-notice/:id', 'partner.clubNotice.detail'],
+  ['PUT /partner/club-notice/:id/review', 'partner.clubNotice.review'],
+  ['PUT /partner/club-notice/:id/air', 'partner.clubNotice.air'],
 
   // 互评：当场说一句，匿名聚合
   ['GET /partner/feedback/pending', 'partner.feedback.pending'],

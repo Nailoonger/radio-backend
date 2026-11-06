@@ -1,0 +1,99 @@
+<!-- pages-partner/club-keys/edit.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
+    </view>
+    <view class="navbar-title">{{record.name || '社团密钥'}}</view>
+    <view class="navbar-right" hover-class="pressed" bindtap="save" wx:if="{{record && !denied}}">保存</view>
+    <view class="navbar-spacer" wx:else></view>
+  </view>
+
+  <view class="body ke-body">
+
+    <view class="loading" wx:if="{{loading && !record}}">加载中……</view>
+
+    <view class="denied" wx:if="{{denied}}">
+      <view class="denied-t">{{denyText}}</view>
+    </view>
+
+    <block wx:elif="{{record}}">
+
+      <view class="club-org">
+        <view class="club-av">
+          <image wx:if="{{record.avatar}}" class="club-av-img" src="{{record.avatar}}" mode="aspectFill" />
+          <block wx:else>{{initial}}</block>
+        </view>
+        <view class="grow">
+          <view class="on1">{{record.name}}</view>
+          <view class="on2">{{subLine}}</view>
+        </view>
+        <view class="st {{stCls}}">{{stText}}</view>
+      </view>
+
+      <!-- ① 刚重置过：六格摊开 + 三个胶囊 -->
+      <block wx:if="{{plain}}">
+        <view class="codebox">
+          <view class="cell" wx:for="{{cells}}" wx:key="index">{{item}}</view>
+        </view>
+        <view class="keyops">
+          <view class="qa" bindtap="copyPlain">复制</view>
+          <view class="qa ghost" bindtap="hide">隐藏</view>
+          <view class="qa danger" bindtap="reset">重置密钥</view>
+        </view>
+        <view class="once-tip">这一段只会显示这一次，离开页面就没了。要发给社长请先复制。</view>
+      </block>
+
+      <!-- ② 平时：只有掩码，取不到完整密钥 -->
+      <block wx:else>
+        <view class="maskbox">
+          <view class="mask-v">密钥 {{record.mask || '——'}}</view>
+          <view class="mask-s">{{record.status === 1 ? '完整密钥只在重置时显示一次' : '这把钥匙已销毁，重置后才能用'}}</view>
+        </view>
+        <view class="keyops">
+          <view class="qa danger" bindtap="reset">{{record.status === 1 ? '重置密钥' : '生成新密钥'}}</view>
+          <view class="qa ghost" bindtap="toggle">{{record.status === 1 ? '作废' : '启用'}}</view>
+        </view>
+      </block>
+
+      <!-- 分享文案：只有拿到明文时才出现 -->
+      <view class="sharebox" wx:if="{{shareText}}">
+        <view class="st-t">发给社长和指导老师</view>
+        <view class="st-b">{{shareText}}</view>
+        <view class="st-a"><view class="qa" bindtap="copyShare">复制整段</view></view>
+      </view>
+
+      <!-- 社团信息 -->
+      <view class="grp-t">社团信息</view>
+      <view class="form">
+        <view class="frow">
+          <text class="fk">负责人</text>
+          <input class="fv-input" value="{{ownerName}}" maxlength="20" placeholder="社长姓名"
+            placeholder-class="ph" bindinput="onOwner" />
+        </view>
+        <view class="frow">
+          <text class="fk">指导老师</text>
+          <input class="fv-input" value="{{teacherName}}" maxlength="20" placeholder="老师姓名"
+            placeholder-class="ph" bindinput="onTeacher" />
+        </view>
+        <view class="frow">
+          <text class="fk">上次重置</text>
+          <text class="fv muted">{{resetText}}</text>
+        </view>
+      </view>
+
+      <view class="hintcard">
+        <view class="hint-t">重置之后</view>
+        <view class="hint-li">旧密钥当场作废，拿着旧钥匙的人进不来</view>
+        <view class="hint-li">新密钥要重新发给社长和指导老师</view>
+        <view class="hint-li">已经提报过的通知不受影响，照常审核播出</view>
+      </view>
+
+    </block>
+
+  </view>
+
+  <view class="pb-safe"></view>
+</view>

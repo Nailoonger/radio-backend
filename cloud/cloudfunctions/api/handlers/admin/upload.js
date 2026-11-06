@@ -41,44 +41,9 @@
  */
 
 const { ApiError, Codes } = require('../../lib/response');
+const { MAX_BYTES, MIME_EXT, sniffMime, monthDir } = require('../../lib/image');
 const { asSuper } = require('./_kit');
 
-/** 只允许这三种（与本地 multer 的 imageFileFilter 白名单一致） */
-const MIME_EXT = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-};
-
-/** 兜底上界（真正可用上界见文件头的 100KB 说明） */
-const MAX_BYTES = 2 * 1024 * 1024;
-
-/**
- * 按文件头判类型（不信任 filename 的扩展名）。
- * @returns {string|null} 'image/jpeg' | 'image/png' | 'image/webp' | null
- */
-function sniffMime(buf) {
-  if (buf.length < 12) return null;
-  // JPEG: FF D8 FF
-  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
-  // PNG: 89 50 4E 47 0D 0A 1A 0A
-  if (
-    buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47 &&
-    buf[4] === 0x0d && buf[5] === 0x0a && buf[6] === 0x1a && buf[7] === 0x0a
-  ) return 'image/png';
-  // WEBP: 'RIFF' .... 'WEBP'
-  if (
-    buf.toString('ascii', 0, 4) === 'RIFF' &&
-    buf.toString('ascii', 8, 12) === 'WEBP'
-  ) return 'image/webp';
-  return null;
-}
-
-/** 北京时间 YYYY-MM（与本地 multer 的 `new Date().toISOString().slice(0,7)` 同为按月归档） */
-function monthDir(now) {
-  const d = new Date(now + 8 * 3600 * 1000);
-  return d.toISOString().slice(0, 7);
-}
 
 /**
  * 上传头像

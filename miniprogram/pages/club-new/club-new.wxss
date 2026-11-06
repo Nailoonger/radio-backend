@@ -1,0 +1,39 @@
+/* pages/club-new/club-new.wxss */
+@import "../../styles/club.wxss";
+
+.new-body { padding-top: 6rpx; }
+
+.ta {
+  width: 100%;
+  min-height: 200rpx;
+  font-size: 26rpx;
+  line-height: 1.78;
+  color: var(--ink);
+  background: transparent;
+}
+.ta-ph { color: var(--soft); font-size: 26rpx; }
+
+.line-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 26rpx;
+  color: var(--ink);
+  height: 44rpx;
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: 14rpx; margin-top: 18rpx; }
+.chip {
+  font-size: 22rpx;
+  color: var(--accent);
+  background: #fff;
+  border-radius: 999rpx;
+  padding: 12rpx 22rpx;
+}
+.chip:active { opacity: 0.66; }
+
+/* 给固定底栏让位（textarea 是原生组件，最后一栏会被盖住） */
+.foot-hold {
+  flex: none;
+  height: calc(230rpx + constant(safe-area-inset-bottom));
+  height: calc(230rpx + env(safe-area-inset-bottom));
+}

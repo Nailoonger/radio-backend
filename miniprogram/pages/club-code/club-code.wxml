@@ -1,0 +1,79 @@
+<!-- pages/club-code/club-code.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
+    </view>
+    <view class="navbar-title">广播通知</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body code-body">
+
+    <!-- 社团轮播：名称是唯一指示（原型定稿），不加圆点指示器 -->
+    <swiper
+      class="car"
+      circular
+      autoplay="{{clubs.length > 1}}"
+      interval="2600"
+      duration="420"
+      previous-margin="150rpx"
+      next-margin="150rpx"
+      current="{{cur}}"
+      bindchange="onCar"
+    >
+      <swiper-item wx:for="{{clubs}}" wx:key="id">
+        <view class="car-i {{cur === index ? 'on' : ''}}">
+          <image wx:if="{{item.avatar}}" class="car-img" src="{{item.avatar}}" mode="aspectFill" />
+          <view wx:else class="car-txt">{{item.initial}}</view>
+        </view>
+      </swiper-item>
+    </swiper>
+    <view class="car-nm">{{curName || '菁悠广播站'}}</view>
+
+    <view class="car-title">输入社团密钥</view>
+
+    <!-- 六格：真实 input 盖在格子上（透明），视觉由 6 个 view 拼 -->
+    <view class="codebox" bindtap="focusInput">
+      <view
+        class="cell {{code.length === item ? 'cur' : ''}}"
+        wx:for="{{cells}}"
+        wx:key="*this"
+      >{{code[item] || ''}}</view>
+      <input
+        class="codeinput"
+        value="{{code}}"
+        maxlength="6"
+        focus="{{focused}}"
+        bindinput="onInput"
+        bindblur="onBlur"
+        adjust-position="{{false}}"
+        confirm-type="done"
+        bindconfirm="submit"
+      />
+    </view>
+
+    <view class="pastebar">
+      <view class="paste" hover-class="pressed" bindtap="paste">粘贴</view>
+    </view>
+
+    <view class="hintline" wx:if="{{hint}}">{{hint}}</view>
+
+    <button
+      class="btn btn-primary btn-block enter"
+      hover-class="pressed"
+      bindtap="submit"
+      disabled="{{submitting || code.length < 6}}"
+    >{{submitting ? '正在进入…' : '进入'}}</button>
+
+    <view class="hintcard">
+      <view class="hint-t">社团密钥是什么</view>
+      <view class="hint-li">每个社团只有一把，长期有效，由广播站后台分配</view>
+      <view class="hint-li">社长与指导老师各持一把，换人时由后台重置</view>
+      <view class="hint-li">弄丢或外泄找社干重新生成，旧密钥当场作废</view>
+    </view>
+
+  </view>
+</view>

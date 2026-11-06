@@ -1,0 +1,72 @@
+<!-- pages/club-desk/club-desk.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
+    </view>
+    <view class="navbar-title">广播通知</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+
+    <!-- 社团抬头：头像可点换（换的是自己这一家，后端只认票据） -->
+    <view class="club-org">
+      <view class="avwrap" hover-class="pressed" bindtap="changeAvatar">
+        <view class="club-av">
+          <image wx:if="{{club.avatar}}" class="club-av-img" src="{{club.avatar}}" mode="aspectFill" />
+          <block wx:else>{{initial}}</block>
+        </view>
+        <view class="avedit">
+          <view class="cam"></view>
+        </view>
+      </view>
+      <view class="grow">
+        <view class="on1">{{club.name || '正在进入…'}}</view>
+        <view class="on2" wx:if="{{club}}">密钥 {{club.mask}} · 负责人 {{club.ownerName || '未填'}}</view>
+      </view>
+      <view class="addbtn" hover-class="pressed" bindtap="goNew" aria-label="提报一条">
+        <view class="plus"></view>
+      </view>
+    </view>
+
+    <!-- 我的提交 -->
+    <view class="sec-h">
+      <text class="sec-t">我的提交 {{count.total}} 条</text>
+      <text class="sec-l" bindtap="reload">刷新</text>
+    </view>
+
+    <view class="loading" wx:if="{{loading && !list.length}}">加载中……</view>
+
+    <view class="empty" wx:elif="{{!list.length}}">还没有提报过，点右上角 + 写一条</view>
+
+    <block wx:for="{{list}}" wx:key="id">
+
+      <!-- 待审核：可改可撤 -->
+      <view class="qcard" data-id="{{item.id}}" bindtap="goDetail">
+        <view class="qtop">
+          <view class="qt">{{item.title}}</view>
+          <view class="st {{item.stCls}}">{{item.statusText}}</view>
+        </view>
+        <view class="qbody">{{item.body}}</view>
+        <view class="qfoot">
+          <text>{{item.timeText}} 提交</text>
+          <text class="sp"></text>
+          <text>{{item.charCount}} 字</text>
+        </view>
+        <view class="qacts" wx:if="{{item.canEdit}}" catchtap="noop">
+          <view class="qa" data-id="{{item.id}}" catchtap="goEdit">修改</view>
+          <view class="qa ghost" data-id="{{item.id}}" catchtap="withdraw">撤回</view>
+        </view>
+      </view>
+
+    </block>
+
+    <view class="switchclub" hover-class="pressed" bindtap="switchClub">换一个社团</view>
+
+  </view>
+
+  <view class="pb-safe"></view>
+</view>

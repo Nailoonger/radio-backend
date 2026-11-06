@@ -1,0 +1,124 @@
+<!-- pages-partner/club-notice/detail.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
+    </view>
+    <view class="navbar-title">{{record.status === 0 ? '审核' : '通知详情'}}</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body pd-body">
+
+    <view class="loading" wx:if="{{loading && !record}}">加载中……</view>
+
+    <view class="denied" wx:if="{{denied}}">
+      <view class="denied-t">{{denyText}}</view>
+    </view>
+
+    <block wx:elif="{{record}}">
+
+      <view class="head">
+        <text class="orgtag">{{record.clubName}}</text>
+        <text class="head-t">{{statusTime}}</text>
+        <text class="sp"></text>
+        <view class="st {{stCls}}">{{record.statusText}}</view>
+      </view>
+
+      <view class="paper">
+        <view class="paper-t">{{record.title}}</view>
+        <view class="paper-b">{{record.body}}</view>
+        <view class="paper-m">
+          <text>{{record.charCount}} 字</text>
+          <text>{{durText}}</text>
+          <text>{{record.submitByName}}</text>
+          <text wx:if="{{record.hopeText}}">希望 {{record.hopeText}}</text>
+        </view>
+        <view class="note-line" wx:if="{{record.note}}">附言：{{record.note}}</view>
+      </view>
+
+      <!-- 待审核：排期 + 驳回理由 -->
+      <block wx:if="{{record.status === 0}}">
+        <view class="grp-t">排播</view>
+        <view class="form">
+          <view class="frow">
+            <text class="fk">排到哪天</text>
+            <picker mode="date" value="{{date}}" start="{{today}}" bindchange="onDate">
+              <view class="fv">{{date}}</view>
+            </picker>
+            <view class="chev-r"></view>
+          </view>
+          <view class="frow">
+            <text class="fk">哪一档</text>
+            <input class="fv-input" value="{{slot}}" maxlength="20" placeholder="如 午间 12:20"
+              placeholder-class="ph" bindinput="onSlot" />
+          </view>
+          <view class="frow col">
+            <view class="chips">
+              <view class="chip" wx:for="{{slots}}" wx:key="*this" data-v="{{item}}" bindtap="pickSlot">{{item}}</view>
+            </view>
+          </view>
+        </view>
+
+        <view class="reasonbox" style="margin-top:24rpx">
+          <view class="rb-t">驳回理由（驳回时要写，学生照着改）</view>
+          <textarea class="reason-ta" value="{{reason}}" maxlength="120"
+            placeholder="比如：来不及排播 / 内容含商业信息 / 建议改成口头通知"
+            placeholder-class="ph" bindinput="onReason" auto-height show-confirm-bar="{{false}}" />
+        </view>
+      </block>
+
+      <!-- 待播：标记已播出 -->
+      <block wx:elif="{{record.status === 1}}">
+        <view class="reasonbox tip" style="margin-top:24rpx">
+          <view class="rb-t">已通过，排期</view>
+          <view class="rb-v">{{airLine}}</view>
+        </view>
+      </block>
+
+      <!-- 已驳回：把当时写的理由再给一遍，便于对照 -->
+      <view class="reasonbox bad" wx:if="{{record.rejectReason}}" style="margin-top:24rpx">
+        <view class="rb-t">驳回理由 · {{record.reviewByName}}</view>
+        <view class="rb-v">{{record.rejectReason}}</view>
+      </view>
+
+      <view class="grp-t">走到哪一步了</view>
+      <view class="tl">
+        <view class="tl-i {{item.cls}}" wx:for="{{timeline}}" wx:key="key">
+          <view class="tl-dot"></view>
+          <view class="tl-tt">{{item.title}}</view>
+          <view class="tl-ss">{{item.text}}</view>
+        </view>
+      </view>
+
+    </block>
+
+  </view>
+
+  <!-- 底部动作条 -->
+  <view class="footbar" wx:if="{{record && !denied}}">
+    <block wx:if="{{record.status === 0}}">
+      <view class="foot-pair">
+        <button class="btn btn-ghost" hover-class="pressed" bindtap="reject" disabled="{{busy}}">驳回</button>
+        <button class="btn btn-primary" hover-class="pressed" bindtap="pass" disabled="{{busy}}">通过并排入待播</button>
+      </view>
+      <view class="footnote">{{passHint}}</view>
+    </block>
+    <block wx:elif="{{record.status === 1}}">
+      <view class="foot-pair">
+        <button class="btn btn-ghost" hover-class="pressed" bindtap="copy">复制内容</button>
+        <button class="btn btn-primary" hover-class="pressed" bindtap="air" disabled="{{busy}}">标记已播出</button>
+      </view>
+    </block>
+    <block wx:else>
+      <view class="foot-pair">
+        <button class="btn btn-ghost" hover-class="pressed" bindtap="copy">复制内容</button>
+        <button class="btn btn-ghost" hover-class="pressed" bindtap="goBack">返回</button>
+      </view>
+    </block>
+  </view>
+
+  <view class="foot-hold"></view>
+</view>

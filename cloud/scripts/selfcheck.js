@@ -60,7 +60,7 @@ eq('健康检查', match('GET', '/health').handlerKey, 'system.health');
 
 const userCount = RAW_ROUTES.filter(([k]) => k.includes(' /user/')).length;
 const adminCount = RAW_ROUTES.filter(([k]) => k.includes(' /admin/')).length;
-eq('用户端路由数', userCount, 38);
+eq('用户端路由数', userCount, 47);   // 38 → 42 社团密钥 → 47 提报通知（2026-11-07）
 eq('管理端路由数', adminCount, 113);   // 112 → 113：+ /admin/admin/reset-password/batch
 eq('招新面试名单导出路由', match('GET', '/admin/recruitment/batches/sample/interview-order/export').handlerKey, 'admin.recruitment.exportInterviewOrder');
 eq('招新手动截止路由', match('POST', '/admin/recruitment/batches/sample/close').handlerKey, 'admin.recruitment.closeBatch');

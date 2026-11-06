@@ -1,0 +1,11 @@
+/* pages-partner/club-notice/queue.wxss */
+@import "../../../styles/club.wxss";
+
+.pq-page { background: #fff; }
+
+.denied { padding: 200rpx 40rpx; text-align: center; }
+.denied-t { font-size: 30rpx; color: var(--muted); letter-spacing: 0.4rpx; }
+
+.go { color: var(--accent); font-weight: 600; }
+
+.keyentry { margin-top: 20rpx; }

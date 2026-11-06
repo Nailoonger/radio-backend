@@ -1,0 +1,75 @@
+<!-- pages-partner/club-notice/queue.wxml -->
+<view class="page pq-page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
+    </view>
+    <view class="navbar-title">广播通知</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+
+    <!-- 权限被关掉：整页只留这一句（与后端 deny 文案同一句） -->
+    <view class="denied" wx:if="{{denied}}">
+      <view class="denied-t">{{denyText}}</view>
+    </view>
+
+    <block wx:else>
+      <view class="segs">
+        <view
+          class="segs-v {{tabIdx === index ? 'on' : ''}}"
+          wx:for="{{tabs}}"
+          wx:key="key"
+          data-i="{{index}}"
+          bindtap="switchTab"
+        >{{item.label}}<text class="segs-n" wx:if="{{index === 0 && counts.wait}}">{{counts.wait}}</text><text class="segs-n" wx:elif="{{index === 1 && counts.air}}">{{counts.air}}</text><text class="segs-n" wx:elif="{{index === 2 && counts.done}}">{{counts.done}}</text></view>
+      </view>
+
+      <view class="loading" wx:if="{{loading && !list.length}}">加载中……</view>
+
+      <view class="empty" wx:elif="{{!list.length}}">
+        {{tabIdx === 0 ? '没有待审核的通知' : (tabIdx === 1 ? '没有待播的通知' : '还没有播过的通知')}}
+      </view>
+
+      <block wx:for="{{list}}" wx:key="id">
+        <view class="qcard" data-id="{{item.id}}" bindtap="open" hover-class="row-hover">
+          <view class="qtop">
+            <text class="orgtag">{{item.clubName}}</text>
+            <view class="qt">{{item.title}}</view>
+            <view class="st {{item.stCls}}">{{item.statusText}}</view>
+          </view>
+          <view class="qbody">{{item.body}}</view>
+          <view class="qfoot">
+            <text>{{item.timeText}} 提交</text>
+            <text class="sp"></text>
+            <text>{{item.charCount}} 字 · {{item.durText}}</text>
+          </view>
+          <view class="qfoot bare" wx:if="{{item.status === 0}}">
+            <text>{{item.hopeLine}}</text>
+            <text class="sp"></text>
+            <text class="go">去审核 →</text>
+          </view>
+          <view class="qfoot bare" wx:elif="{{item.status === 1}}">
+            <text>{{item.airLine}}</text>
+          </view>
+        </view>
+      </block>
+
+      <view class="card-flush keyentry">
+        <view class="card-row" hover-class="row-hover" bindtap="goKeys">
+          <view class="grow stack">
+            <text class="t-strong t-link">社团密钥</text>
+            <text class="t-cap">查看、重置与作废</text>
+          </view>
+          <view class="chev-r"></view>
+        </view>
+      </view>
+    </block>
+
+  </view>
+
+  <view class="pb-safe"></view>
+</view>

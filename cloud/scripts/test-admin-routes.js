@@ -97,8 +97,10 @@ const modKeyToFile = (key) => key.replace(/\./g, '/') + '.js';
   eq('★ 双向刚好一一对应（数量相等）', REG.length, fileKeys.length);
   // 27 → 37：伙伴端 handlers 落成一组（me/slots/availability/draft/rule/leave/attendance/schedule/accounts/feedback）
   // 37 → 38：2026-10-31 加 partner.permissions（超管权限分发）
+  // 38 → 40：2026-11-07 加 user.clubKey + partner.clubKeys（社团密钥）
+  // 40 → 42：2026-11-07 加 user.clubNotice + partner.clubNotice（提报通知）
   // ⚠️ 新增任何 handler 都要同步这两个数字，否则这条会红 —— 它红是**提醒**，不是 bug。
-  eq('REGISTRY 条数（1 system + 11 user + 15 admin + 11 partner）', REG.length, 38);
+  eq('REGISTRY 条数（1 system + 13 user + 15 admin + 13 partner）', REG.length, 42);
 
   // 辅助件必须真的是辅助件（没有被路由引用）
   const routeModKeys = [...new Set(RAW_ROUTES.map(([, hk]) => {
@@ -146,7 +148,7 @@ const modKeyToFile = (key) => key.replace(/\./g, '/') + '.js';
   // ⚠️ 2026-10-29 起有第四种前缀：/partner/**（伙伴端小程序 + admin-web 共用）
   const partnerRoutes = RAW_ROUTES.filter(([k]) => pathOf(k).startsWith('/partner/'));
   eq('★ admin 路由 113 条（含招新）', adminRoutes.length, 113);   // 112 → 113：+ POST /admin/admin/reset-password/batch
-  eq('user 路由 38 条（含招新）', userRoutes.length, 38);
+  eq('user 路由 47 条（含招新、社团密钥 4 + 提报 5）', userRoutes.length, 47);
   eq('system 路由 2 条（/health + /system/init-collections）',
     systemRoutes.map(([k]) => k), ['GET /health', 'POST /system/init-collections']);
   eq('路由总数 = admin + user + system + partner（没有第五种前缀）',

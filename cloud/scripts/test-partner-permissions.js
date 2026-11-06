@@ -79,8 +79,9 @@ const setPerson = (pid, patch, id = 1) => call('PUT', `/partner/permissions/pers
 
   r = await call('GET', '/partner/permissions', {}, 1);
   equal('看板只列社干', r.data.people.map((p) => p.personId), [2, 3]);
-  equal('看板计数', r.data.count, { managers: 2, scheduleOn: 2, reviewOn: 2, proxyOn: 2, overridden: 0 });
-  equal('看板文案位齐全（三个开关）', r.data.meta.map((m) => m.key), ['schedule', 'review', 'proxy']);
+  equal('看板计数', r.data.count, { managers: 2, scheduleOn: 2, reviewOn: 2, proxyOn: 2, clubkeyOn: 2, overridden: 0 });
+  // 2026-11-07：权限位从三个变四个（加 clubkey · 社团密钥）
+  equal('看板文案位齐全（四个开关）', r.data.meta.map((m) => m.key), ['schedule', 'review', 'proxy', 'clubkey']);
 
   /* ───────── ③ 全局关掉 ⇒ 社干被拦，超管不受影响 ───────── */
   r = await setGlobal({ schedule: false });

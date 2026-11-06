@@ -1,0 +1,208 @@
+/* styles/club.wxss —— 广播通知线的共用件
+ *
+ * 依据：preview/notice-hub-v5（已点头的原型）。像素按 1px(设计) × 1.923 ≈ rpx 换算。
+ * 只用 app.wxss 的 token（--accent / --parchment / --red-fg …），**不自起配色**。
+ *
+ * ⚠️ 这里只放「两个以上页面都用」的件；单页专属的写在各自 wxss 里。
+ * ⚠️ 不要写 .btn —— 那是全局的，且必须保持 button.xxx 的元素+类写法（见 MEMORY 铁律）。
+ */
+
+/* ══════ 社团抬头（社团台 / 密钥编辑 / 审核台都用） ══════ */
+.club-org { display: flex; align-items: center; gap: 24rpx; padding: 6rpx 0; }
+.club-av {
+  width: 90rpx; height: 90rpx; flex: none; border-radius: 50%;
+  background: var(--accent-tint); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36rpx; font-weight: 700; overflow: hidden;
+}
+.club-av-img { width: 90rpx; height: 90rpx; border-radius: 50%; display: block; }
+.avwrap { position: relative; flex: none; }
+.avedit {
+  position: absolute; right: -4rpx; bottom: -4rpx;
+  width: 38rpx; height: 38rpx; border-radius: 50%;
+  background: #fff; color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 0 4rpx #fff, 0 4rpx 12rpx -4rpx rgba(15, 28, 46, 0.30);
+}
+.on1 { font-size: 34rpx; font-weight: 600; letter-spacing: -0.2rpx; }
+.on2 { font-size: 22rpx; color: var(--muted); margin-top: 4rpx; letter-spacing: 0.4rpx; }
+.addbtn {
+  width: 62rpx; height: 62rpx; flex: none; border-radius: 50%;
+  background: var(--accent-tint); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ══════ 小节标题 ══════ */
+.sec-h { display: flex; align-items: baseline; justify-content: space-between; padding: 10rpx 4rpx 14rpx; }
+.sec-t { font-size: 26rpx; font-weight: 600; letter-spacing: -0.1rpx; }
+.sec-l { font-size: 22rpx; color: var(--accent); }
+
+/* ══════ 通知卡 ══════ */
+.qcard { background: var(--parchment); border-radius: 34rpx; padding: 26rpx 28rpx; margin-bottom: 20rpx; }
+.qtop { display: flex; align-items: flex-start; gap: 14rpx; }
+.qt { flex: 1; min-width: 0; font-size: 28rpx; font-weight: 600; line-height: 1.45; letter-spacing: -0.2rpx; }
+.qbody {
+  font-size: 24rpx; color: var(--ink-2); line-height: 1.7; margin-top: 10rpx;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+.qfoot {
+  display: flex; align-items: center; gap: 8rpx;
+  font-size: 21rpx; color: var(--muted);
+  margin-top: 16rpx; padding-top: 14rpx; border-top: 1rpx solid rgba(0, 0, 0, 0.06);
+}
+.qfoot.bare { border-top: 0; padding-top: 6rpx; margin-top: 8rpx; }
+.sp { flex: 1; }
+
+/* ══════ 状态徽章（与 services/clubNotice 的 statusText 一一对应） ══════ */
+.st {
+  flex: none; font-size: 21rpx; font-weight: 600; line-height: 1;
+  padding: 9rpx 16rpx; border-radius: 999rpx; letter-spacing: 0.2rpx;
+}
+.st.wait { background: var(--amber-bg); color: var(--amber-fg); }
+.st.air  { background: var(--accent-tint); color: var(--accent); }
+.st.done { background: var(--green-bg); color: var(--green-fg); }
+.st.rej  { background: var(--red-bg); color: var(--red-fg); }
+/* 已撤回：不抢眼，用中性灰 —— 它不是「失败」，是用户自己撤的 */
+.st.mute { background: var(--divider); color: var(--muted); }
+
+/* 社团小标 */
+.orgtag {
+  flex: none; font-size: 20rpx; font-weight: 600; color: var(--ink-2);
+  background: #fff; border-radius: 12rpx; padding: 7rpx 14rpx;
+}
+
+/* ══════ 卡内小动作（修改 / 撤回 / 复制 …） ══════ */
+.qacts { display: flex; justify-content: flex-end; gap: 16rpx; margin-top: 20rpx; }
+.qa {
+  font-size: 23rpx; font-weight: 500; line-height: 1;
+  padding: 16rpx 30rpx; border-radius: 999rpx;
+  background: #fff; color: var(--accent);
+}
+.qa.ghost { color: var(--muted); }
+.qa.danger { color: var(--red-fg); }
+.qa:active { opacity: 0.62; }
+
+/* ══════ 正文纸（详情 / 审核台） ══════ */
+.paper { background: var(--parchment); border-radius: 34rpx; padding: 32rpx 30rpx; }
+.paper-t { font-size: 32rpx; font-weight: 700; line-height: 1.6; letter-spacing: -0.4rpx; }
+.paper-b { font-size: 25rpx; color: var(--ink-2); line-height: 1.78; margin-top: 18rpx; }
+.paper-m {
+  display: flex; gap: 18rpx; font-size: 20rpx; color: var(--muted);
+  margin-top: 22rpx; padding-top: 20rpx; border-top: 1rpx solid rgba(0, 0, 0, 0.06);
+  letter-spacing: 0.4rpx;
+}
+
+/* ══════ 分组标题 ══════ */
+.grp-t {
+  font-size: 21rpx; color: var(--muted); font-weight: 600;
+  letter-spacing: 1.2rpx; padding: 36rpx 4rpx 16rpx;
+}
+
+/* ══════ 时间线（走到哪一步了） ══════ */
+.tl { position: relative; padding-left: 46rpx; }
+.tl-i { position: relative; padding-bottom: 40rpx; }
+.tl-i:last-child { padding-bottom: 0; }
+.tl-i::after {
+  content: ""; position: absolute; left: -35rpx; top: 30rpx; bottom: -6rpx;
+  width: 3rpx; background: #E4E4E7;
+}
+.tl-i:last-child::after { display: none; }
+.tl-dot {
+  position: absolute; left: -46rpx; top: 6rpx;
+  width: 23rpx; height: 23rpx; border-radius: 50%;
+  background: #fff; box-shadow: inset 0 0 0 3rpx #D8D8DC;
+}
+.tl-i.done .tl-dot { background: var(--accent); box-shadow: none; }
+.tl-i.now  .tl-dot { background: #fff; box-shadow: inset 0 0 0 4rpx var(--accent); }
+.tl-i.bad  .tl-dot { background: var(--red-fg); box-shadow: none; }
+.tl-tt { font-size: 26rpx; font-weight: 600; letter-spacing: -0.2rpx; }
+.tl-i.pending .tl-tt { color: var(--soft); font-weight: 500; }
+.tl-ss { font-size: 22rpx; color: var(--muted); margin-top: 6rpx; line-height: 1.55; }
+.tl-who { color: var(--ink-2); font-weight: 500; }
+
+/* ══════ 理由块（驳回 / 提示） ══════ */
+.reasonbox { background: var(--parchment); border-radius: 27rpx; padding: 26rpx 30rpx; }
+.reasonbox.bad { background: var(--red-bg); }
+.reasonbox.tip { background: var(--accent-tint); }
+.rb-t { font-size: 21rpx; color: var(--muted); letter-spacing: 0.8rpx; margin-bottom: 14rpx; }
+.reasonbox.bad .rb-t { color: var(--red-fg); }
+.reasonbox.tip .rb-t { color: #1F5C96; }
+.rb-v { font-size: 24rpx; line-height: 1.72; color: var(--ink-2); }
+.reasonbox.bad .rb-v { color: #7A2418; }
+.reasonbox.tip .rb-v { color: #1F5C96; }
+
+/* ══════ 说明卡（是什么 / 提交之后 / 重置之后） ══════ */
+.hintcard { background: var(--parchment); border-radius: 34rpx; padding: 28rpx 30rpx; margin-top: 28rpx; }
+.hint-t { font-size: 23rpx; font-weight: 600; margin-bottom: 12rpx; letter-spacing: 0.2rpx; }
+.hint-li {
+  font-size: 22rpx; color: var(--muted); line-height: 1.78;
+  padding-left: 26rpx; position: relative;
+}
+.hint-li::before { content: "·"; position: absolute; left: 8rpx; color: var(--soft); }
+
+/* ══════ 表单（提报 / 审核台） ══════ */
+.form { background: var(--parchment); border-radius: 34rpx; overflow: hidden; }
+.frow {
+  display: flex; align-items: center; gap: 22rpx;
+  padding: 26rpx 30rpx; border-bottom: 1rpx solid rgba(0, 0, 0, 0.05);
+  font-size: 26rpx;
+}
+.frow:last-child { border-bottom: 0; }
+.fk { font-size: 24rpx; color: var(--muted); width: 126rpx; flex: none; }
+.fv { flex: 1; min-width: 0; font-weight: 500; }
+.fv.ph { color: var(--soft); font-weight: 400; }
+.frow.col { display: block; }
+.frow.col .fk { display: block; width: auto; margin-bottom: 14rpx; }
+.cnt { font-size: 20rpx; color: var(--muted); text-align: right; margin-top: 12rpx; }
+
+/* ══════ 底部固定操作条 ══════ */
+.footbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  padding: 20rpx 40rpx calc(26rpx + env(safe-area-inset-bottom));
+  background: #fff;
+}
+.footnote { text-align: center; font-size: 21rpx; color: var(--muted); margin-top: 16rpx; }
+.foot-pair { display: flex; gap: 20rpx; }
+.foot-pair .btn { flex: 1; }
+
+/* ══════ 下划线标签页（三段队列） ══════ */
+.segs { display: flex; border-bottom: 1rpx solid #E1E1E6; margin-bottom: 26rpx; }
+.segs-v {
+  flex: 1; text-align: center; padding: 16rpx 0 21rpx;
+  font-size: 26rpx; color: var(--ink-2); font-weight: 500; position: relative;
+}
+.segs-v.on { color: var(--accent); font-weight: 600; }
+.segs-v.on::after {
+  content: ""; position: absolute; left: 50%; transform: translateX(-50%); bottom: -1rpx;
+  width: 44%; height: 5rpx; border-radius: 4rpx; background: var(--accent);
+}
+.segs-n {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 36rpx; height: 36rpx; padding: 0 9rpx; margin-left: 9rpx;
+  border-radius: 11rpx; background: #F0F0F3; color: var(--muted);
+  font-size: 21rpx; font-weight: 600; vertical-align: 2rpx;
+}
+.segs-v.on .segs-n { background: var(--accent-tint); color: var(--accent); }
+
+/* ══════ 两个纯 CSS 小图标（不引图片，避免多一套资源要同步） ══════ */
+.plus { width: 26rpx; height: 26rpx; position: relative; }
+.plus::before, .plus::after {
+  content: ""; position: absolute; background: var(--accent); border-radius: 3rpx;
+}
+.plus::before { left: 50%; top: 0; bottom: 0; width: 4rpx; transform: translateX(-50%); }
+.plus::after { top: 50%; left: 0; right: 0; height: 4rpx; transform: translateY(-50%); }
+
+/* 相机：机身 + 镜头，只用在头像右下角的小圆里 */
+.cam { width: 22rpx; height: 17rpx; border-radius: 5rpx; background: var(--accent); position: relative; }
+.cam::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: 8rpx; height: 8rpx; border-radius: 50%;
+  background: #fff; transform: translate(-50%, -50%);
+}
+
+/* 给不带 tabBar 的页面补底部安全区 */
+.pb-safe {
+  flex: none;
+  height: calc(60rpx + constant(safe-area-inset-bottom));
+  height: calc(60rpx + env(safe-area-inset-bottom));
+}

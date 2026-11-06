@@ -1,0 +1,53 @@
+<!-- pages-partner/club-keys/keys.wxml -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev-l"></view>
+    </view>
+    <view class="navbar-title">社团密钥</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+
+    <view class="denied" wx:if="{{denied}}">
+      <view class="denied-t">{{denyText}}</view>
+    </view>
+
+    <block wx:else>
+      <view class="sec-h">
+        <text class="sec-t">{{count.total}} 个社团 · 每社团一把</text>
+        <text class="sec-l" bindtap="reload">刷新</text>
+      </view>
+
+      <view class="loading" wx:if="{{loading && !list.length}}">加载中……</view>
+
+      <view class="kcard" wx:else>
+        <view class="krow" wx:for="{{list}}" wx:key="id" data-id="{{item.id}}" bindtap="open" hover-class="row-hover">
+          <view class="kav">
+            <image wx:if="{{item.avatar}}" class="kav-img" src="{{item.avatar}}" mode="aspectFill" />
+            <block wx:else>{{item.initial}}</block>
+          </view>
+          <view class="km">
+            <view class="kn">{{item.name}}</view>
+            <view class="ks">{{item.sub}}</view>
+          </view>
+          <view class="st {{item.stCls}}">{{item.stText}}</view>
+          <view class="chev-r"></view>
+        </view>
+      </view>
+
+      <view class="hintcard">
+        <view class="hint-t">密钥怎么流转</view>
+        <view class="hint-li">后台给每个社团生成一把，长期有效，不用每次申请</view>
+        <view class="hint-li">社长与指导老师各持一把，换人时由社干重置</view>
+        <view class="hint-li">谁泄露了就地作废，旧密钥立刻打不开</view>
+      </view>
+    </block>
+
+  </view>
+
+  <view class="pb-safe"></view>
+</view>

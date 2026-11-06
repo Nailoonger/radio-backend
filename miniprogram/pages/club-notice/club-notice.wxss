@@ -1,0 +1,21 @@
+/* pages/club-notice/club-notice.wxss */
+@import "../../styles/club.wxss";
+
+.detail-body { padding-top: 2rpx; gap: 26rpx; }
+
+.head { display: flex; align-items: center; gap: 16rpx; padding: 4rpx 0 0; }
+.head-t { font-size: 22rpx; color: var(--muted); }
+
+.note-line {
+  font-size: 22rpx;
+  color: var(--muted);
+  line-height: 1.7;
+  padding: 24rpx 0 6rpx;
+}
+
+/* 给固定底栏让位 */
+.foot-hold {
+  flex: none;
+  height: calc(210rpx + constant(safe-area-inset-bottom));
+  height: calc(210rpx + env(safe-area-inset-bottom));
+}

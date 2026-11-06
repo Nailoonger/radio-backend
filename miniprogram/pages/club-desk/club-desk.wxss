@@ -1,0 +1,13 @@
+/* pages/club-desk/club-desk.wxss */
+@import "../../styles/club.wxss";
+
+/* 抬头下方留一口气，别让第一张卡贴着社团行 */
+.sec-h { margin-top: 26rpx; }
+
+.switchclub {
+  text-align: center;
+  font-size: 23rpx;
+  color: var(--muted);
+  padding: 40rpx 0 10rpx;
+  letter-spacing: 0.4rpx;
+}

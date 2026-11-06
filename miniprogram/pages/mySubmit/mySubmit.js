@@ -3,6 +3,7 @@ const tabMotion = require('../../utils/tabMotion.js');
 const { request } = require('../../utils/request.js');
 const { submitStatusText, submitStatusClass, fmtDate, fmtIso, fmtSlot, fmtMd } = require('../../utils/format.js');
 const windowBar = require('../../utils/windowBar.js');
+const clubTicket = require('../../utils/clubTicket.js');
 const app = getApp();
 
 /**
@@ -320,5 +321,19 @@ Page({
 
   goRecruitment() {
     wx.navigateTo({ url: '/pages/recruitment/index' });
+  },
+
+  /**
+   * 广播通知：先进输密钥页
+   *
+   * ⚠️ 已有未过期的票据就**直接进社团台**，别再让人重输一遍 ——
+   *    「2 小时」是安全上限，不是「两小时内只准进一次」。
+   */
+  goClubCode() {
+    if (clubTicket.getTicket()) {
+      wx.navigateTo({ url: '/pages/club-desk/club-desk' });
+      return;
+    }
+    wx.navigateTo({ url: '/pages/club-code/club-code' });
   },
 });
