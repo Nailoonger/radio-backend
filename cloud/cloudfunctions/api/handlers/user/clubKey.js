@@ -124,6 +124,9 @@ async function avatar(ctx) {
   let buffer;
   try { buffer = toBuffer(b.fileBase64); }
   catch (e) { throw new ApiError(Codes.PARAM_ERROR, '文件内容不是合法的 base64'); }
+  // ⚠️ 这是**服务端兜底**，实际拦不住手机直出照片：`wx.cloud.callFunction` 的 data 约 1MB 上限，
+  //    2MB 照片 base64 后 2.7MB，平台侧就回 `data exceed max`，请求根本到不了这里。
+  //    真正的第一道闸在客户端（club-desk `_shrink`：压到 720px、base64 ≤ 700KB）。
   if (buffer.length > MAX_BYTES) throw new ApiError(Codes.PARAM_ERROR, '图片超过 2MB，请先压缩后上传');
 
   const mime = sniffMime(buffer);

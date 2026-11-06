@@ -96,7 +96,11 @@ token 源：`miniprogram/app.wxss` → `admin-web/src/styles/theme.css`。`--acc
 「服务器繁忙，请稍后再试（…-502005…）」。正解：`lib/db.js#ensureCollections`（幂等、每实例一次、失败不抛）
 进路径先建 + 读操作套 `readOr` 当空表；**假库用 `H.dropCollection(name)` 真删表才测得出**（默认假库对任何名字都返回空）。
 ⚠️⚠️ 切云弄坏上传类接口（信封 JSON ⇒ `FormData` 变 `{}`，40001）：契约 `{filename,fileBase64}`，凡 FormData/Blob 切云后必须单验。
-⚠️⚠️ **HTTP 访问服务请求体上限 ≈100KB**（base64 再 +33%）⇒ 头像先压、名册导入大表会 413。小程序 `callFunction` ≈1MB 不受限。
+⚠️⚠️ **上传有两道硬上限，都跟 base64 有关**：① HTTP 访问服务请求体 ≈100KB（base64 再 +33%）⇒ 名册导入大表会 413；
+② **小程序 `callFunction` 的 data 也只有 ≈1MB**（不是"不受限"！）⇒ 手机直出照片 2~5MB、base64 后 3~7MB，
+平台侧直接回 `data exceed max`，**请求根本到不了云函数**（2026-11-07 换社团头像真机上就这么卡的，
+服务端那句「超过 2MB」永远触发不到）。凡上传类接口，**第一步是在客户端压**（头像压到 720px / base64 ≤700KB），
+服务端的尺寸判断只当兜底。
 ⚠️⚠️ 学生初始密码＝`user`+学号（唯一出口 `studentAccountService.initPasswordFor()`；初始 cost 8、改密后 10）；管理端 DTO 字段是 `activated`。
 ⚠️⚠️⚠️ **名册逻辑有三份副本，改一处不算改完**：① `src/services/studentRosterService.js`（直连）
 ② **`cloud/cloudfunctions/api/services/roster.js`（云端副本＝线上真正跑的，函数同名行号不同）**
