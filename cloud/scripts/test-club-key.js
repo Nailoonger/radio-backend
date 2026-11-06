@@ -232,6 +232,39 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
   ok('闸的文案说实话（不是「密钥错误」）', /频繁/.test(last.message), last.message);
   eq('换一个学生不受影响（按来源限速）', (await verifyKey('ZZZZZZ', T_STU)).code, 40401);
 
+  /* ═══════════ ⑪ 表还没建（新环境第一次打开） ═══════════
+   *
+   * ⚠️⚠️ 这条是 2026-11-07 线上事故的回填：云开发查一个**没建过**的集合是**抛错**
+   *    （`-502005 database collection not exists`），不是返回空数组。当时密钥页第一下
+   *    就弹「服务器繁忙，请稍后再试（…-502005…）」，因为建集合失败被空 catch 吞了、
+   *    紧接着的裸查询原样抛了上去。
+   *    假库原来越过这条路径（任何名字都「查什么都没有就返回空」），所以**永远测不出来**；
+   *    现在用 `H.dropCollection` 真的把表当作没建，逼代码自己建回来。
+   */
+  section('⑪ 集合还没建（首次打开 / 升级后第一次用）');
+  reset();
+  H.dropCollection('club_keys');
+  H.dropCollection('club_sessions');
+  H.dropCollection('club_key_tries');
+
+  r = await list(T_SUPER);
+  eq('密钥列表：不是 50001，正常返回', r.code, 0);
+  eq('密钥列表：自动建表 + 播种出 5 家', r.data.list.length, 5);
+
+  r = await doReset(first.id, T_SUPER);
+  eq('直接重置（深链，没先打开列表）也走得通', r.code, 0);
+  ok('重置给出明文', typeof r.data.plain === 'string' && r.data.plain.length === clubKeySvc.KEY_LEN, r.data.plain);
+
+  r = await verifyKey(r.data.plain, T_STU);
+  eq('输码换票：票据表不存在时也能建出来并出票', r.code, 0);
+
+  r = await verifyKey('ZZZZZZ', T_STU2);
+  eq('试错闸表不存在时，错码仍是 40401 而不是 50001', r.code, 40401);
+
+  r = await call('GET', '/user/club-key/clubs');
+  eq('学生端轮播清单同样自愈', r.code, 0);
+  eq('清单 5 家', r.data.list.length, 5);
+
   // ⚠️ 这行格式必须与其它套件一致（regression.js 靠它认「结论」行），别改成「通过 N 项断言」
   console.log(`\n结论：断言 ${checks} 项 / 失败 0 项`);
 })().catch((e) => {

@@ -28,8 +28,25 @@
  * 提报人**不是**用来鉴权的（鉴权走 ticket 里的 clubId），只是给人看的落款。
  */
 
-const { C, findOne, findMany, insertOne, updateWhere, nextId } = require('../lib/db');
+const { C, findOne, findMany, insertOne, updateWhere, nextId, ensureCollections } = require('../lib/db');
 const { ApiError, Codes } = require('../lib/response');
+
+/* ⚠️⚠️ 云开发查**没建过**的集合是**抛错**（-502005），不是返回空数组。
+ *    2026-11-07 密钥页就这么炸过一次（陛下看到「服务器繁忙…-502005…」）。
+ *    这里两层保险：进每条路径先建表（幂等、每实例一次），读操作再套 readOr 当空表。 */
+function isMissingCollection(err) {
+  const msg = String((err && (err.errMsg || err.message)) || err);
+  return /collection not exists|-502005|Db or Table not exist|not exist/i.test(msg);
+}
+
+async function readOr(fn, fallback) {
+  try { return await fn(); } catch (e) { if (isMissingCollection(e)) return fallback; throw e; }
+}
+
+/** 单据表先建出来（幂等，每实例只试一次） */
+async function ready() {
+  await ensureCollections([C.CLUB_NOTICE]);
+}
 
 /** 状态（数字）—— 与前端 st.wait / st.air / st.rej / st.done 四个徽章对应 */
 const ST = { WAIT: 0, AIR: 1, REJECT: 2, DONE: 3, WITHDRAW: 9 };
@@ -208,7 +225,11 @@ function assertBody(raw) {
 async function create(club, user, input) {
   const body = assertBody(input && input.body);
 
-  const pending = await findMany(C.CLUB_NOTICE, { club_id: club.id, status: ST.WAIT }, { limit: MAX_PENDING + 1 });
+  await ready();
+  const pending = await readOr(
+    () => findMany(C.CLUB_NOTICE, { club_id: club.id, status: ST.WAIT }, { limit: MAX_PENDING + 1 }),
+    []
+  );
   if (pending.length >= MAX_PENDING) {
     throw new ApiError(Codes.CONFLICT, `还有 ${pending.length} 条没审核，等处理完再提新的吧`);
   }
@@ -243,7 +264,11 @@ async function create(club, user, input) {
 
 /** 本社团的提交（最新在前） */
 async function myList(club) {
-  const rows = await findMany(C.CLUB_NOTICE, { club_id: club.id }, { orderBy: [['id', 'desc']], limit: 100 });
+  await ready();
+  const rows = await readOr(
+    () => findMany(C.CLUB_NOTICE, { club_id: club.id }, { orderBy: [['id', 'desc']], limit: 100 }),
+    []
+  );
   const count = {
     total: rows.length,
     wait: rows.filter((r) => Number(r.status) === ST.WAIT).length,
@@ -258,7 +283,7 @@ async function myList(club) {
 async function one(club, id) {
   const n = Number(id);
   const row = Number.isInteger(n) && n > 0
-    ? await findOne(C.CLUB_NOTICE, { id: n })
+    ? await readOr(() => findOne(C.CLUB_NOTICE, { id: n }), null)
     : null;
   if (!row || Number(row.club_id) !== Number(club.id)) {
     throw new ApiError(Codes.NOT_FOUND, '没有这条通知');
@@ -312,13 +337,14 @@ async function withdraw(club, id) {
  *    按时间倒序会让「昨天那条老的最后才看到」，而它恰恰最急。
  */
 async function queue(status) {
+  await ready();
   const st = Number(status);
   const where = Number.isFinite(st) ? { status: st } : {};
   const rows = st === ST.DONE
-    ? await findMany(C.CLUB_NOTICE, where, { orderBy: [['id', 'desc']], limit: 100 })
-    : await findMany(C.CLUB_NOTICE, where, { orderBy: [['id', 'asc']], limit: 100 });
+    ? await readOr(() => findMany(C.CLUB_NOTICE, where, { orderBy: [['id', 'desc']], limit: 100 }), [])
+    : await readOr(() => findMany(C.CLUB_NOTICE, where, { orderBy: [['id', 'asc']], limit: 100 }), []);
 
-  const all = await findMany(C.CLUB_NOTICE, {}, { limit: 100 });
+  const all = await readOr(() => findMany(C.CLUB_NOTICE, {}, { limit: 100 }), []);
   const count = {
     wait: all.filter((r) => Number(r.status) === ST.WAIT).length,
     air: all.filter((r) => Number(r.status) === ST.AIR).length,
@@ -330,8 +356,11 @@ async function queue(status) {
 
 /** 按数字 id 取**原始行**（伙伴端审核要用它拿 _id；不存在报 40401） */
 async function findRow(id) {
+  await ready();
   const n = Number(id);
-  const row = Number.isInteger(n) && n > 0 ? await findOne(C.CLUB_NOTICE, { id: n }) : null;
+  const row = Number.isInteger(n) && n > 0
+    ? await readOr(() => findOne(C.CLUB_NOTICE, { id: n }), null)
+    : null;
   if (!row) throw new ApiError(Codes.NOT_FOUND, '没有这条通知');
   return row;
 }

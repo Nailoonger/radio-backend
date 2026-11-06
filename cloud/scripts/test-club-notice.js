@@ -240,6 +240,29 @@ const BODY2 = '摄影社招新面试定于本周三 17:30 在艺术楼 302 进�
   eq('也看不了自己的列表', (await myList(ticket)).code, 40101);
   eq('文案是「请重新输入密钥」', (await myList(ticket)).message.indexOf('重新输入') >= 0, true);
 
+  /* ═══════════ ⑮ 单据表还没建（新环境第一次提报） ═══════════
+   *
+   * ⚠️ 2026-11-07 线上 -502005 的同一条路径：云开发查没建过的集合是**抛错**，
+   *    不是返回空数组。假库原本测不出来（任何名字都返回空），现在真删一次表。
+   */
+  section('⑮ 集合还没建（首次提报 / 首次打开处理台）');
+  H.reset(seed());
+  ticket = await ticketOf(1);
+  H.dropCollection('club_notices');
+
+  let g = await save({ body: BODY, ticket });
+  eq('表不存在时提报也能自愈（不是 50001）', g.code, 0);
+  ok('返回体是那条单据', typeof (g.data && g.data.record && g.data.record.id) === 'number',
+    JSON.stringify(g.data && Object.keys(g.data)));
+
+  g = await myList(ticket);
+  eq('我的提交：正常返回（空表也不是 50001）', g.code, 0);
+  eq('刚提的那条在列表里', g.data.list.length, 1);
+
+  g = await queue(0, T_SUPER);
+  eq('伙伴端待审核队列同样自愈', g.code, 0);
+  eq('队列里有这一条', g.data.list.length, 1);
+
   // ⚠️ 这行格式必须与其它套件一致（regression.js 靠它认「结论」行）
   console.log(`\n结论：断言 ${checks} 项 / 失败 0 项`);
 })().catch((e) => {

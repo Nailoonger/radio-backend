@@ -142,6 +142,51 @@ async function removeWhere(name, where) {
   return (r.stats && r.stats.removed) || 0;
 }
 
+/* ═══════════ 集合自愈（2026-11-07 线上 -502005 之后补的） ═══════════
+ *
+ * 云开发里查一个**没建过**的集合是**抛错**（`-502005 database collection not exists`），
+ * 不是返回空数组。所以「新增一张表」在代码层面就意味着：上线后第一次碰它就 50001，
+ * 除非有人记得去控制台手点「新建集合」。2026-11-07 社团密钥上线时就是这么炸的：
+ * 保障逻辑写了 `try { createCollection } catch {}`，失败被静默吞掉，紧接着的裸查询
+ * 原样抛上去 → 陛下看到「服务器繁忙，请稍后再试（…-502005…）」。
+ *
+ * 现在统一走这里：**每个请求路径先用一次，集合就自动建好**，控制台手点从此可选。
+ * 三个约定：
+ *   ① 幂等：已存在当成功（SDK 会抛 -501001 / "already exist"）；
+ *   ② 每实例只试一次（memo），冷启动多实例各建一次也无所谓 —— 撞上就是 exists；
+ *   ③ 失败**不抛**，返回 { status:'error', message }，由调用方决定是继续（当空表）还是报错。
+ *      ⚠️ 绝不在这里 throw：建集合失败不该把「读一个空列表」变成 50001。
+ */
+const _ensureMemo = {};
+
+function ensureCollection(name) {
+  const key = String(name || '');
+  if (!key) return Promise.resolve({ name: key, status: 'skip' });
+  if (_ensureMemo[key]) return _ensureMemo[key];
+
+  _ensureMemo[key] = (async () => {
+    if (!db || typeof db.createCollection !== 'function') {
+      return { name: key, status: 'unsupported' };
+    }
+    try {
+      await db.createCollection(key);
+      return { name: key, status: 'created' };
+    } catch (e) {
+      const msg = String((e && (e.errMsg || e.message)) || e);
+      if (/exist/i.test(msg) || msg.indexOf('-501001') >= 0) return { name: key, status: 'exists' };
+      // 失败别把 memo 钉死：下一次调用再试一遍（权限/网络抖动常常是瞬时的）
+      delete _ensureMemo[key];
+      return { name: key, status: 'error', message: msg };
+    }
+  })();
+
+  return _ensureMemo[key];
+}
+
+function ensureCollections(names) {
+  return Promise.all((names || []).filter(Boolean).map(ensureCollection));
+}
+
 /**
  * 数字主键生成（等价 AUTO_INCREMENT）
  * 计数器集合 sequence：{ _id: 'submit', value: 3 }
@@ -344,4 +389,5 @@ module.exports = {
   findOne, findById, findMany, findAllPaged, insertOne, insertWithId, updateWhere, updateById, removeWhere,
   count, countByField,
   nextId, reserveUnique, releaseUnique, getUniqueOwner, acquireIdempotentKey, parseId,
+  ensureCollection, ensureCollections,
 };

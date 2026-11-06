@@ -26,9 +26,41 @@ const store = new Map();          // name -> Map(_id -> doc)
 const autoId = { n: 0 };
 const INC = Symbol('inc');
 
+/**
+ * 「这张表在云上还没建」——被 dropCollection 过的名字放这里。
+ *
+ * ⚠️⚠️ 真实云开发里查询一个没建过的集合是**抛错**（`-502005 database collection not exists`），
+ *     不是返回空数组。假库原本对任何名字都「查什么都没有就返回空」，所以
+ *     「新表没建 ⇒ 首次访问 50001」这类事故在本地**永远测不出来**
+ *     （2026-11-07 社团密钥上线就这么炸的，陛下看到「服务器繁忙…-502005…」）。
+ *     加这个开关后，用例可以真的把表删掉，验证代码会自己建回来。
+ */
+const dropped = new Set();
+
 function bucket(name) {
+  if (dropped.has(name)) {
+    const e = new Error(`collection.get:fail -502005 database collection not exists. [ResourceNotFound] ${name}`);
+    e.errCode = -502005;
+    throw e;
+  }
   if (!store.has(name)) store.set(name, new Map());
   return store.get(name);
+}
+
+/**
+ * 把一张表当作「云上还没建」——之后任何读写都会抛 -502005，直到有人 createCollection。
+ * 只用于测「首次打开 / 升级后第一次用」这条路径。
+ *
+ * ⚠️ 顺手清掉云函数模块缓存：`lib/db.ensureCollections` 有一个「本实例已经建过」的 memo，
+ *    只删数据不清缓存的话，代码会以为表还在 —— 那是**热实例**的行为，
+ *    而这里要模拟的是**冷启动**（新实例，从没见过这张表）。
+ */
+function dropCollection(name) {
+  dropped.add(String(name));
+  store.delete(String(name));
+  Object.keys(require.cache).forEach((k) => {
+    if (k.indexOf(API_DIR) === 0) delete require.cache[k];
+  });
 }
 
 /**
@@ -269,11 +301,12 @@ const fakeDb = {
   collection: (n) => new Collection(n),
   // 模拟服务端建集合：已存在时抛错（对齐真实 SDK 行为）
   createCollection: async (name) => {
-    if (store.has(name)) {
+    if (store.has(name) && !dropped.has(name)) {
       const e = new Error('collection already exists');
       e.errCode = -501001;
       throw e;
     }
+    dropped.delete(name);        // 建好就不再是「没这张表」
     store.set(name, new Map());
     return {};
   },
@@ -367,6 +400,7 @@ const API_DIR = process.env.HARNESS_API_DIR || path.join(__dirname, '..', 'cloud
 /** 重置数据库并写入种子数据 */
 function reset(seed = {}) {
   store.clear();
+  dropped.clear();
   storage.clear();
   autoId.n = 0;
   wxContext = { OPENID: '', UNIONID: '' };
@@ -391,4 +425,8 @@ async function call(event) {
 
 const req = (method, pathname, body = {}, token = '') => ({ method, path: pathname, body, token });
 
-module.exports = { reset, setOpenid, call, req, dump, fakeDb, store, storage };
+module.exports = {
+  reset, setOpenid, call, req, dump, fakeDb, store, storage,
+  // 「这张表云上还没建」：用例里真的删掉，验证代码会自己建回来（2026-11-07 -502005 之后加的）
+  dropCollection,
+};

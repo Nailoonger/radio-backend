@@ -30,6 +30,7 @@ const crypto = require('crypto');
 const { SECRET: JWT_SECRET } = require('../lib/auth');
 const {
   C, findOne, findById, findMany, insertOne, insertWithId, updateWhere, updateById, nextId,
+  ensureCollections,
 } = require('../lib/db');
 const { ApiError, Codes } = require('../lib/response');
 
@@ -95,7 +96,21 @@ async function readOr(fn, fallback) {
   try { return await fn(); } catch (e) { if (isMissingCollection(e)) return fallback; throw e; }
 }
 
+/**
+ * 三张表先建出来（幂等、每实例一次）—— 2026-11-07 线上 -502005 的正解
+ *
+ * ⚠️⚠️ 原来只在 `ensureSeeded` 的 catch 里 `createCollection`，且失败被空 catch 吞掉：
+ *    `createCollection` 在「云函数没有建集合权限」或 SDK 版本差异下会静默失败，
+ *    紧接着的裸查询就把 `-502005` 原样抛给前端 —— 陛下看到的就是那句
+ *    「服务器繁忙，请稍后再试（…-502005 database collection not exists…）」。
+ *    现在改成**进任何一条密钥路径前先建**，且建失败不算错（当空表读，页面显示空列表也比 50001 强）。
+ */
+async function ensureTables() {
+  await ensureCollections([C.CLUB_KEY, C.CLUB_SESSION, C.CLUB_KEY_TRY]);
+}
+
 async function ensureSeeded() {
+  await ensureTables();
   const existing = await readOr(() => findMany(C.CLUB_KEY, {}, { limit: 1 }), []);
   if (existing.length) return;
   for (let i = 0; i < SEED_CLUBS.length; i += 1) {
@@ -153,8 +168,12 @@ function dto(row) {
 }
 
 async function list() {
+  // ensureSeeded 里已经建过表；这里仍用 readOr 兜一层 —— 建集合失败也不该变成 50001
   await ensureSeeded();
-  const rows = await findMany(C.CLUB_KEY, {}, { orderBy: [['id', 'asc']], limit: 100 });
+  const rows = await readOr(
+    () => findMany(C.CLUB_KEY, {}, { orderBy: [['id', 'asc']], limit: 100 }),
+    []
+  );
   return rows.map(dto);
 }
 
@@ -167,7 +186,7 @@ async function list() {
  */
 async function mustRow(id) {
   await ensureSeeded();
-  const row = await findOne(C.CLUB_KEY, { id: Number(id) });
+  const row = await readOr(() => findOne(C.CLUB_KEY, { id: Number(id) }), null);
   if (!row) throw new ApiError(Codes.NOT_FOUND, '没有这个社团');
   return row;
 }
@@ -251,6 +270,7 @@ async function findByPlain(plain) {
  * 只存 ticket 的哈希（同一个理由：票据也是凭据），过期由 expire_at 判断。
  */
 async function issueSession(clubRow) {
+  await ensureTables();          // 票据表可能一次都没用过（全新环境）
   const ticket = crypto.randomBytes(24).toString('hex');
   const now = Date.now();
   await insertOne(C.CLUB_SESSION, {
@@ -267,7 +287,8 @@ async function issueSession(clubRow) {
 async function readSession(ticket) {
   const t = String(ticket || '').trim();
   if (!t) return null;
-  const row = await findOne(C.CLUB_SESSION, { ticket_hash: hashKey(t) });
+  // readOr：票据表还没建 ⇒ 当「没有这张票」（学生端会因此回输码页，比 50001 好得多）
+  const row = await readOr(() => findOne(C.CLUB_SESSION, { ticket_hash: hashKey(t) }), null);
   if (!row) return null;
   if (new Date(row.expire_at).getTime() < Date.now()) return null;
   return { clubId: row.club_id, clubName: row.club_name };
@@ -296,7 +317,10 @@ async function readSessionClub(ticket) {
  */
 async function publicList() {
   await ensureSeeded();
-  const rows = await findMany(C.CLUB_KEY, {}, { orderBy: [['id', 'asc']], limit: 100 });
+  const rows = await readOr(
+    () => findMany(C.CLUB_KEY, {}, { orderBy: [['id', 'asc']], limit: 100 }),
+    []
+  );
   return rows.map((r) => ({ id: r.id, name: r.club_name, avatar: r.club_avatar || '' }));
 }
 
@@ -314,7 +338,8 @@ async function guardTry(source) {
   const src = String(source || '').trim() || 'anon';
   const minute = Math.floor(Date.now() / 60000);
 
-  const row = await findById(C.CLUB_KEY_TRY, src);
+  await ensureTables();          // 试错闸表第一次用时要先建，否则读它就直接 -502005
+  const row = await readOr(() => findById(C.CLUB_KEY_TRY, src), null);
   const sameMinute = !!row && Number(row.minute) === minute;
   const n = sameMinute ? (Number(row.count) || 0) : 0;
   if (n >= MAX_TRIES_PER_MIN) {
@@ -325,7 +350,11 @@ async function guardTry(source) {
   if (row) await updateById(C.CLUB_KEY_TRY, src, data);
   else {
     try { await insertWithId(C.CLUB_KEY_TRY, src, data); }
-    catch (e) { await updateById(C.CLUB_KEY_TRY, src, data); }  // 并发首建撞上了，退化成更新
+    catch (e) {
+      // 并发首建撞上了，退化成更新；⚠️ 这条更新也可能失败（表没建/无权限），
+      // 但「限速记不下来」不该把一次正常的验码变成 50001 —— 吞掉，宁可不限速。
+      try { await updateById(C.CLUB_KEY_TRY, src, data); } catch (e2) { /* 见上 */ }
+    }
   }
   return n + 1;
 }

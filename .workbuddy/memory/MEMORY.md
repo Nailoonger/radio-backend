@@ -85,6 +85,11 @@ token 源：`miniprogram/app.wxss` → `admin-web/src/styles/theme.css`。`--acc
 源 `cloud/cloudfunctions/api/`，运行目录 `miniprogram/cloudfunctions/api/`。⚠️ Windows CLI 传子目录必坏 ⇒ 打**单文件**，`handlers/index.js` **静态注册表**。
 部署 `node cloud/scripts/deploy-cloud.js` → 手动 cli.bat → 等 1~2 分钟。
 口径：业务查询用数字 `id`；4 张表业务键当 `_id`（`setting:`/`switch:`/`ack:`/`week:`）；字段驼峰；`insertOne` 后改这行用返回的 `_id`。
+⚠️⚠️⚠️ **新增集合 = 必须配自愈，否则上线第一下就是 50001**：云开发查**没建过**的集合是**抛错**
+（`-502005 database collection not exists`），**不是返回空数组**。2026-11-07 社团密钥就这么炸的：
+`try { createCollection } catch {}` 把失败吞了，紧接着的裸查询原样抛上去 ⇒ 陛下看到
+「服务器繁忙，请稍后再试（…-502005…）」。正解：`lib/db.js#ensureCollections`（幂等、每实例一次、失败不抛）
+进路径先建 + 读操作套 `readOr` 当空表；**假库用 `H.dropCollection(name)` 真删表才测得出**（默认假库对任何名字都返回空）。
 ⚠️⚠️ 切云弄坏上传类接口（信封 JSON ⇒ `FormData` 变 `{}`，40001）：契约 `{filename,fileBase64}`，凡 FormData/Blob 切云后必须单验。
 ⚠️⚠️ **HTTP 访问服务请求体上限 ≈100KB**（base64 再 +33%）⇒ 头像先压、名册导入大表会 413。小程序 `callFunction` ≈1MB 不受限。
 ⚠️⚠️ 学生初始密码＝`user`+学号（唯一出口 `studentAccountService.initPasswordFor()`；初始 cost 8、改密后 10）；管理端 DTO 字段是 `activated`。
