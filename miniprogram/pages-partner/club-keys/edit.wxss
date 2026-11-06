@@ -1,5 +1,5 @@
 /* pages-partner/club-keys/edit.wxss */
-@import "../../../styles/club.wxss";
+@import "../../styles/club.wxss";
 
 .ke-body { padding-top: 2rpx; }
 

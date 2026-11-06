@@ -1,5 +1,5 @@
 /* pages-partner/club-notice/detail.wxss */
-@import "../../../styles/club.wxss";
+@import "../../styles/club.wxss";
 
 .pd-body { padding-top: 2rpx; gap: 24rpx; }
 

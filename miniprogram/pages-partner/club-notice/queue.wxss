@@ -1,5 +1,5 @@
 /* pages-partner/club-notice/queue.wxss */
-@import "../../../styles/club.wxss";
+@import "../../styles/club.wxss";
 
 .pq-page { background: #fff; }
 

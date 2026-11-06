@@ -1,5 +1,5 @@
 /* pages-partner/club-keys/keys.wxss */
-@import "../../../styles/club.wxss";
+@import "../../styles/club.wxss";
 
 .denied { padding: 200rpx 40rpx; text-align: center; }
 .denied-t { font-size: 30rpx; color: var(--muted); }
