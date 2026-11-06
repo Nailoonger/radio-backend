@@ -7,8 +7,7 @@
       <view class="chev-l"></view>
     </view>
     <view class="navbar-title">{{record.name || '社团密钥'}}</view>
-    <view class="navbar-right" hover-class="pressed" bindtap="save" wx:if="{{record && !denied}}">保存</view>
-    <view class="navbar-spacer" wx:else></view>
+    <view class="navbar-spacer"></view>
   </view>
 
   <view class="body ke-body">
@@ -82,6 +81,12 @@
           <text class="fk">上次重置</text>
           <text class="fv muted">{{resetText}}</text>
         </view>
+      </view>
+
+      <!-- 保存放在**卡外面**（2026-11-07 陛下二次要求）：
+           卡里只装信息，动作一律落到卡外，与上面「重置密钥 / 作废」同一层级 -->
+      <view class="fsave {{dirty ? 'on' : ''}}" hover-class="fsave-hover" bindtap="save">
+        {{saving ? '保存中…' : '保存'}}
       </view>
 
       <view class="hintcard">

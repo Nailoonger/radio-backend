@@ -30,6 +30,8 @@ Page({
     stText: '已作废',
     ownerName: '',
     teacherName: '',
+    dirty: false,
+    saving: false,
     busy: false,
     loading: true,
     denied: false,
@@ -57,6 +59,7 @@ Page({
           subLine: `密钥 ${r.mask || '——'}${r.ownerName ? ' · 负责人 ' + r.ownerName : ''}`,
           ownerName: r.ownerName || '',
           teacherName: r.teacherName || '',
+          dirty: false,
           stCls: r.status === 1 ? 'done' : 'rej',
           stText: r.status === 1 ? '有效' : '已作废',
           resetText: r.resetAt
@@ -132,22 +135,47 @@ Page({
     wx.showToast({ title: '已隐藏，要再看只能再重置', icon: 'none' });
   },
 
-  onOwner(e) { this.setData({ ownerName: e.detail.value || '' }); },
-  onTeacher(e) { this.setData({ teacherName: e.detail.value || '' }); },
+  onOwner(e) { this.setData({ ownerName: e.detail.value || '' }, () => this.syncDirty()); },
+  onTeacher(e) { this.setData({ teacherName: e.detail.value || '' }, () => this.syncDirty()); },
+
+  /**
+   * 「保存」只在真改过时才点亮。
+   * ⚠️ 后端 saveInfo 在「一个字段都没改」时会回 40001「没有要改的内容」——
+   *    如果按钮一直亮着，点一下弹这句红字，看着像保存失败。
+   */
+  syncDirty() {
+    const r = this.data.record || {};
+    this.setData({
+      dirty: (this.data.ownerName || '') !== (r.ownerName || '')
+        || (this.data.teacherName || '') !== (r.teacherName || ''),
+    });
+  },
 
   save() {
-    if (this.data.busy) return;
-    this.setData({ busy: true });
+    if (this.data.saving) return;
+    if (!this.data.dirty) {
+      wx.showToast({ title: '内容没变，不用保存', icon: 'none' });
+      return;
+    }
+    this.setData({ saving: true });
     adminRequest(`/partner/club-keys/${this.data.id}`, 'PUT', {
       ownerName: this.data.ownerName,
       teacherName: this.data.teacherName,
     })
       .then((d) => {
-        this.setData({ record: d.record || this.data.record });
+        const r = d.record || this.data.record || {};
+        this.setData({
+          record: r,
+          ownerName: r.ownerName || '',
+          teacherName: r.teacherName || '',
+          // 卡头那行也要跟着变，否则「负责人」改了、上面还写着旧名字
+          subLine: `密钥 ${r.mask || '——'}${r.ownerName ? ' · 负责人 ' + r.ownerName : ''}`,
+          dirty: false,
+        });
         wx.showToast({ title: '已保存' });
       })
       .catch((err) => this.fail(err))
-      .then(() => this.setData({ busy: false }));
+      .then(() => this.setData({ saving: false }));
   },
 
   /** 作废 / 启用 */

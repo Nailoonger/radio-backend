@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>社团信息 · 保存按钮放到卡外 v2</title>
+<style>
+  :root{
+    --ink:#1D1D1F; --ink-2:#333333; --muted:#7A7A7A; --soft:#C7C7CC;
+    --parchment:#F5F5F7; --accent:#0066CC; --red-fg:#B42318;
+  }
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  body{
+    margin:0;padding:44px 24px 60px;
+    background:#F2F2F5;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    color:var(--ink);
+  }
+  .hd{max-width:860px;margin:0 auto 30px}
+  .hd h1{font-size:19px;font-weight:700;margin:0 0 8px;letter-spacing:-.3px}
+  .hd p{margin:0;font-size:13px;line-height:1.75;color:#6B6B70}
+  .hd .v{display:inline-block;margin-left:8px;font-size:11px;font-weight:700;color:var(--accent);
+    background:#EAF3FD;border-radius:999px;padding:2px 9px;vertical-align:2px;letter-spacing:.4px}
+
+  .row{max-width:860px;margin:0 auto;display:flex;gap:26px;flex-wrap:wrap;justify-content:center}
+  .col{flex:1 1 330px;max-width:390px}
+
+  .phone{background:#fff;border-radius:26px;padding:18px 16px 24px;box-shadow:0 2px 14px rgba(0,0,0,.06)}
+  .cap{font-size:12px;color:#8A8A8F;text-align:center;margin:0 0 12px;letter-spacing:.3px}
+  .cap b{color:var(--ink);font-weight:600}
+
+  .screen{background:#fff;border-radius:18px;overflow:hidden}
+  .navbar{display:flex;align-items:center;height:44px;padding:0 14px;border-bottom:1px solid #F0F0F2}
+  .nb-back{width:22px;height:22px;position:relative;flex:none}
+  .nb-back::before{content:"";position:absolute;left:6px;top:7px;width:8px;height:8px;
+    border-left:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:rotate(45deg);border-radius:1px}
+  .nb-title{flex:1;text-align:center;font-size:16px;font-weight:600;letter-spacing:-.2px}
+  .nb-sp{width:22px;flex:none}
+  .body{padding:2px 22px 26px}
+
+  .club-org{display:flex;align-items:center;gap:14px;padding:14px 0 4px}
+  .club-av{width:46px;height:46px;border-radius:999px;background:var(--parchment);
+    display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--muted);flex:none}
+  .on1{font-size:16px;font-weight:700;letter-spacing:-.2px}
+  .on2{font-size:11.5px;color:var(--muted);margin-top:4px;letter-spacing:.2px}
+  .st{margin-left:auto;font-size:11px;font-weight:600;padding:5px 11px;border-radius:999px}
+  .st.done{color:#0F7B3E;background:#E7F6ED}
+
+  .maskbox{margin-top:17px;background:var(--parchment);border-radius:17px;padding:18px 15px;text-align:center}
+  .mask-v{font-size:20px;font-weight:700;letter-spacing:1.5px}
+  .mask-s{font-size:10.5px;color:var(--muted);margin-top:7px}
+  .keyops{display:flex;justify-content:center;gap:8px;margin-top:12px}
+  .qa{font-size:11.5px;font-weight:500;line-height:1;padding:8px 15px;border-radius:999px;
+    background:var(--parchment);color:var(--muted)}
+  .qa.danger{color:var(--red-fg)}
+
+  .grp-t{font-size:10.5px;color:var(--muted);font-weight:600;letter-spacing:.6px;padding:18px 2px 8px}
+  .form{background:var(--parchment);border-radius:17px;overflow:hidden}
+  .frow{display:flex;align-items:center;gap:11px;padding:13px 15px;
+    border-bottom:1px solid rgba(0,0,0,.055);font-size:13px}
+  .frow:last-child{border-bottom:0}
+  .fk{font-size:12px;color:var(--muted);width:63px;flex:none}
+  .fv{flex:1;min-width:0;font-weight:500}
+  .fv.muted{color:var(--muted);font-weight:400}
+  .fv.ph{color:var(--soft);font-weight:400}
+
+  /* ★ 卡外保存：与卡片同宽，上边距 12px（=24rpx） */
+  .fsave{
+    margin-top:12px;text-align:center;font-size:13px;font-weight:600;line-height:1;
+    padding:14px 0;border-radius:999px;
+    background:rgba(0,102,204,.06);color:var(--soft);
+  }
+  .fsave.on{background:var(--accent);color:#fff}
+
+  .hintcard{background:var(--parchment);border-radius:17px;padding:14px 15px;margin-top:14px}
+  .hint-t{font-size:11.5px;font-weight:600;margin-bottom:6px}
+  .hint-li{font-size:11px;color:var(--muted);line-height:1.8;padding-left:13px;position:relative}
+  .hint-li::before{content:"·";position:absolute;left:4px;color:var(--soft)}
+
+  .note{max-width:860px;margin:26px auto 0;font-size:12.5px;color:#6B6B70;line-height:1.85}
+  .note b{color:var(--ink)}
+  .note code{background:#EDEDF0;border-radius:4px;padding:1px 5px;font-size:11.5px}
+  .bad{color:var(--red-fg)}
+</style>
+</head>
+<body>
+
+<div class="hd">
+  <h1>「保存」放到社团信息卡外面<span class="v">v2</span></h1>
+  <p>卡片里只装信息（负责人 / 指导老师 / 上次重置），动作一律落到卡外 —— 与上面「重置密钥 / 作废」同一层级。<br>
+     按钮与卡片同宽、圆角胶囊，上边距 24rpx；下面紧接「重置之后」提示卡。<br>
+     左：刚进页面<span class="bad">（没改动，按钮淡的）</span>　右：改过之后<span class="bad">（实心主按钮）</span></p>
+</div>
+
+<div class="row">
+  <!-- ① 没改动 -->
+  <div class="col">
+    <p class="cap">① 刚进页面 · <b>没改动</b></p>
+    <div class="phone"><div class="screen">
+      <div class="navbar"><div class="nb-back"></div><div class="nb-title">摄影协会</div><div class="nb-sp"></div></div>
+      <div class="body">
+        <div class="club-org">
+          <div class="club-av">摄</div>
+          <div>
+            <div class="on1">摄影协会</div>
+            <div class="on2">密钥 ····M7 · 负责人 陈香乐儿</div>
+          </div>
+          <div class="st done">有效</div>
+        </div>
+
+        <div class="maskbox">
+          <div class="mask-v">密钥 ····M7</div>
+          <div class="mask-s">完整密钥只在重置时显示一次</div>
+        </div>
+        <div class="keyops"><div class="qa danger">重置密钥</div><div class="qa">作废</div></div>
+
+        <div class="grp-t">社团信息</div>
+        <div class="form">
+          <div class="frow"><span class="fk">负责人</span><span class="fv">陈香乐儿</span></div>
+          <div class="frow"><span class="fk">指导老师</span><span class="fv ph">老师姓名</span></div>
+          <div class="frow"><span class="fk">上次重置</span><span class="fv muted">11-07 01:06 · 陈香乐儿</span></div>
+        </div>
+        <div class="fsave">保存</div>
+
+        <div class="hintcard">
+          <div class="hint-t">重置之后</div>
+          <div class="hint-li">旧密钥当场作废，拿着旧钥匙的人进不来</div>
+          <div class="hint-li">新密钥要重新发给社长和指导老师</div>
+          <div class="hint-li">已经提报过的通知不受影响，照常审核播出</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- ② 改过 -->
+  <div class="col">
+    <p class="cap">② 改过内容 · <b>按钮点亮</b></p>
+    <div class="phone"><div class="screen">
+      <div class="navbar"><div class="nb-back"></div><div class="nb-title">摄影协会</div><div class="nb-sp"></div></div>
+      <div class="body">
+        <div class="club-org">
+          <div class="club-av">摄</div>
+          <div>
+            <div class="on1">摄影协会</div>
+            <div class="on2">密钥 ····M7 · 负责人 陈香乐儿</div>
+          </div>
+          <div class="st done">有效</div>
+        </div>
+
+        <div class="maskbox">
+          <div class="mask-v">密钥 ····M7</div>
+          <div class="mask-s">完整密钥只在重置时显示一次</div>
+        </div>
+        <div class="keyops"><div class="qa danger">重置密钥</div><div class="qa">作废</div></div>
+
+        <div class="grp-t">社团信息</div>
+        <div class="form">
+          <div class="frow"><span class="fk">负责人</span><span class="fv">陈香乐儿</span></div>
+          <div class="frow"><span class="fk">指导老师</span><span class="fv">王砚青</span></div>
+          <div class="frow"><span class="fk">上次重置</span><span class="fv muted">11-07 01:06 · 陈香乐儿</span></div>
+        </div>
+        <div class="fsave on">保存</div>
+
+        <div class="hintcard">
+          <div class="hint-t">重置之后</div>
+          <div class="hint-li">旧密钥当场作废，拿着旧钥匙的人进不来</div>
+          <div class="hint-li">新密钥要重新发给社长和指导老师</div>
+          <div class="hint-li">已经提报过的通知不受影响，照常审核播出</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<div class="note">
+  <b>与上一版的差别：</b>上一版把按钮塞在卡片里当最后一行；这一版挪到卡外，卡片恢复成纯信息块，按钮与卡片同宽。<br>
+  <b>两态保留：</b>没改动时淡底灰字，点了只提示「内容没变，不用保存」；改过后才变实心蓝。原因是后端在「一个字段都没改」时会回 40001 <code>没有要改的内容</code>，按钮一直亮着就成了「点一下弹红字」。<br>
+  <b>导航栏右上：</b>空着，标题回到正中。
+</div>
+
+</body>
+</html>

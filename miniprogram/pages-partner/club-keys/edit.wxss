@@ -3,15 +3,23 @@
 
 .ke-body { padding-top: 2rpx; }
 
-/* 导航右上「保存」—— app.wxss 只有 navbar-back / navbar-spacer，
-   宽度取 72rpx（与返回键同宽）让标题保持居中 */
-.navbar-right {
-  min-width: 72rpx;
-  text-align: right;
+/* ══════ 「社团信息」卡**外面**的保存按钮（2026-11-07 陛下定：动作不塞进卡里） ══════
+   与卡片同宽的整行胶囊，上边距 24rpx（下面 .hintcard 自带 28rpx，不用再补）。
+   没改动时是淡底灰字（点了提示"内容没变"），改过才变成实心主按钮 ——
+   这样「好没好」一眼可见，也不会出现「点了一下没反应」（后端会回 40001 没有要改的内容）。 */
+.fsave {
+  margin-top: 24rpx;
+  text-align: center;
   font-size: 26rpx;
   font-weight: 600;
-  color: var(--accent);
+  line-height: 1;
+  padding: 28rpx 0;
+  border-radius: 999rpx;
+  background: rgba(0, 102, 204, 0.06);
+  color: var(--soft);
 }
+.fsave.on { background: var(--accent); color: #fff; }
+.fsave-hover { opacity: 0.7; }
 
 .denied { padding: 200rpx 40rpx; text-align: center; }
 .denied-t { font-size: 30rpx; color: var(--muted); }
