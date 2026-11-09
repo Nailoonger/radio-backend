@@ -29,3 +29,33 @@
 .km { flex: 1; min-width: 0; }
 .kn { font-size: 28rpx; font-weight: 600; letter-spacing: -0.2rpx; }
 .ks { font-size: 22rpx; color: var(--muted); margin-top: 5rpx; letter-spacing: 0.2rpx; }
+
+/* ══════ 新建社团那一行（2026-11-09） ══════
+   加号**占的是头像那一格**（74rpx 的盒子 + 22rpx 的 gap），所以文字左端与上面各行的
+   社团名严丝合缝对齐，不需要另外调 padding 去凑。
+   ⚠️ 高度也不靠 padding 猜：.krow 是 24×2 + 头像 74 = 122rpx，
+      这里给 .kadd-v 同样 74rpx 高 + 24rpx 上下 padding，自然也是 122rpx。 */
+.kadd {
+  display: flex; align-items: center; gap: 22rpx;
+  padding: 24rpx 28rpx;
+  border-top: 1rpx solid rgba(0, 0, 0, 0.05);
+}
+.kadd-v {
+  width: 74rpx; height: 74rpx; flex: none;
+  display: flex; align-items: center; justify-content: center;
+}
+.plus { position: relative; width: 28rpx; height: 28rpx; }
+.plus::before, .plus::after {
+  content: ""; position: absolute; background: var(--accent); border-radius: 2rpx;
+}
+.plus::before { left: 50%; top: 0; bottom: 0; width: 3rpx; transform: translateX(-50%); }
+.plus::after { top: 50%; left: 0; right: 0; height: 3rpx; transform: translateY(-50%); }
+.kadd-t {
+  font-size: 27rpx; font-weight: 600; color: var(--accent);
+  letter-spacing: -0.2rpx;
+}
+
+/* 分隔线只画一条：有「新建社团」时，上面那一行的 border-bottom 让位给 .kadd 的 border-top，
+   否则两条 1rpx 叠成 2rpx，比别处的线明显深一档。
+   （⚠️ 不能用 .krow:nth-last-child(2)：社干看不到新建行时，那条规则会把第 4、5 家之间的线也抹掉） */
+.kcard.has-add .krow:nth-last-child(2) { border-bottom: 0; }

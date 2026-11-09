@@ -299,6 +299,9 @@ const PARTNER_ROUTES = [
   // ⚠️ 路径是 `club-keys`（带连字符），handlerKey 是 `clubKeys`（驼峰）——
   //    两者刻意不同：URL 跟别的接口保持 kebab-case，handler 名字用 JS 习惯。
   ['GET /partner/club-keys', 'partner.clubKeys.list'],
+  // 2026-11-09：新建一家社团（仅超管）+ 当场发第一把钥匙
+  // ⚠️ 段数比 `/:id/reset` 少，不会撞；方法也不同（这里 POST，上面是 GET/PUT）
+  ['POST /partner/club-keys', 'partner.clubKeys.create'],
   ['GET /partner/club-keys/:id', 'partner.clubKeys.detail'],
   ['PUT /partner/club-keys/:id', 'partner.clubKeys.saveInfo'],
   ['POST /partner/club-keys/:id/reset', 'partner.clubKeys.reset'],

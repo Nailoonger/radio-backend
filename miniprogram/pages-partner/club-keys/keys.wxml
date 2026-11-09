@@ -24,7 +24,7 @@
 
       <view class="loading" wx:if="{{loading && !list.length}}">加载中……</view>
 
-      <view class="kcard" wx:else>
+      <view class="kcard {{isSuper ? 'has-add' : ''}}" wx:else>
         <view class="krow" wx:for="{{list}}" wx:key="id" data-id="{{item.id}}" bindtap="open" hover-class="row-hover">
           <view class="kav">
             <image wx:if="{{item.avatar}}" class="kav-img" src="{{item.avatar}}" mode="aspectFill" />
@@ -36,6 +36,16 @@
           </view>
           <view class="st {{item.stCls}}">{{item.stText}}</view>
           <view class="chev-r"></view>
+        </view>
+
+        <!-- ═══ 新建社团（2026-11-09）═══
+             放在卡的最后一行，不另起按钮：加一家和看一家是同一件事的上下两步。
+             ⚠️ 只有超管看得见 —— 多一家社团会立刻出现在全校学生的轮播里，
+                这是增减组织，不是密钥操作（社干有 clubkey 位也不给）。
+             ⚠️ 加号占的是「头像那一格」，所以文字左端与上面各行的社团名对齐。 -->
+        <view class="kadd" wx:if="{{isSuper}}" hover-class="pressed" bindtap="goCreate">
+          <view class="kadd-v"><view class="plus"></view></view>
+          <view class="kadd-t">新建社团</view>
         </view>
       </view>
 

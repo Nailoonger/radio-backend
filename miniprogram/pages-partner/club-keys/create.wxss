@@ -1,0 +1,38 @@
+/* pages-partner/club-keys/create.wxss
+ *
+ * ⚠️ 这里 `@import "./edit.wxss"` 是**有意的**：结果态那一屏（六格明文 / 复制隐藏 /
+ *    分享段 / 掩码块 / 整行保存按钮）本来就是编辑页「重置之后」的同一个形态，
+ *    陛下 2026-11-09 点头时说的原话是「跟编辑页重置之后是同一个形态，不再是第二套」。
+ *    抄一份 CSS 出来迟早会漂（改一处忘一处），直接引用才保证永远是同一套。
+ *    edit.wxss 自己又会 @import styles/club.wxss，所以 .form / .frow / .grp-t 也一并有了。
+ */
+@import "./edit.wxss";
+
+/* 正文容器：不用全局 .body，是因为它带 `gap: 34rpx` —— 表单和下面那行说明之间
+   不该有 34rpx 的缝（说明是挂在表单上的注释，不是并列的一块）。
+   底部留白也在这里给（不再挂 .pb-safe）：原因见 .cdone 的注释。 */
+.cbody {
+  flex: 1;
+  padding: 0 40rpx calc(30rpx + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+}
+
+/* 名称下面那句：唯一性 + 不可改 */
+.fnote {
+  font-size: 21rpx;
+  color: var(--muted);
+  line-height: 1.7;
+  padding: 18rpx 8rpx 0;
+}
+/* 超长 / 太短时整句变红（后端 40901 重名也走这个） */
+.fnote.bad { color: var(--red-fg); }
+/* 「建好之后不能改」—— 灰字里唯一一句深的，得能一眼看见 */
+.fn-b { color: var(--ink); font-weight: 600; }
+
+/* 「完成」贴底：结果态内容比一屏短，按钮不该悬在半空。
+   ⚠️ 光靠 margin-top:auto 就够 —— 底部那 30rpx + 安全区由 .cbody 的 padding-bottom 给
+   （原来这里挂 .pb-safe，60rpx + 安全区叠上自己的 margin，按钮会浮起来 47px 高）。 */
+.cdone {
+  margin-top: auto;
+}

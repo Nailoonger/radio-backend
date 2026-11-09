@@ -276,6 +276,73 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
   eq('学生端轮播清单同样自愈', r.code, 0);
   eq('清单 5 家', r.data.list.length, 5);
 
+  /* ═══════════ ⑫ 新建社团（2026-11-09） ═══════════
+   * 这条线有三种错法，全都不报错：
+   *   ① 名称没查重 ⇒ 轮播里并排两家「天文社」，谁也看不出来是脏数据
+   *   ② 只建社团不发钥匙 ⇒ 那家已经在全校学生的轮播里，却谁都进不来（半截状态）
+   *   ③ 社干也能建 ⇒ 全校可见的组织可以被随手增减
+   */
+  section('⑫ 新建社团 POST /partner/club-keys');
+
+  const createClub = (body, token) => call('POST', '/partner/club-keys', body, token);
+
+  reset();
+
+  r = await createClub({ name: '天文社' }, T_MGR);
+  eq('社干（勾了 clubkey 位）也不能新建 → 40301', r.code, 40301);
+
+  r = await createClub({ name: '天文社' }, T_MEMBER);
+  eq('站员不能新建 → 40301', r.code, 40301);
+
+  r = await createClub({ name: '天' }, T_SUPER);
+  eq('名称 1 个字 → 40001', r.code, 40001);
+
+  r = await createClub({ name: '一二三四五六七八九十一二三' }, T_SUPER);
+  eq('名称 13 个字 → 40001', r.code, 40001);
+
+  r = await createClub({ name: '   ' }, T_SUPER);
+  eq('名称全是空白 → 40001', r.code, 40001);
+
+  r = await createClub({ name: ' 天文社 ', ownerName: ' 陈知远 ', teacherName: '林溪' }, T_SUPER);
+  eq('超管新建 → 0', r.code, 0);
+  const newId = r.data.record && r.data.record.id;
+  ok('当场返回 6 位明文',
+    typeof r.data.plain === 'string' && r.data.plain.length === clubKeySvc.KEY_LEN, r.data.plain);
+  eq('掩码 = ····<明文后两位>', r.data.mask, clubKeySvc.maskOf(r.data.plain));
+  eq('名称首尾空白被 trim', r.data.record.name, '天文社');
+  eq('负责人也 trim', r.data.record.ownerName, '陈知远');
+  eq('新建即为有效（不是「已作废」）', r.data.record.status, 1);
+  ok('分享文案里同时有社团名与明文',
+    r.data.shareText.indexOf('天文社') >= 0 && r.data.shareText.indexOf(r.data.plain) >= 0,
+    r.data.shareText);
+
+  // ★ 首把钥匙立刻能用 —— 这条就是「建社团和发钥匙必须同一次请求」的验收点
+  const firstKey = r.data.plain;
+  r = await verifyKey(firstKey, T_STU);
+  eq('首把钥匙立刻能换票（status=1、哈希已落库）', r.code, 0);
+
+  r = await list(T_SUPER);
+  eq('列表变 6 家', r.data.list.length, 6);
+  const created = (r.data.list || []).filter((x) => x.id === newId)[0];
+  ok('新建的那家在列表里', !!created, `id=${newId}`);
+  eq('列表里只有掩码', created && created.mask, clubKeySvc.maskOf(firstKey));
+  ok('列表响应里一处明文都没有', JSON.stringify(r.data).indexOf(firstKey) < 0);
+
+  r = await detail(newId, T_SUPER);
+  ok('详情响应里同样没有明文', JSON.stringify(r.data).indexOf(firstKey) < 0);
+
+  // 学生轮播（免登录）—— 新建的社团必须**立刻**出现在这里
+  r = await call('GET', '/user/club-key/clubs');
+  ok('学生轮播里立刻有这家',
+    (r.data.list || []).some((x) => x.name === '天文社'), JSON.stringify(r.data.list));
+  ok('轮播不露掩码与状态', JSON.stringify(r.data).indexOf('mask') < 0);
+
+  r = await createClub({ name: '天文社' }, T_SUPER);
+  eq('同名再建 → 40901（撞 _id）', r.code, 40901);
+
+  r = await createClub({ name: '  天文社' }, T_SUPER);
+  eq('只差首尾空白的同名也算重复 → 40901', r.code, 40901);
+
   // ⚠️ 这行格式必须与其它套件一致（regression.js 靠它认「结论」行），别改成「通过 N 项断言」
   console.log(`\n结论：断言 ${checks} 项 / 失败 0 项`);
 })().catch((e) => {

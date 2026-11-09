@@ -98,7 +98,8 @@
         "club-notice/queue",
         "club-notice/detail",
         "club-keys/keys",
-        "club-keys/edit"
+        "club-keys/edit",
+        "club-keys/create"
       ]
     }
   ]

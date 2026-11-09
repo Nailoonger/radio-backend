@@ -196,6 +196,87 @@ async function detail(id) {
   return dto(row);
 }
 
+/* ═════════ 新建社团（2026-11-09）═════════
+ *
+ * 起因：陛下「你在伙伴端没有给我做新建社团的入口啊」。
+ * 原来这五家是**种子数据**（SEED_CLUBS），只能看 / 改 / 重置 / 作废，加不了第六家。
+ *
+ * ⚠️ 名称 = 主键的一半（`_id = club:<名称>`）。这不是随便定的：
+ *    当年种子写入要防「两个请求同时发现表空、各插一遍」⇒ 轮播里出现两个「电视台」，
+ *    所以拿业务键当主键。代价就一条：**名称不可改**（改名＝换主键＝等于重开一家）。
+ *    前端因此把这句写进表单说明，后台也不提供改名字段。
+ *
+ * ⚠️ 创建即发第一把钥匙（status=1）。拆成「先建社团、再重置」两次请求的话，
+ *    中间会留下「建好了但没钥匙」的半截状态 —— 那家社团已经在学生轮播里，
+ *    却谁都进不来。一次请求里做完，语义才闭合。
+ */
+const NAME_MIN = 2;
+const NAME_MAX = 12;
+
+/** 名称归一：首尾空白去掉、中间连续空白压成一个空格、全角空格也压（微信键盘容易打出来） */
+function normalizeName(raw) {
+  return String(raw == null ? '' : raw).replace(/[\s\u3000]+/g, ' ').trim();
+}
+
+/**
+ * 新建一家社团并生成首把密钥
+ *
+ * @param {object} input { name, ownerName?, teacherName? }
+ * @param {string} byName 操作人（写进 reset_by，和 reset 同口径）
+ * @returns {{plain:string, mask:string, record:object}} plain 只此一次
+ */
+async function create(input, byName) {
+  await ensureSeeded();
+
+  const name = normalizeName(input && input.name);
+  // 按「字」数：Array.from 才对 —— '天文社'.length 是 3，但生僻字/emoji 会被 .length 算成 2
+  const n = Array.from(name).length;
+  if (n < NAME_MIN) throw new ApiError(Codes.PARAM_ERROR, `社团名称至少 ${NAME_MIN} 个字`);
+  if (n > NAME_MAX) throw new ApiError(Codes.PARAM_ERROR, `社团名称最多 ${NAME_MAX} 个字`);
+
+  /* 查重两道：
+   *   ① 先按 `_id` 查 —— 正常数据一定命中这一道，够快；
+   *   ② 再按 club_name 查 —— 兜历史数据/手工改过 _id 的情况，否则会出现同名两家。
+   * ⚠️ 这两道都不是并发闸，真正的闸是 insertWithId 撞 `_id`（见下面的 catch）。 */
+  const docId = `club:${name}`;
+  if (await readOr(() => findById(C.CLUB_KEY, docId), null)) {
+    throw new ApiError(Codes.CONFLICT, '已经有这家社团了');
+  }
+  if (await readOr(() => findOne(C.CLUB_KEY, { club_name: name }), null)) {
+    throw new ApiError(Codes.CONFLICT, '已经有这家社团了');
+  }
+
+  const plain = genKey();
+  const now = new Date().toISOString();
+  const doc = {
+    id: await nextId(C.CLUB_KEY),
+    club_name: name,
+    club_avatar: '',
+    key_hash: hashKey(plain),
+    key_mask: maskOf(plain),
+    status: 1,
+    owner_name: String((input && input.ownerName) || '').trim().slice(0, 20),
+    teacher_name: String((input && input.teacherName) || '').trim().slice(0, 20),
+    reset_at: now,
+    reset_by: byName || '',
+    create_time: now,
+    update_time: now,
+  };
+
+  try {
+    await insertWithId(C.CLUB_KEY, docId, doc);
+  } catch (e) {
+    const msg = String((e && (e.errMsg || e.message)) || e);
+    // 并发下另一个请求刚好建了同一家：业务语义就是「已经有了」，不是 50001
+    if (/duplicate|already exist|-501001|-502002/i.test(msg)) {
+      throw new ApiError(Codes.CONFLICT, '已经有这家社团了');
+    }
+    throw e;
+  }
+
+  return { plain, mask: maskOf(plain), record: dto(doc) };
+}
+
 /**
  * 重置：生成新明文，写进库的只有新哈希与新掩码，旧哈希当场被覆盖（= 作废）
  * 返回的 `plain` 是**唯一一次**能看到明文的机会，调用方必须原样给前端。
@@ -368,8 +449,8 @@ async function clearTry(source) {
 }
 
 module.exports = {
-  ALPHABET, KEY_LEN, SESSION_TTL_MS, MAX_TRIES_PER_MIN,
-  hashKey, genKey, maskOf, normalize,
-  ensureSeeded, list, publicList, detail, reset, setStatus, saveInfo, findByPlain, dto,
+  ALPHABET, KEY_LEN, SESSION_TTL_MS, MAX_TRIES_PER_MIN, NAME_MIN, NAME_MAX,
+  hashKey, genKey, maskOf, normalize, normalizeName,
+  ensureSeeded, list, publicList, detail, create, reset, setStatus, saveInfo, findByPlain, dto,
   issueSession, readSession, readSessionClub, guardTry, clearTry,
 };
