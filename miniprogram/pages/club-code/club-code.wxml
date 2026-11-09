@@ -12,25 +12,24 @@
 
   <view class="body code-body">
 
-    <!-- 社团轮播：名称是唯一指示（原型定稿），不加圆点指示器 -->
-    <swiper
-      class="car"
-      circular
-      autoplay="{{clubs.length > 1}}"
-      interval="2600"
-      duration="420"
-      previous-margin="150rpx"
-      next-margin="150rpx"
-      current="{{cur}}"
-      bindchange="onCar"
-    >
-      <swiper-item wx:for="{{clubs}}" wx:key="id">
-        <view class="car-i {{cur === index ? 'on' : ''}}">
+    <!-- 社团轮播：弧形旋转木马（位次表在 club-code.js 的 CAR_* 常量里，与原型同源）
+         ⚠️ 不用 swiper：它只能等比放大，做不出位移 / 后仰 / 淡出，也做不出「屏外待命」
+         名称是唯一指示（原型定稿），不加圆点指示器 -->
+    <view class="car">
+      <view class="car-stage {{carOn ? '' : 'nt'}}">
+        <view
+          wx:for="{{clubs}}"
+          wx:key="id"
+          class="car-i {{item.nt ? 'nt' : ''}}"
+          style="{{item.st}}"
+          data-i="{{index}}"
+          bindtap="tapClub"
+        >
           <image wx:if="{{item.avatar}}" class="car-img" src="{{item.avatar}}" mode="aspectFill" />
-          <view wx:else class="car-txt">{{item.initial}}</view>
+          <view wx:else class="car-fb">{{item.initial}}</view>
         </view>
-      </swiper-item>
-    </swiper>
+      </view>
+    </view>
     <view class="car-nm">{{curName || '菁悠广播站'}}</view>
 
     <view class="car-title">输入社团密钥</view>

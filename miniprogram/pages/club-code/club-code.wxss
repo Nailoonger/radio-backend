@@ -3,35 +3,72 @@
 
 .code-body { padding-top: 40rpx; }
 
-/* ══════ 社团轮播 ══════ */
-.car { height: 260rpx; }
+/* ══════ 社团轮播（弧形旋转木马） ══════
+ * 依据 preview/notice-hub-v5 · s-code 屏，1px(设计) × 1.923 换算：
+ *   86px→166rpx  74px→142rpx  94px→181rpx  142px→273rpx  196px→377rpx  780px→1500rpx
+ */
+.car {
+  position: relative;
+  height: 258rpx;
+  perspective: 1500rpx;
+  perspective-origin: 50% 50%;
+}
+.car-stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+}
 .car-i {
-  height: 260rpx;
+  position: absolute;
+  left: -83rpx;
+  top: -83rpx;
+  width: 166rpx;
+  height: 166rpx;
+  border-radius: 50%;
+  background: #fff;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  transform: scale(0.72);
-  opacity: 0.5;
-  transition: transform 0.34s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.34s;
+  /* transform / opacity / z-index 由 js 按位次写进 style，这里只管过渡 */
+  transition: transform 0.62s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.62s;
+  box-shadow: 0 23rpx 50rpx -27rpx rgba(15, 28, 46, 0.4), 0 0 0 2rpx rgba(0, 0, 0, 0.05);
 }
-/* 居中那枚放大、不透明：与原型 coverflow 的观感一致，只是不做 3D 旋转
-   （小程序 swiper 的 3D 只能靠 transform 逐项插值，滚动时会抖） */
-.car-i.on { transform: scale(1); opacity: 1; }
+/* 关过渡：① 首帧落位（整排叠在中心，不关会补间成一次从中间散开）
+           ② 转过半个圆的那枚瞬移屏外那一帧（不关就横穿整个正面） */
+.car-stage.nt .car-i,
+.car-i.nt { transition: none; }
 
-.car-img { width: 176rpx; height: 176rpx; border-radius: 44rpx; display: block; }
-.car-txt {
-  width: 176rpx; height: 176rpx; border-radius: 44rpx;
-  background: var(--accent-tint); color: var(--accent);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 62rpx; font-weight: 700;
+.car-img { width: 142rpx; height: 142rpx; border-radius: 50%; display: block; }
+/* 没上传过徽标：社团名首字，同样圆形 */
+.car-fb {
+  width: 142rpx;
+  height: 142rpx;
+  border-radius: 50%;
+  background: var(--accent-tint);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56rpx;
+  font-weight: 700;
+  letter-spacing: -1rpx;
 }
 
 .car-nm {
-  height: 40rpx;
+  /* ⚠️ `.body` 是 flex column 且 gap: 34rpx —— 名称属于轮播本身，不该跟它隔 34rpx。
+     这里抵掉 gap，净留 4rpx（原型是 2px）。不加这句，徽标和名称之间会空出 34px。 */
+  margin-top: -30rpx;
   text-align: center;
-  font-size: 24rpx;
-  color: var(--muted);
-  letter-spacing: 0.6rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.4rpx;
+  line-height: 1.3;
+  min-height: 34rpx;
 }
 
 .car-title {

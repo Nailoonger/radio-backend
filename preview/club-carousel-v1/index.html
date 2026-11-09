@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>社团轮播 · v1 · 弧形旋转木马（圆形徽标）</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; }
+body {
+  --ink: #1D1D1F;
+  --ink-2: #333333;
+  --muted: #7A7A7A;
+  --soft: #C7C7CC;
+  --parchment: #F5F5F7;
+  --accent: #0066CC;
+  --accent-tint: #EAF3FD;
+  background: #ECECEE;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  color: var(--ink);
+  padding: 40px 0 72px;
+}
+
+/* ══ 页面抬头（演示用，不属于小程序页面） ══ */
+.head { max-width: 900px; margin: 0 auto 26px; padding: 0 24px; }
+.head .v {
+  display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .6px;
+  color: #fff; background: var(--accent); border-radius: 999px; padding: 4px 10px;
+  vertical-align: 3px;
+}
+.head h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; letter-spacing: -.3px; }
+.head p { font-size: 13px; line-height: 1.75; color: #5B5B60; margin: 0; }
+.head p b { color: var(--ink); font-weight: 600; }
+
+/* ══ 手机 ══ */
+.stagewrap { display: flex; gap: 34px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+.col { width: 390px; }
+.col .cap { text-align: center; font-size: 12.5px; font-weight: 600; color: #5B5B60; margin-top: 12px; letter-spacing: .2px; }
+.col .cap i { display: block; font-style: normal; font-weight: 400; font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+
+.phone {
+  width: 390px; height: 800px; background: #fff; border-radius: 42px; overflow: hidden;
+  position: relative; box-shadow: 0 24px 60px -30px rgba(15, 28, 46, .38), 0 0 0 1px rgba(0, 0, 0, .05);
+}
+.sbar { height: 44px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 26px 6px; font-size: 13px; font-weight: 600; }
+.sbar .rt { display: flex; gap: 5px; align-items: center; }
+.sbar .rt i { display: block; width: 15px; height: 9px; border-radius: 2px; background: var(--ink); opacity: .82; }
+
+.navbar { height: 44px; display: flex; align-items: center; padding: 0 6px; }
+.navbar-back { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+.chev-l { width: 10px; height: 10px; border-left: 2px solid var(--ink); border-bottom: 2px solid var(--ink); transform: rotate(45deg) translate(1px, -1px); }
+.navbar-title { flex: 1; text-align: center; font-size: 17px; font-weight: 600; letter-spacing: -.2px; }
+.navbar-spacer { width: 44px; }
+
+.body { padding: 21px 21px 0; }
+
+/* ══════ 轮播（照抄原型 notice-hub-v5 · s-code） ══════ */
+.car { position: relative; height: 134px; perspective: 780px; perspective-origin: 50% 50%; }
+.car-stage { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d; }
+.car-i {
+  position: absolute; left: -43px; top: -43px; width: 86px; height: 86px;
+  border-radius: 50%; background: #fff;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: transform .62s cubic-bezier(.22, .61, .36, 1), opacity .62s;
+  box-shadow: 0 12px 26px -14px rgba(15, 28, 46, .40), 0 0 0 1px rgba(0, 0, 0, .05);
+}
+.car.no-tr .car-i { transition: none; }
+.car-i img { width: 74px; height: 74px; display: block; border-radius: 50%; }
+.car-i .ph {
+  width: 74px; height: 74px; border-radius: 50%;
+  background: var(--accent-tint); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px; font-weight: 700; letter-spacing: -.5px;
+}
+.car-nm {
+  margin-top: 2px; text-align: center; font-size: 13.5px; font-weight: 600;
+  letter-spacing: -.2px; line-height: 1.3; min-height: 18px;
+}
+
+.car-title { font-size: 18.7px; font-weight: 600; letter-spacing: -.2px; text-align: center; margin: 17.7px 0 15.6px; }
+
+.codebox { display: flex; justify-content: center; gap: 8.3px; }
+.cell {
+  width: 45.8px; height: 56.2px; border-radius: 11.4px; background: var(--parchment);
+  display: flex; align-items: center; justify-content: center;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 20.8px; font-weight: 600; letter-spacing: .5px;
+}
+.cell.cur { box-shadow: inset 0 0 0 1.5px var(--accent); }
+
+.pastebar { display: flex; justify-content: flex-end; margin-top: 8.3px; }
+.pastebar span { font-size: 12px; color: var(--accent); font-weight: 500; padding: 5px 3px; }
+
+.btn {
+  display: block; width: 100%; border: 0; font-family: inherit;
+  font-size: 16.6px; font-weight: 600; color: #fff; background: var(--accent);
+  border-radius: 999px; padding: 15.6px 0; margin-top: 13.5px; text-align: center;
+}
+
+.hintcard { background: var(--parchment); border-radius: 17.7px; padding: 14.6px 15.6px; margin-top: 14.6px; }
+.hint-t { font-size: 12px; font-weight: 600; margin-bottom: 6px; letter-spacing: .1px; }
+.hint-li { font-size: 11.4px; color: var(--muted); line-height: 1.78; padding-left: 13.5px; position: relative; }
+.hint-li::before { content: "·"; position: absolute; left: 4px; color: var(--soft); }
+
+/* ══ 手机外的小工具 ══ */
+.tools { display: flex; gap: 10px; justify-content: center; margin: 30px auto 0; }
+.tools button {
+  font-family: inherit; font-size: 13px; font-weight: 500; color: var(--ink);
+  background: #fff; border: 1px solid #D8D8DC; border-radius: 999px; padding: 8px 18px; cursor: pointer;
+}
+.tools button:active { opacity: .7; }
+
+.notes { max-width: 830px; margin: 34px auto 0; padding: 0 24px; }
+.notes .ncard { background: #fff; border-radius: 18px; padding: 18px 20px; box-shadow: 0 1px 0 rgba(0, 0, 0, .04); }
+.notes h2 { font-size: 13.5px; font-weight: 700; margin: 0 0 12px; letter-spacing: -.1px; }
+.notes table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.notes th, .notes td { text-align: left; padding: 7px 0; border-bottom: 1px solid #F0F0F2; vertical-align: top; }
+.notes th { font-weight: 600; color: var(--muted); width: 118px; }
+.notes tr:last-child th, .notes tr:last-child td { border-bottom: 0; }
+.notes code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; background: #F2F2F5; border-radius: 4px; padding: 1px 5px; }
+.notes .bad { color: #B42318; }
+.notes .good { color: #1E7A46; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>社团轮播 <span class="v">v1</span></h1>
+  <p>
+    照 <b>notice-hub-v5 · s-code 屏</b> 那套弧形旋转木马重做：中间正对放大、两侧逐级位移＋后仰＋变淡，
+    转过半个圆的那枚在<b>屏外待命</b>再入位（不横穿正面）。徽标<b>一律圆形</b>，方形圆角已废。
+  </p>
+</div>
+
+<div class="stagewrap">
+
+  <div class="col">
+    <div class="phone">
+      <div class="sbar"><span>9:41</span><span class="rt"><i></i><i style="width:11px"></i></span></div>
+      <div class="navbar">
+        <div class="navbar-back"><div class="chev-l"></div></div>
+        <div class="navbar-title">广播通知</div>
+        <div class="navbar-spacer"></div>
+      </div>
+      <div class="body">
+        <div class="car"><div class="car-stage" id="stgA"></div></div>
+        <div class="car-nm" id="nmA"></div>
+        <div class="car-title">输入社团密钥</div>
+        <div class="codebox">
+          <div class="cell">S</div><div class="cell">9</div><div class="cell">K</div>
+          <div class="cell">3</div><div class="cell">M</div><div class="cell cur">7</div>
+        </div>
+        <div class="pastebar"><span>粘贴</span></div>
+        <button class="btn">进入</button>
+        <div class="hintcard">
+          <div class="hint-t">社团密钥是什么</div>
+          <div class="hint-li">每个社团只有一把，长期有效，由广播站后台分配</div>
+          <div class="hint-li">社长与指导老师各持一把，换人时由后台重置</div>
+          <div class="hint-li">弄丢或外泄找社干重新生成，旧密钥当场作废</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">A · 已上传徽标<i>社团台里换过头像的样子</i></div>
+  </div>
+
+  <div class="col">
+    <div class="phone">
+      <div class="sbar"><span>9:41</span><span class="rt"><i></i><i style="width:11px"></i></span></div>
+      <div class="navbar">
+        <div class="navbar-back"><div class="chev-l"></div></div>
+        <div class="navbar-title">广播通知</div>
+        <div class="navbar-spacer"></div>
+      </div>
+      <div class="body">
+        <div class="car"><div class="car-stage" id="stgB"></div></div>
+        <div class="car-nm" id="nmB"></div>
+        <div class="car-title">输入社团密钥</div>
+        <div class="codebox">
+          <div class="cell">S</div><div class="cell">9</div><div class="cell">K</div>
+          <div class="cell">3</div><div class="cell">M</div><div class="cell cur">7</div>
+        </div>
+        <div class="pastebar"><span>粘贴</span></div>
+        <button class="btn">进入</button>
+        <div class="hintcard">
+          <div class="hint-t">社团密钥是什么</div>
+          <div class="hint-li">每个社团只有一把，长期有效，由广播站后台分配</div>
+          <div class="hint-li">社长与指导老师各持一把，换人时由后台重置</div>
+          <div class="hint-li">弄丢或外泄找社干重新生成，旧密钥当场作废</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">B · 还没上传徽标<i>用社团名首字占位，同样圆形</i></div>
+  </div>
+
+</div>
+
+<div class="tools">
+  <button id="btnPause">暂停</button>
+  <button id="btnReset">重播</button>
+</div>
+
+<div class="notes">
+  <div class="ncard">
+    <h2>与现在那版的差别</h2>
+    <table>
+      <tr>
+        <th>动画</th>
+        <td><span class="bad">现在</span>：<code>swiper</code> 只能等比放大（<code>scale .72→1</code>），没有位移、没有后仰、没有纵深<br>
+            <span class="good">v1</span>：<code>translateX</code> ＋ <code>scale</code> ＋ <code>rotateY</code> ＋ <code>opacity</code> 四轴一起走，
+            父层给 <code>perspective: 780px</code>，两侧真的往后仰</td>
+      </tr>
+      <tr>
+        <th>位次</th>
+        <td>中间 <code>x=0 · 1.18</code>／左右一档 <code>x=±94 · 0.76 · 后仰 26°</code>／左右二档 <code>x=±142 · 0.54 · 后仰 38°</code>；
+            透明度 <code>1 / .95 / .5</code></td>
+      </tr>
+      <tr>
+        <th>掉头</th>
+        <td>转过半个圆的那枚在 <b>屏外 ±196px</b>（<code>scale .42</code>／<code>opacity 0</code>）待命，下一格再入场，
+            所以<b>不会从屏幕中间横穿过去</b>；瞬移那一帧关过渡，其余项照常补间</td>
+      </tr>
+      <tr>
+        <th>徽标</th>
+        <td><span class="bad">现在</span>：<code>176rpx</code> 方块 ＋ <code>border-radius: 44rpx</code>，图 <code>aspectFill</code> 进方框 → 被裁<br>
+            <span class="good">v1</span>：外层 <code>86px</code> 白底圆 ＋ 内层 <code>74px</code> 图，<b>全圆</b>，
+            方图按内切圆入位，不裁内容</td>
+      </tr>
+      <tr>
+        <th>节奏</th>
+        <td>自动 <code>2600ms</code> 走一格；点某一枚则按最近的一侧<b>逐格</b>走过去（<code>150ms/格</code>），走完接着自动</td>
+      </tr>
+      <tr>
+        <th>名称</th>
+        <td>轮播下方那行仍是唯一指示器（不加圆点），随当前项变；按原样加深到 <code>--ink</code>／600 字重</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<script>
+/* 与原型同源的六家（顺序就是种子顺序） */
+var CLUBS = [
+  { n: '菁悠广播站',     f: '../notice-hub-v5/assets/station-badge.png' },
+  { n: '摄影协会',       f: '../notice-hub-v5/assets/clubs/cluster.png' },
+  { n: '电视台',         f: '../notice-hub-v5/assets/clubs/tv.png' },
+  { n: '青年志愿者协会', f: '../notice-hub-v5/assets/clubs/volunteer.png' },
+  { n: '学生会',         f: '../notice-hub-v5/assets/clubs/union.png' },
+  { n: '无与伦比吉他协会', f: '../notice-hub-v5/assets/clubs/music.png' }
+];
+
+var X = [0, 94, 142];      // 位移（设计 px）
+var S = [1.18, 0.76, 0.54];// 缩放
+var R = [0, 26, 38];       // 后仰角
+var O = [1, 0.95, 0.5];    // 不透明度
+var PARK_X = 196, PARK_S = 0.42, PARK_R = 46;
+var STEP_MS = 2600, WALK_MS = 150;
+
+var paused = false;
+var machines = [];
+
+function build(opts) {
+  var stage = opts.stage, nm = opts.nm, useImg = opts.useImg;
+  var N = CLUBS.length, HALF = N / 2;
+  var items = [], pos = [], step = 0, timer = null, walk = null;
+
+  for (var i = 0; i < N; i++) {
+    var el = document.createElement('div');
+    el.className = 'car-i';
+    el.dataset.i = i;
+    if (useImg) {
+      var im = document.createElement('img');
+      im.src = CLUBS[i].f;
+      im.alt = CLUBS[i].n;
+      el.appendChild(im);
+    } else {
+      var ph = document.createElement('div');
+      ph.className = 'ph';
+      ph.textContent = CLUBS[i].n.charAt(0);
+      el.appendChild(ph);
+    }
+    /* 环形初始位：0 在正中，正数往右，负数往左 */
+    pos.push(i > HALF ? i - N : i);
+    stage.appendChild(el);
+    items.push(el);
+  }
+
+  stage.parentNode.classList.add('no-tr');
+
+  function park(el, side) {
+    /* 退到屏外，且要落在它「下一次入场的那一侧」，否则下一帧会横穿整屏。
+       先关过渡、落地样式（强制回流）再恢复 —— 恢复不能放 rAF：rAF 早于本帧样式计算，
+       会把这次瞬移也补间成一次滑过屏幕的动画。 */
+    el.style.transition = 'none';
+    el.style.transform = 'translateX(' + (side > 0 ? PARK_X : -PARK_X) + 'px) scale(' + PARK_S +
+                         ') rotateY(' + (side > 0 ? -PARK_R : PARK_R) + 'deg)';
+    el.style.opacity = '0';
+    void el.offsetWidth;
+    el.style.transition = '';
+  }
+
+  function layout(ds) {
+    for (var k = 0; k < items.length; k++) {
+      var d = pos[k] - ds;
+      /* 转过半个圆就折回另一侧，位置永远落在 ±HALF 内。
+         不用模运算现场归一：它在 N/2 折返点上分不清「从左侧退场」还是「从右侧入列」。 */
+      while (d > HALF) d -= N;
+      while (d < -HALF) d += N;
+      pos[k] = d;
+
+      if (Math.abs(d) >= HALF) { park(items[k], ds > 0 ? 1 : -1); continue; }
+
+      var a = Math.abs(d), sg = d > 0 ? 1 : -1;
+      items[k].style.transform =
+        'translateX(' + (d ? sg * X[a] : 0) + 'px) scale(' + S[a] + ') rotateY(' + (d ? -sg * R[a] : 0) + 'deg)';
+      items[k].style.opacity = String(O[a]);
+      items[k].style.zIndex = String(5 - a);
+    }
+    nm.textContent = CLUBS[((step % N) + N) % N].n;
+  }
+
+  function stop() {
+    if (timer) { clearInterval(timer); timer = null; }
+    if (walk) { clearInterval(walk); walk = null; }
+  }
+
+  function play() {
+    stop();
+    if (paused || N < 2) return;
+    timer = setInterval(function () { step += 1; layout(1); }, STEP_MS);
+  }
+
+  function goTo(i) {
+    var c = ((step % N) + N) % N, d = (i - c + N) % N;
+    if (!d) return;
+    if (d > HALF) d -= N;                 // 走最近的一侧，别一次扫过半个圆
+    var dir = d > 0 ? 1 : -1, left = Math.abs(d);
+    stop();
+    walk = setInterval(function () {
+      step += dir; layout(dir); left -= 1;
+      if (left <= 0) { clearInterval(walk); walk = null; play(); }
+    }, WALK_MS);
+  }
+
+  items.forEach(function (el) {
+    el.addEventListener('click', function () { goTo(+el.dataset.i); });
+  });
+
+  layout(0);
+  /* 首帧落位必须先强制回流再放开过渡，否则会把「从中心散开」补间成一次乱飞 */
+  void stage.offsetWidth;
+  stage.parentNode.classList.remove('no-tr');
+  play();
+
+  return {
+    replay: function () {
+      stop(); step = 0;
+      for (var k = 0; k < N; k++) pos[k] = k > HALF ? k - N : k;
+      stage.parentNode.classList.add('no-tr');
+      for (var j = 0; j < items.length; j++) { items[j].style.transition = ''; items[j].style.opacity = '0'; }
+      layout(0);
+      void stage.offsetWidth;
+      stage.parentNode.classList.remove('no-tr');
+      play();
+    },
+    toggle: function () { paused = !paused; paused ? stop() : play(); },
+    isPaused: function () { return paused; }
+  };
+}
+
+machines.push(build({ stage: document.getElementById('stgA'), nm: document.getElementById('nmA'), useImg: true }));
+machines.push(build({ stage: document.getElementById('stgB'), nm: document.getElementById('nmB'), useImg: false }));
+
+document.getElementById('btnPause').addEventListener('click', function () {
+  machines.forEach(function (m) { m.toggle(); });
+  this.textContent = paused ? '继续' : '暂停';
+});
+document.getElementById('btnReset').addEventListener('click', function () {
+  paused = false;
+  document.getElementById('btnPause').textContent = '暂停';
+  machines.forEach(function (m) { m.replay(); });
+});
+</script>
+</body>
+</html>

@@ -8,8 +8,7 @@
 2. 小程序管理端 `pages-admin/`（分包 5 页，走 admin 表账号）—— **决定退役**，由伙伴端接位、改学号登录。
 3. 伙伴端（原型 88 屏）—— 新端，取代第 2 条。
 4. 管理端 web `admin-web/`（Vue3，14 页）—— **保留，只管电脑端**；权限管理页 `/permissions`（`meta.superAdmin`）2026-11-02 补上。
-   **只加这一条**，2026-10-31 摘掉的 9 条 `/partner/*` 仍摘掉；后端接口一直是 `/partner/permissions` 那三个口子。
-⚠️ 曾把 2 和 4 当成一个东西 → 被纠正「不是一个东西」。
+⚠️ 曾把 2 和 4 当成一个东西 → 被纠正「不是一个东西」。2026-10-31 摘掉的 9 条 `/partner/*` 仍摘掉；后端接口一直是 `/partner/permissions` 那三个口子。
 ⚠️ 退役连带：app.json subpackages · app.js adminToken/adminInfo/adminLogin/adminLogout/isAdminLoggedIn · `utils/request.js#adminRequest` ·
 `pages/login/login.js:142` · `login.wxml:87-91`「管理员登录」。**云函数 `/admin/login` 不能删**（admin-web 还在用）。
 ⚠️ 登录要合并：人统一到 `user`（学号/工号都当 username）+ `admin.user_id` 绑定，老师加 `user.kind=teacher`。
@@ -44,7 +43,6 @@
 - ⚠️⚠️⚠️ **发布 = 覆盖同一个应用**：deploy **任何目录**都会覆盖 `jingyou-partner-hub` 链接（`domainPrefix` 无效）。
   **侧边方案/试验稿只本地 present_files，禁止 deploy**。线上目录 = `preview/partner-hub-gounucai-v5/`，新版本**先 cp 回 v5 再发**。
   ⚠️ 工作副本不是 v5：约 v150 起每版独立目录 `partner-hub-gounucai-v<N>/`，动手前先找最新完整版（2026-11-07 = **v169**·88 屏）。
-  见 `MEMORY-partner-hub.md` 与当日日志。
 - 学生登录页**不再有微信登录**（2026-10-02 拍板），以后不做相关入口/接口。
 - 站徽「菁悠」双色 浅 `#2497D5` / 深 `#093592`（仪器感元件用这组，别用 `#0066CC`）；`--live` 只给 ON AIR。
 - **不锈钢禁拉丝**（点名两次）；抛光＝冷中性灰底 + 宽而柔斜向扫光，反光带窄硬＝褶皱。
@@ -55,6 +53,7 @@
 ## 动 UI / 编内容之前
 先读 `PROJECT-NOTES.md`「先读这三处源」（设计 token / 真实内容 / 结构事实）。底线：**别自起私有配色**、**别编业务事实**（站里没有 FM 频率）。
 token 源：`miniprogram/app.wxss` → `admin-web/src/styles/theme.css`。`--accent #0066CC` 唯一强调色、无装饰渐变、无彩色投影。
+尺寸换算：设计稿按 390pt 出图，**1px(设计) ≈ 1.923rpx**；正文 15px → 28rpx。
 
 ## 伙伴端（手机原型）
 细则 → `MEMORY-partner-hub.md`；逐版记录 → 当日日志；后台对齐 → `preview/admin-sync-v1`（缺口）+ `v2`（更正）。
@@ -71,42 +70,39 @@ token 源：`miniprogram/app.wxss` → `admin-web/src/styles/theme.css`。`--acc
 ## 社团密钥 / 社团提报（2026-11-07 落地）
 `services/clubKey.js`（6 位密钥，**只存 sha256 哈希 + 掩码**，明文只在 `POST /partner/club-keys/:id/reset` 响应里出现一次）+
 `services/clubNotice.js`（状态机 0 待审 / 1 待播 / 2 驳回 / 3 已播 / 9 撤回）。
-⚠️ 为什么 sha256 不用 bcrypt：学生输码时服务端**不知道是哪个社团**，bcrypt 要全表逐个比（N×25ms），sha256 直接等值查一条。
-⚠️ **作废必须清 `key_hash`**，只改 status 是假作废（列表显示已作废、旧钥匙照样能进）。
-⚠️ 学生凭票据（48 hex，`SESSION_TTL_MS=2h`，库里只存 `ticket_hash`）；**重置不踢已发票据**（重置是给新人，不是赶在校生）。
-⚠️⚠️ **整条线不要求学生登录**（2026-11-07 陛下当面纠正）：`verify/me/avatar` 与提报 5 个接口一律没有 `requireUser`，
-唯一凭证是票据。试错闸按 `ctx.source`（openid/IP）限速，**不按登录用户**。
-落款 `optionalUser()`：有 token 用学号，没有退「社长」。
-⚠️ 票据失效报 **40102** 不是 40101 —— `utils/request.js` 见 40101 会清学生登录态，
-两小时一次过期就把人踢下线。前端判断写 `40102 || 40101`。
-⚠️ 试错闸必须**落库**（`club_key_tries`，一份来源一文档，只存 `{minute,count}`）：云函数无状态，内存计数等于没有。
-⚠️ 种子用业务键 `_id='club:<社团名>'`（自动 `_id` 挡不住并发 ⇒ 轮播出现两个「电视台」）。
-⚠️ 并发控制靠条件更新 `updateWhere({_id, status: ST.WAIT}, patch)`，0 行 ⇒ 40901「这条已经处理过了」。
-⚠️ 权限位第 4 个 `clubkey`；**加 PERM_KEYS 必须同步加 `PERM_ALL`**（曾 undefined ⇒ `!!undefined === false`）。
-⚠️ `utils/clubTime.js` 不能用 `utils/format.js#fmtIso`：那条取字符串墙钟字段（给 `+08:00`），本线单据是 `toISOString()`，会差 8 小时且看着正常。
-⚠️ 图片处理抽到 `lib/image.js`（`admin/upload.js` 与学生端头像共用一份 mime 判据）。
+- 为什么 sha256 不用 bcrypt：学生输码时服务端**不知道是哪个社团**，bcrypt 要全表逐个比（N×25ms），sha256 直接等值查一条。
+- ⚠️ **作废必须清 `key_hash`**，只改 status 是假作废（列表显示已作废、旧钥匙照样能进）。
+- 学生凭票据（48 hex，`SESSION_TTL_MS=2h`，库里只存 `ticket_hash`）；**重置不踢已发票据**（重置是给新人，不是赶在校生）。
+- ⚠️⚠️ **整条线不要求学生登录**（2026-11-07 陛下当面纠正）：`verify/me/avatar` 与提报 5 个接口一律没有 `requireUser`，
+  唯一凭证是票据。试错闸按 `ctx.source`（openid/IP）限速，**不按登录用户**。落款 `optionalUser()`：有 token 用学号，没有退「社长」。
+- ⚠️ 票据失效报 **40102** 不是 40101 —— `utils/request.js` 见 40101 会清学生登录态，两小时一次过期就把人踢下线。前端判断写 `40102 || 40101`。
+- ⚠️ 试错闸必须**落库**（`club_key_tries`，一份来源一文档，只存 `{minute,count}`）：云函数无状态，内存计数等于没有。
+- ⚠️ 种子用业务键 `_id='club:<社团名>'`（自动 `_id` 挡不住并发 ⇒ 轮播出现两个「电视台」）。
+- ⚠️ 并发控制靠条件更新 `updateWhere({_id, status: ST.WAIT}, patch)`，0 行 ⇒ 40901「这条已经处理过了」。
+- ⚠️ 权限位第 4 个 `clubkey`；**加 PERM_KEYS 必须同步加 PERM_ALL**（曾 undefined ⇒ `!!undefined === false`）。
+- ⚠️ `utils/clubTime.js` 不能用 `utils/format.js#fmtIso`：那条取字符串墙钟字段（给 `+08:00`），本线单据是 `toISOString()`，会差 8 小时且看着正常。
+- ⚠️ 图片处理抽到 `lib/image.js`（`admin/upload.js` 与学生端头像共用一份 mime 判据）。
 
 ## 云开发（`cloud/` 阶段 0–9）
 源 `cloud/cloudfunctions/api/`，运行目录 `miniprogram/cloudfunctions/api/`。⚠️ Windows CLI 传子目录必坏 ⇒ 打**单文件**，`handlers/index.js` **静态注册表**。
 部署 `node cloud/scripts/deploy-cloud.js` → 手动 cli.bat → 等 1~2 分钟。
 口径：业务查询用数字 `id`；4 张表业务键当 `_id`（`setting:`/`switch:`/`ack:`/`week:`）；字段驼峰；`insertOne` 后改这行用返回的 `_id`。
-⚠️⚠️⚠️ **新增集合 = 必须配自愈，否则上线第一下就是 50001**：云开发查**没建过**的集合是**抛错**
-（`-502005 database collection not exists`），**不是返回空数组**。2026-11-07 社团密钥就这么炸的：
-`try { createCollection } catch {}` 把失败吞了，紧接着的裸查询原样抛上去 ⇒ 陛下看到
-「服务器繁忙，请稍后再试（…-502005…）」。正解：`lib/db.js#ensureCollections`（幂等、每实例一次、失败不抛）
-进路径先建 + 读操作套 `readOr` 当空表；**假库用 `H.dropCollection(name)` 真删表才测得出**（默认假库对任何名字都返回空）。
-⚠️⚠️ 切云弄坏上传类接口（信封 JSON ⇒ `FormData` 变 `{}`，40001）：契约 `{filename,fileBase64}`，凡 FormData/Blob 切云后必须单验。
-⚠️⚠️ **上传有两道硬上限，都跟 base64 有关**：① HTTP 访问服务请求体 ≈100KB（base64 再 +33%）⇒ 名册导入大表会 413；
-② **小程序 `callFunction` 的 data 也只有 ≈1MB**（不是"不受限"！）⇒ 手机直出照片 2~5MB、base64 后 3~7MB，
-平台侧直接回 `data exceed max`，**请求根本到不了云函数**（2026-11-07 换社团头像真机上就这么卡的，
-服务端那句「超过 2MB」永远触发不到）。凡上传类接口，**第一步是在客户端压**（头像压到 720px / base64 ≤700KB），
-服务端的尺寸判断只当兜底。
-⚠️⚠️ 学生初始密码＝`user`+学号（唯一出口 `studentAccountService.initPasswordFor()`；初始 cost 8、改密后 10）；管理端 DTO 字段是 `activated`。
-⚠️⚠️⚠️ **名册逻辑有三份副本，改一处不算改完**：① `src/services/studentRosterService.js`（直连）
-② **`cloud/cloudfunctions/api/services/roster.js`（云端副本＝线上真正跑的，函数同名行号不同）**
-③ `miniprogram/cloudfunctions/api/index.js`（单文件产物，`sync.js` 打出，`--check` 校验）。
-只改 `src/` ⇒ 切云不生效；改完不 `sync.js` ⇒ 部署的还是旧产物。**"改完没生效"先问改的哪一份、打包了没。**
-⚠️ 云端唯一性**不是索引**，是 `unique_keys` 集合（`lib/db.js:170` `reserveUnique` → `_id="scope:key"`）；运行时只用 `user_name` scope。
+- ⚠️⚠️⚠️ **新增集合 = 必须配自愈，否则上线第一下就是 50001**：云开发查**没建过**的集合是**抛错**
+  （`-502005 database collection not exists`），**不是返回空数组**。2026-11-07 社团密钥就这么炸的：
+  `try { createCollection } catch {}` 把失败吞了，紧接着的裸查询原样抛上去 ⇒ 陛下看到「服务器繁忙…（…-502005…）」。
+  正解：`lib/db.js#ensureCollections`（幂等、每实例一次、失败不抛）进路径先建 + 读操作套 `readOr` 当空表；
+  **假库用 `H.dropCollection(name)` 真删表才测得出**（默认假库对任何名字都返回空）。
+- ⚠️⚠️ 切云弄坏上传类接口（信封 JSON ⇒ `FormData` 变 `{}`，40001）：契约 `{filename,fileBase64}`，凡 FormData/Blob 切云后必须单验。
+- ⚠️⚠️ **上传有两道硬上限，都跟 base64 有关**：① HTTP 访问服务请求体 ≈100KB（base64 再 +33%）⇒ 名册导入大表会 413；
+  ② **小程序 `callFunction` 的 data 也只有 ≈1MB**（不是"不受限"！）⇒ 手机直出照片 2~5MB、base64 后 3~7MB，
+  平台侧直接回 `data exceed max`，**请求根本到不了云函数**（2026-11-07 换社团头像真机上就这么卡的，服务端那句「超过 2MB」永远触发不到）。
+  凡上传类接口，**第一步是在客户端压**（头像压到 720px / base64 ≤700KB），服务端的尺寸判断只当兜底。
+- ⚠️⚠️ 学生初始密码＝`user`+学号（唯一出口 `studentAccountService.initPasswordFor()`；初始 cost 8、改密后 10）；管理端 DTO 字段是 `activated`。
+- ⚠️⚠️⚠️ **名册逻辑有三份副本，改一处不算改完**：① `src/services/studentRosterService.js`（直连）
+  ② **`cloud/cloudfunctions/api/services/roster.js`（云端副本＝线上真正跑的，函数同名行号不同）**
+  ③ `miniprogram/cloudfunctions/api/index.js`（单文件产物，`sync.js` 打出，`--check` 校验）。
+  只改 `src/` ⇒ 切云不生效；改完不 `sync.js` ⇒ 部署的还是旧产物。**"改完没生效"先问改的哪一份、打包了没。**
+- 云端唯一性**不是索引**，是 `unique_keys` 集合（`lib/db.js:170` `reserveUnique` → `_id="scope:key"`）；运行时只用 `user_name` scope。
 
 ## 发布 & 真机收尾
 ✅✅ **发布只看一条：`git push` master 自动发布**（`.github/workflows/cloud-release.yml`：verify → 只发变更那端）。**别再手动上传静态托管/部署云函数**。
@@ -130,6 +126,8 @@ API 网关 `…-1491709115.ap-shanghai.app.tcloudbase.com`。管理后台线上�
 jest 基线：56 条里 15 条失败全是已删 member 模块，别当新回归。
 ⚠️⚠️ **push 本机做不了**（GCM 取不到凭据）⇒ commit 我负责、**push 陛下自己敲**（判据 `git status -sb` 无 `ahead N`）；**部署云函数本机也做不了**（沙箱拦 `reg.exe`），CLI `D:\dev\wx-devtools\cli.bat`。
 PowerShell `Add-Type` 被拦 ⇒ 图像处理走 Python（`~/.workbuddy/binaries/python/versions/3.13.12/python.exe`，PIL 装这里）。
+截图：`C:\Program Files\Google\Chrome\Application\chrome.exe --headless=new --force-device-scale-factor=2 --window-size=W,H --user-data-dir=<每次独立> --virtual-time-budget=N --screenshot=out.png <file:///...>`。
+⚠️ 无头下 CSS transition **不随 virtual-time 推进**，截图会停在过渡起始帧；要对位次就 `--dump-dom` 读内联 style，别信截图。
 
 ## 后端约定
 容器 UTC、MySQL 北京时间；按天/周**禁裸 `dayjs()`**，统一走 `src/utils/bjTime.js`（AGENTS.md 写作 `services/bjTime.js`）。路由顺序：字面量段在参数路由之前。

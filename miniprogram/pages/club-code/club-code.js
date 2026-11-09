@@ -18,12 +18,27 @@ const clubTicket = require('../../utils/clubTicket.js');
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const KEY_LEN = 6;
 
+/**
+ * 弧形旋转木马的位次表 —— 与 preview/notice-hub-v5 · s-code 屏同源，只把 px 换成 rpx（×1.923）。
+ * 下标 = 离中心几格：0 正中 / 1 左右一档 / 2 左右二档；更远的落屏外待命（见 CAR_PARK_*）。
+ */
+const CAR_X = [0, 181, 273];          // translateX  94px / 142px
+const CAR_S = [1.18, 0.76, 0.54];     // scale
+const CAR_R = [0, 26, 38];            // rotateY 后仰角
+const CAR_O = [1, 0.95, 0.5];         // opacity
+const CAR_PARK_X = 377;               // 196px 屏外待命
+const CAR_PARK_S = 0.42;
+const CAR_PARK_R = 46;
+const CAR_STEP_MS = 2600;             // 自动走一格的间隔
+const CAR_WALK_MS = 150;              // 点某一枚时逐格走的速度
+
 Page({
   data: {
     statusBarHeight: 20,
     clubs: [],
-    cur: 0,
     curName: '',
+    // 首帧必须关过渡：徽标从「全叠在中心」的状态落位，不关就会补间成一次从中间散开的乱飞
+    carOn: false,
     cells: [0, 1, 2, 3, 4, 5],
     code: '',
     focused: false,
@@ -40,6 +55,11 @@ Page({
     this.loadClubs();
   },
 
+  /** 切后台就停：页面看不见还在跑定时器，白烧电 */
+  onHide() { this._carStop(); },
+  onShow() { if (this.data.clubs.length > 1) this._carPlay(); },
+  onUnload() { this._carStop(); },
+
   /**
    * 社团清单（免登录接口）
    * ⚠️ 接口失败**不能挡路**：轮播只是「说明这是哪些社团」，输码才是正事。
@@ -54,14 +74,129 @@ Page({
           initial: (c.name || '社').charAt(0),
         }));
         this.setData({ clubs: list, curName: list.length ? list[0].name : '' });
+        this._carStart();
       })
       .catch(() => { /* 静默：见上 */ });
   },
 
-  onCar(e) {
-    const cur = e.detail.current;
+  /* ══════ 弧形旋转木马 ══════ */
+
+  _carStop() {
+    if (this._carTimer) { clearInterval(this._carTimer); this._carTimer = null; }
+    if (this._carWalk) { clearInterval(this._carWalk); this._carWalk = null; }
+  },
+
+  /** 起步：算每枚的环形初始位 → 落位 → 开始自动转 */
+  _carStart() {
+    const N = this.data.clubs.length;
+    this._carStop();
+    this._carStep = 0;
+    this._carPos = [];
+    if (!N) return;
+    const half = N / 2;
+    for (let q = 0; q < N; q++) this._carPos.push(q > half ? q - N : q);
+    this.setData({ carOn: false });   // 与下面那次 setData 合批，首帧不带过渡
+    this._carLayout(0);
+    this._carPlay();
+  },
+
+  _carPlay() {
+    this._carStop();
+    if (this.data.clubs.length < 2) return;
+    this._carTimer = setInterval(() => {
+      this._carStep += 1;
+      this._carLayout(1);
+    }, CAR_STEP_MS);
+  },
+
+  /**
+   * 按 ds（相对上一帧走了几格）重排一次。
+   * ⚠️ 位置靠「上一帧的位置减 ds」连续推，不用模运算现场归一：
+   *    模运算在 N/2 折返点上分不清「从左侧退场」还是「从右侧入列」，
+   *    那一次符号算错，就会让徽标横穿整个屏幕。
+   */
+  _carLayout(ds) {
     const clubs = this.data.clubs;
-    this.setData({ cur, curName: clubs[cur] ? clubs[cur].name : '' });
+    const N = clubs.length;
+    if (!N) return;
+    const half = N / 2;
+    // 位次表只有 0/±1/±2 三档 ⇒ |d| > 2 一律落屏外（7 家以上折完会到 ±3、±4，那格没有位子）
+    // 3 家及以下没有「背面」，别按折返判，否则会出现「折到 0 却当成离场」
+    const parkAt = N >= 5 ? 3 : Math.max(2, half);
+    let parkIdx = -1;
+    const next = [];
+
+    for (let k = 0; k < N; k++) {
+      const dr = this._carPos[k] - ds;      // 折叠前的连续位置
+      // 这一帧它是不是绕过背面了：奇数的社团数（如 5 家）折不到 ±half 那个整格，
+      // 只靠 |d| 判断会让它从 -273 一口气滑到 +273 横穿正面 ⇒ 必须按「跨没跨过」判
+      const crossed = N >= 3 && ((dr > half) || (dr < -half));
+      let d = dr;
+      while (d > half) d -= N;              // 转过半个圆就折回另一侧，位置永远落在 ±half 内
+      while (d < -half) d += N;
+      this._carPos[k] = d;
+
+      if (crossed || Math.abs(d) >= parkAt) {
+        // 退到屏外，且要落在它「下一次入场的那一侧」，否则下一帧会横穿整屏
+        const side = ds > 0 ? 1 : -1;
+        parkIdx = k;
+        next.push({
+          ...clubs[k],
+          nt: true,
+          st: 'transform:translateX(' + (side > 0 ? CAR_PARK_X : -CAR_PARK_X) + 'rpx) scale(' + CAR_PARK_S +
+              ') rotateY(' + (side > 0 ? -CAR_PARK_R : CAR_PARK_R) + 'deg);opacity:0;z-index:0',
+        });
+        continue;
+      }
+
+      const a = Math.abs(d);
+      const sg = d > 0 ? 1 : -1;
+      const tx = d ? sg * CAR_X[a] : 0;
+      const ry = d ? -sg * CAR_R[a] : 0;
+      next.push({
+        ...clubs[k],
+        nt: false,
+        st: 'transform:translateX(' + tx + 'rpx) scale(' + CAR_S[a] + ') rotateY(' + ry + 'deg);opacity:' +
+            CAR_O[a] + ';z-index:' + (5 - a),
+      });
+    }
+
+    this.setData({
+      clubs: next,
+      curName: clubs[((this._carStep % N) + N) % N].name,
+    }, () => {
+      const patch = {};
+      // 瞬移那一帧只关这一枚的过渡，下一帧立刻放开；不放开它下次入场也不会补间
+      if (parkIdx >= 0) patch['clubs[' + parkIdx + '].nt'] = false;
+      // ⚠️ 首帧的「放开过渡」必须放到回调里：和落位样式同一次 setData 提交的话，
+      //    合并后 carOn 直接就是 true，等于没关过 —— 六枚会从中心散开乱飞一次
+      if (!this.data.carOn) patch.carOn = true;
+      if (patch.carOn || parkIdx >= 0) this.setData(patch);
+    });
+  },
+
+  /** 点某一枚：走最近的一侧**逐格**过去（一次只走一格，跳太远会让绕到背面的那枚没有中间帧，像凭空闪现） */
+  tapClub(e) {
+    const i = Number(e.currentTarget.dataset.i);
+    const N = this.data.clubs.length;
+    if (N < 2) return;
+    const c = ((this._carStep % N) + N) % N;
+    let d = (((i - c) % N) + N) % N;
+    if (!d) return;
+    if (d > N / 2) d -= N;
+    const dir = d > 0 ? 1 : -1;
+    let left = Math.abs(d);
+    this._carStop();
+    this._carWalk = setInterval(() => {
+      this._carStep += dir;
+      this._carLayout(dir);
+      left -= 1;
+      if (left <= 0) {
+        clearInterval(this._carWalk);
+        this._carWalk = null;
+        this._carPlay();
+      }
+    }, CAR_WALK_MS);
   },
 
   focusInput() {
