@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>社团密钥 · 新建社团 · v1</title>
+<style>
+  :root{
+    --ink:#1D1D1F; --ink-2:#333333; --muted:#7A7A7A; --soft:#C7C7CC;
+    --hairline:#E0E0E0; --divider:#F0F0F0; --parchment:#F5F5F7; --canvas:#FFFFFF;
+    --accent:#0066CC; --accent-tint:#EAF3FD;
+    --amber-bg:#FEF3C7; --amber-fg:#8A6100;
+    --green-bg:#E7F5EC; --green-fg:#1E7A46;
+    --red-bg:#FDE8E8; --red-fg:#B42318;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:#EFEFEF;font-family:-apple-system,"PingFang SC","Microsoft Yahei",sans-serif;color:var(--ink);}
+  body{padding:34px 24px 60px;}
+
+  .head{max-width:1240px;margin:0 auto 26px;}
+  .head h1{font-size:21px;margin:0 0 10px;font-weight:700;letter-spacing:-.3px;display:flex;align-items:center;gap:9px;}
+  .head .v{font-size:11px;font-weight:700;color:var(--accent);background:var(--accent-tint);border-radius:999px;padding:3px 9px;letter-spacing:.4px;}
+  .head p{font-size:13px;line-height:1.75;color:#5B5B60;margin:0;}
+  .head p b{color:var(--ink);font-weight:600;}
+  .head p.chg{margin-top:10px;padding:9px 12px;border-radius:10px;background:var(--accent-tint);color:#2A2A2C;font-size:12.5px;line-height:1.75;}
+  .head p.chg i{font-style:normal;font-weight:700;color:var(--accent);margin-right:6px;}
+
+  .stagewrap{display:flex;gap:36px;justify-content:center;align-items:flex-start;flex-wrap:wrap;max-width:1300px;margin:0 auto;}
+  .col{width:390px;}
+  .col .cap{text-align:center;font-size:12.5px;font-weight:600;color:#5B5B60;margin-top:12px;}
+  .col .cap i{display:block;font-style:normal;font-weight:400;font-size:11.5px;color:var(--muted);margin-top:4px;}
+
+  .phone{
+    width:390px;height:844px;background:#fff;border-radius:42px;overflow:hidden;position:relative;
+    box-shadow:0 24px 60px -30px rgba(15,28,46,.38),0 0 0 1px rgba(0,0,0,.05);
+    display:flex;flex-direction:column;
+  }
+  .sbar{height:44px;flex:none;display:flex;align-items:flex-end;justify-content:space-between;padding:0 26px 6px;font-size:13px;font-weight:600;}
+  .sbar .rt{display:flex;gap:5px;align-items:center;}
+  .sbar .rt i{display:block;width:15px;height:9px;border-radius:2px;background:var(--ink);opacity:.82;}
+
+  /* 导航栏：标题按屏幕中线居中（真机上右上被微信胶囊占着，这里不画胶囊，留空） */
+  .navbar{position:relative;height:46px;flex:none;display:flex;align-items:center;padding:0 21px;}
+  .nav-back{position:relative;z-index:1;width:37px;height:37px;border-radius:999px;background:var(--parchment);display:flex;align-items:center;justify-content:center;}
+  .nav-title{position:absolute;left:0;right:0;text-align:center;font-size:15.5px;font-weight:600;letter-spacing:-.2px;}
+
+  .body{flex:1;min-height:0;padding:0 21px;display:flex;flex-direction:column;gap:0;overflow:hidden;}
+
+  /* 小节标题 */
+  .sec-h{display:flex;align-items:baseline;justify-content:space-between;padding:6px 2px 8px;}
+  .sec-t{font-size:13.5px;font-weight:600;}
+  .sec-l{font-size:11.5px;color:var(--accent);}
+
+  /* 列表卡 */
+  .kcard{background:var(--parchment);border-radius:18px;overflow:hidden;}
+  .krow{display:flex;align-items:center;gap:11px;padding:12px 15px;border-bottom:1px solid rgba(0,0,0,.05);}
+  .krow:last-child{border-bottom:0;}
+  .kav{width:38px;height:38px;flex:none;border-radius:50%;background:#fff;color:var(--accent);
+       display:flex;align-items:center;justify-content:center;font-size:15.5px;font-weight:700;overflow:hidden;}
+  .kav-img{width:38px;height:38px;border-radius:50%;display:block;}
+  .km{flex:1;min-width:0;}
+  .kn{font-size:14.5px;font-weight:600;letter-spacing:-.1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ks{font-size:11.5px;color:var(--muted);margin-top:3px;letter-spacing:.1px;}
+  .st{flex:none;font-size:11px;font-weight:600;line-height:1;padding:5px 8px;border-radius:999px;letter-spacing:.1px;}
+  .st.done{background:var(--green-bg);color:var(--green-fg);}
+  .st.rej{background:var(--red-bg);color:var(--red-fg);}
+  .chev-r{width:7px;height:7px;border-right:1.6px solid var(--soft);border-bottom:1.6px solid var(--soft);transform:rotate(-45deg);flex:none;margin-left:2px;}
+
+  /* 列表末尾那一行：新建社团 */
+  /* 新建行：min-height 对齐上面 38px 头像撑出来的 62px，别靠 padding 猜 */
+  .kadd{display:flex;align-items:center;gap:11px;padding:14px 15px;min-height:62px;border-top:1px solid rgba(0,0,0,.05);}
+  .kadd .plus{width:14px;height:14px;position:relative;flex:none;margin:0 12px;}
+  .plus::before,.plus::after{content:"";position:absolute;background:var(--accent);border-radius:2px;}
+  .plus::before{left:50%;top:0;bottom:0;width:2px;transform:translateX(-50%);}
+  .plus::after{top:50%;left:0;right:0;height:2px;transform:translateY(-50%);}
+  .kadd-t{font-size:14px;font-weight:600;color:var(--accent);letter-spacing:-.1px;}
+
+  /* 说明卡 */
+  .hintcard{background:var(--parchment);border-radius:18px;padding:14px 16px;margin-top:14px;}
+  .hint-t{font-size:12px;font-weight:600;margin-bottom:6px;}
+  .hint-li{font-size:11.5px;color:var(--muted);line-height:1.78;padding-left:13px;position:relative;}
+  .hint-li::before{content:"·";position:absolute;left:4px;color:var(--soft);}
+
+  /* 分组标题 */
+  .grp-t{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.6px;padding:19px 2px 8px;}
+
+  /* 表单 */
+  .form{background:var(--parchment);border-radius:18px;overflow:hidden;}
+  .frow{display:flex;align-items:center;gap:11px;padding:13px 16px;border-bottom:1px solid rgba(0,0,0,.05);font-size:13.5px;}
+  .frow:last-child{border-bottom:0;}
+  .fk{font-size:12.5px;color:var(--muted);width:66px;flex:none;}
+  .fv{flex:1;min-width:0;font-weight:500;font-size:13.5px;}
+  .fv.ph{color:var(--soft);font-weight:400;}
+
+  /* 名称下面那句：唯一性 + 不可改 */
+  .fnote{font-size:11px;color:var(--muted);line-height:1.7;padding:9px 4px 0;}
+  .fnote b{color:var(--ink);font-weight:600;}
+  .fnote.bad{color:var(--red-fg);font-weight:600;}
+
+  /* 整行胶囊按钮（与 edit 页的 .fsave 同款） */
+  .fsave{margin-top:13px;text-align:center;font-size:13.5px;font-weight:600;line-height:1;
+         padding:15px 0;border-radius:999px;background:var(--accent);color:#fff;}
+  .fsave.off{background:rgba(0,102,204,.06);color:var(--soft);}
+
+  /* 六格明文 */
+  .codebox{display:flex;justify-content:center;gap:8px;margin-top:18px;}
+  .cell{width:46px;height:56px;border-radius:11px;background:var(--parchment);color:var(--ink);
+        font-size:21px;font-weight:700;display:flex;align-items:center;justify-content:center;
+        font-variant-numeric:tabular-nums;}
+  .keyops{display:flex;justify-content:center;gap:8px;margin-top:12px;}
+  .qa{font-size:12px;font-weight:500;line-height:1;padding:8px 18px;border-radius:999px;background:var(--parchment);color:var(--accent);}
+  .qa.ghost{color:var(--muted);}
+  .once-tip{text-align:center;font-size:11px;color:var(--muted);line-height:1.6;padding:9px 16px 0;}
+
+  /* 社团抬头 */
+  .club-org{display:flex;align-items:center;gap:12px;padding:3px 0;}
+  .club-av{width:47px;height:47px;flex:none;border-radius:50%;background:var(--accent-tint);color:var(--accent);
+           display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;overflow:hidden;}
+  .on1{font-size:17.5px;font-weight:600;letter-spacing:-.2px;}
+  .on2{font-size:11.5px;color:var(--muted);margin-top:2px;letter-spacing:.2px;}
+
+  /* 分享段 */
+  .sharebox{background:var(--parchment);border-radius:18px;padding:14px 16px 11px;margin-top:15px;}
+  .sharebox .st-t{font-size:11px;color:var(--muted);letter-spacing:.5px;font-weight:600;margin-bottom:8px;}
+  .sharebox .st-b{background:#fff;border-radius:11px;padding:11px 12px;font-size:12px;line-height:1.85;color:var(--ink-2);white-space:pre-wrap;}
+  .sharebox .st-a{display:flex;justify-content:flex-end;margin-top:9px;}
+
+  /* 说明 */
+  .notes{max-width:1240px;margin:34px auto 0;}
+  .notes .ncard{background:#fff;border-radius:18px;padding:18px 20px;}
+  .notes h2{font-size:13.5px;font-weight:700;margin:0 0 12px;}
+  .notes table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .notes th,.notes td{text-align:left;padding:8px 0;border-bottom:1px solid #F0F0F2;vertical-align:top;}
+  .notes th{font-weight:600;color:var(--muted);width:140px;}
+  .notes tr:last-child th,.notes tr:last-child td{border-bottom:0;}
+  .notes code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;background:#F2F2F5;border-radius:4px;padding:1px 5px;}
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>社团密钥 · 新建社团 <span class="v">v1</span></h1>
+  <p>
+    现在这一页只能看和改 —— <b>五家社团是种子数据，没有「加一家」的入口</b>。
+    这一版补三个屏：列表末尾那一行、新建表单、建完当场发出去的第一把密钥。
+  </p>
+  <p class="chg">
+    <i>先看这里</i>后端目前<b>也没有建社团的接口</b>（<code>clubKeys.js</code> 只有 list / detail / saveInfo / reset / setStatus），
+    所以要连后端一起加一个 <code>POST /partner/club-keys</code>。这一版只出形态，代码等你点头。
+  </p>
+</div>
+
+<div class="stagewrap">
+
+  <!-- ══ A 列表：多一行 ══ -->
+  <div class="col">
+    <div class="phone">
+      <div class="sbar"><span>9:41</span><span class="rt"><i></i><i style="width:11px"></i></span></div>
+      <div class="navbar">
+        <div class="nav-back"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M6.6 1.2L2.4 5l4.2 3.8" stroke="#1D1D1F" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" transform="translate(0.6,0)"/></svg></div>
+        <div class="nav-title">社团密钥</div>
+      </div>
+      <div class="body">
+        <div class="sec-h"><span class="sec-t">5 个社团 · 每社团一把</span><span class="sec-l">刷新</span></div>
+        <div class="kcard">
+          <div class="krow">
+            <div class="kav"><img class="kav-img" src="assets/cluster.jpg" alt=""></div>
+            <div class="km"><div class="kn">摄影协会</div><div class="ks">密钥 ····M7 · 陈知远</div></div>
+            <div class="st done">有效</div><div class="chev-r"></div>
+          </div>
+          <div class="krow">
+            <div class="kav"><img class="kav-img" src="assets/tv.jpg" alt=""></div>
+            <div class="km"><div class="kn">电视台</div><div class="ks">密钥已作废</div></div>
+            <div class="st rej">已作废</div><div class="chev-r"></div>
+          </div>
+          <div class="krow">
+            <div class="kav"><img class="kav-img" src="assets/volunteer.jpg" alt=""></div>
+            <div class="km"><div class="kn">青年志愿者协会</div><div class="ks">密钥 ····K2 · 张晓棠</div></div>
+            <div class="st done">有效</div><div class="chev-r"></div>
+          </div>
+          <div class="krow">
+            <div class="kav"><img class="kav-img" src="assets/union.jpg" alt=""></div>
+            <div class="km"><div class="kn">学生会</div><div class="ks">密钥 ····P9 · 李述祥</div></div>
+            <div class="st done">有效</div><div class="chev-r"></div>
+          </div>
+          <div class="krow">
+            <div class="kav"><img class="kav-img" src="assets/music.jpg" alt=""></div>
+            <div class="km"><div class="kn">无与伦比吉他协会</div><div class="ks">密钥 ····T4</div></div>
+            <div class="st done">有效</div><div class="chev-r"></div>
+          </div>
+          <!-- 就是这一行 -->
+          <div class="kadd"><span class="plus"></span><span class="kadd-t">新建社团</span></div>
+        </div>
+
+        <div class="hintcard">
+          <div class="hint-t">密钥怎么流转</div>
+          <div class="hint-li">后台给每个社团生成一把，长期有效，不用每次申请</div>
+          <div class="hint-li">社长与指导老师各持一把，换人时由社干重置</div>
+          <div class="hint-li">谁泄露了就地作废，旧密钥立刻打不开</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">A · 列表<i>只多一行，跟上面几行同高、同一张卡</i></div>
+  </div>
+
+  <!-- ══ B 新建 ══ -->
+  <div class="col">
+    <div class="phone">
+      <div class="sbar"><span>9:41</span><span class="rt"><i></i><i style="width:11px"></i></span></div>
+      <div class="navbar">
+        <div class="nav-back"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M6.6 1.2L2.4 5l4.2 3.8" stroke="#1D1D1F" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" transform="translate(0.6,0)"/></svg></div>
+        <div class="nav-title">新建社团</div>
+      </div>
+      <div class="body">
+        <div class="grp-t">社团 · 只有名称必填，另两项可后补</div>
+        <div class="form">
+          <div class="frow"><span class="fk">名称</span><span class="fv">天文社</span></div>
+          <div class="frow"><span class="fk">负责人</span><span class="fv ph">社长姓名</span></div>
+          <div class="frow"><span class="fk">指导老师</span><span class="fv ph">老师姓名</span></div>
+        </div>
+        <div class="fnote">名称是这家社团在系统里的唯一标识，<b>建好之后不能改</b>。徽标回列表点头像再换。</div>
+
+        <div class="fsave">创建并生成密钥</div>
+
+        <div class="hintcard" style="margin-top:26px">
+          <div class="hint-t">点下去会发生什么</div>
+          <div class="hint-li">这家社团马上出现在学生端的社团轮播里</div>
+          <div class="hint-li">同时生成第一把密钥，只在下一屏显示这一次</div>
+          <div class="hint-li">负责人和老师之后再改都不影响密钥</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">B · 新建<i>只问三个字段，名称以外都可后补</i></div>
+  </div>
+
+  <!-- ══ C 首把密钥 ══ -->
+  <div class="col">
+    <div class="phone">
+      <div class="sbar"><span>9:41</span><span class="rt"><i></i><i style="width:11px"></i></span></div>
+      <div class="navbar">
+        <div class="nav-back"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M6.6 1.2L2.4 5l4.2 3.8" stroke="#1D1D1F" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" transform="translate(0.6,0)"/></svg></div>
+        <div class="nav-title">天文社</div>
+      </div>
+      <div class="body">
+        <div class="club-org">
+          <div class="club-av">天</div>
+          <div class="km" style="flex:1">
+            <div class="on1">天文社</div>
+            <div class="on2">密钥 ···· · 刚生成</div>
+          </div>
+          <div class="st done">有效</div>
+        </div>
+
+        <div class="codebox">
+          <div class="cell">Q</div><div class="cell">7</div><div class="cell">X</div>
+          <div class="cell">K</div><div class="cell">3</div><div class="cell">M</div>
+        </div>
+        <div class="keyops"><span class="qa">复制</span><span class="qa ghost">隐藏</span></div>
+        <div class="once-tip">这一段只会显示这一次，离开页面就没了。要发给社长请先复制。</div>
+
+        <div class="sharebox">
+          <div class="st-t">发给社长和指导老师</div>
+          <div class="st-b">【菁悠广播站】天文社的社团密钥：Q7XK3M
+请在「我的 → 广播通知 → 输入社团密钥」里填写，长期有效。
+密钥只发给社长和指导老师，请勿转发。</div>
+          <div class="st-a"><span class="qa">复制整段</span></div>
+        </div>
+
+        <div class="fsave" style="margin-top:auto;margin-bottom:16px">完成</div>
+      </div>
+    </div>
+    <div class="cap">C · 首把密钥<i>跟编辑页「重置之后」是同一个形态，不再是第二套</i></div>
+  </div>
+
+</div>
+
+<div class="notes">
+  <div class="ncard">
+    <h2>这一版的规矩</h2>
+    <table>
+      <tr><th>入口位置</th><td>列表卡最后一行「＋ 新建社团」，跟上面几行<b>同高、同一张卡</b>。不另起一个按钮 —— 加社团和看社团是同一件事的上下两步；也避开了「手机里挂装饰性描边框」那条。</td></tr>
+      <tr><th>为什么只问名称</th><td>「负责人 / 指导老师」在编辑页本来就能改，且都不影响密钥。新建时多问一句就是多一道坎。</td></tr>
+      <tr><th>名称不可改</th><td>库里的 <code>_id</code> 是 <code>club:&lt;社团名&gt;</code>（当年为了防并发重复插同一家）。重名直接被 <code>_id</code> 撞住，所以：输入时做重名提示，提交撞了回 409「已经有这家社团了」。<b>要能改名就得先拆主键</b>，这一版不碰。</td></tr>
+      <tr><th>创建即发钥匙</th><td>一次 <code>POST</code> 建社团 + 生成首把密钥（<code>status=1</code>），响应里带 <code>plain</code> 与 <code>shareText</code> —— 新钥匙的第一次，与 reset 同一口径。不拆成两次请求：拆了就有「建好了但没钥匙」的半截状态。</td></tr>
+      <tr><th>谁看得见这一行</th><td><b>只有超管</b>。社干即便被勾了 <code>clubkey</code> 位，也只有看 / 重置 / 作废 —— 多一家社团会出现在全校学生的轮播里，这不是密钥操作，是增减组织。</td></tr>
+      <tr><th>后端要加什么</th><td><code>POST /partner/club-keys</code> body <code>{name, ownerName?, teacherName?}</code> → <code>{record, plain, mask, shareText}</code>；<code>asSuperAdmin</code> 闸；名称 trim 后 2~12 字、查重；<code>_id=club:&lt;名&gt;</code> + <code>nextId</code>；不新增集合，还是 <code>club_keys</code> 一张表。前端 <code>pages-partner/club-keys/create</code> 一个表单页 + 列表一行。</td></tr>
+    </table>
+  </div>
+</div>
+
+</body>
+</html>
