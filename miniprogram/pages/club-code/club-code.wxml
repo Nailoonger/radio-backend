@@ -25,7 +25,18 @@
           data-i="{{index}}"
           bindtap="tapClub"
         >
-          <image wx:if="{{item.avatar}}" class="car-img" src="{{item.avatar}}" mode="aspectFill" />
+          <!-- ⚠️ 宽高按源图比例缩进圆盘（onAvLoad 里算）：源图是方的就正好 142×142，
+               是竖图就 106×142 —— 比例对上了 aspectFill 才不裁内容，圆盘自己负责削角。
+               写死 142×142 会把竖图的上下切掉（2026-11-09 学生会那张就这么被切了）。 -->
+          <image
+            wx:if="{{item.avatar}}"
+            class="car-img"
+            src="{{item.avatar}}"
+            mode="aspectFill"
+            data-i="{{index}}"
+            bindload="onAvLoad"
+            style="width: {{item.iw || 142}}rpx; height: {{item.ih || 142}}rpx"
+          />
           <view wx:else class="car-fb">{{item.initial}}</view>
         </view>
       </view>

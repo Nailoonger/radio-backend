@@ -42,7 +42,10 @@
 .car-stage.nt .car-i,
 .car-i.nt { transition: none; }
 
-.car-img { width: 142rpx; height: 142rpx; border-radius: 50%; display: block; }
+/* ⚠️ 这里不写 border-radius：圆形由外层 .car-i（白圆盘 + overflow:hidden）负责削。
+   图片只按源图比例缩到圆盘里（宽高在 onAvLoad 里算），比例对上了 aspectFill 就不裁内容。
+   写死 142×142 的方块会把竖图上下切掉（2026-11-09 学生会那张就是这么被切的）。 */
+.car-img { display: block; max-width: 142rpx; max-height: 142rpx; }
 /* 没上传过徽标：社团名首字，同样圆形 */
 .car-fb {
   width: 142rpx;

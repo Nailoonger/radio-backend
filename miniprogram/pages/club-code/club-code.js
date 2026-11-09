@@ -79,6 +79,24 @@ Page({
       .catch(() => { /* 静默：见上 */ });
   },
 
+  /**
+   * 头像加载完，按**源图比例**定宽高（基准 142rpx，最长边给满）。
+   * 比例跟源图一致，aspectFill 就一点内容都不裁，圆形由白圆盘自己削角。
+   * 最扁/最窄兜 56rpx，否则 1:5 的图会变成一条线。
+   */
+  onAvLoad(e) {
+    const i = Number(e.currentTarget.dataset.i);
+    const w = Number(e.detail && e.detail.width) || 0;
+    const h = Number(e.detail && e.detail.height) || 0;
+    if (!w || !h) return;
+    const M = 142, MIN = 56;
+    const iw = w >= h ? M : Math.max(MIN, Math.round(M * w / h));
+    const ih = w >= h ? Math.max(MIN, Math.round(M * h / w)) : M;
+    const cur = this.data.clubs[i] || {};
+    if (cur.iw === iw && cur.ih === ih) return;
+    this.setData({ ['clubs[' + i + '].iw']: iw, ['clubs[' + i + '].ih']: ih });
+  },
+
   /* ══════ 弧形旋转木马 ══════ */
 
   _carStop() {
@@ -95,6 +113,7 @@ Page({
     if (!N) return;
     const half = N / 2;
     for (let q = 0; q < N; q++) this._carPos.push(q > half ? q - N : q);
+    this._carVis = this._carPos.map((d) => Math.abs(d) <= 2);   // 位次表只有 0/±1/±2
     this.setData({ carOn: false });   // 与下面那次 setData 合批，首帧不带过渡
     this._carLayout(0);
     this._carPlay();
@@ -120,26 +139,33 @@ Page({
     const N = clubs.length;
     if (!N) return;
     const half = N / 2;
-    // 位次表只有 0/±1/±2 三档 ⇒ |d| > 2 一律落屏外（7 家以上折完会到 ±3、±4，那格没有位子）
-    // 3 家及以下没有「背面」，别按折返判，否则会出现「折到 0 却当成离场」
-    const parkAt = N >= 5 ? 3 : Math.max(2, half);
-    let parkIdx = -1;
+    // 扇形只有 0/±1/±2 五个位子。
+    // N > 5：永远有余量，绕到背面的那一枚藏到屏外，再滑进来（最好看）；
+    // N = 5：一个萝卜一个坑，藏了就必然空出一个位子 ⇒ 不能藏，改成「瞬移到对侧 + 淡入」。
+    const hasSpare = N > 5;
+    const parkIdxs = [];
+    const fadeIdxs = [];
+    const fadeSt = {};
     const next = [];
 
     for (let k = 0; k < N; k++) {
       const dr = this._carPos[k] - ds;      // 折叠前的连续位置
-      // 这一帧它是不是绕过背面了：奇数的社团数（如 5 家）折不到 ±half 那个整格，
-      // 只靠 |d| 判断会让它从 -273 一口气滑到 +273 横穿正面 ⇒ 必须按「跨没跨过」判
+      const wasVis = this._carVis[k] !== false;
       const crossed = N >= 3 && ((dr > half) || (dr < -half));
       let d = dr;
       while (d > half) d -= N;              // 转过半个圆就折回另一侧，位置永远落在 ±half 内
       while (d < -half) d += N;
       this._carPos[k] = d;
 
-      if (crossed || Math.abs(d) >= parkAt) {
+      // 只有「上一帧还看得见」才算绕到背面去了；否则它是刚从背面绕回来，正要入场
+      const wrapped = crossed && wasVis;
+      const parked = hasSpare && (Math.abs(d) > 2 || wrapped);
+      this._carVis[k] = !parked;
+
+      if (parked) {
         // 退到屏外，且要落在它「下一次入场的那一侧」，否则下一帧会横穿整屏
         const side = ds > 0 ? 1 : -1;
-        parkIdx = k;
+        parkIdxs.push(k);
         next.push({
           ...clubs[k],
           nt: true,
@@ -153,12 +179,19 @@ Page({
       const sg = d > 0 ? 1 : -1;
       const tx = d ? sg * CAR_X[a] : 0;
       const ry = d ? -sg * CAR_R[a] : 0;
-      next.push({
-        ...clubs[k],
-        nt: false,
-        st: 'transform:translateX(' + tx + 'rpx) scale(' + CAR_S[a] + ') rotateY(' + ry + 'deg);opacity:' +
-            CAR_O[a] + ';z-index:' + (5 - a),
-      });
+      const finalSt = 'transform:translateX(' + tx + 'rpx) scale(' + CAR_S[a] + ') rotateY(' + ry + 'deg);opacity:' +
+                      CAR_O[a] + ';z-index:' + (5 - a);
+
+      if (wrapped) {
+        // 5 家时绕到背面的这一枚：先不加过渡地落到对侧位子、透明度 0，
+        // 下一拍再放开过渡淡进来 —— 不做这一步它就会从 -273 滑到 +273 横穿正面。
+        fadeIdxs.push(k);
+        fadeSt[k] = finalSt;
+        next.push({ ...clubs[k], nt: true, st: finalSt.replace(/opacity:[^;]*/, 'opacity:0') });
+        continue;
+      }
+
+      next.push({ ...clubs[k], nt: false, st: finalSt });
     }
 
     this.setData({
@@ -166,12 +199,17 @@ Page({
       curName: clubs[((this._carStep % N) + N) % N].name,
     }, () => {
       const patch = {};
-      // 瞬移那一帧只关这一枚的过渡，下一帧立刻放开；不放开它下次入场也不会补间
-      if (parkIdx >= 0) patch['clubs[' + parkIdx + '].nt'] = false;
+      // 瞬移那一帧只关这几枚的过渡，下一帧立刻放开；不放开它下次入场也不会补间
+      parkIdxs.forEach((i) => { patch['clubs[' + i + '].nt'] = false; });
+      // 淡入的这几枚：位子不动，只把透明度补上，由 .62s 过渡自己淡进来
+      fadeIdxs.forEach((i) => {
+        patch['clubs[' + i + '].nt'] = false;
+        patch['clubs[' + i + '].st'] = fadeSt[i];
+      });
       // ⚠️ 首帧的「放开过渡」必须放到回调里：和落位样式同一次 setData 提交的话，
       //    合并后 carOn 直接就是 true，等于没关过 —— 六枚会从中心散开乱飞一次
       if (!this.data.carOn) patch.carOn = true;
-      if (patch.carOn || parkIdx >= 0) this.setData(patch);
+      if (Object.keys(patch).length) this.setData(patch);
     });
   },
 
