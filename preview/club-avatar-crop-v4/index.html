@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>调整头像 · v4 · 去掉滑杆，提示语与复位并成一行贴在裁剪框下</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; }
+body {
+  --ink: #1D1D1F;
+  --ink-2: #333333;
+  --muted: #7A7A7A;
+  --soft: #C7C7CC;
+  --parchment: #F5F5F7;
+  --accent: #0066CC;
+  --accent-tint: #EAF3FD;
+  background: #ECECEE;
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  padding: 40px 0 72px;
+}
+
+.head { max-width: 940px; margin: 0 auto 24px; padding: 0 24px; }
+.head .v {
+  display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .6px;
+  color: #fff; background: var(--accent); border-radius: 999px; padding: 4px 10px; vertical-align: 3px;
+}
+.head h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; letter-spacing: -.3px; }
+.head p { font-size: 13px; line-height: 1.75; color: #5B5B60; margin: 0; }
+.head p b { color: var(--ink); font-weight: 600; }
+.head p.chg { margin-top: 10px; padding: 9px 12px; border-radius: 10px; background: var(--accent-tint); color: var(--ink-2); font-size: 12.5px; line-height: 1.7; }
+.head p.chg i { font-style: normal; font-weight: 700; color: var(--accent); margin-right: 6px; }
+
+.stagewrap { display: flex; gap: 36px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+.col { width: 390px; }
+.col .cap { text-align: center; font-size: 12.5px; font-weight: 600; color: #5B5B60; margin-top: 12px; }
+.col .cap i { display: block; font-style: normal; font-weight: 400; font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+
+.phone {
+  width: 390px; height: 720px; background: #fff; border-radius: 42px; overflow: hidden; position: relative;
+  box-shadow: 0 24px 60px -30px rgba(15, 28, 46, .38), 0 0 0 1px rgba(0, 0, 0, .05);
+}
+.sbar { height: 44px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 26px 6px; font-size: 13px; font-weight: 600; }
+.sbar .rt { display: flex; gap: 5px; align-items: center; }
+.sbar .rt i { display: block; width: 15px; height: 9px; border-radius: 2px; background: var(--ink); opacity: .82; }
+
+/* 导航栏：标题按屏幕中线居中（不按剩余空间），右上那个位子永远留给微信胶囊 */
+.navbar { position: relative; height: 44px; display: flex; align-items: center; padding: 0 8px; }
+.navbar-back { position: relative; z-index: 1; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+.navbar-back svg { display: block; }
+.navbar-title { position: absolute; left: 0; right: 0; text-align: center; font-size: 17px; font-weight: 600; letter-spacing: -.2px; pointer-events: none; }
+
+/* ⚠️ 微信小程序的胶囊（··· 和 ◎）就长在那儿，右边 87×32 是被占住的，别往里放任何按钮 */
+.capsule {
+  position: absolute; right: 7px; top: 6px; width: 87px; height: 32px; box-sizing: border-box;
+  border-radius: 999px; border: 1px solid rgba(15, 28, 46, .12);
+  background: rgba(255, 255, 255, .82); display: flex; align-items: center;
+}
+.capsule .dots { flex: 1; display: flex; align-items: center; justify-content: center; gap: 2.5px; }
+.capsule .dots i { width: 3.5px; height: 3.5px; border-radius: 50%; background: rgba(15, 28, 46, .48); }
+.capsule .div { width: 1px; height: 15px; background: rgba(15, 28, 46, .12); }
+.capsule .ring { flex: 1; display: flex; align-items: center; justify-content: center; }
+.capsule .ring::before { content: ''; width: 11px; height: 11px; border-radius: 50%; border: 1.4px solid rgba(15, 28, 46, .48); }
+
+/* ══ 取景舞台 ══ */
+/* 撑满导航栏以下的整块，好让「完成」用 margin-top:auto 真正沉到最底下 */
+.crop-body { padding: 14px 22px 26px; display: flex; flex-direction: column; height: calc(100% - 88px); box-sizing: border-box; }
+.stage {
+  position: relative; width: 346px; height: 346px; overflow: hidden;
+  background: var(--parchment); border-radius: 20px; touch-action: none; cursor: grab;
+}
+.stage.dragging { cursor: grabbing; }
+.pic { position: absolute; left: 50%; top: 50%; display: block; user-select: none; -webkit-user-drag: none; }
+/* 白色蒙版挖一个圆洞：浅色页面上不压暗，圆外退成白，一眼看出「只有这一圈」 */
+.hole {
+  position: absolute; left: 50%; top: 50%; border-radius: 50%; pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(15, 28, 46, .14), 0 0 0 2000px rgba(255, 255, 255, .92);
+}
+
+/* 提示语 + 复位：一行，整体居中，就贴在裁剪框下沿 —— 不再单占一条滑杆 */
+.tipline {
+  display: flex; align-items: baseline; justify-content: center;
+  gap: 14px; margin-top: 16px; font-size: 12.5px; letter-spacing: .2px;
+}
+.tipline .tl { color: var(--muted); }
+.tipline .tl-reset {
+  color: var(--accent); font-weight: 600;
+  padding: 8px 6px; margin: -8px 0; border-radius: 8px;
+  cursor: pointer; user-select: none;
+}
+.tipline .tl-reset:active { opacity: .55; }
+
+.btn-primary {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 50px; margin-top: auto; border: 0; border-radius: 999px;
+  background: var(--accent); color: #fff; font-family: inherit;
+  font-size: 16.5px; font-weight: 600; letter-spacing: .3px; cursor: pointer;
+}
+.btn-primary:active { opacity: .82; }
+.btn-primary.done { background: var(--accent-tint); color: var(--accent); }
+/* ══ 完成后的样子 ══ */
+.done-body { padding: 14px 22px 0; }
+.orgcard { background: var(--parchment); border-radius: 34px; padding: 22px 20px; display: flex; align-items: center; gap: 16px; }
+.avwrap { position: relative; flex: none; }
+.av { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; background: var(--accent-tint); }
+.av img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.avedit {
+  position: absolute; right: -2px; bottom: -2px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; color: var(--accent); display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 0 2px var(--parchment), 0 2px 6px -2px rgba(15, 28, 46, .30);
+}
+.on1 { font-size: 17px; font-weight: 700; letter-spacing: -.3px; }
+.on2 { font-size: 11.5px; color: var(--muted); margin-top: 5px; }
+
+.sizecard { background: var(--parchment); border-radius: 34px; padding: 20px; margin-top: 14px; }
+.sizecard .t { font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 16px; }
+.sizegrid { display: flex; align-items: flex-end; gap: 26px; }
+.sz { text-align: center; }
+.sz .r { border-radius: 50%; overflow: hidden; background: var(--accent-tint); margin: 0 auto; }
+.sz .r img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.sz .l { font-size: 10.5px; color: var(--muted); margin-top: 8px; letter-spacing: .2px; }
+
+.notecard { margin-top: 14px; font-size: 11.5px; color: var(--muted); line-height: 1.8; padding: 0 4px; }
+.notecard b { color: var(--ink-2); font-weight: 600; }
+
+/* ══ 说明 ══ */
+.notes { max-width: 860px; margin: 34px auto 0; padding: 0 24px; }
+.notes .ncard { background: #fff; border-radius: 18px; padding: 18px 20px; }
+.notes h2 { font-size: 13.5px; font-weight: 700; margin: 0 0 12px; }
+.notes table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.notes th, .notes td { text-align: left; padding: 7px 0; border-bottom: 1px solid #F0F0F2; vertical-align: top; }
+.notes th { font-weight: 600; color: var(--muted); width: 132px; }
+.notes tr:last-child th, .notes tr:last-child td { border-bottom: 0; }
+.notes code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; background: #F2F2F5; border-radius: 4px; padding: 1px 5px; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>上传头像后调大小和位置 <span class="v">v4</span></h1>
+  <p>
+    选完图不再直接上传，先进这一页：<b>拖动移位置、双指捏合缩放</b>，圆里看中的那一块才是头像。
+    左边能直接拖、能滚轮缩放，底下的「完成」会把取景框里的那块真裁出来给右边看。
+  </p>
+  <p class="chg">
+    <i>v4 改这一处</i><b>滑杆整条删掉</b>（缩放只走双指捏合，屏幕上就少一排东西）；
+    「双指缩放 · 拖动移动」这行灰字<b>贴到裁剪框下沿居中</b>，「复位」用<b>蓝字</b>紧跟在它后面。
+    「完成」仍在最底部通栏。点一下「完成」能看见它变灰显示「已更新」，右边三档尺寸是它真裁出来的。
+  </p>
+</div>
+
+<div class="stagewrap">
+
+  <!-- ═══ 调整中 ═══ -->
+  <div class="col">
+    <div class="phone">
+      <div class="sbar"><span>9:41</span><span class="rt"><i></i><i style="width:11px"></i></span></div>
+      <div class="navbar">
+        <div class="navbar-back">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M4.5 4.5l9 9M13.5 4.5l-9 9" stroke="#1D1D1F" stroke-width="1.7" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="navbar-title">调整头像</div>
+        <div class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="div"></span><span class="ring"></span></div>
+      </div>
+
+      <div class="crop-body">
+        <div class="stage" id="stage">
+          <img class="pic" id="pic" src="assets/demo-portrait.jpg" alt="" draggable="false">
+          <div class="hole" id="hole"></div>
+        </div>
+
+        <div class="tipline">
+          <span class="tl">双指缩放 · 拖动移动</span>
+          <span class="tl-reset" id="resetBtn">复位</span>
+        </div>
+
+        <button class="btn-primary" id="doneBtn">完成</button>
+      </div>
+    </div>
+    <div class="cap">A · 调整页<i>图能拖出去吗？拖到头会停住，圆里不会露白</i><i>滚轮也能缩放（替掉原来那条滑杆）</i></div>
+  </div>
+
+  <!-- ═══ 完成之后 ═══ -->
+  <div class="col">
+    <div class="phone">
+      <div class="sbar"><span>9:41</span><span class="rt"><i></i><i style="width:11px"></i></span></div>
+      <div class="navbar">
+        <div class="navbar-back">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M6.6 1.2L2.4 5l4.2 3.8" stroke="#1D1D1F" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" transform="translate(0.6,0)"/>
+          </svg>
+        </div>
+        <div class="navbar-title">广播通知</div>
+        <div class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="div"></span><span class="ring"></span></div>
+      </div>
+
+      <div class="done-body">
+        <div class="orgcard">
+          <div class="avwrap">
+            <div class="av"><img id="r1" src="assets/demo-portrait.jpg" alt=""></div>
+            <div class="avedit">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M1.2 4.2h1.6L3.6 2.6h4.8l.8 1.6h1.6v5.2H1.2z" stroke="#0066CC" stroke-width="1.2" stroke-linejoin="round"/>
+                <circle cx="6" cy="7" r="1.7" stroke="#0066CC" stroke-width="1.2"/>
+              </svg>
+            </div>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div class="on1">学生会</div>
+            <div class="on2">密钥 ····M7 · 负责人 林溪</div>
+          </div>
+        </div>
+
+        <div class="sizecard">
+          <div class="t">同一个头像在别处出现的样子</div>
+          <div class="sizegrid">
+            <div class="sz">
+              <div class="r" style="width:86px;height:86px"><img id="r2" src="assets/demo-portrait.jpg" alt=""></div>
+              <div class="l">输码页轮播 166rpx</div>
+            </div>
+            <div class="sz">
+              <div class="r" style="width:46px;height:46px"><img id="r3" src="assets/demo-portrait.jpg" alt=""></div>
+              <div class="l">社团台抬头 90rpx</div>
+            </div>
+            <div class="sz">
+              <div class="r" style="width:30px;height:30px"><img id="r4" src="assets/demo-portrait.jpg" alt=""></div>
+              <div class="l">密钥列表 58rpx</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="notecard">
+          <b>存的是方图，不是圆图。</b>圆形由各处自己削角 —— 这样以后要做方卡、分享图都还能用。
+        </div>
+      </div>
+    </div>
+    <div class="cap">B · 完成之后<i>大小三档都还认得出是这个社团</i></div>
+  </div>
+
+</div>
+
+<div class="notes">
+  <div class="ncard">
+    <h2>这一页的规矩</h2>
+    <table>
+      <tr><th>进页默认</th><td>先把图缩到「刚好铺满圆」，居中。不自动放大 —— 一进来就放大容易把人搞懵。</td></tr>
+      <tr><th>缩放下限</th><td><code>刚好铺满圆</code>，不能再小。再小圆里就会露白，头像边上出现白圈。</td></tr>
+      <tr><th>拖动范围</th><td>图片的四条边都不能进到圆里，拖到头就停住（跟微信换头像一样的手感）。</td></tr>
+      <tr><th>缩放时</th><td>以圆心那一点为锚点缩放，不飘。双指捏合与滚轮（预览里）走同一套。</td></tr>
+      <tr><th>按钮位置</th><td>「完成」固定在<b>内容区最下方、水平居中</b>，<code>margin-top:auto</code> 沉到底边留 <code>26px</code>。手指拖完图拇指正好落在按钮上，不用再往右上角去够。宽度<b>通栏 <code>100%</code></b>（蓝底白字，高 <code>50px</code>、圆角 <code>999px</code>）—— 陛下定了这一档，窄版胶囊不再留。</td></tr>
+      <tr><th>⚠️ 右上禁区</th><td>导航栏右上是<b>微信胶囊</b>（宽约 <code>87px</code>、离边 <code>7px</code>），小程序里永远被占着 —— 不放任何可点元素，也不放文字。标题靠 <code>position:absolute</code> 按屏幕中线居中，辅助操作全放内容区。</td></tr>
+      <tr><th>手势</th><td><b>不再有滑杆</b>，缩放只走双指捏合（下限 1×，上限 3×）。提示语与「复位」并成一行贴在裁剪框下沿：<code>双指缩放 · 拖动移动</code>（灰）<code>复位</code>（蓝，<code>--accent</code>）。</td></tr>
+      <tr><th>输出</th><td><code>720×720</code> 方图，JPEG 质量 0.86，压完约 80~150KB，远低于 <code>callFunction</code> 那 1MB 的天花板。</td></tr>
+      <tr><th>入口</th><td>社团台头像右下角相机角标 → 选图 → 本页 → 完成即上传，不再有第二次确认。</td></tr>
+    </table>
+  </div>
+</div>
+
+<script>
+(function () {
+  var stage = document.getElementById('stage');
+  var pic = document.getElementById('pic');
+  var hole = document.getElementById('hole');
+  var resetEl = document.getElementById('resetBtn');
+  var S, D, R, w0 = 0, h0 = 0, base = 1, k = 1, dw = 0, dh = 0, tx = 0, ty = 0;
+
+  function measure() {
+    S = stage.clientWidth;
+    D = Math.round(S * 0.78);
+    R = D / 2;
+    hole.style.width = D + 'px';
+    hole.style.height = D + 'px';
+    hole.style.marginLeft = (-D / 2) + 'px';
+    hole.style.marginTop = (-D / 2) + 'px';
+  }
+
+  function clamp() {
+    var mx = Math.max(0, dw / 2 - R);
+    var my = Math.max(0, dh / 2 - R);
+    tx = Math.min(mx, Math.max(-mx, tx));
+    ty = Math.min(my, Math.max(-my, ty));
+  }
+
+  function apply() {
+    pic.style.width = dw + 'px';
+    pic.style.height = dh + 'px';
+    pic.style.marginLeft = (-dw / 2) + 'px';
+    pic.style.marginTop = (-dh / 2) + 'px';
+    pic.style.transform = 'translate(' + tx.toFixed(2) + 'px,' + ty.toFixed(2) + 'px)';
+  }
+
+  function setZoom(nk) {
+    nk = Math.min(3, Math.max(1, nk));
+    var ratio = nk / k;
+    k = nk;
+    dw = w0 * base * k;
+    dh = h0 * base * k;
+    tx *= ratio; ty *= ratio;      // 以圆心为锚点缩放
+    clamp(); apply();
+  }
+
+  function reset() {
+    k = 1; dw = w0 * base; dh = h0 * base; tx = 0; ty = 0;
+    clamp(); apply();
+  }
+
+  function init() {
+    measure();
+    pic.onload = function () {
+      w0 = pic.naturalWidth || 1080;
+      h0 = pic.naturalHeight || 1440;
+      base = D / Math.min(w0, h0);   // 刚好铺满圆
+      reset();
+      applyCrop();                   // 右边先用当前取景显示，不然它显示的是整张原图
+    };
+    if (pic.complete && pic.naturalWidth) pic.onload();
+  }
+
+  /* 拖动 */
+  var down = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  stage.addEventListener('pointerdown', function (e) {
+    down = true; sx = e.clientX; sy = e.clientY; ox = tx; oy = ty;
+    stage.classList.add('dragging');
+    stage.setPointerCapture(e.pointerId);
+  });
+  stage.addEventListener('pointermove', function (e) {
+    if (!down) return;
+    tx = ox + (e.clientX - sx);
+    ty = oy + (e.clientY - sy);
+    clamp(); apply();
+  });
+  stage.addEventListener('pointerup', function () { down = false; stage.classList.remove('dragging'); });
+  stage.addEventListener('pointercancel', function () { down = false; stage.classList.remove('dragging'); });
+
+  /* 滚轮缩放 */
+  stage.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    setZoom(k * (1 - e.deltaY / 900));
+  }, { passive: false });
+
+  document.getElementById('resetBtn').addEventListener('click', reset);
+
+  /* 双指缩放 */
+  var pinch = null;
+  stage.addEventListener('touchstart', function (e) {
+    if (e.touches.length === 2) {
+      pinch = { d: dist(e.touches), k: k };
+    }
+  }, { passive: true });
+  stage.addEventListener('touchmove', function (e) {
+    if (pinch && e.touches.length === 2) {
+      e.preventDefault();
+      setZoom(pinch.k * dist(e.touches) / pinch.d);
+    }
+  }, { passive: false });
+  stage.addEventListener('touchend', function () { pinch = null; });
+
+  function dist(t) {
+    var dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy) || 1;
+  }
+
+  /* 按取景框真裁一块 720×720 */
+  function applyCrop() {
+    if (!w0 || !h0) return;
+    var scale = base * k;                 // 屏幕 px / 源图 px
+    var side = D / scale;                 // 取景框对应的源图边长
+    var cx = w0 / 2 - tx / scale;
+    var cy = h0 / 2 - ty / scale;
+    var OUT = 720;
+    var cv = document.createElement('canvas');
+    cv.width = cv.height = OUT;
+    var ctx = cv.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, OUT, OUT);
+    ctx.drawImage(pic, cx - side / 2, cy - side / 2, side, side, 0, 0, OUT, OUT);
+    var url = cv.toDataURL('image/jpeg', 0.86);
+    ['r1', 'r2', 'r3', 'r4'].forEach(function (id) { document.getElementById(id).src = url; });
+  }
+
+  var doneEl = document.getElementById('doneBtn');
+  doneEl.addEventListener('click', function () {
+    applyCrop();
+    doneEl.classList.add('done');
+    doneEl.textContent = '已更新';
+    setTimeout(function () {
+      doneEl.classList.remove('done');
+      doneEl.textContent = '完成';
+    }, 1200);
+  });
+
+
+  window.addEventListener('resize', function () { init(); });
+  init();
+})();
+</script>
+</body>
+</html>

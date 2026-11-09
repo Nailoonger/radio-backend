@@ -32,8 +32,6 @@ Page({
     cropStyle: '',
     cropHoleStyle: '',
     cropD: 0,
-    cropKV: 100,        // 滑杆值 = 缩放 × 100
-    cropIdle: true,     // 已在默认位置 ⇒ 「复位」灰掉
     cropBusy: false,
   },
 
@@ -149,7 +147,7 @@ Page({
     this._k = 1; this._tx = 0; this._ty = 0;
     this._pinch = null; this._drag = null;
     this._w0 = 0; this._h0 = 0;
-    this.setData({ cropOn: true, cropSrc: src, cropBusy: false, cropIdle: true, cropKV: 100 }, () => {
+    this.setData({ cropOn: true, cropSrc: src, cropBusy: false }, () => {
       wx.nextTick(() => this._measure());
     });
     wx.getImageInfo({
@@ -192,18 +190,14 @@ Page({
 
   _apply() {
     const dw = this._dw, dh = this._dh;
-    const idle = this._k <= 1.0001 && Math.abs(this._tx) < 0.5 && Math.abs(this._ty) < 0.5;
     this.setData({
       cropStyle: 'width:' + dw.toFixed(1) + 'px;height:' + dh.toFixed(1) + 'px;' +
         'margin-left:' + (-dw / 2).toFixed(1) + 'px;margin-top:' + (-dh / 2).toFixed(1) + 'px;' +
         'transform:translate(' + this._tx.toFixed(1) + 'px,' + this._ty.toFixed(1) + 'px)',
-      // 已经在默认位置就没什么可复位的 —— 灰掉，别让人白点一下
-      cropIdle: idle,
     });
   },
 
-  /** fromSlider：拖滑杆引起的缩放，别把值再写回滑杆（会跟手指抢） */
-  _setZoom(nk, fromSlider) {
+  _setZoom(nk) {
     nk = Math.min(3, Math.max(1, nk));
     if (!this._base) return;
     const ratio = nk / this._k;
@@ -213,7 +207,6 @@ Page({
     this._tx *= ratio; this._ty *= ratio;   // 以圆心为锚点缩放
     this._clamp();
     this._apply();
-    if (!fromSlider) this.setData({ cropKV: Math.round(nk * 100) });
   },
 
   _dist(a, b) {
@@ -261,19 +254,14 @@ Page({
     if (!ts.length) { this._drag = null; this._pinch = null; }
   },
 
-  onZoomChange(e) {
-    this._setZoom((e.detail && e.detail.value) / 100, true);
-  },
-
   resetCrop() {
-    if (this.data.cropIdle) return;
+    if (!this._base) return;
     this._k = 1;
     this._dw = this._w0 * this._base;
     this._dh = this._h0 * this._base;
     this._tx = 0; this._ty = 0;
     this._clamp();
     this._apply();
-    this.setData({ cropKV: 100 });
   },
 
   closeCrop() {

@@ -56,24 +56,18 @@
   box-shadow: 0 0 0 1px rgba(15, 28, 46, 0.14), 0 0 0 2000px rgba(255, 255, 255, 0.92);
 }
 
-.cr-zoom {
-  display: flex; align-items: center; gap: 22rpx;
-  padding: 58rpx 12rpx 0;
-}
-.cr-zi { width: 30rpx; text-align: center; font-size: 32rpx; color: var(--soft); }
-.cr-sl { flex: 1; margin: 0; }
-
-/* 提示语靠左、复位靠右 —— 复位不占导航栏右上（那儿是微信胶囊） */
+/* 提示语 + 复位：一行，整体居中，就贴在裁剪框下沿 —— 不再单占一条滑杆。
+   缩放只走双指捏合；复位用蓝字跟在提示后面（不占导航栏右上，那儿是微信胶囊）。 */
 .cr-tip {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-top: 34rpx;
+  display: flex; align-items: baseline; justify-content: center;
+  gap: 28rpx; margin-top: 30rpx;
 }
 .cr-tl { font-size: 24rpx; color: var(--muted); letter-spacing: 0.4rpx; }
+/* 左右只给 12rpx：跟提示语挨着，别被内边距拉出一道缝 */
 .cr-reset {
   font-size: 24rpx; font-weight: 600; color: var(--accent);
-  padding: 16rpx 20rpx; margin: -16rpx -20rpx -16rpx 0;
+  padding: 16rpx 12rpx; margin: -16rpx 0;
 }
-.cr-reset.idle { color: var(--soft); font-weight: 500; }
 
 /* 完成沉到最底：margin-top:auto 吃掉中间的空，宽度靠 .btn-block 的 100% */
 .cr-done { margin-top: auto; }

@@ -96,18 +96,10 @@
       <view class="cr-hole" style="{{cropHoleStyle}}"></view>
     </view>
 
-    <view class="cr-zoom">
-      <text class="cr-zi">−</text>
-      <slider class="cr-sl" min="100" max="300" step="1" value="{{cropKV}}"
-              activeColor="#0066CC" backgroundColor="#E4E4E9" block-size="22"
-              bindchanging="onZoomChange" bindchange="onZoomChange" />
-      <text class="cr-zi">+</text>
-    </view>
-
-    <!-- 提示语靠左、复位靠右：一对「怎么用 / 反悔」，也不占导航栏右上 -->
+    <!-- 提示语 + 复位：一行，整体居中，就贴在裁剪框下沿 —— 不再单占一条滑杆 -->
     <view class="cr-tip">
       <text class="cr-tl">双指缩放 · 拖动移动</text>
-      <text class="cr-reset {{cropIdle ? 'idle' : ''}}" bindtap="resetCrop">复位</text>
+      <text class="cr-reset" bindtap="resetCrop">复位</text>
     </view>
 
     <button class="btn btn-primary btn-block cr-done" bindtap="confirmCrop"
