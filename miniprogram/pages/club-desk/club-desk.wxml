@@ -70,3 +70,50 @@
 
   <view class="pb-safe"></view>
 </view>
+
+<!-- ═══ 调整头像：全屏层（不是新页面，关掉就回社团台） ═══
+     ⚠️ 导航栏右上留给微信胶囊，这一层不往那儿放任何元素；关闭走左边 ✕ -->
+<view class="crop" wx:if="{{cropOn}}">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="closeCrop" aria-label="关闭">
+      <view class="xmark">
+        <view class="xmark-a"></view>
+        <view class="xmark-b"></view>
+      </view>
+    </view>
+    <view class="navbar-title">调整头像</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="cr-body">
+    <!-- 舞台：图绝对定位在正中，位移/缩放全靠内联 transform；圆洞是白色蒙版挖出来的 -->
+    <view class="cr-stage" id="cropStage"
+          bindtouchstart="onCropStart" catchtouchmove="onCropMove"
+          bindtouchend="onCropEnd" bindtouchcancel="onCropEnd">
+      <image class="cr-pic" src="{{cropSrc}}" style="{{cropStyle}}" mode="scaleToFill" />
+      <view class="cr-hole" style="{{cropHoleStyle}}"></view>
+    </view>
+
+    <view class="cr-zoom">
+      <text class="cr-zi">−</text>
+      <slider class="cr-sl" min="100" max="300" step="1" value="{{cropKV}}"
+              activeColor="#0066CC" backgroundColor="#E4E4E9" block-size="22"
+              bindchanging="onZoomChange" bindchange="onZoomChange" />
+      <text class="cr-zi">+</text>
+    </view>
+
+    <!-- 提示语靠左、复位靠右：一对「怎么用 / 反悔」，也不占导航栏右上 -->
+    <view class="cr-tip">
+      <text class="cr-tl">双指缩放 · 拖动移动</text>
+      <text class="cr-reset {{cropIdle ? 'idle' : ''}}" bindtap="resetCrop">复位</text>
+    </view>
+
+    <button class="btn btn-primary btn-block cr-done" bindtap="confirmCrop"
+            loading="{{cropBusy}}" disabled="{{cropBusy}}">完成</button>
+  </view>
+
+  <!-- 真裁用的离屏画布（720×720 由 JS 定，CSS 只负责藏起来） -->
+  <canvas type="2d" id="cropCanvas" class="cr-cv"></canvas>
+</view>

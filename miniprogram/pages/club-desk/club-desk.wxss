@@ -11,3 +11,76 @@
   padding: 40rpx 0 10rpx;
   letter-spacing: 0.4rpx;
 }
+
+/* ════════ 调整头像（全屏层） ════════ */
+/* 口径见 club-desk.js 顶部注释；数值一律 1px(设计) × 1.923rpx */
+.crop {
+  position: fixed; left: 0; top: 0; right: 0; bottom: 0;
+  z-index: 900;
+  background: var(--canvas);
+  display: flex; flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 关掉用 ✕，不用返回箭头：这一层没有「上一页」可回 */
+.xmark { position: relative; width: 36rpx; height: 36rpx; }
+.xmark-a, .xmark-b {
+  position: absolute; left: 0; top: 50%;
+  width: 100%; height: 2rpx; border-radius: 2rpx;
+  background: var(--ink);
+}
+.xmark-a { transform: rotate(45deg); }
+.xmark-b { transform: rotate(-45deg); }
+
+.cr-body {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+  padding: 26rpx 42rpx 50rpx;
+}
+
+/* 方形舞台：宽度撑满，高度用 padding-bottom 跟出来（不靠 aspect-ratio，老基础库也认） */
+.cr-stage {
+  position: relative; width: 100%; height: 0; padding-bottom: 100%;
+  overflow: hidden;
+  background: var(--parchment);
+  border-radius: 38rpx;
+}
+/* 宽高、位移、缩放全由 JS 写成内联 style —— 这里只给「居中锚点」和「不裁内容」 */
+.cr-pic { position: absolute; left: 50%; top: 50%; display: block; }
+
+/* 白色蒙版挖一个圆洞：浅色页面上不压暗，圆外退成白，一眼看出「只有这一圈」 */
+.cr-hole {
+  position: absolute; left: 50%; top: 50%;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(15, 28, 46, 0.14), 0 0 0 2000px rgba(255, 255, 255, 0.92);
+}
+
+.cr-zoom {
+  display: flex; align-items: center; gap: 22rpx;
+  padding: 58rpx 12rpx 0;
+}
+.cr-zi { width: 30rpx; text-align: center; font-size: 32rpx; color: var(--soft); }
+.cr-sl { flex: 1; margin: 0; }
+
+/* 提示语靠左、复位靠右 —— 复位不占导航栏右上（那儿是微信胶囊） */
+.cr-tip {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 34rpx;
+}
+.cr-tl { font-size: 24rpx; color: var(--muted); letter-spacing: 0.4rpx; }
+.cr-reset {
+  font-size: 24rpx; font-weight: 600; color: var(--accent);
+  padding: 16rpx 20rpx; margin: -16rpx -20rpx -16rpx 0;
+}
+.cr-reset.idle { color: var(--soft); font-weight: 500; }
+
+/* 完成沉到最底：margin-top:auto 吃掉中间的空，宽度靠 .btn-block 的 100% */
+.cr-done { margin-top: auto; }
+
+/* 真裁用的离屏画布：720×720 由 JS 定，CSS 只负责不占位、不挡手 */
+.cr-cv {
+  position: fixed; left: 0; top: 0;
+  width: 10px; height: 10px;
+  opacity: 0; pointer-events: none;
+}
