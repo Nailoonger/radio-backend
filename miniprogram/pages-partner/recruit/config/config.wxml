@@ -59,8 +59,11 @@
                     data-key="{{item.key}}" bindchange="onReq" />
           </view>
           <block wx:if="{{item.options}}">
-            <view class="chips" wx:if="{{(item.key === 'grade' ? gradeOpts : classOpts).length}}">
-              <view class="chip-x" wx:for="{{item.key === 'grade' ? gradeOpts : classOpts}}" wx:for-item="o" wx:key="label">
+            <!-- ⚠️ 只读 item.opts（JS 里按 key 摊好的那一组），不要在模板里现挑：
+                 WXML 解析器不认「括号表达式后接 .length」⇒ 直接编译报
+                 Bad attr `wx:if` with message: unexpected token `.` -->
+            <view class="chips" wx:if="{{item.opts.length}}">
+              <view class="chip-x" wx:for="{{item.opts}}" wx:for-item="o" wx:key="label">
                 <text>{{o.label}}</text>
                 <text class="x" wx:if="{{canManage}}" data-key="{{item.key}}" data-label="{{o.label}}" catchtap="onOptDel">✕</text>
               </view>

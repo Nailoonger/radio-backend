@@ -34,6 +34,21 @@ const FIXED = [
   { key: 'className', label: '班级', options: true },
 ];
 
+/**
+ * 固定信息行 + 该行要显示的选项。
+ *
+ * ⚠️⚠️ 选项必须在 JS 里算好挂到行上，**不能**在 WXML 里现挑：
+ *   WXML 模板解析器不认「括号表达式后面接 .length」——
+ *   `{{(item.key === 'grade' ? gradeOpts : classOpts).length}}` 直接编译报
+ *   「Bad attr `wx:if` with message: unexpected token `.`」。
+ *   模板只做取值，不做取属性。
+ */
+function buildFixedList(gradeOpts, classOpts) {
+  return FIXED.map((f) => Object.assign({}, f, {
+    opts: f.key === 'grade' ? (gradeOpts || []) : (f.key === 'className' ? (classOpts || []) : []),
+  }));
+}
+
 function pad(n) { return String(n).padStart(2, '0'); }
 /* ISO -> 'YYYY-MM-DD'：取字符串里的墙钟日期，别用 Date（设备时区一变就跳日） */
 function dayOf(iso) {
@@ -66,7 +81,7 @@ Page({
     openDay: '',
     closeDay: '',
     fixed: {},
-    fixedList: FIXED,
+    fixedList: buildFixedList([], []),
     gradeOpts: [],
     classOpts: [],
     questions: [],
@@ -132,6 +147,8 @@ Page({
            · 归档后：整份都改不了 */
         const published = !!b.publishedAt;
         const started = b.closedAt !== null || (!!b.opensAt && Date.parse(b.opensAt) <= Date.now());
+        const gradeOpts = ((fixed.grade && fixed.grade.options) || []).map((x) => ({ id: x.id, label: x.label }));
+        const classOpts = ((fixed.className && fixed.className.options) || []).map((x) => ({ id: x.id, label: x.label }));
         this.setData({
           loading: false,
           version: Number(b.version) || 0,
@@ -153,8 +170,9 @@ Page({
             grade: !fixed.grade || fixed.grade.required !== false,
             className: !fixed.className || fixed.className.required !== false,
           },
-          gradeOpts: ((fixed.grade && fixed.grade.options) || []).map((x) => ({ id: x.id, label: x.label })),
-          classOpts: ((fixed.className && fixed.className.options) || []).map((x) => ({ id: x.id, label: x.label })),
+          gradeOpts: gradeOpts,
+          classOpts: classOpts,
+          fixedList: buildFixedList(gradeOpts, classOpts),
           questions: (b.questions || []).map((x) => ({
             id: x.id, type: x.type, title: x.title, required: !!x.required,
             typeText: TYPE_TEXT[x.type] || x.type,
@@ -184,12 +202,17 @@ Page({
   },
 
   /* 年级 / 班级选项：点叉删，点「+ 添加」输一个（原生可输入弹窗，省一层自制层） */
+  /* ⚠️ 改完选项必须同时重建 fixedList，否则界面上那一排 chip 不会变 */
   onOptDel(e) {
     if (!this.data.canManage) return;
     const { key, label } = e.currentTarget.dataset;
     const prop = key === 'grade' ? 'gradeOpts' : 'classOpts';
     const next = this.data[prop].filter((x) => x.label !== label);
-    this.setData({ [prop]: next });
+    this.setData({
+      [prop]: next,
+      fixedList: buildFixedList(key === 'grade' ? next : this.data.gradeOpts,
+        key === 'className' ? next : this.data.classOpts),
+    });
   },
   onOptAdd(e) {
     if (!this.data.canManage) return;
@@ -206,7 +229,12 @@ Page({
         const list = this.data[prop];
         if (list.some((x) => x.label === label)) { wx.showToast({ title: '已经有这个选项了', icon: 'none' }); return; }
         if (list.length >= 50) { wx.showToast({ title: '最多 50 个选项', icon: 'none' }); return; }
-        this.setData({ [prop]: list.concat([{ id: '', label }]) });   // id 留空＝保存时让服务端生成
+        const next = list.concat([{ id: '', label }]);   // id 留空＝保存时让服务端生成
+        this.setData({
+          [prop]: next,
+          fixedList: buildFixedList(key === 'grade' ? next : this.data.gradeOpts,
+            key === 'className' ? next : this.data.classOpts),
+        });
       },
     });
   },
