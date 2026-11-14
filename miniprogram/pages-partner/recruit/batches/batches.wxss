@@ -1,0 +1,93 @@
+/* pages-partner/recruit/batches.wxss · v1（2026-11-14 批次管理）
+   度量照 rules.wxss / review.wxss：卡 35rpx 圆角、行内边距 30rpx、分割线 #E3E3E8。
+   ⚠️ 按钮用全局 .btn + .btn-primary（连字符），别写 .btn.primary —— 那个类不存在，会变成无色块。 */
+.page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
+.body { flex: 1; padding: 19rpx 35rpx 80rpx; display: flex; flex-direction: column; gap: 23rpx; }
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(-135deg);
+  flex: none;
+}
+.hint-note { font-size: 23rpx; color: #76767E; text-align: center; padding: 60rpx 0; }
+
+/* ── 三段：选中蓝字 + 底下一根蓝短线（v169 口径，与稿件页同款） ── */
+.stabs {
+  display: flex; gap: 56rpx;
+  border-bottom: 2rpx solid #E3E3E8;
+  padding: 0 4rpx;
+}
+.stab {
+  position: relative;
+  padding: 14rpx 0 16rpx;
+  font-size: 27rpx; color: #76767E;
+}
+.stab.on { color: #0066CC; font-weight: 600; }
+.stab .bar {
+  position: absolute; left: 50%; bottom: -2rpx;
+  transform: translateX(-50%);
+  width: 48rpx; height: 6rpx; border-radius: 9999rpx;
+  background: #0066CC;
+}
+
+/* ── 批次行 ── */
+.rows { background: #FFFFFF; border-radius: 35rpx; padding: 0 31rpx; }
+.row { display: flex; align-items: center; gap: 18rpx; padding: 28rpx 0; }
+.row + .row { border-top: 2rpx solid #E3E3E8; }
+.r-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6rpx; }
+.r-line { display: flex; align-items: center; gap: 12rpx; }
+.r-name {
+  font-size: 27rpx; font-weight: 500; color: #1D1D1F;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 380rpx;
+}
+.r-sub { font-size: 21rpx; color: #76767E; font-variant-numeric: tabular-nums; }
+.r-sub2 { font-size: 21rpx; color: #1E7A46; }
+.del {
+  flex: none; font-size: 23rpx; color: #B42318;
+  padding: 8rpx 4rpx;
+}
+
+.empty-card {
+  background: #FFFFFF; border-radius: 35rpx; padding: 52rpx 31rpx;
+  display: flex; flex-direction: column; align-items: center; gap: 14rpx; text-align: center;
+}
+.empty-t { font-size: 29rpx; font-weight: 600; color: #1D1D1F; }
+.empty-d { font-size: 23rpx; color: #76767E; line-height: 1.7; }
+
+.acts { display: flex; }
+.acts button.btn { width: 100%; }
+.note { font-size: 21rpx; color: #76767E; line-height: 1.7; text-align: center; padding: 0 20rpx; }
+
+/* ── 弹层 ── */
+.mask { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.32); z-index: 90; }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 91;
+  background: #FFFFFF;
+  border-radius: 40rpx 40rpx 0 0;
+  padding: 0 0 40rpx;
+  display: flex; flex-direction: column;
+  animation: sheetUp 0.22s var(--ease, ease-out);
+}
+@keyframes sheetUp { from { transform: translateY(40rpx); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.sheet-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 30rpx 31rpx;
+  border-bottom: 2rpx solid #F0F0F0;
+}
+.sh-c { font-size: 27rpx; color: #76767E; }
+.sh-t { font-size: 29rpx; font-weight: 600; color: #1D1D1F; }
+.sh-k { width: 80rpx; }
+.sheet-bd { padding: 26rpx 31rpx 8rpx; display: flex; flex-direction: column; }
+.f-label { font-size: 21rpx; color: #76767E; margin-bottom: 10rpx; }
+.f-input {
+  background: #F5F5F7; border-radius: 23rpx;
+  padding: 24rpx 26rpx; font-size: 27rpx; color: #1D1D1F;
+  min-height: 92rpx; box-sizing: border-box;
+}
+.f-row { display: flex; gap: 18rpx; margin-top: 22rpx; }
+.f-half { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.f-tip { font-size: 21rpx; color: #76767E; line-height: 1.7; margin-top: 16rpx; }
+.f-tip.del-warn { color: #B42318; margin-top: 0; margin-bottom: 20rpx; }
+.sheet-btn { margin: 18rpx 31rpx 0; }
+.sheet-btn.danger { background: #B42318; color: #FFFFFF; font-weight: 600; }

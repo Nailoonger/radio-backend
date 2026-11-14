@@ -1,0 +1,67 @@
+<!-- pages-partner/recruit/order/order.wxml · v1（2026-11-14 面试顺序）
+     面试当天叫号用。名单按面试序号排，点一行进处理台。
+     ⚠️ 生成按钮只在「已截止 + 未出结果 + 未归档 + 超管」时出现 —— 其余的等，
+        跟电脑端同条件（admin-web canGenerateOrder）。 -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">面试顺序</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <!-- 头部：批次 + 生成状态 -->
+    <view class="head">
+      <text class="head-t">{{title}}</text>
+      <text class="head-d" wx:if="{{generated}}">{{generatedText}} 生成 · 共 {{total}} 人</text>
+      <text class="head-d" wx:else>尚未生成顺序</text>
+    </view>
+
+    <!-- 动作 -->
+    <view class="acts">
+      <button class="btn btn-primary" wx:if="{{canGenerate}}" hover-class="pressed"
+              disabled="{{generating}}" bindtap="onGenerate">
+        {{generating ? '生成中…' : (generated ? '重新生成顺序' : '生成随机面试顺序')}}
+      </button>
+      <button class="btn btn-ghost" wx:if="{{generated}}" hover-class="pressed"
+              disabled="{{exporting}}" bindtap="onExport">
+        {{exporting ? '准备中…' : '导出 Excel 名单'}}
+      </button>
+    </view>
+
+    <view class="hint-note" wx:if="{{loading && !list.length}}">正在加载……</view>
+
+    <block wx:else>
+      <view class="rows" wx:if="{{list.length}}">
+        <view class="row" wx:for="{{list}}" wx:key="id" hover-class="pressed"
+              data-id="{{item.id}}" bindtap="onOpen">
+          <view class="seq {{item.seq > 99 ? 'seq-3' : (item.seq > 9 ? 'seq-2' : '')}}">{{item.seq}}</view>
+          <view class="r-main">
+            <view class="r-line">
+              <text class="r-name">{{item.name}}</text>
+              <text class="tag {{item.tag}}">{{item.statusText}}</text>
+            </view>
+            <text class="r-sub">{{item.grade}}{{item.className ? ' · ' + item.className : ''}}{{item.qq ? ' · QQ ' + item.qq : ''}}</text>
+            <text class="r-sub2" wx:if="{{item.at}}">{{item.at}}{{item.place ? ' · ' + item.place : ''}}{{item.custom ? ' · 单独配置' : ''}}</text>
+            <text class="r-sub2" wx:else>未安排面试时间</text>
+          </view>
+          <view class="chev"></view>
+        </view>
+      </view>
+
+      <view class="empty-card" wx:else>
+        <text class="empty-t">{{generated ? '名单为空' : '还没有面试顺序'}}</text>
+        <text class="empty-d">{{generated
+          ? '这条批次里的有效报名已经全部撤回或拟不录取。'
+          : (canGenerate
+              ? '报名截止后，把有效报名洗牌生成序号；面试当天按这个顺序叫号。'
+              : '等超管在报名截止后生成顺序，生成后这里就能看。')}}</text>
+      </view>
+
+      <view class="more" wx:if="{{list.length}}">{{hasMore ? '上拉加载更多' : '共 ' + total + ' 人'}}</view>
+    </block>
+  </view>
+</view>

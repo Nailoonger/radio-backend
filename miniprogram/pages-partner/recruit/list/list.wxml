@@ -1,0 +1,55 @@
+<!-- pages-partner/recruit/list.wxml · v1（2026-11-14 报名列表）
+     ⚠️ 没有搜索框：服务端 /admin/recruitment/applications 不收关键字（见 js 头注释）。
+     年级筛选的选项来自批次自己的固定信息配置。 -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">报名列表</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <text class="batch" wx:if="{{title}}">{{title}}</text>
+
+    <view class="stabs">
+      <view class="stab {{tab === item.key ? 'on' : ''}}" wx:for="{{tabs}}" wx:key="key"
+            data-tab="{{item.key}}" bindtap="onTab">
+        <text>{{item.label}}</text>
+        <view class="bar" wx:if="{{tab === item.key}}"></view>
+      </view>
+      <view class="grow"></view>
+      <picker wx:if="{{gradeLabels.length > 1}}" range="{{gradeLabels}}" bindchange="onGrade">
+        <view class="gsel">{{gradeLabel}}<view class="gchev"></view></view>
+      </picker>
+    </view>
+
+    <view class="hint-note" wx:if="{{loading && !list.length}}">正在加载……</view>
+
+    <block wx:else>
+      <view class="rows" wx:if="{{list.length}}">
+        <view class="row" wx:for="{{list}}" wx:key="id" hover-class="pressed"
+              data-id="{{item.id}}" bindtap="onOpen">
+          <view class="r-main">
+            <view class="r-line">
+              <text class="r-name">{{item.name}}</text>
+              <text class="tag {{item.status === 'accepted' ? 'tag-pass' : (item.status === 'rejected' ? 'tag-reject' : 'tag-pending')}}">{{item.statusText}}</text>
+            </view>
+            <text class="r-sub">{{item.grade}}{{item.className ? ' · ' + item.className : ''}}{{item.qq ? ' · QQ ' + item.qq : ''}}</text>
+            <text class="r-sub2" wx:if="{{item.at}}">面试 {{item.at}}{{item.seq ? ' · 第 ' + item.seq + ' 号' : ''}}</text>
+            <text class="r-sub2" wx:elif="{{item.created}}">报名于 {{item.created}}</text>
+          </view>
+          <view class="chev"></view>
+        </view>
+      </view>
+      <view class="empty-card" wx:else>
+        <text class="empty-t">{{tab === 'submitted' ? '没有待审的报名' : (tab === 'interview' ? '没有待面试的报名' : '还没有定下来的报名')}}</text>
+        <text class="empty-d">{{tab === 'submitted' ? '报名截止前只收不审；截止后再逐条处理。' : ''}}</text>
+      </view>
+
+      <view class="more" wx:if="{{list.length}}">{{hasMore ? '上拉加载更多' : '共 ' + total + ' 条'}}</view>
+    </block>
+  </view>
+</view>

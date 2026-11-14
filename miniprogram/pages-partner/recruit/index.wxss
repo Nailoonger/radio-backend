@@ -1,0 +1,51 @@
+/* pages-partner/recruit/index.wxss · v1（2026-11-14 招新总览）
+   度量照 rules.wxss：卡 35rpx 圆角、内边距 31rpx、标题 27rpx、副行 21rpx、分割线 #E3E3E8。 */
+.page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
+.body { flex: 1; padding: 19rpx 35rpx 80rpx; display: flex; flex-direction: column; gap: 23rpx; }
+
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(-135deg);
+  flex: none;
+}
+.hint-note { font-size: 23rpx; color: #76767E; text-align: center; padding: 60rpx 0; }
+
+/* ── 当前批次卡 ── */
+.hero {
+  background: #FFFFFF; border-radius: 35rpx; padding: 31rpx;
+  display: flex; flex-direction: column; gap: 12rpx;
+}
+.hero-top { display: flex; align-items: center; gap: 16rpx; }
+.hero-title {
+  flex: 1; min-width: 0; font-size: 31rpx; font-weight: 600; color: #1D1D1F;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hero-range { font-size: 23rpx; color: #76767E; font-variant-numeric: tabular-nums; }
+.hero-foot { display: flex; align-items: baseline; gap: 8rpx; margin-top: 4rpx; }
+.hero-num { font-size: 44rpx; font-weight: 600; color: #0066CC; font-variant-numeric: tabular-nums; }
+.hero-unit { font-size: 21rpx; color: #76767E; }
+
+/* ── 空态 ── */
+.empty-card {
+  background: #FFFFFF; border-radius: 35rpx; padding: 48rpx 31rpx;
+  display: flex; flex-direction: column; align-items: center; gap: 14rpx; text-align: center;
+}
+.empty-t { font-size: 29rpx; font-weight: 600; color: #1D1D1F; }
+.empty-d { font-size: 23rpx; color: #76767E; line-height: 1.7; }
+.empty-card button.btn { margin-top: 18rpx; }
+
+/* ── 入口行 ── */
+.entries { background: #FFFFFF; border-radius: 35rpx; padding: 0 31rpx; }
+.entry { display: flex; align-items: center; gap: 18rpx; padding: 30rpx 0; }
+.entry + .entry { border-top: 2rpx solid #E3E3E8; }
+.e-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.e-t { font-size: 27rpx; font-weight: 500; color: #1D1D1F; }
+.e-d { font-size: 21rpx; color: #76767E; margin-top: 6rpx; }
+.e-n {
+  flex: none; font-size: 21rpx; color: #0066CC;
+  font-variant-numeric: tabular-nums;
+}
+
+.note { font-size: 21rpx; color: #76767E; line-height: 1.7; text-align: center; padding: 0 20rpx; }

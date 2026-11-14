@@ -1,0 +1,52 @@
+/* pages-partner/recruit/list.wxss · v1（2026-11-14 报名列表）
+   与批次管理同一套度量：35rpx 卡、30rpx 行、下划线三段、21rpx 副行。 */
+.page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
+.body { flex: 1; padding: 19rpx 35rpx 80rpx; display: flex; flex-direction: column; gap: 18rpx; }
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(-135deg);
+  flex: none;
+}
+.batch { font-size: 23rpx; color: #76767E; padding: 0 4rpx; }
+.hint-note { font-size: 23rpx; color: #76767E; text-align: center; padding: 60rpx 0; }
+
+.stabs {
+  display: flex; align-items: center; gap: 48rpx;
+  border-bottom: 2rpx solid #E3E3E8;
+  padding: 0 4rpx;
+}
+.grow { flex: 1; }
+.stab { position: relative; padding: 14rpx 0 16rpx; font-size: 27rpx; color: #76767E; }
+.stab.on { color: #0066CC; font-weight: 600; }
+.stab .bar {
+  position: absolute; left: 50%; bottom: -2rpx; transform: translateX(-50%);
+  width: 48rpx; height: 6rpx; border-radius: 9999rpx; background: #0066CC;
+}
+.gsel {
+  display: flex; align-items: center; gap: 6rpx;
+  font-size: 23rpx; color: #0066CC; padding: 10rpx 0;
+}
+.gchev {
+  width: 12rpx; height: 12rpx;
+  border-right: 3rpx solid #0066CC; border-bottom: 3rpx solid #0066CC;
+  transform: rotate(45deg) translateY(-2rpx);
+}
+
+.rows { background: #FFFFFF; border-radius: 35rpx; padding: 0 31rpx; }
+.row { display: flex; align-items: center; gap: 18rpx; padding: 26rpx 0; }
+.row + .row { border-top: 2rpx solid #E3E3E8; }
+.r-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6rpx; }
+.r-line { display: flex; align-items: center; gap: 12rpx; }
+.r-name { font-size: 27rpx; font-weight: 500; color: #1D1D1F; }
+.r-sub { font-size: 21rpx; color: #76767E; }
+.r-sub2 { font-size: 21rpx; color: #76767E; font-variant-numeric: tabular-nums; }
+
+.empty-card {
+  background: #FFFFFF; border-radius: 35rpx; padding: 56rpx 31rpx;
+  display: flex; flex-direction: column; align-items: center; gap: 12rpx; text-align: center;
+}
+.empty-t { font-size: 29rpx; font-weight: 600; color: #1D1D1F; }
+.empty-d { font-size: 23rpx; color: #76767E; line-height: 1.7; }
+.more { font-size: 21rpx; color: #76767E; text-align: center; padding: 24rpx 0 8rpx; }

@@ -1,0 +1,104 @@
+<!-- pages-partner/recruit/batches.wxml · v1（2026-11-14 批次管理）
+     ⚠️ 「删除」在行内右侧、红字纯文字，不进详情页（v170 陛下定的位置）。
+     ⚠️ 已归档段是只读区：不给删除、不给新建。 -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">批次管理</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <!-- 三段：选中蓝字 + 底下一根蓝短线（v169 口径） -->
+    <view class="stabs">
+      <view class="stab {{tab === item.key ? 'on' : ''}}" wx:for="{{tabs}}" wx:key="key"
+            data-tab="{{item.key}}" bindtap="onTab">
+        <text>{{item.label}}</text>
+        <view class="bar" wx:if="{{tab === item.key}}"></view>
+      </view>
+    </view>
+
+    <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
+
+    <block wx:else>
+      <view class="rows" wx:if="{{rows.length}}">
+        <view class="row" wx:for="{{rows}}" wx:key="id" hover-class="pressed"
+              data-id="{{item.id}}" bindtap="onOpen">
+          <view class="r-main">
+            <view class="r-line">
+              <text class="r-name">{{item.title}}</text>
+              <text class="tag {{item.state === 'open' ? 'tag-pass' : (item.state === 'draft' ? 'tag-mute' : 'tag-pending')}}">{{item.stateText}}</text>
+            </view>
+            <text class="r-sub">{{item.range}} · 待定 {{item.unresolved}} 人</text>
+            <text class="r-sub2" wx:if="{{item.resultPublished}}">录取结果已发布</text>
+          </view>
+          <view class="del" wx:if="{{canManage && tab !== 'arch'}}" hover-class="pressed" catchtap="onDel"
+                data-id="{{item.id}}" data-title="{{item.title}}" data-need="{{item.needConfirm ? '1' : '0'}}">删除</view>
+          <view class="chev"></view>
+        </view>
+      </view>
+      <view class="empty-card" wx:else>
+        <text class="empty-t">这个分段里还没有批次</text>
+        <text class="empty-d">{{tab === 'live' ? '新建一份草稿，填好报名时间再发布。' : (tab === 'closed' ? '收满截止后才会落到这里。' : '结果发布后归档的批次会落到这里。')}}</text>
+      </view>
+
+      <view class="acts" wx:if="{{canManage && tab !== 'arch'}}">
+        <button class="btn btn-primary" hover-class="pressed" bindtap="onNew">新建招新批次</button>
+      </view>
+      <view class="note">点批次进「批次配置」改名称 / 时间 / 固定信息 / 题目；删除要原样输入批次名称。</view>
+    </block>
+  </view>
+
+  <!-- 新建：名称 + 开始日 + 截止日（其余都在配置页里改） -->
+  <view class="mask" wx:if="{{sheet}}" bindtap="onSheetClose"></view>
+  <view class="sheet" wx:if="{{sheet}}">
+    <view class="sheet-hd">
+      <text class="sh-c" bindtap="onSheetClose">取消</text>
+      <text class="sh-t">新建招新批次</text>
+      <text class="sh-k"></text>
+    </view>
+    <view class="sheet-bd">
+      <text class="f-label">批次名称</text>
+      <input class="f-input" value="{{form.title}}" placeholder="例如：2026 年秋季招新" maxlength="100" bindinput="onTitle" />
+      <view class="f-row">
+        <view class="f-half">
+          <text class="f-label">开始日（零点开）</text>
+          <picker mode="date" value="{{form.start}}" bindchange="onStart">
+            <view class="f-input">{{form.start || '选择日期'}}</view>
+          </picker>
+        </view>
+        <view class="f-half">
+          <text class="f-label">截止日（24 点关）</text>
+          <picker mode="date" value="{{form.end}}" bindchange="onEnd">
+            <view class="f-input">{{form.end || '选择日期'}}</view>
+          </picker>
+        </view>
+      </view>
+      <text class="f-tip">建好是「草稿」：还没人能看到，配置页里补完固定信息与题目再发布。</text>
+    </view>
+    <button class="btn btn-primary sheet-btn" hover-class="pressed" bindtap="onCreate" disabled="{{creating}}">建草稿</button>
+  </view>
+
+  <!-- 删除确认：有报名或已发布的批次要原样输入名称 -->
+  <view class="mask" wx:if="{{del}}" bindtap="onDelClose"></view>
+  <view class="sheet" wx:if="{{del}}">
+    <view class="sheet-hd">
+      <text class="sh-c" bindtap="onDelClose">取消</text>
+      <text class="sh-t">删除批次</text>
+      <text class="sh-k"></text>
+    </view>
+    <view class="sheet-bd">
+      <text class="f-tip del-warn">连同报名、查询码一起删，不可恢复。</text>
+      <block wx:if="{{del.need}}">
+        <text class="f-label">要原样输入批次名称</text>
+        <input class="f-input" value="{{delInput}}" placeholder="{{del.title}}" bindinput="onDelInput" />
+        <text class="f-tip">要删的是「{{del.title}}」—— 一个字都不能差。</text>
+      </block>
+      <text class="f-tip" wx:else>这个批次还没有报名、也没发布过，点下面就能删。</text>
+    </view>
+    <button class="btn sheet-btn danger" hover-class="pressed" bindtap="onDelOk" disabled="{{deleting}}">删除</button>
+  </view>
+</view>

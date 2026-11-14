@@ -99,7 +99,13 @@
         "club-notice/detail",
         "club-keys/keys",
         "club-keys/edit",
-        "club-keys/create"
+        "club-keys/create",
+        "recruit/index",
+        "recruit/batches/batches",
+        "recruit/config/config",
+        "recruit/list/list",
+        "recruit/detail/detail",
+        "recruit/order/order"
       ]
     }
   ]

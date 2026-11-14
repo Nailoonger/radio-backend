@@ -232,4 +232,23 @@ function isConflict(err) {
   return !!(err && Number(err.code) === 40901);
 }
 
-module.exports = { request, adminRequest, isConflict, configure, setForbiddenHook, getMode: () => CONFIG.mode };
+/**
+ * 招新线**自己的**版本冲突码：40910。
+ *
+ * ═══════════ 为什么不能直接用 isConflict ═══════════
+ * 招新服务（cloud/cloudfunctions/api/services/recruitmentCodes.js）自起了一套码：
+ *   VERSION_CONFLICT: 40910 —— 不是通用的 40901。
+ * 电脑端一直按 40910 判断（Recruitment.vue: `error?.code === 40910`），
+ * 而 isConflict() 只认 40901 ⇒ 手机上撞锁时会被当成普通业务错误，
+ * 用户看到一句「数据已更新，请刷新后重试」，屏幕上却还是旧数据。
+ *
+ * 两条通道（direct / cloud）都把 body.code 原样抛上来，所以认数字就够。
+ */
+function isVersionConflict(err) {
+  return !!(err && Number(err.code) === 40910);
+}
+
+module.exports = {
+  request, adminRequest, isConflict, isVersionConflict,
+  configure, setForbiddenHook, getMode: () => CONFIG.mode,
+};

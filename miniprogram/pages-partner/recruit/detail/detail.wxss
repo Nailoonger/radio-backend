@@ -1,0 +1,64 @@
+/* pages-partner/recruit/detail.wxss · v1（2026-11-14 处理台）
+   卡 35rpx、内边距 31rpx；胶囊用浅灰底 + 选中 --accent-tint（v172 定的三颗分开的胶囊）。 */
+.page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
+.body { flex: 1; padding: 19rpx 35rpx 80rpx; display: flex; flex-direction: column; gap: 23rpx; }
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(-135deg);
+  flex: none;
+}
+.hint-note { font-size: 23rpx; color: #76767E; text-align: center; padding: 60rpx 0; }
+
+.card { background: #FFFFFF; border-radius: 35rpx; padding: 28rpx 31rpx 30rpx; display: flex; flex-direction: column; }
+.card-hd { display: flex; align-items: center; gap: 12rpx; margin-bottom: 8rpx; }
+.nm { flex: 1; min-width: 0; font-size: 33rpx; font-weight: 600; color: #1D1D1F; }
+.hd-t { flex: 1; font-size: 27rpx; font-weight: 600; color: #1D1D1F; }
+.hd-s { font-size: 21rpx; color: #76767E; }
+
+.kv { display: flex; gap: 16rpx; padding: 12rpx 0; }
+.k { flex: none; width: 140rpx; font-size: 23rpx; color: #76767E; }
+.v { flex: 1; min-width: 0; font-size: 25rpx; color: #1D1D1F; font-variant-numeric: tabular-nums; }
+
+/* 问答 */
+.qa { display: flex; gap: 14rpx; padding: 16rpx 0; border-top: 2rpx solid #F0F0F0; }
+.qa:first-of-type { border-top: 0; }
+.q-no { flex: none; font-size: 21rpx; color: #C7C7CC; font-variant-numeric: tabular-nums; padding-top: 2rpx; }
+.q-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6rpx; }
+.q-t { font-size: 25rpx; color: #1D1D1F; line-height: 1.5; }
+.q-v { font-size: 25rpx; color: #333333; line-height: 1.65; }
+
+/* 表单 */
+.f-label { font-size: 21rpx; color: #76767E; margin-bottom: 10rpx; display: block; }
+.f-label.mt { margin-top: 18rpx; }
+.f-input {
+  background: #F5F5F7; border-radius: 23rpx;
+  padding: 22rpx 26rpx; font-size: 26rpx; color: #1D1D1F;
+  min-height: 86rpx; box-sizing: border-box;
+}
+.f-area {
+  background: #F5F5F7; border-radius: 23rpx;
+  padding: 22rpx 26rpx; font-size: 26rpx; color: #1D1D1F;
+  width: 100%; box-sizing: border-box; height: 140rpx;
+}
+.f-row { display: flex; gap: 18rpx; margin-top: 14rpx; }
+.f-half { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.f-tip { font-size: 21rpx; color: #76767E; line-height: 1.7; margin-top: 14rpx; }
+.row-btns { display: flex; gap: 16rpx; margin-top: 22rpx; }
+.flex1 { flex: 1; min-width: 0; }
+.mt-btn { margin-top: 24rpx; }
+button.btn.flex1 { width: auto; font-size: 26rpx; padding: 20rpx 0; }
+
+/* 三颗分开的胶囊（v172：各占一份、中间留缝） */
+.pills { display: flex; gap: 16rpx; margin-top: 14rpx; }
+.pills button.pill {
+  flex: 1; min-width: 0;
+  height: 88rpx; line-height: 88rpx; padding: 0;
+  border: 0; border-radius: 9999rpx;
+  background: #F5F5F7; color: #76767E;
+  font-size: 25rpx; font-family: inherit;
+}
+.pills button.pill.on { background: var(--accent-tint); color: #0066CC; font-weight: 600; }
+
+.note { font-size: 21rpx; color: #76767E; line-height: 1.7; text-align: center; padding: 0 20rpx; }

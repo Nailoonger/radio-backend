@@ -1,0 +1,55 @@
+<!-- pages-partner/recruit/index.wxml · v1（2026-11-14 招新总览）
+     一张「当前批次」卡 + 三个下级入口。
+     ⚠️ 没批次时不给「报名列表 / 批次配置」两行 —— 点进去只会空转，
+        空态里只留「批次管理」＋（超管）新建。 -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">招新</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
+    <view class="hint-note" wx:elif="{{err}}">{{err}}</view>
+
+    <block wx:else>
+      <!-- 当前批次 -->
+      <view class="hero" wx:if="{{batch}}">
+        <view class="hero-top">
+          <text class="hero-title">{{batch.title}}</text>
+          <text class="tag {{batch.state === 'open' ? 'tag-pass' : (batch.state === 'draft' ? 'tag-mute' : 'tag-pending')}}">{{batch.stateText}}</text>
+        </view>
+        <text class="hero-range">报名时间 {{batch.range}}</text>
+        <view class="hero-foot">
+          <text class="hero-num">{{batch.unresolved}}</text>
+          <text class="hero-unit">人待定（未出结果）</text>
+        </view>
+      </view>
+
+      <view class="empty-card" wx:else>
+        <text class="empty-t">还没有招新批次</text>
+        <text class="empty-d">{{canManage ? '开一个草稿批次，填好报名时间再发布。' : '等超管开批次，开了这里就能看到。'}}</text>
+        <button class="btn btn-primary" wx:if="{{canManage}}" hover-class="pressed" bindtap="onNew">新建招新批次</button>
+      </view>
+
+      <!-- 入口 -->
+      <view class="entries">
+        <view class="entry" wx:for="{{entries}}" wx:key="key" hover-class="pressed"
+              data-key="{{item.key}}" bindtap="onEntry">
+          <view class="e-main">
+            <text class="e-t">{{item.t}}</text>
+            <text class="e-d">{{item.d}}</text>
+          </view>
+          <text class="e-n" wx:if="{{item.n !== null}}">{{item.n}} {{item.u}}</text>
+          <view class="chev"></view>
+        </view>
+      </view>
+
+      <view class="note" wx:if="{{!canManage}}">新建、发布、截止、归档只有超管能做；你能看批次、审报名、安排面试。</view>
+    </block>
+  </view>
+</view>

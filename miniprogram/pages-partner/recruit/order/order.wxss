@@ -1,0 +1,49 @@
+/* pages-partner/recruit/order.wxss · v1（2026-11-14 面试顺序）
+   与报名列表同一套度量：35rpx 卡、25rpx 行距、21rpx 副行。
+   序号是等宽数字，按位数分档（1 位 / 2 位 / 3 位），不靠 padding 撑。 */
+.page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
+.body { flex: 1; padding: 19rpx 35rpx 80rpx; display: flex; flex-direction: column; gap: 18rpx; }
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(-135deg);
+  flex: none;
+}
+.hint-note { font-size: 23rpx; color: #76767E; text-align: center; padding: 60rpx 0; }
+
+.head { display: flex; flex-direction: column; gap: 8rpx; padding: 0 4rpx; }
+.head-t { font-size: 29rpx; font-weight: 600; color: #1D1D1F; }
+.head-d { font-size: 23rpx; color: #76767E; font-variant-numeric: tabular-nums; }
+
+.acts { display: flex; flex-direction: column; gap: 14rpx; }
+
+.rows { background: #FFFFFF; border-radius: 35rpx; padding: 0 31rpx; }
+.row { display: flex; align-items: center; gap: 20rpx; padding: 24rpx 0; }
+.row + .row { border-top: 2rpx solid #E3E3E8; }
+
+/* 序号：固定宽度档位 + 等宽数字，两位数不会把姓名推歪 */
+.seq {
+  flex: none;
+  width: 44rpx; padding: 0;
+  font-size: 27rpx; font-weight: 600;
+  color: #0066CC;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.seq-2 { width: 58rpx; }
+.seq-3 { width: 72rpx; }
+
+.r-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6rpx; }
+.r-line { display: flex; align-items: center; gap: 12rpx; }
+.r-name { font-size: 27rpx; font-weight: 500; color: #1D1D1F; }
+.r-sub { font-size: 21rpx; color: #76767E; }
+.r-sub2 { font-size: 21rpx; color: #76767E; font-variant-numeric: tabular-nums; }
+
+.empty-card {
+  background: #FFFFFF; border-radius: 35rpx; padding: 56rpx 31rpx;
+  display: flex; flex-direction: column; align-items: center; gap: 12rpx; text-align: center;
+}
+.empty-t { font-size: 29rpx; font-weight: 600; color: #1D1D1F; }
+.empty-d { font-size: 23rpx; color: #76767E; line-height: 1.7; }
+.more { font-size: 21rpx; color: #76767E; text-align: center; padding: 24rpx 0 8rpx; }

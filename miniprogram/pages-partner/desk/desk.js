@@ -31,6 +31,7 @@
 
 const { adminRequest } = require('../../utils/request.js');
 const partnerRole = require('../../utils/partnerRole.js');
+const skeleton = require('../../utils/skeleton.js');
 
 /* v151 greetWord()：逐时段问候，原样搬 */
 function greetWord() {
@@ -87,6 +88,9 @@ const ROUTES = {
   // 广播通知处理台（2026-11-07）：社团提报的审核 / 排播 / 标记已播出，密钥入口在其页底
   'club-notice': '/pages-partner/club-notice/queue',
   permissions: '/pages-partner/permissions/permissions',
+  /* 招新（2026-11-14 落地）：总览页，报名列表 / 批次配置都从那里点下去。
+     ⚠️ 社干也能进（服务端 asAdmin 放行列表、详情、审核），新建/发布/截止/归档才是 asSuper。 */
+  recruit: '/pages-partner/recruit/index',
   'song-schedule': '/pages-partner/song-schedule/song-schedule',
   planning: '/pages-partner/schedule/planning/planning',
   me: '/pages-partner/me/me',
@@ -99,6 +103,17 @@ Page({
   data: {
     statusBarHeight: 20,
     ready: false,
+
+    /**
+     * 加载骨架（2026-11-13 · preview/loading-skeleton-v1、v2 落地）
+     *   sk    骨架层显不显示（300ms 闸门后才 true）
+     *   skOut 退场中（120ms 淡出，与第一行进场同帧开始）
+     *   enter 挂进场动画（只挂一次；下拉刷新、切 tab 回来都不重播）
+     * ⚠️ 闸门与落定的判定在 utils/skeleton.js，页面只负责「数据齐了」时喊一声 check()。
+     */
+    sk: true,   // ⚠️ 初值必须 true：骨架首帧就画，不能先渲染内容再盖上来（2026-11-13 陛下退回）
+    skOut: false,
+    enter: false,
 
     // 身份（先用本地 adminInfo 出界面避免闪错，再以 /partner/me 为准）
     roleKey: 'manager',          // member | manager | super
@@ -121,6 +136,8 @@ Page({
 
     // 社干 / 超管：三联卡区块（见 buildSections）
     sections: [],
+    // 骨架层专用的分区卡清单：同一份 buildSections，但数字位全空 ⇒ 名字/说明能立刻显示
+    skSections: [],
     // 站员：需要你处理（数据接口就绪前显示 v151 空态句）
     needs: [],
     needCount: 0,
@@ -160,6 +177,21 @@ Page({
       // 站员的底栏第一个 tab 是 home，社干/超管是 desk
       tabActive: roleKey === 'member' ? 'home' : 'desk',
     });
+    // ⚠️ 骨架层的分区卡标题/说明**照常显示**（2026-11-13 陛下退回过一次）：
+    //    它们全是 buildSections 里的写死文案，跟接口无关。sections 要等数据才建，
+    //    所以这里先用同一份清单搭一份「只有骨架、没有数字」的 skSections 给骨架层用。
+    //    n 传 0、mods 传空 ⇒ 名字/说明全在，数字位一律留空由 wxml 画骨架。
+    const skSections = this.buildSections(0, 0, { roleKey, mods: {} });
+    this.setData({ skSections });
+    // 加载骨架的闸门（300ms 才亮、2.5s 兜底、只跑一次）见 utils/skeleton.js
+    // ⚠️ 实例叫 skGate，别和 data.sk 混：data.sk 是"骨架层显不显示"，skGate 是控制器。
+    // ⚠️ 落定条件 = 身份到了 **且** 分区卡算出来了 —— 只等 ready 会退场过早，
+    //    那时 sections 还是空的，用户会看到"卡片先空着、数字后跳出来"。
+    //    站员版没有 sections（走 needs），所以 roleKey==='member' 也放行。
+    this.skGate = skeleton.create(this, {
+      when: () => !!this.data.ready && (this.data.roleKey === 'member' || this.data.sections.length > 0),
+    });
+    this.skGate.boot();
     this.fetchMe();
   },
 
@@ -435,7 +467,7 @@ Page({
           name: m.name || this.data.name,
           // ⚠️ 身份刚变，大白卡副句按新身份重出一遍；班表状态另有 fetchSchedule 负责
           slides: this.buildSlides(Object.assign({}, this.data, { roleKey })),
-        }, () => this.measureSlide());
+        }, () => { this.measureSlide(); this.skGate && this.skGate.check(); });
         this.fetchSchedule();
         this.fetchSongs();
         this.fetchModules();
@@ -446,7 +478,7 @@ Page({
           wx.reLaunch({ url: '/pages-partner/login/login' });
           return;
         }
-        this.setData({ ready: true, slides: this.buildSlides() }, () => this.measureSlide());
+        this.setData({ ready: true, slides: this.buildSlides() }, () => { this.measureSlide(); this.skGate && this.skGate.check(); });
         this.fetchSchedule();
         this.fetchSongs();
         this.fetchModules();
@@ -470,7 +502,7 @@ Page({
         messagePending,
         sections: this.buildSections(submitPending, messagePending, view),
         badges: this.buildBadges(view),
-      });
+      }, () => { this.skGate && this.skGate.check(); });
     });
   },
 
@@ -563,6 +595,9 @@ Page({
          ⚠️ 不给角标：待审数要单拉一次 /partner/club-notice/queue，为一个红点
             让工作台多一个请求不划算（这条线一天也就几条）。 */
       { go: 'club-notice', t: '广播通知', d: '社团提报 · 审核 · 播出', n: null, u: '' },
+      /* 招新（2026-11-14）：跟着「站内协作」走，不给角标 —— 待审数是批次级的，
+         要单拉一次 /admin/recruitment/batches 才有；为一个红点让工作台多一个请求不划算。 */
+      { go: 'recruit', t: '招新', d: '批次 · 报名审核 · 面试', n: null, u: '' },
     ];
     /* ⚠️ 2026-10-28 陛下拍板：第三块「排班协作」（可排时间 / 值班时段）去掉 ——
        v151 社干工作台就只有"听众投稿 / 站内协作"两块，这两项原型挂在「班表」tab。

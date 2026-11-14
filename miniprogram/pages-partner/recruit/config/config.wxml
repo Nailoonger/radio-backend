@@ -1,0 +1,160 @@
+<!-- pages-partner/recruit/config.wxml · v1（2026-11-14 批次配置）
+     ⚠️ 锁位直接照服务端规则显示：发布后名称与题目只读，报名开始/手动截止后时间只读。
+        锁住的字段在保存时**整个不提交**（见 js 的 save()），不是"提交了再被拒"。 -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">批次配置</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
+    <view class="hint-note" wx:elif="{{err}}">{{err}}</view>
+
+    <block wx:else>
+      <!-- 状态条 -->
+      <view class="state">
+        <text class="tag {{state === 'open' ? 'tag-pass' : (state === 'draft' ? 'tag-mute' : 'tag-pending')}}">{{stateText}}</text>
+        <text class="state-t">{{archived ? '已归档：整份只读' : (published ? '已发布：名称与题目锁定' : '草稿：还没人能看到')}}</text>
+      </view>
+
+      <!-- 基本信息 -->
+      <view class="card">
+        <text class="hd-t">批次信息</text>
+        <text class="f-label mt">批次名称</text>
+        <input class="f-input {{lockedTitle ? 'ro' : ''}}" value="{{title}}" disabled="{{lockedTitle || !canManage}}"
+               placeholder="例如：2026 年秋季招新" bindinput="onTitle" />
+        <text class="f-label mt">招新介绍（报名页顶部展示）</text>
+        <textarea class="f-area" value="{{intro}}" disabled="{{!canManage}}" placeholder="一两句话说清这次招什么、什么时候面试"
+                  bindinput="onIntro" />
+        <view class="f-row">
+          <view class="f-half">
+            <text class="f-label">报名开始日（零点开）</text>
+            <picker mode="date" value="{{openDay}}" disabled="{{lockedTime || !canManage}}" bindchange="onOpenDay">
+              <view class="f-input {{lockedTime ? 'ro' : ''}}">{{openDay || '选择日期'}}</view>
+            </picker>
+          </view>
+          <view class="f-half">
+            <text class="f-label">报名截止日（24 点关）</text>
+            <picker mode="date" value="{{closeDay}}" disabled="{{lockedTime || !canManage}}" bindchange="onCloseDay">
+              <view class="f-input {{lockedTime ? 'ro' : ''}}">{{closeDay || '选择日期'}}</view>
+            </picker>
+          </view>
+        </view>
+        <text class="f-tip" wx:if="{{lockedTime}}">报名已开始或已手动截止，时间锁定。</text>
+      </view>
+
+      <!-- 固定信息 -->
+      <view class="card">
+        <view class="card-hd"><text class="hd-t">固定信息</text><text class="hd-s">必填 + 选项</text></view>
+        <view class="fix" wx:for="{{fixedList}}" wx:key="key">
+          <view class="fix-hd">
+            <text class="fix-t">{{item.label}}</text>
+            <text class="fix-s">必填</text>
+            <switch class="sw" checked="{{fixed[item.key]}}" color="#0066CC" disabled="{{!canManage}}"
+                    data-key="{{item.key}}" bindchange="onReq" />
+          </view>
+          <block wx:if="{{item.options}}">
+            <view class="chips" wx:if="{{(item.key === 'grade' ? gradeOpts : classOpts).length}}">
+              <view class="chip-x" wx:for="{{item.key === 'grade' ? gradeOpts : classOpts}}" wx:for-item="o" wx:key="label">
+                <text>{{o.label}}</text>
+                <text class="x" wx:if="{{canManage}}" data-key="{{item.key}}" data-label="{{o.label}}" catchtap="onOptDel">✕</text>
+              </view>
+            </view>
+            <view class="chip-add" wx:if="{{canManage}}" data-key="{{item.key}}" bindtap="onOptAdd">＋ 添加</view>
+            <text class="f-tip" wx:else>没配选项＝学生自己填。</text>
+          </block>
+        </view>
+      </view>
+
+      <!-- 自定义问题 -->
+      <view class="card">
+        <view class="card-hd"><text class="hd-t">自定义问题</text><text class="hd-s">{{questions.length}} / 20</text></view>
+        <view class="q" wx:for="{{questions}}" wx:key="id">
+          <text class="q-no">{{index + 1 < 10 ? '0' : ''}}{{index + 1}}</text>
+          <view class="q-main">
+            <text class="q-t">{{item.title}}</text>
+            <text class="q-s">{{item.typeText}}{{item.required ? ' · 必填' : ' · 选填'}}{{item.optionText ? ' · ' + item.optionText : ''}}</text>
+          </view>
+          <block wx:if="{{canManage}}">
+            <text class="q-a" data-i="{{index}}" bindtap="onQEdit">编辑</text>
+            <text class="q-d" data-i="{{index}}" catchtap="onQDel">删除</text>
+          </block>
+        </view>
+        <view class="empty-q" wx:if="{{!questions.length}}">还没有自定义问题（上面四项固定信息仍然照收）</view>
+        <button class="btn btn-ghost mt-btn" wx:if="{{canManage}}" hover-class="pressed" bindtap="onQAdd">添加问题</button>
+      </view>
+
+      <!-- 批次级面试统一安排 -->
+      <view class="card" wx:if="{{canManage}}">
+        <view class="card-hd"><text class="hd-t">面试统一安排</text><text class="hd-s">改完要点保存</text></view>
+        <view class="f-row">
+          <view class="f-half">
+            <text class="f-label">日期</text>
+            <picker mode="date" value="{{itvDate}}" bindchange="onItvDate">
+              <view class="f-input">{{itvDate || '选择'}}</view>
+            </picker>
+          </view>
+          <view class="f-half">
+            <text class="f-label">时刻</text>
+            <picker mode="time" value="{{itvTime}}" bindchange="onItvTime">
+              <view class="f-input">{{itvTime || '选择'}}</view>
+            </picker>
+          </view>
+        </view>
+        <text class="f-label mt">地点</text>
+        <input class="f-input" value="{{itvPlace}}" placeholder="例如：广播站（教学楼 3 层）" bindinput="onItvPlace" />
+        <text class="f-label mt">说明（可空）</text>
+        <input class="f-input" value="{{itvNote}}" placeholder="例如：每人 5 分钟" bindinput="onItvNote" />
+        <view class="row-btns">
+          <button class="btn btn-primary flex1" hover-class="pressed" bindtap="onSaveItv" disabled="{{acting}}">保存统一安排</button>
+          <button class="btn btn-ghost flex1" wx:if="{{itvAt}}" hover-class="pressed" bindtap="onClearItv">清掉</button>
+        </view>
+        <text class="f-tip">统一安排只作用于没单独配置过的报名；单个人的时间在报名处理台里改。</text>
+      </view>
+
+      <!-- 动作 -->
+      <view class="acts" wx:if="{{canManage}}">
+        <button class="btn btn-primary" hover-class="pressed" bindtap="onSave" disabled="{{saving || archived}}">保存配置</button>
+        <button class="btn btn-ghost" wx:if="{{state === 'draft'}}" hover-class="pressed" bindtap="onPublish" disabled="{{acting}}">发布批次</button>
+        <button class="btn btn-ghost" wx:if="{{state === 'open'}}" hover-class="pressed" bindtap="onClose" disabled="{{acting}}">提前截止报名</button>
+        <button class="btn btn-ghost" wx:if="{{state === 'closed' && !resultPublished}}" hover-class="pressed" bindtap="onResults" disabled="{{acting}}">发布录取结果</button>
+        <button class="btn btn-ghost" wx:if="{{!archived}}" hover-class="pressed" bindtap="onArchive" disabled="{{acting}}">归档批次</button>
+      </view>
+      <view class="note" wx:else>只有超管能改配置；你能看批次、审报名、安排面试。</view>
+    </block>
+  </view>
+
+  <!-- 问题编辑弹层 -->
+  <view class="mask" wx:if="{{qSheet}}" bindtap="onQClose"></view>
+  <view class="sheet" wx:if="{{qSheet}}">
+    <view class="sheet-hd">
+      <text class="sh-c" bindtap="onQClose">取消</text>
+      <text class="sh-t">{{qEdit >= 0 ? '编辑问题' : '添加问题'}}</text>
+      <text class="sh-k" bindtap="onQOk">完成</text>
+    </view>
+    <view class="sheet-bd">
+      <text class="f-label">题干</text>
+      <textarea class="f-area" value="{{qTitle}}" placeholder="例如：你为什么想加入广播站？" bindinput="onQTitle" />
+      <text class="f-label mt">题型</text>
+      <view class="types">
+        <view class="type {{qType === item.key ? 'on' : ''}}" wx:for="{{types}}" wx:key="key"
+              data-t="{{item.key}}" bindtap="onQType">{{item.label}}</view>
+      </view>
+      <view class="fix-hd mt">
+        <text class="fix-t">必填</text>
+        <view class="grow"></view>
+        <switch class="sw" checked="{{qReq}}" color="#0066CC" bindchange="onQReq" />
+      </view>
+      <block wx:if="{{qType === 'single' || qType === 'multiple'}}">
+        <text class="f-label mt">选项（一行一个，2～20 个）</text>
+        <textarea class="f-area tall" value="{{qOpts}}" placeholder="选项一&#10;选项二" bindinput="onQOpts" />
+      </block>
+      <text class="f-tip">题目结构在批次发布后就锁定，改不了。</text>
+    </view>
+  </view>
+</view>
