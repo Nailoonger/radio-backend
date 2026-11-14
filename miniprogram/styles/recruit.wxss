@@ -449,6 +449,15 @@ button.rc-btn-ghost[disabled] { color: var(--soft); border-color: var(--divider)
 }
 .rc-rng-f.off { opacity: .55; }
 
+/* 日期字段的简约下箭头（替代原来的蓝色日历块轮廓）——与 rc-pick 的箭头同一画法 */
+.rc-rng-f .arw {
+  flex: none;
+  width: 14rpx; height: 14rpx;
+  border-top: 4rpx solid var(--soft);
+  border-right: 4rpx solid var(--soft);
+  transform: rotate(135deg);
+}
+
 /* 原地展开的日历层 */
 .rc-pop {
   position: absolute;
@@ -584,6 +593,26 @@ button.rc-btn-ghost[disabled] { color: var(--soft); border-color: var(--divider)
 .rc-pick.picked .arw { border-color: var(--accent); }
 .rc-pick.open .arw { transform: rotate(135deg); }
 
+/* 无左标签的变体（时刻下拉）：值左对齐，内边距/字号与 rc-rng-f 完全一致（左右两列对齐）；
+   ⚠️ 时刻值不用蓝色标注 —— picked 的 accent 色在这里关掉，跟日期字段一样是正文墨色 */
+.rc-pick.bare {
+  height: 92rpx;
+  padding: 0 25rpx;
+}
+.rc-pick.bare .v {
+  text-align: left;
+  font-size: 25rpx;
+  color: var(--ink);
+  font-weight: 400;
+  letter-spacing: -0.2rpx;
+  font-variant-numeric: tabular-nums;
+}
+.rc-pick.bare.picked .v { color: var(--ink); font-weight: 400; }
+/* bare 的箭头：恒朝下（与日期字段一致）、恒软灰（picked/open 都不改色不转向） */
+.rc-pick.bare .arw { transform: rotate(135deg); border-color: var(--soft); }
+.rc-pick.bare.open .arw { transform: rotate(135deg); border-color: var(--soft); }
+.rc-pick.bare.picked .arw { border-color: var(--soft); }
+
 /* 面板：flex 列 + overflow:hidden ⇒ 列表自己滚，「＋ 添加班级」是固定底行。
    ⚠️ 不能用 position:sticky 想把它钉在底部 —— 滚动容器里 sticky 不生效（v173 实测）。 */
 .rc-panel {
@@ -646,6 +675,33 @@ button.rc-btn-ghost[disabled] { color: var(--soft); border-color: var(--divider)
 }
 .rc-opt .x:active { background: #D93025; color: #FFFFFF; }
 /* 「＋ 添加班级」是面板自己的固定底行，不跟着列表滚 */
+
+/* ═══════════ 时刻两栏（左时右分，点选即回填）═══════════ */
+.rc-time-cols { display: flex; }
+.rc-time-side { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rc-time-hd {
+  flex: none;
+  text-align: center;
+  font-size: 19rpx;               /* 10px */
+  color: var(--muted);
+  padding: 4rpx 0 8rpx;
+}
+/* ⚠️ scroll-view 必须拿到「纯固定 height」才滚得动——availability.wxss 的结论：
+   一旦写成 flex 子项（flex:1），高度改由内容决定，完全滑不动。
+   这里直接给 380rpx 固定高，不给 flex。 */
+.rc-time-col { height: 380rpx; }
+.rc-time-sep { flex: none; width: 2rpx; background: var(--hairline); margin: 40rpx 0; }
+.rc-topt {
+  height: 77rpx;                  /* 40px，与 rc-opt 一致 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  color: var(--ink);
+  border-radius: 17rpx;
+  font-variant-numeric: tabular-nums;
+}
+.rc-topt.on { background: var(--accent-tint); color: var(--accent); font-weight: 600; }
 .rc-opt-add {
   flex: none;
   margin-top: 8rpx;
