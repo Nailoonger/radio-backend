@@ -79,6 +79,9 @@ Page({
     planCalMonth: '',
     planCalHint: '',
     planCalWeeks: WEEKDAYS,
+    /* 时刻下拉（参考图：点字段展开列表，选中自动回填） */
+    timeOpen: false,
+    timeOpts: [],
     /* 名单 */
     generated: false,
     generatedAt: '',
@@ -253,7 +256,32 @@ Page({
     });
   },
 
-  onPlanTime(e) { this.setData({ planTime: e.detail.value }); },
+  /* 时刻：点字段展开下拉列表，选中即回填（参考图样式，与班级下拉同一套组件）。
+     栅格 06:30–22:30 每 30 分钟一档；已存的值不在档位里就按序插进去，绝不静默丢。 */
+  onPlanTimeOpen() {
+    if (!this.data.canManage) return;
+    const open = !this.data.timeOpen;
+    this.setData({ timeOpen: open, timeOpts: open ? this.buildTimeOpts(this.data.planTime) : [] });
+  },
+  onPlanTimePick(e) {
+    const v = String(e.currentTarget.dataset.v || '');
+    if (!v) return;
+    this.setData({ planTime: v, timeOpen: false, timeOpts: [] });
+  },
+  buildTimeOpts(cur) {
+    const out = [];
+    for (let h = 6; h <= 22; h += 1) {
+      out.push(`${pad(h)}:00`, `${pad(h)}:30`);
+    }
+    out.push('23:00');
+    out.sort();
+    if (cur && out.indexOf(cur) < 0) {
+      out.push(cur);
+      out.sort();
+    }
+    return out;
+  },
+
   onPlanPlace(e) { this.setData({ planPlace: e.detail.value }); },
   onPlanNote(e) { this.setData({ planNote: e.detail.value }); },
 

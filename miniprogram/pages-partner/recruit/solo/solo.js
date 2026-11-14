@@ -63,6 +63,9 @@ Page({
     soloCalMonth: '',
     soloCalHint: '',
     soloCalWeeks: WEEKDAYS,
+    /* 时刻下拉（参考图：点字段展开列表，选中自动回填） */
+    timeOpen: false,
+    timeOpts: [],
   },
 
   onLoad(q) {
@@ -178,7 +181,31 @@ Page({
     });
   },
 
-  onTime(e) { this.setData({ time: e.detail.value }); },
+  /* 时刻：点字段展开下拉列表，选中即回填（与班级下拉同一套组件）。
+     栅格 06:30–23:00 每 30 分钟一档；已存的值不在档位里就按序插进去，绝不静默丢。 */
+  onTimeOpen() {
+    const open = !this.data.timeOpen;
+    this.setData({ timeOpen: open, timeOpts: open ? this.buildTimeOpts(this.data.time) : [] });
+  },
+  onTimePick(e) {
+    const v = String(e.currentTarget.dataset.v || '');
+    if (!v) return;
+    this.setData({ time: v, timeOpen: false, timeOpts: [] });
+  },
+  buildTimeOpts(cur) {
+    const out = [];
+    for (let h = 6; h <= 22; h += 1) {
+      out.push(`${pad(h)}:00`, `${pad(h)}:30`);
+    }
+    out.push('23:00');
+    out.sort();
+    if (cur && out.indexOf(cur) < 0) {
+      out.push(cur);
+      out.sort();
+    }
+    return out;
+  },
+
   onPlace(e) { this.setData({ place: e.detail.value }); },
   onNote(e) { this.setData({ note: e.detail.value }); },
 

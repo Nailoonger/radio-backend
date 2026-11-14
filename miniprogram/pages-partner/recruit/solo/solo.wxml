@@ -49,9 +49,21 @@
               </view>
               <view class="rc-fhalf">
                 <text class="rc-lb">时刻</text>
-                <picker mode="time" value="{{time}}" bindchange="onTime">
-                  <view class="rc-inp">{{time || '选择'}}</view>
-                </picker>
+                <view class="rc-dd">
+                  <view class="rc-pick bare {{time ? 'picked' : ''}} {{timeOpen ? 'open' : ''}}" bindtap="onTimeOpen">
+                    <text class="v">{{time || '选择'}}</text>
+                    <view class="arw"></view>
+                  </view>
+                  <view class="rc-panel" wx:if="{{timeOpen}}">
+                    <scroll-view class="rc-list" scroll-y>
+                      <view class="rc-opt {{time === v ? 'on' : ''}}" wx:for="{{timeOpts}}" wx:for-item="v" wx:key="*this">
+                        <view class="hit" data-v="{{v}}" bindtap="onTimePick">
+                          <text class="t">{{v}}</text><text class="ck">✓</text>
+                        </view>
+                      </view>
+                    </scroll-view>
+                  </view>
+                </view>
               </view>
             </view>
             <view class="rc-pop" wx:if="{{soloCal.open}}">
