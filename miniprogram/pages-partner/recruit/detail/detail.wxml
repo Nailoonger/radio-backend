@@ -115,8 +115,7 @@
             <button class="rc-btn rc-btn-ghost" wx:if="{{itvCustom}}" hover-class="pressed"
                     bindtap="onClearItv">改回统一</button>
           </view>
-          <view class="rc-tip">单独配置只影响这一个人；清掉后就跟随批次的统一安排。</view>
-        </view>
+   </view>
       </view>
 
       <!-- ⑤ 内部备注 -->
@@ -151,12 +150,7 @@
             <button class="rc-pill {{a.decided === 'rejected' ? 'on' : ''}}" hover-class="pressed"
                     data-d="rejected" bindtap="onPill">拟不录取</button>
           </view>
-          <view class="rc-tip">安排面试后进「待面试」，出现在面试名单里；拟不录取要写对外说明。超管统一发布结果后对所有人生效并锁定。</view>
         </view>
-      </view>
-
-      <view class="rc-layer" wx:if="{{!canReview}}">
-        <view class="rc-note">你没有报名审核权限，这一页只能看。</view>
       </view>
       <view class="rc-pad"></view>
     </block>

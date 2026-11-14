@@ -74,11 +74,6 @@
         </view>
       </view>
 
-      <view class="rc-layer">
-        <view class="rc-note">{{hasMore
-          ? '上拉加载更多；搜索只筛已加载的 ' + all.length + ' 条。'
-          : '共 ' + all.length + ' 条。姓名搜索与年级筛选只作用于这一批已加载的报名（服务端不支持关键字查询）。'}}</view>
-      </view>
       <view class="rc-pad"></view>
     </block>
   </view>

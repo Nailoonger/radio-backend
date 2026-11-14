@@ -49,7 +49,6 @@
             <button class="rc-btn rc-btn-ghost" wx:if="{{savedPlan}}" hover-class="pressed"
                     bindtap="onClearPlan">清除</button>
           </view>
-          <view class="rc-tip">统一安排只作用于没单独配置过的报名；单个人的时间在名单里点进去改。</view>
         </view>
       </view>
 
@@ -69,7 +68,6 @@
             <text class="k">面试说明</text>
             <text class="v">{{savedPlan ? (planNote || '—') : '—'}}</text>
           </view>
-          <view class="rc-tip">统一安排与单人覆盖都只有超管能改，这里只读。</view>
         </view>
       </view>
 
@@ -139,9 +137,6 @@
         </view>
       </view>
 
-      <view class="rc-layer">
-        <view class="rc-note">面试安排＝批次统一安排 + 单人覆盖：名单里点某一位只改这一个人，其余人跟着统一安排走。候选＝全部有效报名（排除拟不录取），随机洗牌后序号固定；重新生成只在结果发布前，会整份替换。清除统一安排后，没单独配置的人会退回「已提交」。</view>
-      </view>
       <view class="rc-pad"></view>
     </block>
   </view>

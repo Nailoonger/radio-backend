@@ -78,9 +78,6 @@
         <text class="rc-trash" wx:if="{{!locked}}" bindtap="onDel">{{isNew ? '放弃这道题' : '删除这道题'}}</text>
       </view>
 
-      <view class="rc-layer">
-        <view class="rc-note">最多 20 题；选择题 2–20 个选项。发布后题干与题型锁定，只能看。</view>
-      </view>
       <view class="rc-pad"></view>
     </block>
   </view>

@@ -19,6 +19,6 @@
   width: 18rpx; height: 18rpx;
   border-left: 4rpx solid var(--ink-2);
   border-bottom: 4rpx solid var(--ink-2);
-  transform: rotate(-135deg);
+  transform: rotate(45deg);
   flex: none;
 }

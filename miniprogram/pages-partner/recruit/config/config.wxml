@@ -84,9 +84,7 @@
             </view>
           </view>
 
-          <view class="rc-tip">{{lockedTime
-            ? '报名已开始或批次已截止，起止时间锁定（防收了一半改窗口）。'
-            : '点开这个字段：先点开始那天、再点截止那天；开始日零点起、截止日 24 点止——按天算，不用挑时刻。'}}</view>
+          <view class="rc-tip" wx:if="{{lockedTime}}">报名已开始或批次已截止，起止时间锁定。</view>
         </view>
       </view>
 
@@ -110,9 +108,7 @@
                       wx:key="*this" data-v="{{g}}" bindtap="onGradePick">{{g}}</view>
                 <view class="rc-ftag" bindtap="onGradeAdd">＋ 添加</view>
               </view>
-              <view class="rc-tip">{{canManage && !published
-                ? '只能选一个年级，再点一下取消（不选＝学生自己填）。'
-                : (item.pick ? '可报年级：' + item.pick : '没配选项＝学生自己填。')}}</view>
+              <view class="rc-tip" wx:if="{{!canManage || published}}">{{item.pick ? '可报年级：' + item.pick : '没配选项＝学生自己填。'}}</view>
             </block>
 
             <!-- 班级：字段下方下拉 -->
@@ -135,9 +131,7 @@
                   <view class="rc-opt rc-opt-add" bindtap="onClsAdd">＋ 添加班级</view>
                 </view>
               </view>
-              <view class="rc-tip">{{canManage && !published
-                ? '点开下拉选一个班级，只能选一个；每行右边小叉叉把多出来的班删掉。'
-                : (item.pick ? '可报班级：' + item.pick : '没配选项＝学生自己填。')}}</view>
+              <view class="rc-tip" wx:if="{{!canManage || published}}">{{item.pick ? '可报班级：' + item.pick : '没配选项＝学生自己填。'}}</view>
             </block>
           </view>
         </view>
@@ -162,11 +156,10 @@
             <text class="rc-del" wx:if="{{canManage}}" data-i="{{index}}" catchtap="onQDel">删除</text>
           </view>
 
-          <view class="rc-tip" wx:if="{{!questions.length}}">还没有自定义问题（上面四项固定信息仍然照收）</view>
+          <view class="rc-tip" wx:if="{{!questions.length}}">还没有自定义问题</view>
 
           <button class="rc-btn rc-btn-ghost mt" wx:if="{{canManage}}" hover-class="pressed"
                   bindtap="onQNew">添加问题</button>
-          <view class="rc-tip" wx:if="{{canManage && lockedQuestions}}">已发布批次题目锁定；点「添加问题」会提示怎么开草稿。</view>
         </view>
       </view>
 
@@ -218,15 +211,6 @@
         </view>
       </view>
 
-      <view class="rc-layer">
-        <view class="rc-note">{{archived
-          ? '已归档批次整份只读：名称、题目、报名记录都不能再改。'
-          : (canManage
-              ? (lockedTitle
-                  ? '发布后名称与题目结构锁定；报名开始或手动截止后时间锁定。要改就回「批次管理」新建一份草稿。'
-                  : '草稿批次可以随时改；发布后名称与题目锁死，报名开始后时间锁死。')
-              : '只有超管能改配置；你能看批次、审报名、安排面试。')}}</view>
-      </view>
       <view class="rc-pad"></view>
     </block>
   </view>

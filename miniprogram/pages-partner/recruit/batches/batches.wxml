@@ -55,13 +55,6 @@
         <button class="rc-btn rc-btn-primary" hover-class="pressed" bindtap="onNew">新建招新批次</button>
       </view>
 
-      <view class="rc-layer">
-        <view class="rc-note">{{tab === 'arch'
-          ? '归档批次只读：名字、题目、报名记录都不能再改，只能看。'
-          : (canManage
-              ? '点批次进它的「批次配置」改名称 / 时间 / 固定信息 / 题目；行尾红色「删除」＝删这一个批次，要原样输入批次名称。'
-              : '点批次进它的详情看报名与面试；新建、配置、发布、截止、归档、删除都只有超管能做。')}}</view>
-      </view>
       <view class="rc-pad"></view>
     </block>
   </view>

@@ -62,7 +62,6 @@
             <button class="rc-btn rc-btn-ghost" wx:if="{{custom}}" hover-class="pressed"
                     bindtap="onReset">恢复统一</button>
           </view>
-          <view class="rc-tip">单独配置只影响这一个人。清除后进度交回「已提交」，批次有统一安排时由服务端派生出「待面试」——不会留下没时间的待面试状态。</view>
         </view>
       </view>
       <view class="rc-pad"></view>

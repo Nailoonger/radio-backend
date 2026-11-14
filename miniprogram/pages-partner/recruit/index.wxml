@@ -46,10 +46,6 @@
         </view>
       </view>
 
-      <!-- ③ 说明 -->
-      <view class="rc-layer">
-        <view class="rc-note">批次由超管建立与发布；社干可以看报名、审核、看面试名单。{{canManage ? '' : '新建、配置、发布、截止、归档、删除都只有超管能做。'}}</view>
-      </view>
       <view class="rc-pad"></view>
     </block>
   </view>
