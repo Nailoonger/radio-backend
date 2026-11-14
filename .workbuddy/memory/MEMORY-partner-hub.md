@@ -174,3 +174,53 @@ tabbar＝**浮动白胶囊 dock**（选中块用 `--accent`，Codex 原为深色
 - **投影/颜色判据一律采样像素**（差 <6 灰阶＝看不出）；**尺寸判据量 rect**（如两按钮 159.5×56.0、top 同线）。
 - 探针副本**必须与交付稿同目录**（否则 `assets/` 解析错）；**改完主文件要重新生成探针**（否则截到旧稿得出"图像没变"假象）。
 - 无头截图：`--headless=new --disable-gpu --allow-file-access-from-files --window-size=780,1900 --virtual-time-budget=4000`；⚠️ 最小视口 ≈512（`--window-size=390` 会假溢出）。
+
+## v173（报名时间一个字段选整段 · 班级原地下拉）
+- `S.recr.rng={open,y,m,a,b,hh1,mm1,hh2,mm2}`（挂 `S.recr`，不是 cfg）。`rcRangeField()` 内嵌 `rcRangePop()`，
+  pop 是 `.rc-rng{position:relative}` 里的绝对层；点第一下定 a（并清 b）、第二下定 b、`ds<a` 自动对调、
+  第三下＝重开一段。`确定` 才写回 `bt.start/end`（`mm-dd hh:mm`），`取消` 不动原值。
+- 班级：`rcClsPanel()` 在 `.rc-dd` 里原地展开；`.rc-panel` 是 flex 列（`overflow:hidden`），
+  `.rc-list` 滚动、「＋ 添加班级」是面板固定底行——**sticky 在滚动容器里不生效**，别再用 sticky。
+- ⚠️ **`.nav` 是全局类（`min-height:42px;padding:0 52px`）**，日历翻月按钮叫 `.nav` 会被撑成大胶囊 ⇒ 改名 `.rnav`。
+- ⚠️ 时刻下拉是 5 分钟栅格，草稿存的 `23:59` 不在栅格里会**静默跳到 23:00** ⇒ 把现有值补进选项。
+- 盘上：`_opfit/{vars,audit,overflow}.cjs <版本目录>` + `runaudit/runov <生成的 html>`；
+  交互 `ia<N>.cjs` 生成 `_ia.html` 后用 chrome `--dump-dom` 读 `<title>`。基线：26/25 · AUDIT_OK · OV n=16 · 121/0 · IA ok=93 fail=0 · 88 屏。
+
+## v174（报名时间只按天）
+- 删掉 v173 日历下面「开始 / 截止」两行钟点下拉：`S.recr.rng` 只剩 `{open,y,m,a,b}`；
+  `rcRngParse` 改成只认 `mm-dd`（不再要求时分），`rcRangeField` 只显示 `11-08 — 11-18`。
+- 写回固定 `bt.start='mm-dd 00:00'`、`bt.end='mm-dd 24:00'`；示例批次种子也同步改成 00:00/24:00。
+- 日历下方改一句 `.rc-rhint`（11px）：「11-08 00:00 起 — 11-18 24:00 止」。
+- 基线：26/25 · AUDIT_OK · OV n=16 · 121/0 · IA ok=95 fail=0 · 88 屏。
+
+## 招新真机落地（2026-11-14 · **不是原型**，是 `miniprogram/pages-partner/recruit/`）
+> ⚠️⚠️ **唯一依据 = `preview/partner-hub-gounucai-v174/app.html` 的招新八屏**
+> （`V.recruit` / `V['recruit-batches']` / `V['recruit-config']` / `V['recruit-q']` /
+>  `V['recruit-list']` / `V['recruit-detail']` / `V['recruit-interview']` / `V['recruit-solo']`）。
+> 2026-11-14 我先自己拍了一版（写「人待定」、批次管理用白药丸、班级弹窗、多搞一个 order 页），
+> 被陛下点名「你去给我好好看看 v174 的方案照着做」⇒ 整条重写。**别再自己编。**
+> 八页目录与 v174 一一对应，`order/` 已删（v174 没有这一屏，面试名单是 interview 的下段）。
+> 原型（`preview/partner-hub-*`）只是样子；真代码在分包里。后端 17 个 `/admin/recruitment/*`
+> 与 `admin-web/src/views/Recruitment.vue` 早已就绪，缺的只有 phone 端 ⇒ 纯前端接现有 API，不新增接口。
+> 六页：`index` / `batches` / `config` / `list` / `detail` / `order`；`app.json` 分包 32→38 页。
+> 自检：`node _opfit/chk-recruit.cjs`（注册·handlers·类名·路由表·权限·冲突码·入口）+ `chk-recruit-req.cjs`。
+
+- ⚠️⚠️⚠️ **招新的版本冲突码是 40910，不是通用 40901**（`services/recruitmentCodes.js` 的 `VERSION_CONFLICT`）。
+  `utils/request.js#isConflict()` 只认 40901 ⇒ 只写它等于**没接冲突处理**：真撞锁时用户只看到一句
+  「数据已更新，请刷新后重试」，屏幕上还是旧数据。已补 `isVersionConflict()`（认 40910），
+  config / detail / order 三页都是 `isVersionConflict(err) || isConflict(err)`。
+  电脑端本来就是对 40910 判断（`Recruitment.vue: error?.code === 40910`）。
+- ⚠️⚠️ **子目录页的 require 深度**：`recruit/index.js` 是 `../../utils/`；但 `recruit/<x>/<x>.js`
+  必须是**三层** `../../../utils/`。少一层 ⇒ 真机整页白屏，`node --check` 完全不报（它不解析路径）。
+  改完跑 `node _opfit/chk-recruit-req.cjs`（逐条解析到真实文件）。
+- **锁位不是"提交了再被拒"，是"锁住的整个不出现"**：服务端用 `F.own(body,'title')` 判断「有没有提交这个字段」，
+  发布后提交 title/questions 会**直接报错**（不是静默忽略）。所以 `config.js#save()` 按 `lockedTitle/lockedQuestions/lockedTime`
+  拼 body，锁住的那几项整个不进 body。锁位判定：`published` ⇒ 名称+题目锁；`published && (closedAt || opensAt<=now)` ⇒ 时间也锁。
+- **面试顺序生成四前提**：已发布 + `windowState==='closed'` + 未 `resultPublishedAt` + 未 `archivedAt`，且 asSuper。
+  覆盖已有顺序要 `confirm:'REGENERATE'`（不带就 R.INVALID_STATE 拒绝）。名单按 `interviewOrderIds` 顺序，
+  服务端已排好带 `interviewSequence`，前端不要再排。导出返回 xlsx 的 `{filename,base64}`，
+  手机上 `getFileSystemManager().writeFile(base64)` 落盘再 `wx.openDocument`。
+- **`deleteBatch` 不用 version**，用 `confirm` 原样输入批次名（两边都 trim）；所以删除不会 40910。
+- 权限照 `asAdmin`/`asSuper`：社干能看批次/审报名/排面试/看名单；新建·发布·截止·删除·归档·生成顺序只给 `role===0`。
+- 「已定」不是服务端状态：一次只收一个 `status` ⇒ 前端并发拉 `accepted` + `rejected` 再合并。
+- 服务端 admin DTO **只给 `unresolvedCount`（未出结果条数），没有总报名数** ⇒ 界面不写「共 N 人」。
