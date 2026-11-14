@@ -31,7 +31,7 @@
                 <text class="rc-lb">面试日期</text>
                 <view class="rc-rng-f" bindtap="onPlanCalOpen">
                   <text class="vl">{{planDate || '未设置'}}</text>
-                  <view class="cal"></view>
+                  <view class="arw"></view>
                 </view>
               </view>
               <view class="rc-fhalf">

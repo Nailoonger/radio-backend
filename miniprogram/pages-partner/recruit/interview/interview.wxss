@@ -22,3 +22,6 @@
   transform: rotate(45deg);
   flex: none;
 }
+
+/* 日期/时刻两列放宽：不要那么紧凑（页面级覆盖共享的 15rpx） */
+.rc-frow { gap: 24rpx; }
