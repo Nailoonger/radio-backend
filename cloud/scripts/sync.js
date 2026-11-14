@@ -183,8 +183,13 @@ function run(checkOnly) {
    * ⚠️⚠️ 这个文件是**平台侧解析**的：它决定定时触发器是否存在。
    *    漏传的表现是「函数部署成功、日志一片正常、但定时任务从来不跑」——
    *    纯静默，排查代价极高。所以：
-   *      ① 必须跟着 index.js 一起上传（`deploy --names api -r` 传的是整个目录）；
-   *      ② `cleanDir()` 会清空产物目录，所以只能在这里复制，不能手动往里放。
+   *      ① 必须跟着 index.js 一起上传（`deploy --names api -r` 传的是整个目录）**，
+   *        但这**只是第一步** —— 光把文件传上去**不会**让触发器生效；
+   *      ② 还要**单独上传触发器**：右键 `config.json` →「上传触发器」，
+   *        或在 CloudBase 控制台里可视化配置，或用 CloudBase CLI 的 `tcb fn deploy`。
+   *        ⚠️ 官方部署流程就是这两步，缺第二步等于没配（2026-11-15 查官方文档 + 社区实测确认，
+   *        本仓库的这个触发器因此从未真正上线过 —— 线上 scheduleLockAt 早已过点、周却一直不锁）。
+   *      ③ `cleanDir()` 会清空产物目录，所以只能在这里复制，不能手动往里放。
    * 内容：triggers[0] = { name: songSweepTick, type: timer, config: 每分钟第 0 秒 }
    *      —— 微信云开发小程序端**只支持一个触发器**；cron 为 **7 位**
    *      「秒 分 时 日 月 周 年」，写法见源文件 `cloud/cloudfunctions/api/config.json`。

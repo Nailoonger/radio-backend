@@ -80,6 +80,29 @@ catch (e) { return { skipped: false, error: e.message, weeks: 0, played: 0 }; } 
 - 触发时 `event = { Type: 'Timer', TriggerName, TriggerTime }`。
 - **改了 `config.json` 必须重新部署**（触发器随函数上传，不在平台侧单独配）。
 
+> ⚠️⚠️ **2026-11-15 更正：上面最后一条是错的，别再照它做。**
+>
+> 官方部署流程其实是**两步**，缺一不可：
+> ① 「上传并部署:云端安装依赖」（= 微信开发者工具 CLI 的 `deploy -r`，**只更代码，不碰触发器**）；
+> ② **单独右键 `config.json` →「上传触发器」**（或 CloudBase 控制台里可视化配置 / CloudBase CLI 的
+> `tcb fn deploy`）——**这一步才让触发器真正生效执行**。
+>
+> 证据：微信开放文档「定时触发器」的部署步骤明确写了这两步；腾讯云社区 Q&A 也强调
+> 「**更新触发器文件**和**上传触发器**是两个概念，不能用前者代替后者」；
+> 另有社区实战记录「部分版本的开发者工具，『云端安装依赖』的部署模式**不会**同步 config.json 的触发器配置到云端」。
+>
+> ⇒ **本仓库 `config.json` 里的 `songSweepTick` 从未真正上线过**：2026-11-14 实测线上
+> `scheduleLockAt` 早已过点、周却一直不锁 ⇒ 定时器一次都没跑过。
+> ⇒ 建触发器的三条可靠路径（任选其一）：
+> ① **腾讯云 CloudBase 控制台**（`cloud.tencent.com/tcb`）→ 环境 → 云函数 `api` → 编辑 → 定时触发器，
+>    配置内容填 `{"triggers":[{"name":"songSweepTick","type":"timer","config":"0 */1 * * * * *"}]}`（cron **7 位**）；
+> ② 微信开发者工具里右键 `miniprogram/cloudfunctions/api/config.json` →「上传触发器」；
+> ③ CloudBase CLI（`@cloudbase/cli`）：`cloudbaserc.json` 里写 `triggers`，再 `tcb fn deploy`（会带上触发器）。
+>
+> ⚠️ 旧版微信云开发控制台**界面可能一直显示为空**（社区实测的显示 bug），别据此判断触发器不存在——
+> 看**日志**里有没有 `[cron]` 输出才作数。
+
+
 ### 3.4 `index.js` —— 定时事件分支插在路由匹配**之前**
 
 ```js

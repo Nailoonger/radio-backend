@@ -231,14 +231,20 @@ function createCloudAdapter({
     const routesBefore = await readRoutes();
     logger('云函数：已验证运行配置、' + detail.Triggers.length + ' 个原有触发器和 API 入口');
     // ⚠️ 触发器**不归 CI 管**（updateFunctionCode 只更代码，造不出触发器）——
-    //    这是 2026-09-28 起的有意边界：触发器只能由「cli deploy -r 整包部署」或控制台建立。
+    //    这是 2026-09-28 起的有意边界。且**开发者工具 CLI 的 `deploy -r` 也不建触发器**：
+    //    官方部署流程是两步 —— ①「上传并部署:云端安装依赖」②**单独右键 config.json →「上传触发器」**，
+    //    第二步才会让触发器生效（2026-11-15 查官方文档 + 社区实测确认）。
     //    但线上为空集时**必须喊出来**，否则「定时兜底不跑」会继续静默：
     //    症状是 scheduleLockAt 早已过点、周却一直不锁（2026-11-14 实测踩中）。
     if (!detail.Triggers.length) {
       logger('⚠️ 警告：线上 api 函数没有任何触发器 ⇒ 定时兜底（每分钟 sweep / 到点锁周）不会跑。');
-      logger('   修法：cli.bat cloud functions deploy --env <env> --names api --project <miniprogram> -r 整包部署，');
-      logger('        或在云开发控制台为 api 新建定时触发器 songSweepTick（cron 0 */1 * * * * *，必须 7 位）。');
+      logger('   修法（任选其一，cli deploy -r 无效）：');
+      logger('     ① 腾讯云 CloudBase 控制台（cloud.tencent.com/tcb）→ 环境 → 云函数 api → 编辑 → 定时触发器，');
+      logger('        填配置内容：{"triggers":[{"name":"songSweepTick","type":"timer","config":"0 */1 * * * * *"}]}（cron 7 位）');
+      logger('     ② 微信开发者工具里右键 miniprogram/cloudfunctions/api/config.json →「上传触发器」；');
+      logger('     ③ CloudBase CLI：cloudbaserc.json 里写 triggers，再 tcb fn deploy（会带上触发器）。');
     }
+
     const result = await platform('更新云函数代码', () => manager.functions.updateFunctionCode({
       func: { name: 'api', handler: detail.Handler, runtime: detail.Runtime,
         installDependency: detail.InstallDependency, isWaitInstall: true },
