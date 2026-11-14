@@ -24,18 +24,42 @@
             <text class="t">批次统一安排</text>
             <text class="more">{{savedPlan ? '已发布' : '未安排'}}</text>
           </view>
-          <view class="rc-frow">
-            <view class="rc-fhalf">
-              <text class="rc-lb">面试日期</text>
-              <picker mode="date" value="{{planDate}}" bindchange="onPlanDate">
-                <view class="rc-inp">{{planDate || '选择'}}</view>
-              </picker>
+          <!-- 面试日期：字段装整段，点开在下方原地展开日历（单选一天，确定回填） -->
+          <view class="rc-rng mt">
+            <view class="rc-frow">
+              <view class="rc-fhalf">
+                <text class="rc-lb">面试日期</text>
+                <view class="rc-rng-f" bindtap="onPlanCalOpen">
+                  <text class="vl">{{planDate || '未设置'}}</text>
+                  <view class="cal"></view>
+                </view>
+              </view>
+              <view class="rc-fhalf">
+                <text class="rc-lb">时刻</text>
+                <picker mode="time" value="{{planTime}}" bindchange="onPlanTime">
+                  <view class="rc-inp">{{planTime || '选择'}}</view>
+                </picker>
+              </view>
             </view>
-            <view class="rc-fhalf">
-              <text class="rc-lb">时刻</text>
-              <picker mode="time" value="{{planTime}}" bindchange="onPlanTime">
-                <view class="rc-inp">{{planTime || '选择'}}</view>
-              </picker>
+            <view class="rc-pop" wx:if="{{planCal.open}}">
+              <view class="rc-pop-hd">
+                <view class="rnav" data-step="-1" bindtap="onPlanCalNav">‹</view>
+                <b>{{planCalMonth}}</b>
+                <view class="rnav" data-step="1" bindtap="onPlanCalNav">›</view>
+              </view>
+              <view class="rc-rgrid">
+                <view class="rc-rw" wx:for="{{planCalWeeks}}" wx:key="*this" wx:for-item="w">{{w}}</view>
+                <view class="rc-rd {{item.cls}}" wx:for="{{planCalCells}}" wx:key="index"
+                      data-d="{{item.d}}" bindtap="onPlanCalDay">{{item.d}}</view>
+              </view>
+              <view class="rc-rhint">{{planCalHint}}</view>
+              <view class="rc-rfoot">
+                <button class="cbtn cancel" hover-class="pressed" bindtap="onPlanCalClear">清空</button>
+                <view class="grow"></view>
+                <button class="cbtn cancel" hover-class="pressed" bindtap="onPlanCalClose">取消</button>
+                <button class="cbtn ok" hover-class="pressed" bindtap="onPlanCalOk"
+                        disabled="{{planCal.sel ? false : true}}">确定</button>
+              </view>
             </view>
           </view>
           <text class="rc-lb mt">面试地点</text>

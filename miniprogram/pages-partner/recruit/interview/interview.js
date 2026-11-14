@@ -37,6 +37,25 @@ const STATUS_TEXT = {
 const STATUS_CLS = { submitted: 'warn', interview: 'ok', accepted: 'done', rejected: 'no', withdrawn: 'gray' };
 
 function pad(n) { return String(n).padStart(2, '0'); }
+function cmpDay(a, b) { return String(a).localeCompare(String(b)); }
+
+/** 日历格子（与 config 页同一套）：一个月的 {d, cls}；a===b 时那天是深蓝单选 */
+function monthCells(y, m, a, b) {
+  const first = new Date(y, m - 1, 1).getDay();      // 0=周日
+  const days = new Date(y, m, 0).getDate();
+  const out = [];
+  for (let i = 0; i < first; i += 1) out.push({ d: '', cls: 'blank' });
+  for (let d = 1; d <= days; d += 1) {
+    const key = `${y}-${pad(m)}-${pad(d)}`;
+    let cls = '';
+    if (a && b && cmpDay(key, a) >= 0 && cmpDay(key, b) <= 0) {
+      cls = (key === a && key === b) ? 'cap solo' : 'mid';
+    }
+    out.push({ d: String(d), cls });
+  }
+  return out;
+}
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
 Page({
   data: {
@@ -54,6 +73,12 @@ Page({
     planNote: '',
     savedPlan: false,
     savingPlan: false,
+    /* 面试日期：字段装整段 + 点开原地展开日历（单选一天），跟「报名时间」同一套组件 */
+    planCal: { open: false, y: 0, m: 0, sel: '' },
+    planCalCells: [],
+    planCalMonth: '',
+    planCalHint: '',
+    planCalWeeks: WEEKDAYS,
     /* 名单 */
     generated: false,
     generatedAt: '',
@@ -177,7 +202,57 @@ Page({
   },
 
   /* ══════════ 统一安排（超管）══════════ */
-  onPlanDate(e) { this.setData({ planDate: e.detail.value }); },
+  /* 面试日期：点字段开/收日历；单选一天，确定回填（与「报名时间」同一套视觉） */
+  onPlanCalOpen() {
+    if (!this.data.canManage) return;
+    const c = this.data.planCal;
+    if (c.open) { this.setData({ planCal: Object.assign({}, c, { open: false }) }); return; }
+    const now = new Date();
+    const from = this.data.planDate;
+    const y = from ? Number(from.slice(0, 4)) : now.getFullYear();
+    const m = from ? Number(from.slice(5, 7)) : now.getMonth() + 1;
+    this.setData({ planCal: { open: true, y, m, sel: from || '' } });
+    this.refreshPlanCal();
+  },
+  onPlanCalNav(e) {
+    const step = Number(e.currentTarget.dataset.step) || 0;
+    const c = this.data.planCal;
+    let m = c.m + step;
+    let y = c.y;
+    if (m > 12) { m = 1; y += 1; }
+    if (m < 1) { m = 12; y -= 1; }
+    this.setData({ planCal: Object.assign({}, c, { y, m }) });
+    this.refreshPlanCal();
+  },
+  onPlanCalDay(e) {
+    const d = String(e.currentTarget.dataset.d || '');
+    if (!d) return;
+    const c = this.data.planCal;
+    this.setData({ planCal: Object.assign({}, c, { sel: `${c.y}-${pad(c.m)}-${pad(Number(d))}` }) });
+    this.refreshPlanCal();
+  },
+  onPlanCalClear() {
+    this.setData({ planCal: Object.assign({}, this.data.planCal, { sel: '' }) });
+    this.refreshPlanCal();
+  },
+  onPlanCalClose() {
+    this.setData({ planCal: Object.assign({}, this.data.planCal, { open: false }) });
+  },
+  onPlanCalOk() {
+    const c = this.data.planCal;
+    if (!c.sel) { wx.showToast({ title: '先点选面试那一天', icon: 'none' }); return; }
+    this.setData({ planDate: c.sel, planCal: Object.assign({}, c, { open: false }) });
+  },
+  refreshPlanCal() {
+    const c = this.data.planCal;
+    if (!c.y || !c.m) return;
+    this.setData({
+      planCalCells: monthCells(c.y, c.m, c.sel, c.sel),
+      planCalMonth: `${c.y} 年 ${c.m} 月`,
+      planCalHint: c.sel ? `面试那天：${c.sel.slice(5, 7)}-${c.sel.slice(8, 10)}` : '点选面试那一天；确定后回填字段',
+    });
+  },
+
   onPlanTime(e) { this.setData({ planTime: e.detail.value }); },
   onPlanPlace(e) { this.setData({ planPlace: e.detail.value }); },
   onPlanNote(e) { this.setData({ planNote: e.detail.value }); },

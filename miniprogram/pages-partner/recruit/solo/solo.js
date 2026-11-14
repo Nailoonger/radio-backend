@@ -18,6 +18,27 @@
 const { adminRequest, isConflict, isVersionConflict } = require('../../../utils/request.js');
 const { fmtIso } = require('../../../utils/format.js');
 
+function pad(n) { return String(n).padStart(2, '0'); }
+function cmpDay(a, b) { return String(a).localeCompare(String(b)); }
+
+/** 日历格子（与 config / interview 页同一套）：a===b 时那天是深蓝单选 */
+function monthCells(y, m, a, b) {
+  const first = new Date(y, m - 1, 1).getDay();
+  const days = new Date(y, m, 0).getDate();
+  const out = [];
+  for (let i = 0; i < first; i += 1) out.push({ d: '', cls: 'blank' });
+  for (let d = 1; d <= days; d += 1) {
+    const key = `${y}-${pad(m)}-${pad(d)}`;
+    let cls = '';
+    if (a && b && cmpDay(key, a) >= 0 && cmpDay(key, b) <= 0) {
+      cls = (key === a && key === b) ? 'cap solo' : 'mid';
+    }
+    out.push({ d: String(d), cls });
+  }
+  return out;
+}
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -36,6 +57,12 @@ Page({
     note: '',
     custom: false,
     saving: false,
+    /* 面试日期：字段装整段 + 点开原地展开日历（单选一天），跟「报名时间」同一套组件 */
+    soloCal: { open: false, y: 0, m: 0, sel: '' },
+    soloCalCells: [],
+    soloCalMonth: '',
+    soloCalHint: '',
+    soloCalWeeks: WEEKDAYS,
   },
 
   onLoad(q) {
@@ -101,7 +128,56 @@ Page({
       });
   },
 
-  onDate(e) { this.setData({ date: e.detail.value }); },
+  /* 面试日期：点字段开/收日历；单选一天，确定回填（与「报名时间」同一套视觉） */
+  onSoloCalOpen() {
+    const c = this.data.soloCal;
+    if (c.open) { this.setData({ soloCal: Object.assign({}, c, { open: false }) }); return; }
+    const now = new Date();
+    const from = this.data.date;
+    const y = from ? Number(from.slice(0, 4)) : now.getFullYear();
+    const m = from ? Number(from.slice(5, 7)) : now.getMonth() + 1;
+    this.setData({ soloCal: { open: true, y, m, sel: from || '' } });
+    this.refreshSoloCal();
+  },
+  onSoloCalNav(e) {
+    const step = Number(e.currentTarget.dataset.step) || 0;
+    const c = this.data.soloCal;
+    let m = c.m + step;
+    let y = c.y;
+    if (m > 12) { m = 1; y += 1; }
+    if (m < 1) { m = 12; y -= 1; }
+    this.setData({ soloCal: Object.assign({}, c, { y, m }) });
+    this.refreshSoloCal();
+  },
+  onSoloCalDay(e) {
+    const d = String(e.currentTarget.dataset.d || '');
+    if (!d) return;
+    const c = this.data.soloCal;
+    this.setData({ soloCal: Object.assign({}, c, { sel: `${c.y}-${pad(c.m)}-${pad(Number(d))}` }) });
+    this.refreshSoloCal();
+  },
+  onSoloCalClear() {
+    this.setData({ soloCal: Object.assign({}, this.data.soloCal, { sel: '' }) });
+    this.refreshSoloCal();
+  },
+  onSoloCalClose() {
+    this.setData({ soloCal: Object.assign({}, this.data.soloCal, { open: false }) });
+  },
+  onSoloCalOk() {
+    const c = this.data.soloCal;
+    if (!c.sel) { wx.showToast({ title: '先点选面试那一天', icon: 'none' }); return; }
+    this.setData({ date: c.sel, soloCal: Object.assign({}, c, { open: false }) });
+  },
+  refreshSoloCal() {
+    const c = this.data.soloCal;
+    if (!c.y || !c.m) return;
+    this.setData({
+      soloCalCells: monthCells(c.y, c.m, c.sel, c.sel),
+      soloCalMonth: `${c.y} 年 ${c.m} 月`,
+      soloCalHint: c.sel ? `面试那天：${c.sel.slice(5, 7)}-${c.sel.slice(8, 10)}` : '点选面试那一天；确定后回填字段',
+    });
+  },
+
   onTime(e) { this.setData({ time: e.detail.value }); },
   onPlace(e) { this.setData({ place: e.detail.value }); },
   onNote(e) { this.setData({ note: e.detail.value }); },

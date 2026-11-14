@@ -124,6 +124,7 @@ Page({
     rangeText: '未设置',
     /* 报名时间区间：open 展开 / y,m 当前月 / a,b 两端（'YYYY-MM-DD'） */
     rng: { open: false, y: 0, m: 0, a: '', b: '' },
+    rngWeeks: ['日', '一', '二', '三', '四', '五', '六'],
     cells: [],
     rngMonth: '',
     rngHint: '',

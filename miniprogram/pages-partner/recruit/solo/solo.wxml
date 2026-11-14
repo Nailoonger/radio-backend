@@ -37,18 +37,42 @@
             <text class="t">{{custom ? '改单独配置' : '单独配置'}}</text>
             <text class="more">{{batchPlanAt ? '批次统一 ' + batchPlanAt : '批次未安排'}}</text>
           </view>
-          <view class="rc-frow">
-            <view class="rc-fhalf">
-              <text class="rc-lb">面试日期</text>
-              <picker mode="date" value="{{date}}" bindchange="onDate">
-                <view class="rc-inp">{{date || '选择'}}</view>
-              </picker>
+          <!-- 面试日期：字段装整段，点开在下方原地展开日历（单选一天，确定回填） -->
+          <view class="rc-rng mt">
+            <view class="rc-frow">
+              <view class="rc-fhalf">
+                <text class="rc-lb">面试日期</text>
+                <view class="rc-rng-f" bindtap="onSoloCalOpen">
+                  <text class="vl">{{date || '未设置'}}</text>
+                  <view class="cal"></view>
+                </view>
+              </view>
+              <view class="rc-fhalf">
+                <text class="rc-lb">时刻</text>
+                <picker mode="time" value="{{time}}" bindchange="onTime">
+                  <view class="rc-inp">{{time || '选择'}}</view>
+                </picker>
+              </view>
             </view>
-            <view class="rc-fhalf">
-              <text class="rc-lb">时刻</text>
-              <picker mode="time" value="{{time}}" bindchange="onTime">
-                <view class="rc-inp">{{time || '选择'}}</view>
-              </picker>
+            <view class="rc-pop" wx:if="{{soloCal.open}}">
+              <view class="rc-pop-hd">
+                <view class="rnav" data-step="-1" bindtap="onSoloCalNav">‹</view>
+                <b>{{soloCalMonth}}</b>
+                <view class="rnav" data-step="1" bindtap="onSoloCalNav">›</view>
+              </view>
+              <view class="rc-rgrid">
+                <view class="rc-rw" wx:for="{{soloCalWeeks}}" wx:key="*this" wx:for-item="w">{{w}}</view>
+                <view class="rc-rd {{item.cls}}" wx:for="{{soloCalCells}}" wx:key="index"
+                      data-d="{{item.d}}" bindtap="onSoloCalDay">{{item.d}}</view>
+              </view>
+              <view class="rc-rhint">{{soloCalHint}}</view>
+              <view class="rc-rfoot">
+                <button class="cbtn cancel" hover-class="pressed" bindtap="onSoloCalClear">清空</button>
+                <view class="grow"></view>
+                <button class="cbtn cancel" hover-class="pressed" bindtap="onSoloCalClose">取消</button>
+                <button class="cbtn ok" hover-class="pressed" bindtap="onSoloCalOk"
+                        disabled="{{soloCal.sel ? false : true}}">确定</button>
+              </view>
             </view>
           </view>
           <text class="rc-lb mt">面试地点</text>
