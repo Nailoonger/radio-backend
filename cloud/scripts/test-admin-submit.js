@@ -273,6 +273,10 @@ function byId(id) {
   eq('派生镜像 status = 1（已排期）', r.data.status, 1);
   eq('reviewerId / rejectReason / autoRejected', [byId(1).reviewerId, byId(1).rejectReason, byId(1).autoRejected], [2, null, 0]);
   ok('reviewTime 已写入', byId(1).reviewTime instanceof Date);
+  // ⚠️ 前端 toast 读的是 `d.slot`，而行里的字段叫 `scheduledSlot` —— 名字对不上就拿不到值，
+  //    「已通过，占住「…」」会静默退化成「已通过」（2026-11-15 真机翻车）。这里钉死。
+  eq('响应体带 slot，且与 scheduledSlot 一致',
+    [r.data.slot, r.data.scheduledSlot], [`${DATE0} 早间 07:20`, `${DATE0} 早间 07:20`]);
 
   r = await H.call(H.req('PUT', '/admin/submit/5/approve', {}, PLAIN_TOKEN));
   eq('已是通过状态 → 幂等不报错', r.code, 0);

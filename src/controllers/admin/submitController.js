@@ -399,6 +399,10 @@ exports.approve = async (req, res, next) => {
     if (rel && rel.assigned) msg += `（新增落座 ${rel.assigned} 条）`;
 
     const data = withStatus(fresh.toJSON());
+    // 与云函数口径一致（cloud/…/handlers/admin/submit.js 同名补丁）：
+    // 前端 toast 读 `d.slot`，行里的字段叫 `scheduledSlot` —— 不补这行，
+    // 「已通过，占住「…」」永远退化成「已通过」。
+    data.slot = fresh.scheduledSlot || null;
     if (Number(fresh.type) === 1) {
       try { data.card = await songQueue.cardFor(fresh); } catch (e) { data.card = null; }
     }

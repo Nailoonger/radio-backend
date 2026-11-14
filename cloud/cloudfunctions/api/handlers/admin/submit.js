@@ -515,6 +515,12 @@ async function approve(ctx) {
   void rel;
 
   const data = withStatus(fresh);
+  // ⚠️⚠️ 前端 toast 读的是 `d.slot`，而行里的字段叫 `scheduledSlot` —— 名字对不上，
+  //    不补这一行，「已通过，占住「2026-11-16 午间 12:10」」会永远退化成「已通过」，
+  //    管理员根本看不出这次审核到底占住了哪一格（2026-11-15 真机翻车）。
+  //    ⚠️ 取 fresh.scheduledSlot 而不是 approveOne 返回的 slot：审核后还可能再跑一轮
+  //    reconcile 改派，最终他占在哪一格，以行上落库的那个值为准。
+  data.slot = fresh.scheduledSlot || null;
   if (Number(fresh.type) === 1) {
     try { data.card = await songQueue.cardFor(fresh); } catch (e) { data.card = null; }
   }
