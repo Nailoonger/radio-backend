@@ -290,14 +290,21 @@ button.rc-btn-ghost[disabled] { color: var(--soft); border-color: var(--divider)
   width: 2rpx;
   background: var(--hairline);
 }
-.rc-ps-l { font-size: 19rpx; color: var(--muted); line-height: 1; }     /* 10px（覆写层 810）*/
+.rc-ps-l {
+  display: block;   /* ⚠️ text 是行内：不写 block，标签和数字会挤在同一行 */
+  font-size: 19rpx;
+  color: var(--muted);
+  line-height: 1;
+}     /* 10px（覆写层 810）*/
 .rc-ps-d {
+  display: block;
   font-size: 24rpx;                               /* 12.5px */
   margin-top: 12rpx;                              /* 6px */
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 .rc-ps-n {
+  display: block;
   font-size: 46rpx;                               /* 24px（覆写层 811）——数字就是大号的 */
   font-weight: 500;
   letter-spacing: -1rpx;                          /* -0.5px */
