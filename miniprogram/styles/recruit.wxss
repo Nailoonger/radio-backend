@@ -450,6 +450,9 @@ button.rc-btn-ghost[disabled] { color: var(--soft); border-color: var(--divider)
 .rc-rng-f.off { opacity: .55; }
 
 /* 日期字段的简约下箭头（替代原来的蓝色日历块轮廓）——与 rc-pick 的箭头同一画法 */
+/* 日期值字距放宽（面试日期字段用；config「报名时间」保持 v174 定稿不动） */
+.rc-rng-f.loose .vl { letter-spacing: 2rpx; }
+
 .rc-rng-f .arw {
   flex: none;
   width: 14rpx; height: 14rpx;
@@ -604,7 +607,7 @@ button.rc-btn-ghost[disabled] { color: var(--soft); border-color: var(--divider)
   font-size: 25rpx;
   color: var(--ink);
   font-weight: 400;
-  letter-spacing: -0.2rpx;
+  letter-spacing: 2rpx;           /* 与日期字段(loose)同宽字距 */
   font-variant-numeric: tabular-nums;
 }
 .rc-pick.bare.picked .v { color: var(--ink); font-weight: 400; }
