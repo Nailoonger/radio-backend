@@ -27,6 +27,7 @@ const API_DIR = path.join(__dirname, '..', 'cloudfunctions', 'api');
 const { sign } = require(path.join(API_DIR, 'lib', 'auth'));
 const bj = require(path.join(API_DIR, 'lib', 'bjTime'));
 const S = require(path.join(API_DIR, 'services', 'songStatus'));
+const slotSvc = require(path.join(API_DIR, 'services', 'broadcastSlot'));
 
 const lines = [];
 let failed = 0;
@@ -47,8 +48,14 @@ const PLAIN_TOKEN = sign({ id: 2, username: 'reviewer', role: 1 });
 
 const WEEK_MS = bj.nextWeekRange(Date.now()).start.getTime();
 const DATE0 = bj.ymd(bj.shifted(WEEK_MS));
+/** 本用例只用一格：周一午间 12:20（容量 2）。
+ *  ⚠️ 2026-11-14 起「审核通过 = 当场占住首选格」，所以种子里**必须**给一个
+ *  真实存在、当前仍在发布列表里的时段 —— 否则 approve 会被判「时段无法识别」。 */
+const SLOT = `${DATE0} 午间 12:20`;
 
-function seed() {
+async function seed() {
+  slotSvc.clearCache();
+  await slotSvc.setSlotTimes([{ time: '12:20', label: '午间' }], 2);
   H.reset({
     admin: [
       { _id: 'ad1', id: 1, username: 'root', password: HASH, nickname: '王慕之', role: 0, status: 1, createTime: new Date(), updateTime: new Date() },
@@ -82,7 +89,7 @@ function seed() {
       songName: '晴天',
       singer: '周杰伦',
       wishContent: null,
-      wantBroadcastTime: null,     // 不落周 ⇒ 排期阶段不会动别的格子，用例确定
+      wantBroadcastTime: SLOT,     // 首选已发布的一格（通过时当场占住它）
       scheduledSlot: null,
       queueAt: null,
       promotedAt: null,
@@ -119,7 +126,7 @@ function log(o) {
 }
 
 async function main() {
-  seed();
+  await seed();
 
   /* ══════════════ A. 措辞：代号 → 人话 ══════════════ */
   section('A. 动作代号翻人话');

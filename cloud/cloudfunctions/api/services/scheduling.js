@@ -382,6 +382,286 @@ async function logAssignment(requestId, fromSlot, toSlot, type, reason, operator
  *    这批行从内存喂过去。非 dryRun 时恒为空数组。
  * @returns {Promise<{assigned:number, waiting:number, weekId:number, actions:Array, waitingRows:Array}>}
  */
+/* ================================================================== *
+ * 按格审核 + 统筹补派（2026-11-14 陛下定案，取代「审核即全局排期」）
+ * ================================================================== *
+ *
+ * 规则（按陛下口述拆解）：
+ *   ① 格子相互独立：一格满了**绝不**占用别的格，也**不把人挪到别的格**去腾位。
+ *   ② 审核通过 = 当场占住他的首选格。该格已满 → 该条审核被**拒绝**（40906），
+ *      不是"通过后进候补"，也不是"被调剂走"。
+ *   ③ 某格满了，该格剩下的投稿**先不动**（仍是待审），管理员直接跳到下一个格子。
+ *   ④ 所有格都满了 → 剩下的待审**直接系统驳回**，不用再一条条审。
+ *   ⑤ 所有格都审完但仍有空格 → 统筹：剩下的待审按**提交时间升序**，
+ *      逐条通过并指派到「离首选最近」的空格；空格用完 → 剩余驳回。
+ *   ⑥ 锁定前撤回 → 位子空出 → 统筹会把待审的人按时间补进去；
+ *      锁定后撤回一律拒绝（`assertWeekOpen` 已经拦）。
+ *
+ * ⚠️ 与旧协议版的区别：旧版是「审核通过只拿候选资格 → initialAllocate 分组抢位
+ *    → reschedule 跨格调剂」。那套函数保留给「排期预览」用，但**不再挂在审核动作上**。
+ *
+ * ⚠️ 「不接受调剂」(allow_reschedule=0)：首选格满了就没有别的去处 → 统筹时直接驳回，
+ *    理由写明"首选已满且不接受调剂"。这是"格子独立、不借位"的必然结果。
+ */
+
+/** 一次读出「本周格子 / 容量 / 各格占用」 */
+async function slotOccupancy(weekStartMs) {
+  const values = await slotValuesOfWeek(weekStartMs);
+  const capacity = await getCapacity();
+  const counters = await countSeatedBySlot(values);
+  return { values, capacity, counters };
+}
+
+/** 该格还能放几首（capacity <= 0 视为不限） */
+function roomOf(capacity, counters, value) {
+  if (!(capacity > 0)) return Infinity;
+  return Math.max(0, capacity - Number(counters[value] || 0));
+}
+
+/**
+ * 审核通过 + 当场占住首选格（一步完成）
+ * @returns {Promise<{conflict:boolean, row:object, slot:string|null}>}
+ * @throws code=40906 该格已满 / code=40001 首选时段不在本周可选列表
+ */
+async function approveInto(row, { now = Date.now(), operatorId = null, opId = null } = {}) {
+  const want = row.wantBroadcastTime;
+  const ws = weekStartOfValue(want);
+  if (!ws) throw Object.assign(new Error('这条投稿的播出时段无法识别，不能通过'), { code: 40001 });
+
+  const { values, capacity, counters } = await slotOccupancy(ws.getTime());
+  if (!want || values.indexOf(want) < 0) {
+    throw Object.assign(
+      new Error('这条投稿首选的时段已不在当前发布列表里，先恢复该时段或直接驳回'),
+      { code: 40001 }
+    );
+  }
+  const used = Number(counters[want] || 0);
+  if (roomOf(capacity, counters, want) <= 0) {
+    // 整周都满了 vs 只是这一格满了 —— 提示不一样，否则管理员会一直点下去
+    const anyRoom = values.some((v) => roomOf(capacity, counters, v) > 0);
+    const msg = anyRoom
+      ? `该时段已排满（${used}/${capacity}），请先审别的时段`
+      : `本周所有时段都已排满（${values.length} 格 × ${capacity} 首），剩下的不用再审，锁定排期时会自动驳回`;
+    throw Object.assign(new Error(msg), {
+      code: 40906, slot: want, used, capacity, allFull: !anyRoom,
+    });
+  }
+
+  const r = await S.applyChange(row, {
+    reviewStatus: S.REVIEW.APPROVED,
+    scheduleStatus: S.SCHEDULE.APPROVED,
+    scheduledSlot: want,
+    assignedAt: new Date(now),
+    reviewerId: operatorId,
+    reviewTime: new Date(now),
+    rejectReason: null,
+    autoRejected: 0,
+  }, { operatorId, operatorName: operatorId ? 'ADMIN' : 'SYSTEM', reason: 'REVIEW_APPROVED', opId });
+
+  if (!r.logs.length) return { conflict: true, row, slot: null };
+  await logAssignment(row.id, null, want, ASSIGN.INITIAL, ASSIGN_REASON.INITIAL, operatorId);
+  return { conflict: false, row: r.row, slot: want };
+}
+
+/**
+ * 统筹（幂等，可反复跑）：
+ *   有空格   → 只处理「首选格已满」的待审，按提交时间升序逐条通过 + 指派最近空格
+ *   首选格还有空位的待审**不动** —— 那是留给管理员自己审的
+ *   全格满   → **默认什么都不做**（见下）
+ *
+ * ⚠️ 全格满为什么不立即驳回：陛下的规则里「满格后剩下的直接驳回」和「撤回后从
+ *    还未排期的候补里补派」是同一段流程的两头 —— 一满就把人清空，撤回就没人可补了。
+ *    所以审核阶段只是「点不动了」（approve 抛 40906 并提示），人**留在待审**；
+ *    真正批量驳回放在 `lockWeek`（`rejectWhenFull: true`），那一刻才盖棺定论。
+ */
+async function reconcile(weekStartMs, { now = Date.now(), operatorId = null, autoFill = false, excludeId = null, fullText = null, fullCode = 'ALL_SLOTS_FULL', rejectWhenFull = false } = {}) {
+  const res = { weekId: null, rejected: 0, assigned: 0, rescheduled: 0, promoted: 0, untouched: 0 };
+  // 「没位子」的对外措辞：审核阶段说「所有时段都已排满」；锁定那一刻换成
+  // 「排期已锁定，没有可用位置」—— 后者是 `unlockWeek` 认得出的暗号（见其恢复条件）。
+  const noSlotText = fullText || '所有时段都已排满，本次未能排上';
+  const week = await ensureWeek(weekStartMs, { now });
+  res.weekId = week.id;
+  if (week.status === WEEK_STATUS.LOCKED || week.status === WEEK_STATUS.CANCELLED) return res;
+
+  // 点播已截止、周还停在 DRAFT/APPLICATION → 推进到 SCHEDULING（排期阶段）。
+  // ⚠️ 这一步原来挂在 `initialAllocate` 末尾，改成「审核即占格」后必须搬过来，
+  //    否则周状态会永远停在 APPLICATION，锁定时刻也就永远派不上用场。
+  // ⚠️ 只推 derived 已经是 REVIEW 的周：还没截止的周不该提前进排期。
+  if (!ANCHOR_FROZEN_STATUS.includes(week.status) && deriveWeekStatus(week, now) === WEEK_STATUS.REVIEW) {
+    await applyWeekPatch(week, { status: WEEK_STATUS.SCHEDULING });
+  }
+
+  const { values, capacity, counters } = await slotOccupancy(weekStartMs);
+  if (!values.length) return res;
+  const indexOf = new Map(values.map((v, i) => [v, i]));
+  const room = (v) => roomOf(capacity, counters, v);
+
+  // ⓪ 旧协议遗留的 `APPROVED + WAITING`：那批人**审核已经过了**，只是当年"通过只拿候选资格"。
+  //    新口径下他们只要首选格还有位子就该直接坐上去（按提交时间升序），否则会永远卡在候补里。
+  //    ⚠️ 新流程**不会**再产生 WAITING，这段纯粹是给线上老数据擦屁股，跑空一次就再也不会命中。
+  const legacy = await findAllPaged(C.SUBMIT, {
+    type: 1,
+    reviewStatus: S.REVIEW.APPROVED,
+    scheduleStatus: S.SCHEDULE.WAITING,
+    wantBroadcastTime: _.in(values),
+  }, { orderBy: [['createTime', 'asc'], ['id', 'asc']] });
+  const legacySeated = new Set();
+  for (const row of legacy) {
+    const v = row.wantBroadcastTime;
+    if (room(v) <= 0) continue;
+    const r = await S.applyChange(row, {
+      reviewStatus: S.REVIEW.APPROVED,
+      scheduleStatus: S.SCHEDULE.APPROVED,
+      scheduledSlot: v,
+      assignedAt: new Date(now),
+      reviewTime: new Date(now),
+      autoRejected: 0,
+    }, { operatorName: 'SYSTEM', reason: 'PROMOTED_FROM_WAITING' });
+    if (!r.logs.length) continue;
+    await logAssignment(row.id, v, v, ASSIGN.PROMOTED, ASSIGN_REASON.slotReleased, operatorId);
+    counters[v] = Number(counters[v] || 0) + 1;
+    legacySeated.add(Number(row.id));
+    res.promoted += 1;
+    res.assigned += 1;
+  }
+
+  // 老候补里首选格**已经满了**的那些：审核早过了，只差一个位子 —— 跟「首选满的待审」
+  // 一起进统筹池（他们不占"审核未完成"的名额，因为审核那一步当年已经做过）。
+  // ⚠️ 必须排除 `legacySeated`：上面刚坐上去的人再算进来，会被"就近"改派到别的格
+  //    （坐下去就把自己首选格占满了，`room(want)` 变成 0 —— 不排除必踩）。
+  const legacyRest = legacy.filter((row) => !legacySeated.has(Number(row.id))
+    && room(row.wantBroadcastTime) <= 0);
+
+  const pending = await findAllPaged(C.SUBMIT, {
+    type: 1,
+    reviewStatus: S.REVIEW.PENDING,
+    wantBroadcastTime: _.in(values),
+  }, { orderBy: [['createTime', 'asc'], ['id', 'asc']] });
+  if (!pending.length && !legacyRest.length) return res;
+
+  const freeAll = () => values.filter((v) => room(v) > 0);
+
+  const rejectRow = async (row, reason, code) => {
+    const r = await S.applyChange(row, {
+      reviewStatus: S.REVIEW.APPROVED,
+      scheduleStatus: S.SCHEDULE.AUTO_REJECTED,
+      rejectReason: reason,
+      autoRejected: 1,
+      reviewTime: new Date(now),
+    }, { operatorName: 'SYSTEM', reason: code });
+    if (r.logs.length) res.rejected += 1;
+  };
+
+  // ① 全格满
+  //   · 审核阶段（sweep 每分钟跑）：**不动手**，人留在待审 —— 一满就清空，撤回就没人可补
+  //   · 锁定那一刻（rejectWhenFull）：批量驳回，盖棺定论
+  if (!freeAll().length) {
+    if (!rejectWhenFull) return res;
+    for (const row of pending) await rejectRow(row, noSlotText, fullCode);
+    for (const row of legacyRest) await rejectRow(row, noSlotText, fullCode);
+    console.log(`[songSchedule] 统筹 周${week.weekStartDate}：全格已满，驳回 ${res.rejected} 条待审`);
+    return res;
+  }
+
+  // ② 还没审的里，首选格仍然有空位的 = 留给人工，系统不许抢（`untouched` 只用于日志）
+  res.untouched = pending.filter((row) => room(row.wantBroadcastTime) > 0).length;
+
+  // ①.5 系统补派（**只由撤回/删除触发**，审核阶段绝不自动通过任何人）
+  //   陛下规则：撤回一条 → 位子空出 → 从"还没指派排期的人"里按提交时间补一个进去。
+  //   ⚠️ 普通人审路径（approve/reject）传 autoFill=false：那一位留给管理员自己重审。
+  let filled = 0;
+  if (autoFill && pending.length) {
+    for (const v of values) {
+      while (room(v) > 0) {
+        // ⚠️ `excludeId`：刚被撤回/删除的那条**不能**马上又被补回来 ——
+        //    否则「撤回」等于没做（它自己就是首选该格、提交最早的人）。
+        const idx = pending.findIndex((row) => row.wantBroadcastTime === v && !row.__filled
+          && (excludeId === null || Number(row.id) !== Number(excludeId)));
+        if (idx < 0) break;
+        const row = pending[idx];
+        row.__filled = true;
+        const ok = await S.applyChange(row, {
+          reviewStatus: S.REVIEW.APPROVED,
+          scheduleStatus: S.SCHEDULE.APPROVED,
+          scheduledSlot: v,
+          assignedAt: new Date(now),
+          reviewTime: new Date(now),
+          autoRejected: 0,
+        }, { operatorName: 'SYSTEM', reason: 'SYSTEM_REFILL_AFTER_RELEASE' });
+        if (!ok.logs.length) { row.__filled = false; break; }
+        await logAssignment(row.id, row.wantBroadcastTime, v, ASSIGN.PROMOTED,
+          ASSIGN_REASON.slotReleased, operatorId);
+        counters[v] = Number(counters[v] || 0) + 1;
+        filled += 1;
+        res.assigned += 1;
+      }
+    }
+    if (filled) res.untouched = Math.max(0, res.untouched - filled);
+  }
+
+  // ⚠️ **审核还没做完**：只要还有「首选格没满」的待审，就不能统筹 ——
+  //    否则系统会抢在管理员前面，把别格落选的人塞进一个还没审完的格子。
+  //    这正是「所有时段都审核完了才统筹」的准确判定。
+  // ⚠️ `excludeId` 在统筹阶段同样要排除：刚被撤回的那条属于"管理员要重新考虑"，
+  //    既不能补回原格，也不能被统筹到别的格 —— 它就停在待审。
+  const live = pending.filter((row) => !row.__filled
+    && (excludeId === null || Number(row.id) !== Number(excludeId)));
+  const poolLive = live.filter((row) => room(row.wantBroadcastTime) <= 0);
+  const untouchedLive = live.length - poolLive.length;
+  if (untouchedLive > 0) return res;
+
+  // 候选池 = 首选已满的待审（人工还没审）+ 首选已满的老候补（审核早过了）→ 统一按提交时间升序
+  const poolAll = poolLive.concat(legacyRest).sort((a, b) => {
+    const da = a.createTime ? +new Date(a.createTime) : 0;
+    const db2 = b.createTime ? +new Date(b.createTime) : 0;
+    return (da - db2) || (Number(a.id) - Number(b.id));
+  });
+  if (!poolAll.length) return res;
+
+  for (const row of poolAll) {
+    const free = freeAll();
+    if (!free.length) {
+      await rejectRow(row, noSlotText, fullCode);
+      continue;
+    }
+    const want = row.wantBroadcastTime;
+    const isPending = Number(row.reviewStatus) === S.REVIEW.PENDING;
+    // 「不接受调剂」：待审的直接在这儿驳回（尽早告诉管理员原因）；
+    // 老候补不能动他的审核结论，就留在 WAITING，由 `lockWeek` 用自己的口径驳回。
+    if (Number(row.allowReschedule) === 0) {
+      if (isPending) await rejectRow(row, '首选时段已排满，且这条选择了不接受调剂', 'ORIGINAL_SLOT_FULL_NO_RESCHEDULE');
+      continue;
+    }
+
+    // 就近：成本表取最小，cost 相同按周内下标升序（与既有口径一致）
+    const target = costCalc.pickBest(free, want, indexOf);
+    // ⚠️ 点播还没截止时**不许跨格**（`canCrossSlot`）：学生还在投，系统一边把人挪走，
+    //    语义就乱了 —— 只能等首选格自己空出来。显式手动执行排期（`manual`）由调用方
+    //    绕过这道闸门，不走这里。
+    if (target !== want && !canCrossSlot(week, now)) continue;
+    const patch = {
+      reviewStatus: S.REVIEW.APPROVED,
+      scheduleStatus: S.SCHEDULE.APPROVED,
+      scheduledSlot: target,
+      assignedAt: new Date(now),
+      autoRejected: 0,
+    };
+    // ⚠️ 老候补的审核时间不能重写 —— 写一下会凭空多出一条「通过」流水
+    if (isPending) patch.reviewTime = new Date(now);
+    const r = await S.applyChange(row, patch, { operatorName: 'SYSTEM', reason: 'RESCHEDULED_BY_TIME_ORDER' });
+    if (!r.logs.length) continue;
+
+    await logAssignment(row.id, want, target,
+      target === want ? ASSIGN.PROMOTED : ASSIGN.RESCHEDULED,
+      target === want ? ASSIGN_REASON.slotReleased : ASSIGN_REASON.originalFull, operatorId);
+    res.assigned += 1;
+    res.rescheduled += 1;
+    if (capacity > 0) counters[target] = Number(counters[target] || 0) + 1;
+  }
+  console.log(`[songSchedule] 统筹 周${week.weekStartDate}：按时间补派 ${res.assigned}、驳回 ${res.rejected}、留待人工 ${res.untouched}`);
+  return res;
+}
+
 async function initialAllocate(weekStartMs, { now = Date.now(), operatorId = null, dryRun = false, opId = null } = {}) {
   const week = await ensureWeek(weekStartMs, { now });
   const values = await slotValuesOfWeek(weekStartMs);
@@ -614,13 +894,16 @@ async function reschedule(weekStartMs, {
   return res;
 }
 
-/** 释放位子之后统一调用：原位递补 + 全局调剂（幂等） */
+/** 释放位子之后统一调用：按格独立 + 统筹补派（幂等）
+ *  ⚠️ 2026-11-14 起不再做「跨格调剂」—— 位子空出来以后，
+ *     只从这里按提交时间顺序把**还没审的**人补进来（见 reconcile）。 */
 async function runAllocators(weekStartMs, opts = {}) {
   try {
-    const r = await reschedule(weekStartMs, opts);
-    return r;
+    const r = await reconcile(weekStartMs, opts);
+    // 兼容旧调用方的字段（releaseMsg 会读 promoted / rescheduled / left）
+    return { ...r, promoted: r.promoted || 0, left: 0 };
   } catch (e) {
-    console.log(`[songSchedule] 调剂失败（下次审核 / 手动 sweep 会重试）：${e.message}`);
+    console.log(`[songSchedule] 补派失败（下次审核 / 手动 sweep 会重试）：${e.message}`);
     return { promoted: 0, rescheduled: 0, left: 0, error: e.message };
   }
 }
@@ -649,24 +932,32 @@ async function lockWeek(weekStartMs, { now = Date.now(), operatorId = null, forc
     return { ...weekView(week, now), already: false, tooEarly: true, rejected: 0 };
   }
 
-  // 最后一次调度：把还能塞进空位的人都塞进去
-  // 锁定时**显式**放开跨时段 —— 到了这一步点播早已截止，不可能再有新申请者
-  await initialAllocate(weekStartMs, { now, operatorId });
-  const alloc = await reschedule(weekStartMs, { now, operatorId, crossSlot: true });
+  // 最后一次统筹：把「首选格已满」的待审按提交时间补进空位（格子独立，不跨格互借）
+  // ⚠️ 措辞用锁定口径：这一刻起「没排上」的原因是排期已定，而 `unlockWeek` 正是靠
+  //    这串文案认出「哪些是锁定时被系统驳回的」（它只恢复这批人）。
+  const alloc = await reconcile(weekStartMs, {
+    now,
+    operatorId,
+    autoFill: true,
+    rejectWhenFull: true,
+    fullText: S.SYSTEM_REASON.lockedNoSlot,
+    fullCode: 'SCHEDULE_LOCKED_NO_AVAILABLE_SLOT',
+  });
 
-  // 剩下仍是 WAITING 的 → AUTO_REJECTED
+  // 锁定后不能再审：剩下的待审 + 历史遗留的 WAITING → 一律自动驳回
   // ⚠️ 云数据库的顶层 `_.or` 子项是 **where 子句**（见 harness 里 matchesWhere 的注释）
   const values = await slotValuesOfWeek(weekStartMs);
-  const waiting = await findAllPaged(C.SUBMIT, _.and([
-    { type: 1, reviewStatus: S.REVIEW.APPROVED, scheduleStatus: S.SCHEDULE.WAITING },
+  const leftover = await findAllPaged(C.SUBMIT, _.and([
+    { type: 1 },
     _.or([
-      { wantBroadcastTime: _.in(values) },
-      { scheduledSlot: _.in(values) },
+      { reviewStatus: S.REVIEW.PENDING, wantBroadcastTime: _.in(values) },
+      { reviewStatus: S.REVIEW.APPROVED, scheduleStatus: S.SCHEDULE.WAITING },
     ]),
   ]));
   let rejected = 0;
-  for (const row of waiting) {
+  for (const row of leftover) {
     const r = await S.applyChange(row, {
+      reviewStatus: S.REVIEW.APPROVED,
       scheduleStatus: S.SCHEDULE.AUTO_REJECTED,
       rejectReason: S.SYSTEM_REASON.lockedNoSlot,
       autoRejected: 1,
@@ -674,10 +965,13 @@ async function lockWeek(weekStartMs, { now = Date.now(), operatorId = null, forc
     }, { operatorName: 'SYSTEM', reason: 'SCHEDULE_LOCKED_NO_AVAILABLE_SLOT' });
     if (r.logs.length) rejected += 1;
   }
+  // 统筹阶段（全格已满那条分支）已经驳回的也要算进总数 —— 否则接口回报的 rejected
+  // 会漏掉一半，管理员看「锁定成功、驳回 0 条」，实际却有一批人被系统驳回。
+  rejected += Number(alloc.rejected || 0);
 
   await applyWeekPatch(week, { status: WEEK_STATUS.LOCKED, lockedAt: new Date(now), lockPaused: 0 });
-  console.log(`[songSchedule] 周 ${week.weekStartDate} 已锁定：最后调度 ${alloc.promoted + alloc.rescheduled} 条，无位自动驳回 ${rejected} 条`);
-  return { ...weekView(await findById(C.WEEKLY, week._id), now), already: false, rejected, lastAlloc: alloc };
+  console.log(`[songSchedule] 周 ${week.weekStartDate} 已锁定：最后统筹 ${alloc.assigned || 0} 条，无位自动驳回 ${rejected} 条`);
+  return { ...weekView(await findById(C.WEEKLY, week._id), now), already: false, rejected, lastAlloc: { ...alloc, promoted: 0 } };
 }
 
 /**
@@ -882,23 +1176,22 @@ async function sweep({ now = Date.now(), operatorId = null } = {}) {
       // ⚠️ 已解锁的周：到点了也**不自动锁**，否则解锁后一眨眼又锁回去。
       // 仍然跑一遍排期（空位照补），只是不再走「锁定 + 自动驳回」那一步。
       entry.lockPaused = true;
-      const a = await initialAllocate(wsMs, { now, operatorId });
-      const b = await reschedule(wsMs, { now, operatorId });
-      entry.assigned = a.assigned;
-      entry.waiting = a.waiting;
-      entry.promoted = b.promoted;
-      entry.rescheduled = b.rescheduled;
+      const r = await reconcile(wsMs, { now, operatorId });
+      entry.assigned = r.assigned;
+      entry.waiting = 0;
+      entry.rescheduled = r.rescheduled;
+      entry.rejected = r.rejected;
     } else if (lockAt && now >= lockAt) {
       const r = await lockWeek(wsMs, { now, operatorId });
       entry.locked = !r.already;
       entry.rejected = r.rejected;
     } else {
-      const a = await initialAllocate(wsMs, { now, operatorId });
-      const b = await reschedule(wsMs, { now, operatorId });
-      entry.assigned = a.assigned;
-      entry.waiting = a.waiting;
-      entry.promoted = b.promoted;
-      entry.rescheduled = b.rescheduled;
+      const r = await reconcile(wsMs, { now, operatorId });
+      entry.assigned = r.assigned;
+      entry.waiting = 0;
+      entry.promoted = 0;
+      entry.rescheduled = r.rescheduled;
+      entry.rejected = r.rejected;
     }
     result.weeks.push(entry);
   }
@@ -1114,6 +1407,11 @@ module.exports = {
   waitingPosOf,
   // ── 排期算法（阶段 5 · 已全部落地）──
   logAssignment,
+  // ── 按格审核 + 统筹补派（2026-11-14 新口径）──
+  slotOccupancy,
+  roomOf,
+  approveInto,
+  reconcile,
   initialAllocate,
   reschedule,
   runAllocators,

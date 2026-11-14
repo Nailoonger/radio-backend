@@ -1318,8 +1318,9 @@ async function runSchedule() {
   running.value = true;
   try {
     const r = await http.post('/admin/submit/schedule/run', {});
+    // 新口径下不再产生「候补」：首选格满的人会被就近补进空位，补不进就等锁定统一驳回。
     ElMessage.success(
-      `排期完成：落座 ${r?.assigned ?? 0} 条 · 进候补 ${r?.waiting ?? 0} 条 · 递补 ${(r?.promoted || 0) + (r?.rescheduled || 0)} 条`
+      `统筹完成：补派 ${r?.assigned ?? 0} 条（其中改派 ${r?.rescheduled ?? 0} 条）· 驳回 ${r?.rejected ?? 0} 条 · 留待人工 ${r?.untouched ?? 0} 条`
     );
     await refreshAll();
   } catch { /* 拦截器已提示 */ }
@@ -1761,14 +1762,10 @@ async function refreshAll() {
 const acting = ref(false);
 async function approve(row) {
   try {
-    await http.put(`/admin/submit/${row.id}/approve`);
-    // ⚠️ 协议版：审核通过**不会当场排期**，只是拿到候选资格。
-    //    toast 必须把这一步讲明白，否则管理员点完看到状态变成「已通过·待排期」会以为没生效。
-    ElMessage.success(
-      Number(row.status) === ST.QUEUED
-        ? '已记录审核，这条仍在候补队列里等空位'
-        : '已通过，等系统排期落座（可在「已通过·待排期」桶里看到）'
-    );
+    const d = await http.put(`/admin/submit/${row.id}/approve`);
+    // 2026-11-14 新口径：审核通过 = **当场占住首选格**，不再有「等系统排期」这一步。
+    // 所以 toast 必须直接把占到的格子报出来，否则管理员看不出发生了什么。
+    ElMessage.success(d?.slot ? `已通过，占住「${d.slot}」` : '已通过');
     await refreshAll();
   } catch (e) { /* 拦截器已提示 */ }
 }
@@ -1791,7 +1788,7 @@ async function confirmReject() {
 
 async function revoke(row) {
   await ElMessageBox.confirm(
-    '撤销后这条回到「待审」，之前审过/排过的痕迹都清掉。若是已排期的点歌，位子立刻释放并自动重跑该周的调剂，候补里最合适的会被提上来。',
+    '撤销后这条回到「待审」，之前审过/排过的痕迹都清掉。若是已排期的点歌，位子立刻释放，系统会从「还没排上的人」里按提交时间补一位进来（锁定后不能撤销）。',
     '撤销审核结果',
     { type: 'warning', confirmButtonText: '撤销' },
   );

@@ -51,6 +51,11 @@ const SUITE = [
   // 账号密码统一（2026-10-31）：一个学号一份密码、改密后三端立刻失效、老师惰性补建
   ['test-account-unify.js', true],
   ['test-admin-submit.js', true],
+  // 点歌排期专项（2026-11-14 新口径）：审核通过 = 当场占住首选格 / 满格 40906 /
+  // 格子相互独立 / 全满锁定才统一驳回 / 审完才统筹就近补派 / 撤回按时间补人。
+  // 标 true —— 它横跨 handlers/admin/submit.js 与 services/scheduling.js，sync 漏一个
+  // 就会退化成旧协议（视频：点通过看不出任何反应）。
+  ['test-song-alloc-v2.js', true],
   ['test-admin-student.js', true],
   // ⚠️ 标 false：它自己会检测「目标不是源码目录」并打印 [skip] 退出 ——
   //    路由守门测的是「handler 能不能加载」，产物是单文件、没有 handlers/，本就没意义。

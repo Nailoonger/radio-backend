@@ -857,16 +857,24 @@ const byId = (id) => subs().find((r) => Number(r.id) === Number(id));
   /* ══════════════════ U. sweep ══════════════════ */
   section('U. sweep · 三分支 + ★★ 独立扫周表');
 
-  // U-a：未到锁定时刻 → 排期 + 调剂，不锁
+  // U-a：未到锁定时刻 → 统筹把「首选格已满」的待审按时间补进空位，不锁
+  // ⚠️ 2026-11-14 新口径：「审核 = 当场占格」，系统**不再替管理员通过任何人**。
+  //    只有「首选格已经满了」的待审才会进统筹（那格已经没得选了，留在原地也没用）。
+  //    所以这里必须让首个格子先坐满，否则 sweep 什么都不该做（那是留给人工的）。
   reset({
     system_setting: kv({ song_slot_capacity: '1' }),
-    submit: [doc({ id: 1, want: S1 }), doc({ id: 2, want: S1 })],
-    weekly_schedule: [weekRow({ scheduleLockAt: new Date(Date.now() + 86400000) })],
+    submit: [
+      doc({ id: 1, want: S1, sched: S.SCHEDULE.APPROVED, scheduledSlot: S1, status: S.ST.SCHEDULED }),
+      doc({ id: 2, want: S1, review: S.REVIEW.PENDING, sched: S.SCHEDULE.UNASSIGNED }),
+      doc({ id: 3, want: S1, review: S.REVIEW.PENDING, sched: S.SCHEDULE.UNASSIGNED }),
+    ],
+    weekly_schedule: [weekRow({ applicationEndAt: new Date(Date.now() - 86400000), scheduleLockAt: new Date(Date.now() + 86400000) })],
   });
   let swp = await sched.sweep();
   eq('U1 处理了 1 个周', swp.weeks.length, 1);
   eq('U2 未到点 → 只排期不锁', swp.weeks[0].locked === undefined, true);
-  eq('U3 落座 1、候补 1', JSON.stringify([swp.weeks[0].assigned, swp.weeks[0].waiting]), JSON.stringify([1, 1]));
+  eq('U3 首选已满的 2 条都被补进空位（不再有候补队列）',
+    JSON.stringify([swp.weeks[0].assigned, byId(2).scheduleStatus, byId(3).scheduleStatus]), JSON.stringify([2, 1, 1]));
   eq('U4 周仍是 SCHEDULING', weeks()[0].status, sched.WEEK_STATUS.SCHEDULING);
 
   // U-b：已到锁定时刻 → 锁定
@@ -879,11 +887,14 @@ const byId = (id) => subs().find((r) => Number(r.id) === Number(id));
   eq('U5 到点 → 锁定', swp.weeks[0].locked, true);
   eq('U6 周状态 LOCKED', weeks()[0].status, sched.WEEK_STATUS.LOCKED);
 
-  // U-c：已解锁（lockPaused=1）→ 到点也不锁，只排期
+  // U-c：已解锁（lockPaused=1）→ 到点也不锁，只补空位
   reset({
     system_setting: kv({ song_slot_capacity: '1' }),
-    submit: [doc({ id: 1, want: S1 }), doc({ id: 2, want: S1 })],
-    weekly_schedule: [weekRow({ lockPaused: 1 })],
+    submit: [
+      doc({ id: 1, want: S1, sched: S.SCHEDULE.APPROVED, scheduledSlot: S1, status: S.ST.SCHEDULED }),
+      doc({ id: 2, want: S1, review: S.REVIEW.PENDING, sched: S.SCHEDULE.UNASSIGNED }),
+    ],
+    weekly_schedule: [weekRow({ applicationEndAt: new Date(Date.now() - 86400000), lockPaused: 1 })],
   });
   swp = await sched.sweep();
   eq('U7 ★★ 解锁后 sweep 不再自动锁回', weeks()[0].status, sched.WEEK_STATUS.SCHEDULING);
@@ -939,12 +950,15 @@ const byId = (id) => subs().find((r) => Number(r.id) === Number(id));
   // U-g：sweep 幂等（连跑两次第二次没有新变化）
   reset({
     system_setting: kv({ song_slot_capacity: '1' }),
-    submit: [doc({ id: 1, want: S1 }), doc({ id: 2, want: S1 })],
-    weekly_schedule: [weekRow({ scheduleLockAt: new Date(Date.now() + 86400000) })],
+    submit: [
+      doc({ id: 1, want: S1, sched: S.SCHEDULE.APPROVED, scheduledSlot: S1, status: S.ST.SCHEDULED }),
+      doc({ id: 2, want: S1, review: S.REVIEW.PENDING, sched: S.SCHEDULE.UNASSIGNED }),
+    ],
+    weekly_schedule: [weekRow({ applicationEndAt: new Date(Date.now() - 86400000), scheduleLockAt: new Date(Date.now() + 86400000) })],
   });
   const s1st = await sched.sweep();
   const s2nd = await sched.sweep();
-  eq('U19 sweep 第一次落座 1', s1st.weeks[0].assigned, 1);
+  eq('U19 sweep 第一次补进 1 条', s1st.weeks[0].assigned, 1);
   eq('U20 sweep 第二次幂等：不再落座', s2nd.weeks[0].assigned, 0);
   eq('U21 sweep 第二次不再调剂', s2nd.weeks[0].promoted, 0);
 
@@ -1121,21 +1135,37 @@ const byId = (id) => subs().find((r) => Number(r.id) === Number(id));
 
   // ── W7 sweepTick：有活 → 真跑 ──
   reset({
-    system_setting: kv({ song_slot_capacity: '1' }),
-    submit: [doc({ id: 1, want: S1 }), doc({ id: 2, want: S1 })],
-    weekly_schedule: [weekRow({ status: sched.WEEK_STATUS.APPLICATION, scheduleLockAt: new Date(NOW + 86400000) })],
+    system_setting: kv({ song_slot_capacity: '1', song_lock_offset_minutes: '2880' }),
+    submit: [
+      doc({ id: 1, want: S1, sched: S.SCHEDULE.APPROVED, scheduledSlot: S1, status: S.ST.SCHEDULED }),
+      doc({ id: 2, want: S1, review: S.REVIEW.PENDING, sched: S.SCHEDULE.UNASSIGNED }),
+    ],
+    // 点播已截止、周还停在 APPLICATION → sweep 应把状态推到 SCHEDULING
+    // ⚠️ 锚点由 KV 派生，**不能**写成「今天是周几」：
+    //    审核截止 = 点播结束 + offset（offset 是纯时长，不带星期），
+    //    再把 now 精确挪到「点播结束后 1 分钟」，这条断言就与运行日是周几无关。
+    weekly_schedule: [weekRow({ status: sched.WEEK_STATUS.APPLICATION })],
   });
-  const tk2 = await sched.sweepTick({ now: NOW });
+  const wcfg = await songWindow.getConfig();
+  const wrng = await songWindow.anchorRangeAt(wcfg, WEEK_MS - 1000);
+  // ⚠️ `anchorRangeAt` 返回的是 **Date**，`Date + 60000` 会变成字符串拼接（NaN 比较静默失败）
+  const W7_NOW = +new Date(wrng.end) + 60000;   // 已截止 1 分钟，锁定时刻还差几小时
+  const tk2 = await sched.sweepTick({ now: W7_NOW });
   eq('W7a skipped=false', tk2.skipped, false);
   eq('W7b 涉及 1 个周', tk2.weeks, 1);
-  eq('W7c 真排上 1 条（容量截断）', tk2.detail.weeks[0].assigned, 1);
+  eq('W7c 真补进 1 条（首选格已满 → 就近补位）', tk2.detail.weeks[0].assigned, 1);
   eq('W7d 周状态推进到 SCHEDULING', weeks()[0].status, sched.WEEK_STATUS.SCHEDULING);
 
   // ── W8 sweepTick：异常必须被吞掉（抛出去会记成函数执行失败） ──
+  // 制造「一定要写库」的最小场景：一条旧候补，首选格空着 → 归位（applyChange 必被调用）
   reset({
     system_setting: kv({ song_slot_capacity: '1' }),
-    submit: [doc({ id: 1, want: S1 })],
-    weekly_schedule: [weekRow({ status: sched.WEEK_STATUS.APPLICATION, scheduleLockAt: new Date(NOW + 86400000) })],
+    submit: [doc({ id: 2, want: S2, review: S.REVIEW.APPROVED, sched: S.SCHEDULE.WAITING })],
+    weekly_schedule: [weekRow({
+      status: sched.WEEK_STATUS.APPLICATION,
+      applicationEndAt: new Date(Date.now() - 3600000),
+      scheduleLockAt: new Date(NOW + 86400000),
+    })],
   });
   const origApplyW = S.applyChange;
   S.applyChange = async () => { throw new Error('boom'); };
@@ -1144,7 +1174,7 @@ const byId = (id) => subs().find((r) => Number(r.id) === Number(id));
   eq('W8a 异常被吞、函数正常返回', tk3.error, 'boom');
   eq('W8b skipped=false（不是短路）', tk3.skipped, false);
   eq('W8c 异常时 played=0', tk3.played, 0);
-  eq('W8d 抛错的那条没被改', byId(1).scheduleStatus, S.SCHEDULE.UNASSIGNED);
+  eq('W8d 抛错的那条没被改', byId(2).scheduleStatus, S.SCHEDULE.WAITING);
 
   // ── W9 端到端：定时事件真的能走通 index.js（不是只调 service） ──
   const TIMER = { Type: 'Timer', TriggerName: 'songSweepTick', TriggerTime: new Date(NOW).toISOString() };

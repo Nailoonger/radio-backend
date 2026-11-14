@@ -151,15 +151,15 @@ async function assertWeekOpen(submit) {
 /** 审核动作之后让这一周的排期与候补重新对齐（幂等） */
 async function runWeekSchedule(submit, opts = {}) {
   const ms = weekMsOf(submit);
-  if (ms === null) return { promoted: 0, rescheduled: 0, left: 0 };
+  if (ms === null) return { assigned: 0, rejected: 0, rescheduled: 0 };
   try {
-    const a = await sched.initialAllocate(ms, opts);
-    const b = await sched.reschedule(ms, opts);
-    return { ...b, assigned: a.assigned, waiting: a.waiting };
+    // 2026-11-14 起：审核动作只影响「这一格」，全局统筹交给 reconcile
+    // （全格满 → 驳回剩余待审；有空格且审核已做完 → 按提交时间补派）
+    return await sched.reconcile(ms, opts);
   } catch (e) {
-    // 排期失败不能把审核动作本身搞失败（审核已经落库了），但**必须留痕**
-    console.warn(`[songSchedule] 审核后重算排期失败 week=${new Date(ms).toISOString()}：${e.message}`);
-    return { promoted: 0, rescheduled: 0, left: 0, error: e.message };
+    // 统筹失败不能把审核动作本身搞失败（审核已经落库了），但**必须留痕**
+    console.warn(`[songSchedule] 审核后统筹失败 week=${new Date(ms).toISOString()}：${e.message}`);
+    return { assigned: 0, rejected: 0, rescheduled: 0, error: e.message };
   }
 }
 
@@ -167,8 +167,8 @@ async function runWeekSchedule(submit, opts = {}) {
 function releaseMsg(base, rel) {
   if (!rel) return base;
   const bits = [];
-  if (rel.promoted) bits.push(`原位递补 ${rel.promoted} 条`);
-  if (rel.rescheduled) bits.push(`跨时段调剂 ${rel.rescheduled} 条`);
+  if (rel.rescheduled) bits.push(`按提交时间补派 ${rel.rescheduled} 条`);
+  if (rel.rejected) bits.push(`系统驳回 ${rel.rejected} 条`);
   return bits.length ? `${base}，已${bits.join('、')}` : base;
 }
 
@@ -204,12 +204,15 @@ async function conflictOf(submit, targetReview, actionText) {
 }
 
 /**
- * 协议 §14：这里的 approve **只是审核通过**，不等于拿到位置。
- *   审核通过 → review=APPROVED / schedule=UNASSIGNED → 进排期候选池
+ * 审核通过 = **当场占住他的首选格**（2026-11-14 陛下定案）
+ *
+ * 格子相互独立：该格已满 → 拒绝这次审核（40906），不把人挪到别的格，
+ * 也不"先通过再进候补"。管理员看到 40906 就跳到下一个时段继续审。
+ *
+ * ⚠️ 旧协议版「通过只是拿候选资格、等 initialAllocate 统一分配」已废弃。
  */
 async function approveOne(submit, adminId, opId) {
   const review = Number(submit.reviewStatus) || 0;
-  const schedule = Number(submit.scheduleStatus) || 0;
 
   if (review === S.REVIEW.APPROVED) {
     return { submit, changed: false, already: true };
@@ -222,24 +225,35 @@ async function approveOne(submit, adminId, opId) {
     throw new ApiError(Codes.PARAM_ERROR, '这条已被取消，不能通过');
   }
 
-  // 曾被系统自动驳回（无位 / 逾期）的，审核通过时要把排期维度重置回候选池
-  const changes = {
-    reviewStatus: S.REVIEW.APPROVED,
-    reviewerId: adminId,
-    reviewTime: new Date(),
-    rejectReason: null,
-    autoRejected: 0,
-  };
-  if (schedule === S.SCHEDULE.AUTO_REJECTED || schedule === S.SCHEDULE.UNASSIGNED) {
-    changes.scheduleStatus = S.SCHEDULE.UNASSIGNED;
+  // 文稿（type=2）没有「格子」概念：只改审核维度，不占位、不参与统筹。
+  // ⚠️ 不能让它走 approveInto —— 文稿的 wantBroadcastTime 是选填，空值会被判成非法时段。
+  if (Number(submit.type) !== 1) {
+    const doc = await S.applyChange(submit, {
+      reviewStatus: S.REVIEW.APPROVED,
+      reviewerId: adminId,
+      reviewTime: new Date(),
+      rejectReason: null,
+      autoRejected: 0,
+    }, { operatorId: adminId, operatorName: 'ADMIN', reason: 'REVIEW_APPROVED', opId });
+    if (doc.conflict) return conflictOf(submit, S.REVIEW.APPROVED, '通过了');
+    return { submit: doc.row, changed: true, slot: null };
   }
 
-  const r = await S.applyChange(submit, changes, {
-    operatorId: adminId, operatorName: 'ADMIN', reason: 'REVIEW_APPROVED', opId,
-  });
+  let r;
+  try {
+    r = await sched.approveInto(submit, { operatorId: adminId, opId });
+  } catch (e) {
+    if (e.code === 40906) {
+      throw new ApiError(Codes.SLOT_FULL, e.message, {
+        slot: e.slot, used: e.used, capacity: e.capacity,
+      });
+    }
+    if (e.code === 40001) throw new ApiError(Codes.PARAM_ERROR, e.message);
+    throw e;
+  }
   // 文件头 ⑨：抢晚了（影响 0 行）→ 回读真实状态后按结论分流（见 conflictOf）
   if (r.conflict) return conflictOf(submit, S.REVIEW.APPROVED, '通过了');
-  return { submit: r.row, changed: true };
+  return { submit: r.row, changed: true, slot: r.slot };
 }
 
 /**
@@ -537,7 +551,8 @@ async function remove(ctx) {
   const ms = Number(submit.type) === 1 ? weekMsOf(submit) : null;
   await removeWhere(C.SUBMIT, { id: Number(submit.id) });
   if (wasSeated && ms !== null) {
-    await sched.runAllocators(ms, { operatorId: ctx.admin.id }).catch(() => null);
+    // 删除已占位的 = 位子让出来 → 同样自动补派一个（与撤回同口径）
+    await sched.runAllocators(ms, { operatorId: ctx.admin.id, autoFill: true }).catch(() => null);
   }
   return null;
 }
@@ -580,7 +595,8 @@ async function revoke(ctx) {
       await sched.logAssignment(row.id, fromSlot, null, sched.ASSIGN.RELEASED, sched.ASSIGN_REASON.slotReleased, ctx.admin.id);
     }
     if (wasSeated) {
-      const rel = await runWeekSchedule(row, { operatorId: ctx.admin.id });
+      // 撤回 = 位子让出来 → 从"还没指派排期的人"里按提交时间自动补一个（陛下规则）
+      const rel = await runWeekSchedule(row, { operatorId: ctx.admin.id, autoFill: true, excludeId: row.id });
       void releaseMsg('已撤销，回到待审', rel);
     }
   }

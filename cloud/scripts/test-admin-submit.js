@@ -290,9 +290,12 @@ function byId(id) {
   reset(baseSeed({
     submit: [
       mkSubmit(1, { review: S.REVIEW.APPROVED, schedule: S.SCHEDULE.APPROVED, slot: `${DATE0} 早间 07:20`, want: `${DATE0} 早间 07:20` }),
-      mkSubmit(2, { review: S.REVIEW.APPROVED, schedule: S.SCHEDULE.WAITING, want: `${DATE0} 早间 07:20` }),
+      // #2 与 #1 同格、仍是待审：驳回 #1 之后**不应该**被系统自动通过（人工优先）
+      mkSubmit(2, { review: S.REVIEW.PENDING, schedule: S.SCHEDULE.UNASSIGNED, want: `${DATE0} 早间 07:20` }),
       mkSubmit(3, { review: S.REVIEW.REJECTED, rejectReason: '旧理由' }),
-      mkSubmit(4, { review: S.REVIEW.APPROVED, schedule: S.SCHEDULE.APPROVED, slot: `${DATE0} 午间 12:20` }),
+      mkSubmit(4, { review: S.REVIEW.APPROVED, schedule: S.SCHEDULE.APPROVED, slot: `${DATE0} 午间 12:20`, want: `${DATE0} 午间 12:20` }),
+      // #5 与 #4 同格、待审：撤销 #4 之后**应该**被系统自动补派进这一格
+      mkSubmit(5, { review: S.REVIEW.PENDING, schedule: S.SCHEDULE.UNASSIGNED, want: `${DATE0} 午间 12:20` }),
     ],
   }));
 
@@ -307,11 +310,11 @@ function byId(id) {
   eq('schedule 维度**保留原值**（回答「他当时排到哪一格」）', byId(1).scheduleStatus, S.SCHEDULE.APPROVED);
   eq('派生 status = 2（已驳回）', r.data.status, 2);
 
-  // ★ 位子释放 → 候补原位递补（点播未截止，weekRow 默认 appEnd 在过去 → 允许跨时段；
-  //   这里两个人都首选同一格，所以递补走的是原位）
-  const promoted = (H.dump().request_status_log || []).filter((x) => x.requestId === 2 && x.dimension === 'schedule');
-  ok('驳回释放位子后候补被递补（schedule 维度有变更日志）', promoted.length >= 1,
-    JSON.stringify(promoted.map((x) => [x.fromStatus, x.toStatus])));
+  // ★ 新规则（2026-11-14 陛下定案）：审核是**人工**动作，驳回后位子空出来
+  //   不自动补人 —— 留给管理员重审这一格。只有「撤回 / 删除已占位」才系统补派。
+  ok('驳回释放位子后，同格待审**不会**被系统自动通过（人工优先）',
+    byId(2).reviewStatus === S.REVIEW.PENDING && !byId(2).scheduledSlot,
+    `#2 review=${byId(2).reviewStatus} slot=${byId(2).scheduledSlot}`);
 
   r = await H.call(H.req('PUT', '/admin/submit/3/reject', { reason: '再驳回' }, PLAIN_TOKEN));
   eq('重复驳回 → 40001', [r.code, r.message], [40001, '这条已是驳回状态，无需重复操作']);
@@ -333,6 +336,14 @@ function byId(id) {
   ok('写了 RELEASED 的 assignment_log',
     (H.dump().assignment_log || []).some((x) => x.requestId === 4 && x.assignmentType === 'RELEASED' && x.reason === 'SLOT_RELEASED'),
     JSON.stringify((H.dump().assignment_log || []).map((x) => [x.requestId, x.assignmentType, x.reason])));
+
+  // ★ 撤回一个已占位的人 → 位子空出 → 系统从「首选同一格、提交最早」的待审里补一个
+  eq('撤回后：#5 被系统自动补派进该格（review=APPROVED）', byId(5).reviewStatus, S.REVIEW.APPROVED);
+  eq('撤回后：#5 的实际时段 = 他首选的午间', byId(5).scheduledSlot, `${DATE0} 午间 12:20`);
+  eq('撤回后：#5 派生 status = 1（已排期）', byId(5).status, 1);
+  ok('补派写了 PROMOTED 的 assignment_log（原因 SLOT_RELEASED）',
+    (H.dump().assignment_log || []).some((x) => x.requestId === 5 && x.assignmentType === 'PROMOTED' && x.reason === 'SLOT_RELEASED'),
+    JSON.stringify((H.dump().assignment_log || []).filter((x) => x.requestId === 5)));
 
   /* ══════════════════ E. batch ══════════════════ */
   section('E. POST /admin/submit/batch');
