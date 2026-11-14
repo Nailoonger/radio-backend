@@ -52,7 +52,9 @@ Page({
     answers: [],
     /* 队列 */
     queue: [],
-    queueAt: 0,
+    queueAt: -1,
+    queuePos: '',       // 「第 3 / 12 条待审」；不在队列里时留空
+    hasQueue: false,
     /* 面试 */
     itvAt: '',          // 'MM-DD HH:mm'（服务端生效值）
     itvPlace: '',
@@ -180,9 +182,16 @@ Page({
       .then((p) => {
         const queue = ((p && p.items) || []).map((x) => x.id);
         const at = queue.indexOf(this.data.id);
-        this.setData({ queue, queueAt: at });
+        this.setData({
+          queue,
+          queueAt: at,
+          hasQueue: at >= 0,
+          /* ⚠️ indexOf 找不到是 -1：直接拿它 +1 会写出「第 0 / N 条」，
+             所以先算好一句文案，模板只取值 */
+          queuePos: at >= 0 ? `第 ${at + 1} / ${queue.length} 条待审` : '',
+        });
       })
-      .catch(() => { this.setData({ queue: [], queueAt: -1 }); });
+      .catch(() => { this.setData({ queue: [], queueAt: -1, hasQueue: false, queuePos: '' }); });
   },
 
   /* 面试时刻拆两截给 picker：'MM-DD HH:mm' → 'YYYY-MM-DD' + 'HH:mm'

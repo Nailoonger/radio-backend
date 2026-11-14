@@ -25,10 +25,10 @@
           </view>
         </view>
       </view>
-      <view class="rc-layer" wx:if="{{queue.length}}">
+      <view class="rc-layer" wx:if="{{hasQueue}}">
         <view class="rc-qnav">
           <text class="go {{queueAt <= 0 ? 'off' : ''}}" bindtap="onPrev">‹ 上一条</text>
-          <text class="pos">第 {{queueAt + 1}} / {{queue.length}} 条待审</text>
+          <text class="pos">{{queuePos}}</text>
           <text class="go {{queueAt >= queue.length - 1 ? 'off' : ''}}" bindtap="onNext">下一条 ›</text>
         </view>
       </view>
