@@ -1,21 +1,25 @@
-// pages-partner/recruit/batches · v1（2026-11-14 批次管理）
+// pages-partner/recruit/batches · v2（2026-11-14 照 preview/partner-hub-gounucai-v174 V['recruit-batches']）
 //
-// 三段：进行中 / 已截止 / 已归档。**服务端只有 archived 一个筛选**，没有「进行中」这种状态口径，
-// 所以这里拉两次（archived=false / true），未归档那批再按 windowState 前端分组：
-//   draft / upcoming / open → 进行中      closed → 已截止      archivedAt 有值 → 已归档
+// ═══════════════════════════════════════════════════════════════════════════
+// v174 那一屏的样子，逐条搬：
+//   ① 三段**下划线标签**（`.stabs`，不是白药丸 —— v167 改成白药丸被当场退回，v169 恢复）：
+//      进行中 / 已截止 / 已归档。
+//   ② **点行才进配置页**（v166 口径）：批次配置是批次管理的下级页面，不在列表里同屏展开。
+//   ③ 行尾红色纯文字「删除」（`.qt-del` 那种，不是胶囊）；**已归档的行不给删除**。
+//   ④ 「新建招新批次」只在非归档段出现 —— 归档段摆新建按钮会被读成「新建一个归档批次」。
+//   ⑤ 每行三行字：名称 + 状态 tag ／ 起止与人数 ／ 一句补充（草稿可改 / N 人待决定）。
+// ═══════════════════════════════════════════════════════════════════════════
 //
-// ⚠️ 新建只给超管（asSuper）。新建弹层只收三样：名称 / 开始日 / 截止日 ——
-//    固定信息和题目都在「批次配置」页里改，别把配置塞进弹层（那是 v166 踩过的层级错）。
+// 数据：服务端只有 `archived` 一个筛选，没有「进行中」这种口径 ⇒ 拉两次再前端分组：
+//   未归档里 windowState !== 'closed' → 进行中；=== 'closed' → 已截止；archived=true → 已归档。
 //
-// ⚠️ 时间写成 `YYYY-MM-DDT00:00:00+08:00` 起、`YYYY-MM-DDT23:59:59+08:00` 止：
-//    业务口径是「开始日零点开、截止日 24 点关」。**截止存 23:59:59 而不是次日 00:00** ——
-//    存次日零点的话，每一处显示（批次行、配置页、报名页）都得先减一天，
-//    漏一处就显示成「11-08 ~ 11-19」，比丢那 1 秒危险得多。
+// ⚠️ 社干点批次：v174 是「看批次详情」（只读），真机上给的是同一个配置页，
+//    但 canManage=false 时整页只读、不摆动作按钮（见 config.js 的 canManage）。
 //
-// ⚠️ 删除要原样输入批次名（服务端 body.confirm 校验），有报名或已发布的批次才要输；
-//    服务端的报错文案已经带了要输的原文，前端照抄提示，不要自己编一句「名称不对」。
+// ⚠️ 删除要原样输入批次名（服务端 body.confirm 校验，两边都 trim）。
+//    报错文案服务端已经带了要输的原文，前端照抄，别自己编一句「名称不对」。
 
-const { adminRequest } = require('../../../utils/request.js');
+const { adminRequest, isConflict, isVersionConflict } = require('../../../utils/request.js');
 const partnerRole = require('../../../utils/partnerRole.js');
 const { fmtIso } = require('../../../utils/format.js');
 
@@ -25,20 +29,22 @@ const TABS = [
   { key: 'arch', label: '已归档' },
 ];
 const STATE_TEXT = { draft: '草稿', upcoming: '未开始', open: '报名中', closed: '已截止' };
+const STATE_CLS = { draft: 'warn', upcoming: 'gray', open: 'ok', closed: 'no' };
 
+function shortDay(iso) { const s = fmtIso(iso); return s ? s.slice(0, 5) : ''; }
 function pad(n) { return String(n).padStart(2, '0'); }
 function ymd(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
-function dayOf(iso) { const s = fmtIso(iso); return s ? s.slice(0, 5) : '—'; }
 
 Page({
   data: {
     statusBarHeight: 20,
     loading: true,
+    err: '',
     canManage: false,
     tabs: TABS,
     tab: 'live',
-    groups: { live: [], closed: [], arch: [] },
     rows: [],
+    groups: { live: [], closed: [], arch: [] },
     /* 新建弹层 */
     sheet: false,
     form: { title: '', start: '', end: '' },
@@ -56,22 +62,22 @@ Page({
       return;
     }
     const info = (app.globalData && app.globalData.adminInfo) || {};
-    const roleNum = partnerRole.known(partnerRole.role()) ? partnerRole.role() : Number(info.role);
+    const r = partnerRole.known(partnerRole.role()) ? partnerRole.role() : Number(info.role);
     const today = new Date();
-    const start = new Date(today.getTime() + 86400000);
-    const end = new Date(today.getTime() + 14 * 86400000);
     this.setData({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
-      canManage: roleNum === 0,
-      form: { title: '', start: ymd(start), end: ymd(end) },
+      canManage: r === 0,
+      form: {
+        title: '',
+        start: ymd(new Date(today.getTime() + 86400000)),
+        end: ymd(new Date(today.getTime() + 14 * 86400000)),
+      },
     });
     if (!partnerRole.known(partnerRole.role())) {
-      partnerRole.ensure().then((r) => {
-        if (r === 0 && !this.data.canManage) this.setData({ canManage: true });
-      });
+      partnerRole.ensure().then((n) => { if (n === 0) this.setData({ canManage: true }); });
     }
     this.load().then(() => {
-      /* 从总览页「新建」进来（?create=1）：拉完再开层，免得层开着列表还是空的 */
+      /* 总览页「新建」进来（?create=1）：拉完再开层，免得层开着列表还是空的 */
       if (String(q && q.create) === '1' && this.data.canManage) this.setData({ sheet: true });
     });
   },
@@ -85,35 +91,49 @@ Page({
   },
 
   load() {
-    this.setData({ loading: true });
+    this.setData({ loading: !this._ready, err: '' });
     return Promise.all([
       adminRequest('/admin/recruitment/batches?archived=false&pageSize=50', 'GET'),
       adminRequest('/admin/recruitment/batches?archived=true&pageSize=50', 'GET'),
     ])
-      .then(([live, arch]) => {
-        const shape = (x) => ({
-          id: x.id,
-          title: x.title || '未命名批次',
-          state: x.windowState,
-          stateText: STATE_TEXT[x.windowState] || x.windowState,
-          range: dayOf(x.opensAt) + ' ~ ' + dayOf(x.closesAt),
-          unresolved: Number(x.unresolvedCount) || 0,
-          resultPublished: !!x.resultPublishedAt,
-          archived: !!x.archivedAt,
-          /* 删除要不要输名字：有报名或已发布的服务端才要求，前端据此决定输入框显不显示 */
-          needConfirm: (Number(x.unresolvedCount) || 0) > 0 || !!x.publishedAt,
-        });
-        const rows = ((live && live.items) || []).map(shape);
-        const groups = {
-          live: rows.filter((x) => x.state !== 'closed'),
-          closed: rows.filter((x) => x.state === 'closed'),
-          arch: ((arch && arch.items) || []).map(shape),
+      .then((res) => {
+        const live = res[0] || {};
+        const arch = res[1] || {};
+        const shape = (x, isArch) => {
+          const state = isArch ? 'arch' : x.windowState;
+          const range = shortDay(x.opensAt) && shortDay(x.closesAt)
+            ? `${shortDay(x.opensAt)} ~ ${shortDay(x.closesAt)}` : '时间未设置';
+          const unresolved = Number(x.unresolvedCount) || 0;
+          /* 第三行那句补充：归档说时间与人数，草稿说「还没发布」，其余说「N 人待决定」 */
+          let line;
+          if (isArch) line = `报名 ${Number(x.interviewOrderCount) || 0} 人 · 录取结果已发布`;
+          else if (!x.publishedAt) line = '还没发布 · 草稿可改';
+          else if (x.resultPublishedAt) line = '结果已发布';
+          else line = unresolved ? `${unresolved} 人待决定` : '全部已决定';
+          return {
+            id: x.id,
+            key: x.id,
+            title: x.title || '未命名批次',
+            pub: !!x.publishedAt,
+            archived: isArch,
+            stateText: isArch ? '已归档' : (STATE_TEXT[x.windowState] || x.windowState),
+            stateCls: isArch ? 'gray' : (STATE_CLS[x.windowState] || 'gray'),
+            range,
+            line,
+            lineWarn: !isArch && !!x.publishedAt && !x.resultPublishedAt && unresolved > 0,
+          };
         };
+        const liveRows = ((live.items) || []).map((x) => shape(x, false));
+        const groups = {
+          live: liveRows.filter((x) => x.stateText !== '已截止'),
+          closed: liveRows.filter((x) => x.stateText === '已截止'),
+          arch: ((arch.items) || []).map((x) => shape(x, true)),
+        };
+        this._ready = true;
         this.setData({ loading: false, groups, rows: groups[this.data.tab] || [] });
       })
       .catch((err) => {
-        this.setData({ loading: false });
-        wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' });
+        this.setData({ loading: false, err: (err && err.message) || '加载失败' });
       });
   },
 
@@ -122,9 +142,15 @@ Page({
     this.setData({ tab, rows: this.data.groups[tab] || [] });
   },
 
+  /* 点行：进这一批的配置页（社干进去是只读） */
   onOpen(e) {
-    const id = e.currentTarget.dataset.id;
-    wx.navigateTo({ url: `/pages-partner/recruit/config/config?batchId=${id}` });
+    const row = this.data.rows[Number(e.currentTarget.dataset.i)];
+    if (!row) return;
+    if (row.archived) {
+      wx.showToast({ title: '已归档批次只读，改不了', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({ url: `/pages-partner/recruit/config/config?batchId=${row.id}` });
   },
 
   /* ── 新建 ── */
@@ -146,6 +172,8 @@ Page({
     if (f.start >= f.end) { wx.showToast({ title: '截止日要晚于开始日', icon: 'none' }); return; }
     this.setData({ creating: true });
     wx.showLoading({ title: '创建中', mask: true });
+    /* ⚠️ 截止存 23:59:59 而不是次日 00:00：业务口径是「截止日 24 点关」，
+       存次日零点的话每一处显示都得先减一天，漏一处就显示成后一天。 */
     adminRequest('/admin/recruitment/batches', 'POST', {
       title,
       intro: '',
@@ -156,7 +184,7 @@ Page({
         wx.hideLoading();
         this.setData({ creating: false, sheet: false });
         wx.showToast({ title: '草稿已建', icon: 'success' });
-        /* 建完直接进配置页：草稿不填固定信息/题目就没法发布 */
+        /* 建完直接进配置页：草稿不填固定信息就能发布，但题目和介绍得在那儿写 */
         wx.navigateTo({ url: `/pages-partner/recruit/config/config?batchId=${d.id}` });
       })
       .catch((err) => {
@@ -169,8 +197,11 @@ Page({
   /* ── 删除 ── */
   onDel(e) {
     if (!this.data.canManage) return;
-    const { id, title, need } = e.currentTarget.dataset;
-    this.setData({ del: { id, title, need: String(need) === '1' }, delInput: '' });
+    const row = this.data.rows[Number(e.currentTarget.dataset.i)];
+    if (!row) return;
+    if (row.archived) { wx.showToast({ title: '归档批次不能删', icon: 'none' }); return; }
+    /* 有报名或已发布时服务端要求原样输入名称；前端据此决定要不要显示输入框 */
+    this.setData({ del: { id: row.id, title: row.title, need: row.pub }, delInput: '' });
   },
   onDelClose() { if (!this.data.deleting) this.setData({ del: null, delInput: '' }); },
   onDelInput(e) { this.setData({ delInput: e.detail.value }); },
@@ -194,6 +225,7 @@ Page({
       .catch((err) => {
         wx.hideLoading();
         this.setData({ deleting: false });
+        if (isVersionConflict(err) || isConflict(err)) { this.load(); return; }
         wx.showToast({ title: (err && err.message) || '删除失败', icon: 'none' });
       });
   },

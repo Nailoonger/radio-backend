@@ -1,6 +1,6 @@
-<!-- pages-partner/recruit/list.wxml · v1（2026-11-14 报名列表）
-     ⚠️ 没有搜索框：服务端 /admin/recruitment/applications 不收关键字（见 js 头注释）。
-     年级筛选的选项来自批次自己的固定信息配置。 -->
+<!-- pages-partner/recruit/list/list.wxml · v2（2026-11-14 照 v174 V['recruit-list']）
+     搜姓名 → 年级胶囊 → 三段下划线标签（带人数）→「录取状态」下面两个小胶囊 → 行。
+     ⚠️ 搜索只筛已拉下来的行（服务端不收关键字），页脚明说，不装假。 -->
 <view class="page">
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
   <view class="navbar">
@@ -12,44 +12,74 @@
   </view>
 
   <view class="body">
-    <text class="batch" wx:if="{{title}}">{{title}}</text>
-
-    <view class="stabs">
-      <view class="stab {{tab === item.key ? 'on' : ''}}" wx:for="{{tabs}}" wx:key="key"
-            data-tab="{{item.key}}" bindtap="onTab">
-        <text>{{item.label}}</text>
-        <view class="bar" wx:if="{{tab === item.key}}"></view>
+    <!-- ① 搜姓名 -->
+    <view class="rc-layer">
+      <view class="rc-srch {{kw ? 'has' : ''}}">
+        <view class="mg"></view>
+        <input value="{{kw}}" placeholder="搜姓名" confirm-type="search" bindinput="onKw" />
+        <view class="clr" bindtap="onKwClear">✕</view>
       </view>
-      <view class="grow"></view>
-      <picker wx:if="{{gradeLabels.length > 1}}" range="{{gradeLabels}}" bindchange="onGrade">
-        <view class="gsel">{{gradeLabel}}<view class="gchev"></view></view>
-      </picker>
     </view>
 
-    <view class="hint-note" wx:if="{{loading && !list.length}}">正在加载……</view>
+    <!-- ② 年级：小方角胶囊 -->
+    <view class="rc-layer" wx:if="{{gradeTags.length > 1}}">
+      <view class="rc-ftags">
+        <view class="rc-ftag {{grade === item.v ? 'on' : ''}}" wx:for="{{gradeTags}}" wx:key="v"
+              data-v="{{item.v}}" bindtap="onGrade">{{item.label}}</view>
+      </view>
+    </view>
 
-    <block wx:else>
-      <view class="rows" wx:if="{{list.length}}">
-        <view class="row" wx:for="{{list}}" wx:key="id" hover-class="pressed"
-              data-id="{{item.id}}" bindtap="onOpen">
-          <view class="r-main">
-            <view class="r-line">
-              <text class="r-name">{{item.name}}</text>
-              <text class="tag {{item.status === 'accepted' ? 'tag-pass' : (item.status === 'rejected' ? 'tag-reject' : 'tag-pending')}}">{{item.statusText}}</text>
-            </view>
-            <text class="r-sub">{{item.grade}}{{item.className ? ' · ' + item.className : ''}}{{item.qq ? ' · QQ ' + item.qq : ''}}</text>
-            <text class="r-sub2" wx:if="{{item.at}}">面试 {{item.at}}{{item.seq ? ' · 第 ' + item.seq + ' 号' : ''}}</text>
-            <text class="r-sub2" wx:elif="{{item.created}}">报名于 {{item.created}}</text>
-          </view>
-          <view class="chev"></view>
+    <!-- ③ 三段下划线标签（带人数） -->
+    <view class="rc-layer">
+      <view class="rc-stabs">
+        <view class="rc-stab {{tab === item.key ? 'on' : ''}}" wx:for="{{stabs}}" wx:key="key"
+              data-tab="{{item.key}}" bindtap="onStab">
+          <text>{{item.label}}</text>
+          <text class="n">{{item.n}}</text>
         </view>
       </view>
-      <view class="empty-card" wx:else>
-        <text class="empty-t">{{tab === 'submitted' ? '没有待审的报名' : (tab === 'interview' ? '没有待面试的报名' : '还没有定下来的报名')}}</text>
-        <text class="empty-d">{{tab === 'submitted' ? '报名截止前只收不审；截止后再逐条处理。' : ''}}</text>
+      <!-- ④ 「录取状态」下面的两个小胶囊 -->
+      <view class="rc-ftags" wx:if="{{tab === 'acc'}}">
+        <view class="rc-ftag {{accTab === item.key ? 'on' : ''}}" wx:for="{{accStabs}}" wx:key="key"
+              data-acc="{{item.key}}" bindtap="onAccTab">{{item.label}}<text class="n">{{item.n}}</text></view>
+      </view>
+    </view>
+
+    <view class="rc-hint" wx:if="{{loading}}">正在加载……</view>
+    <view class="rc-hint err" wx:elif="{{err}}">{{err}}</view>
+
+    <block wx:else>
+      <view class="rc-layer">
+        <view class="rc-rows" wx:if="{{rows.length}}">
+          <view class="rc-row rc-row-top" wx:for="{{rows}}" wx:key="id" hover-class="pressed"
+                data-id="{{item.id}}" bindtap="onOpen">
+            <view class="grow">
+              <view class="rc-t1">
+                <b>{{item.name}}</b>
+                <text class="rc-tag {{item.statusCls}}">{{item.statusText}}</text>
+              </view>
+              <text class="rc-t2">{{item.grade}}{{item.className ? ' · ' + item.className : ''}}{{item.qq ? ' · QQ ' + item.qq : ''}}</text>
+              <text class="rc-t3" wx:if="{{item.at}}">面试 {{item.at}}</text>
+              <text class="rc-t3" wx:elif="{{item.created}}">{{item.created}} 提交</text>
+            </view>
+            <view class="chev-r"></view>
+          </view>
+        </view>
+
+        <view class="rc-blk" wx:else>
+          <view class="rc-empty">
+            <b>没有符合条件的报名</b>
+            <span>{{kw ? '换个姓名或年级试试' : (tab === 'submitted' ? '截止前只收不审，待审的都在这里' : (tab === 'interview' ? '还没人排进面试' : '还没有定下来的报名'))}}</span>
+          </view>
+        </view>
       </view>
 
-      <view class="more" wx:if="{{list.length}}">{{hasMore ? '上拉加载更多' : '共 ' + total + ' 条'}}</view>
+      <view class="rc-layer">
+        <view class="rc-note">{{hasMore
+          ? '上拉加载更多；搜索只筛已加载的 ' + all.length + ' 条。'
+          : '共 ' + all.length + ' 条。姓名搜索与年级筛选只作用于这一批已加载的报名（服务端不支持关键字查询）。'}}</view>
+      </view>
+      <view class="rc-pad"></view>
     </block>
   </view>
 </view>

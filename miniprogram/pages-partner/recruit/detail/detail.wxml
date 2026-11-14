@@ -1,5 +1,7 @@
-<!-- pages-partner/recruit/detail.wxml · v1（2026-11-14 报名处理台）
-     「录取决定」＝三个分开的胶囊（v172 口径），选中的浅蓝底蓝字，再点一次撤销。 -->
+<!-- pages-partner/recruit/detail/detail.wxml · v2（2026-11-14 照 v174 V['recruit-detail']）
+     返回条 + 队列导航 → 报名人卡（三格：QQ / 序号 / 面试时间）→ 报名内容
+     → 内部备注 → 结果说明 → 三颗胶囊（安排面试 / 拟录取 / 拟不录取）→ 撤销。
+     ⚠️ 面试时间的编辑收在「面试安排」卡里（picker 选日期 + 时刻），跟 v174 recruit-solo 同口径。 -->
 <view class="page">
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
   <view class="navbar">
@@ -11,93 +13,152 @@
   </view>
 
   <view class="body">
-    <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
+    <view class="rc-hint" wx:if="{{loading}}">正在加载……</view>
+    <view class="rc-hint err" wx:elif="{{err}}">{{err}}</view>
 
     <block wx:elif="{{a}}">
-      <!-- 这个人 -->
-      <view class="card">
-        <view class="card-hd">
-          <text class="nm">{{a.name}}</text>
-          <text class="tag {{a.status === 'accepted' ? 'tag-pass' : (a.status === 'rejected' ? 'tag-reject' : 'tag-pending')}}">{{a.statusText}}</text>
+      <!-- ① 返回条 + 队列 -->
+      <view class="rc-layer">
+        <view class="rc-rows">
+          <view class="rc-row" hover-class="pressed" bindtap="goBack">
+            <text class="grow rc-back">‹ 报名列表</text>
+          </view>
         </view>
-        <view class="kv"><text class="k">年级班级</text><text class="v">{{a.grade}}{{a.className ? ' · ' + a.className : ''}}</text></view>
-        <view class="kv"><text class="k">QQ 号</text><text class="v">{{a.qq || '—'}}</text></view>
-        <view class="kv" wx:if="{{a.seq}}"><text class="k">面试序号</text><text class="v">第 {{a.seq}} 号</text></view>
-        <view class="kv"><text class="k">报名于</text><text class="v">{{a.created}}</text></view>
-        <view class="kv" wx:if="{{a.legacy}}"><text class="k">历史学号</text><text class="v">{{a.legacy}}</text></view>
+      </view>
+      <view class="rc-layer" wx:if="{{queue.length}}">
+        <view class="rc-qnav">
+          <text class="go {{queueAt <= 0 ? 'off' : ''}}" bindtap="onPrev">‹ 上一条</text>
+          <text class="pos">第 {{queueAt + 1}} / {{queue.length}} 条待审</text>
+          <text class="go {{queueAt >= queue.length - 1 ? 'off' : ''}}" bindtap="onNext">下一条 ›</text>
+        </view>
       </view>
 
-      <!-- 答案 -->
-      <view class="card" wx:if="{{answers.length}}">
-        <view class="card-hd"><text class="hd-t">报名表答案</text></view>
-        <view class="qa" wx:for="{{answers}}" wx:key="key">
-          <text class="q-no">{{item.no}}</text>
-          <view class="q-main">
-            <text class="q-t">{{item.title}}</text>
-            <text class="q-v">{{item.val}}</text>
+      <!-- ② 报名人卡 -->
+      <view class="rc-layer">
+        <view class="rc-blk rc-pod">
+          <view class="rc-pod-hd">
+            <view class="rc-pod-av">{{a.initial}}</view>
+            <view class="grow">
+              <text class="rc-pod-nm">{{a.name}}</text>
+              <text class="rc-pod-sub">{{a.grade}}{{a.className ? ' · ' + a.className : ''}} · {{a.created}} 提交</text>
+            </view>
+            <text class="rc-pod-chip">{{a.statusText}}</text>
+          </view>
+          <view class="rc-pod-stats">
+            <view class="rc-ps">
+              <text class="rc-ps-l">QQ 号</text>
+              <text class="rc-ps-d">{{a.qq || '—'}}</text>
+            </view>
+            <view class="rc-ps">
+              <text class="rc-ps-l">面试序号</text>
+              <text class="rc-ps-d">{{a.seqText}}</text>
+            </view>
+            <view class="rc-ps">
+              <text class="rc-ps-l">面试时间</text>
+              <text class="rc-ps-d">{{a.atText}}</text>
+            </view>
           </view>
         </view>
       </view>
 
-      <!-- 面试安排 -->
-      <view class="card">
-        <view class="card-hd">
-          <text class="hd-t">面试安排</text>
-          <text class="hd-s" wx:if="{{interview && !interview.custom}}">跟随批次统一安排</text>
-          <text class="hd-s" wx:elif="{{interview}}">单独配置</text>
+      <!-- ③ 报名内容 -->
+      <view class="rc-layer">
+        <view class="rc-blk">
+          <view class="rc-blk-h">
+            <text class="t">报名内容</text>
+            <text class="more">完整回答，不截断</text>
+          </view>
+          <view class="rc-kv" wx:for="{{fixedRows}}" wx:key="k">
+            <text class="k">{{item.k}}</text>
+            <text class="v">{{item.v}}</text>
+          </view>
+          <view class="rc-qa" wx:for="{{answers}}" wx:key="key">
+            <text class="qt">{{item.no}}　{{item.title}}</text>
+            <text class="qv">{{item.val}}</text>
+          </view>
+          <view class="rc-tip" wx:if="{{a.legacy}}">历史学号：{{a.legacy}}</view>
         </view>
-        <view class="kv" wx:if="{{interview}}">
-          <text class="k">当前</text>
-          <text class="v">{{interview.at ? interview.at : '未填时间'}}{{interview.location ? ' · ' + interview.location : ''}}</text>
-        </view>
-        <block wx:if="{{canReview}}">
-          <view class="f-row">
-            <view class="f-half">
-              <text class="f-label">日期</text>
+      </view>
+
+      <!-- ④ 面试安排（单人） -->
+      <view class="rc-layer" wx:if="{{canReview}}">
+        <view class="rc-blk">
+          <view class="rc-blk-h">
+            <text class="t">面试安排</text>
+            <text class="more">{{itvCustom ? '单独配置' : (a.batchItv ? '跟随批次统一安排' : '未安排')}}</text>
+          </view>
+          <view class="rc-kv" wx:if="{{itvAt}}">
+            <text class="k">当前</text>
+            <text class="v">{{itvAt}}{{itvPlace ? ' · ' + itvPlace : ''}}</text>
+          </view>
+          <view class="rc-frow">
+            <view class="rc-fhalf">
+              <text class="rc-lb">日期</text>
               <picker mode="date" value="{{atDate}}" bindchange="onDate">
-                <view class="f-input">{{atDate || '选择'}}</view>
+                <view class="rc-inp">{{atDate || '选择'}}</view>
               </picker>
             </view>
-            <view class="f-half">
-              <text class="f-label">时刻</text>
+            <view class="rc-fhalf">
+              <text class="rc-lb">时刻</text>
               <picker mode="time" value="{{atTime}}" bindchange="onTime">
-                <view class="f-input">{{atTime || '选择'}}</view>
+                <view class="rc-inp">{{atTime || '选择'}}</view>
               </picker>
             </view>
           </view>
-          <text class="f-label mt">地点</text>
-          <input class="f-input" value="{{atPlace}}" placeholder="例如：广播站（教学楼 3 层）" bindinput="onPlace" />
-          <text class="f-label mt">说明（可空）</text>
-          <input class="f-input" value="{{atNote}}" placeholder="例如：带一段自我介绍" bindinput="onItvNote" />
-          <view class="row-btns">
-            <button class="btn btn-primary flex1" hover-class="pressed" bindtap="onSaveItv" disabled="{{savingItv}}">保存面试安排</button>
-            <button class="btn btn-ghost flex1" wx:if="{{interview && interview.custom}}" hover-class="pressed" bindtap="onClearItv">改回统一安排</button>
+          <text class="rc-lb mt">地点</text>
+          <input class="rc-inp" value="{{atPlace}}" placeholder="例如：广播站（教学楼 3 层）" bindinput="onPlace" />
+          <text class="rc-lb mt">说明（可空）</text>
+          <input class="rc-inp" value="{{atNote}}" placeholder="例如：带一段自我介绍" bindinput="onNote" />
+          <view class="rc-btnrow mt">
+            <button class="rc-btn rc-btn-primary" hover-class="pressed" bindtap="onSaveItv"
+                    disabled="{{savingItv}}">保存面试安排</button>
+            <button class="rc-btn rc-btn-ghost" wx:if="{{itvCustom}}" hover-class="pressed"
+                    bindtap="onClearItv">改回统一</button>
           </view>
-        </block>
-      </view>
-
-      <!-- 录取决定：三个分开的胶囊 -->
-      <view class="card" wx:if="{{canReview}}">
-        <view class="card-hd"><text class="hd-t">录取决定</text><text class="hd-s">发布结果前都能改</text></view>
-        <view class="pills">
-          <button class="pill {{decided === 'accepted' ? 'on' : ''}}" data-d="accepted" hover-class="pressed" bindtap="onDecide">拟录取</button>
-          <button class="pill {{decided === 'rejected' ? 'on' : ''}}" data-d="rejected" hover-class="pressed" bindtap="onDecide">拟不录取</button>
-          <button class="pill {{decided === '' ? 'on' : ''}}" data-d="" hover-class="pressed" bindtap="onDecide">先不定</button>
+          <view class="rc-tip">单独配置只影响这一个人；清掉后就跟随批次的统一安排。</view>
         </view>
-        <text class="f-tip">拟录取之前要先安排面试时间；「先不定」＝清掉决定，回到待面试。</text>
       </view>
 
-      <!-- 备注 -->
-      <view class="card" wx:if="{{canReview}}">
-        <view class="card-hd"><text class="hd-t">备注</text></view>
-        <text class="f-label">内部备注（只有站里看得到）</text>
-        <textarea class="f-area" value="{{internalNote}}" placeholder="例如：声音条件好，想安排晚时段" bindinput="onIn" />
-        <text class="f-label mt">对外说明（学生查结果时能看到）</text>
-        <textarea class="f-area" value="{{publicNote}}" placeholder="例如：请于周一午间到广播站试音" bindinput="onPub" />
-        <button class="btn btn-primary mt-btn" hover-class="pressed" bindtap="onSaveNotes" disabled="{{saving}}">保存备注</button>
+      <!-- ⑤ 内部备注 -->
+      <view class="rc-layer" wx:if="{{canReview}}">
+        <view class="rc-blk">
+          <view class="rc-blk-h"><text class="t">内部备注</text><text class="more">学生看不到</text></view>
+          <textarea class="rc-area" value="{{internalNote}}" maxlength="2000"
+                    placeholder="审核记录、面试评价、要回避的人……" bindinput="onIn" />
+        </view>
       </view>
 
-      <view class="note" wx:if="{{!canReview}}">你没有报名审核权限，这一页只能看。</view>
+      <!-- ⑥ 结果说明 -->
+      <view class="rc-layer" wx:if="{{canReview}}">
+        <view class="rc-blk">
+          <view class="rc-blk-h"><text class="t">结果说明</text><text class="more">统一发布后报名者可见</text></view>
+          <textarea class="rc-area" value="{{publicNote}}" maxlength="2000"
+                    placeholder="录取后的要求，或未录取的对外说明" bindinput="onPub" />
+          <button class="rc-btn rc-btn-primary mt" hover-class="pressed" bindtap="onSaveNotes"
+                  disabled="{{saving}}">保存备注</button>
+        </view>
+      </view>
+
+      <!-- ⑦ 处理结果：三个分开的胶囊 -->
+      <view class="rc-layer" wx:if="{{canReview}}">
+        <view class="rc-blk">
+          <view class="rc-blk-h"><text class="t">处理结果</text><text class="more">结果发布前可改</text></view>
+          <view class="rc-pills">
+            <button class="rc-pill {{a.decided ? '' : 'on'}}" hover-class="pressed"
+                    data-d="interview" bindtap="onPill">安排面试</button>
+            <button class="rc-pill {{a.decided === 'accepted' ? 'on' : ''}}" hover-class="pressed"
+                    data-d="accepted" bindtap="onPill">拟录取</button>
+            <button class="rc-pill {{a.decided === 'rejected' ? 'on' : ''}}" hover-class="pressed"
+                    data-d="rejected" bindtap="onPill">拟不录取</button>
+          </view>
+          <view class="rc-tip">安排面试后进「待面试」，出现在面试名单里；拟不录取要写对外说明。超管统一发布结果后对所有人生效并锁定。</view>
+        </view>
+      </view>
+
+      <view class="rc-layer" wx:if="{{!canReview}}">
+        <view class="rc-note">你没有报名审核权限，这一页只能看。</view>
+      </view>
+      <view class="rc-pad"></view>
     </block>
   </view>
 </view>

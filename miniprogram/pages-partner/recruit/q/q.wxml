@@ -1,0 +1,87 @@
+<!-- pages-partner/recruit/q/q.wxml · v1（2026-11-14 照 v174 V['recruit-q']）
+     题干 / 题型（四颗小方角）/ 必填拨杆 / 选项（仅选择题）/ 保存 + 红字删除。
+     ⚠️ 已发布（locked）时整页只读，底部保存与删除都是灰的。 -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">{{isNew ? '添加问题' : '问题编辑'}}</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <view class="rc-hint" wx:if="{{loading}}">正在加载……</view>
+    <view class="rc-hint err" wx:elif="{{err}}">{{err}}</view>
+
+    <block wx:else>
+      <!-- ① 头：第 N 题 / 新题 + 右端说明 -->
+      <view class="rc-layer">
+        <view class="rc-q-head">
+          <text class="rc-tag gray">{{label}}</text>
+          <view class="grow"></view>
+          <text class="st">{{locked ? '已发布，结构锁定' : '保存后才写回批次'}}</text>
+        </view>
+      </view>
+
+      <!-- ② 题干 -->
+      <view class="rc-layer">
+        <view class="rc-blk">
+          <view class="rc-blk-h">
+            <text class="t">题干</text>
+            <text class="more">{{titleLen}} / 60</text>
+          </view>
+          <textarea class="rc-area tall" value="{{title}}" maxlength="60" disabled="{{locked}}"
+                    placeholder="比如：你为什么想加入广播站？" bindinput="onTitle" />
+
+          <!-- ③ 题型 -->
+          <text class="rc-lb mt">题型</text>
+          <view class="rc-ftags">
+            <view class="rc-ftag {{type === item.key ? 'on' : ''}}" wx:for="{{types}}" wx:key="key"
+                  data-t="{{item.key}}" bindtap="onType">{{item.label}}</view>
+          </view>
+
+          <!-- ④ 必填 -->
+          <view class="rc-swrow">
+            <view class="grow">
+              <text class="lb">这题必填</text>
+              <text class="hint">必填＝学生不填就交不上；选填可以留空。</text>
+            </view>
+            <switch checked="{{required}}" color="#0066CC" disabled="{{locked}}" bindchange="onReq" />
+          </view>
+        </view>
+      </view>
+
+      <!-- ⑤ 选项（只给选择题） -->
+      <view class="rc-layer" wx:if="{{type === 'single' || type === 'multiple'}}">
+        <view class="rc-blk">
+          <view class="rc-blk-h">
+            <text class="t">选项</text>
+            <text class="more">{{opts.length}} / 20</text>
+          </view>
+          <view class="rc-optrow" wx:for="{{opts}}" wx:key="index">
+            <text class="no">{{index + 1}}</text>
+            <input class="in" value="{{item}}" data-i="{{index}}" disabled="{{locked}}"
+                   placeholder="选项 {{index + 1}}" bindinput="onOpt" />
+            <text class="del" data-i="{{index}}" bindtap="onOptDel">删</text>
+          </view>
+          <button class="rc-btn rc-btn-ghost" wx:if="{{!locked}}" hover-class="pressed"
+                  bindtap="onOptAdd">添加选项</button>
+        </view>
+      </view>
+
+      <!-- ⑥ 保存 + 删除 -->
+      <view class="rc-layer">
+        <button class="rc-btn rc-btn-primary" hover-class="pressed" bindtap="onSave"
+                disabled="{{saving || locked}}">保存这道题</button>
+        <text class="rc-trash" wx:if="{{!locked}}" bindtap="onDel">{{isNew ? '放弃这道题' : '删除这道题'}}</text>
+      </view>
+
+      <view class="rc-layer">
+        <view class="rc-note">最多 20 题；选择题 2–20 个选项。发布后题干与题型锁定，只能看。</view>
+      </view>
+      <view class="rc-pad"></view>
+    </block>
+  </view>
+</view>

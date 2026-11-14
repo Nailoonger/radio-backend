@@ -103,9 +103,11 @@
         "recruit/index",
         "recruit/batches/batches",
         "recruit/config/config",
+        "recruit/q/q",
         "recruit/list/list",
         "recruit/detail/detail",
-        "recruit/order/order"
+        "recruit/interview/interview",
+        "recruit/solo/solo"
       ]
     }
   ]

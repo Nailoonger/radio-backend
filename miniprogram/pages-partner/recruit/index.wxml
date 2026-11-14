@@ -1,7 +1,6 @@
-<!-- pages-partner/recruit/index.wxml · v1（2026-11-14 招新总览）
-     一张「当前批次」卡 + 三个下级入口。
-     ⚠️ 没批次时不给「报名列表 / 批次配置」两行 —— 点进去只会空转，
-        空态里只留「批次管理」＋（超管）新建。 -->
+<!-- pages-partner/recruit/index.wxml · v2（2026-11-14 照 v174 V.recruit）
+     一张批次卡（上段身份 + 下段四格计数，hairline 分隔）+ 三行入口 + 页底一句说明。
+     ⚠️ 这一页不放任何操作：发布 / 截止 / 生成顺序 / 发布结果 / 删除全在「批次管理」里（v170 口径）。 -->
 <view class="page">
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
   <view class="navbar">
@@ -13,43 +12,45 @@
   </view>
 
   <view class="body">
-    <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
-    <view class="hint-note" wx:elif="{{err}}">{{err}}</view>
+    <view class="rc-hint" wx:if="{{loading}}">正在加载……</view>
+    <view class="rc-hint err" wx:elif="{{err}}">{{err}}</view>
 
     <block wx:else>
-      <!-- 当前批次 -->
-      <view class="hero" wx:if="{{batch}}">
-        <view class="hero-top">
-          <text class="hero-title">{{batch.title}}</text>
-          <text class="tag {{batch.state === 'open' ? 'tag-pass' : (batch.state === 'draft' ? 'tag-mute' : 'tag-pending')}}">{{batch.stateText}}</text>
-        </view>
-        <text class="hero-range">报名时间 {{batch.range}}</text>
-        <view class="hero-foot">
-          <text class="hero-num">{{batch.unresolved}}</text>
-          <text class="hero-unit">人待定（未出结果）</text>
-        </view>
-      </view>
-
-      <view class="empty-card" wx:else>
-        <text class="empty-t">还没有招新批次</text>
-        <text class="empty-d">{{canManage ? '开一个草稿批次，填好报名时间再发布。' : '等超管开批次，开了这里就能看到。'}}</text>
-        <button class="btn btn-primary" wx:if="{{canManage}}" hover-class="pressed" bindtap="onNew">新建招新批次</button>
-      </view>
-
-      <!-- 入口 -->
-      <view class="entries">
-        <view class="entry" wx:for="{{entries}}" wx:key="key" hover-class="pressed"
-              data-key="{{item.key}}" bindtap="onEntry">
-          <view class="e-main">
-            <text class="e-t">{{item.t}}</text>
-            <text class="e-d">{{item.d}}</text>
+      <!-- ① 批次卡：上段＝身份，下段＝四格 -->
+      <view class="rc-layer" wx:if="{{b}}">
+        <view class="rc-hero">
+          <text class="today">{{b.title}}</text>
+          <text class="bigd">报名时间 {{b.range}}{{b.intro ? ' · ' + b.intro : ''}}</text>
+          <view class="rc-hero-tags">
+            <text class="rc-tag {{b.stateCls}}">{{b.stateText}}</text>
+            <text class="rc-tag {{b.resultCls}}">{{b.resultText}}</text>
           </view>
-          <text class="e-n" wx:if="{{item.n !== null}}">{{item.n}} {{item.u}}</text>
-          <view class="chev"></view>
+          <view class="rc-pod-stats">
+            <view class="rc-ps" wx:for="{{b.numbers}}" wx:key="l">
+              <text class="rc-ps-l">{{item.l}}</text>
+              <text class="rc-ps-n">{{item.n}}</text>
+            </view>
+          </view>
         </view>
       </view>
 
-      <view class="note" wx:if="{{!canManage}}">新建、发布、截止、归档只有超管能做；你能看批次、审报名、安排面试。</view>
+      <!-- ② 入口：三行，右端一句补充值 -->
+      <view class="rc-layer">
+        <view class="rc-rows">
+          <view class="rc-row" wx:for="{{rows}}" wx:key="key" hover-class="pressed"
+                data-key="{{item.key}}" bindtap="onRow">
+            <text class="grow rc-row-t">{{item.t}}</text>
+            <text class="rv">{{item.d}}</text>
+            <view class="chev-r"></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- ③ 说明 -->
+      <view class="rc-layer">
+        <view class="rc-note">批次由超管建立与发布；社干可以看报名、审核、看面试名单。{{canManage ? '' : '新建、配置、发布、截止、归档、删除都只有超管能做。'}}</view>
+      </view>
+      <view class="rc-pad"></view>
     </block>
   </view>
 </view>

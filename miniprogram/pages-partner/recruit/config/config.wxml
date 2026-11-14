@@ -1,6 +1,10 @@
-<!-- pages-partner/recruit/config.wxml · v1（2026-11-14 批次配置）
-     ⚠️ 锁位直接照服务端规则显示：发布后名称与题目只读，报名开始/手动截止后时间只读。
-        锁住的字段在保存时**整个不提交**（见 js 的 save()），不是"提交了再被拒"。 -->
+<!-- pages-partner/recruit/config/config.wxml · v2（2026-11-14 照 v174 V['recruit-config']）
+     ① 返回条「‹ 批次管理」+ 右端状态
+     ② 批次信息：名称 / 介绍 / 报名时间＝一个字段装整段（点开原地展开日历）
+     ③ 固定信息：四项必填拨杆 + 年级胶囊（单选）+ 班级字段下方下拉（单选，可加可删）
+     ④ 自定义问题：点整行进「问题编辑」页
+     ⑤ 保存 + 批次操作（按状态位出现）
+     ⚠️ 模板只取值、不取属性：选项一律读 item.opts（js 里 buildFixed 摊好的）。 -->
 <view class="page">
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
   <view class="navbar">
@@ -12,152 +16,218 @@
   </view>
 
   <view class="body">
-    <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
-    <view class="hint-note" wx:elif="{{err}}">{{err}}</view>
+    <view class="rc-hint" wx:if="{{loading}}">正在加载……</view>
+    <view class="rc-hint err" wx:elif="{{err}}">{{err}}</view>
 
     <block wx:else>
-      <!-- 状态条 -->
-      <view class="state">
-        <text class="tag {{state === 'open' ? 'tag-pass' : (state === 'draft' ? 'tag-mute' : 'tag-pending')}}">{{stateText}}</text>
-        <text class="state-t">{{archived ? '已归档：整份只读' : (published ? '已发布：名称与题目锁定' : '草稿：还没人能看到')}}</text>
-      </view>
-
-      <!-- 基本信息 -->
-      <view class="card">
-        <text class="hd-t">批次信息</text>
-        <text class="f-label mt">批次名称</text>
-        <input class="f-input {{lockedTitle ? 'ro' : ''}}" value="{{title}}" disabled="{{lockedTitle || !canManage}}"
-               placeholder="例如：2026 年秋季招新" bindinput="onTitle" />
-        <text class="f-label mt">招新介绍（报名页顶部展示）</text>
-        <textarea class="f-area" value="{{intro}}" disabled="{{!canManage}}" placeholder="一两句话说清这次招什么、什么时候面试"
-                  bindinput="onIntro" />
-        <view class="f-row">
-          <view class="f-half">
-            <text class="f-label">报名开始日（零点开）</text>
-            <picker mode="date" value="{{openDay}}" disabled="{{lockedTime || !canManage}}" bindchange="onOpenDay">
-              <view class="f-input {{lockedTime ? 'ro' : ''}}">{{openDay || '选择日期'}}</view>
-            </picker>
-          </view>
-          <view class="f-half">
-            <text class="f-label">报名截止日（24 点关）</text>
-            <picker mode="date" value="{{closeDay}}" disabled="{{lockedTime || !canManage}}" bindchange="onCloseDay">
-              <view class="f-input {{lockedTime ? 'ro' : ''}}">{{closeDay || '选择日期'}}</view>
-            </picker>
+      <!-- 返回条：回批次管理 + 当前状态 -->
+      <view class="rc-layer">
+        <view class="rc-rows">
+          <view class="rc-row" hover-class="pressed" bindtap="goBatches">
+            <text class="grow rc-back">‹ 批次管理</text>
+            <text class="rv">{{archived ? '已归档' : stateText}}</text>
           </view>
         </view>
-        <text class="f-tip" wx:if="{{lockedTime}}">报名已开始或已手动截止，时间锁定。</text>
       </view>
 
-      <!-- 固定信息 -->
-      <view class="card">
-        <view class="card-hd"><text class="hd-t">固定信息</text><text class="hd-s">必填 + 选项</text></view>
-        <view class="fix" wx:for="{{fixedList}}" wx:key="key">
-          <view class="fix-hd">
-            <text class="fix-t">{{item.label}}</text>
-            <text class="fix-s">必填</text>
-            <switch class="sw" checked="{{fixed[item.key]}}" color="#0066CC" disabled="{{!canManage}}"
-                    data-key="{{item.key}}" bindchange="onReq" />
+      <!-- ② 批次信息 -->
+      <view class="rc-layer">
+        <view class="rc-blk">
+          <view class="rc-blk-h">
+            <text class="t">批次信息</text>
+            <text class="more">{{lockedTitle ? '名称已锁定' : '草稿可改'}}</text>
           </view>
-          <block wx:if="{{item.options}}">
-            <!-- ⚠️ 只读 item.opts（JS 里按 key 摊好的那一组），不要在模板里现挑：
-                 WXML 解析器不认「括号表达式后接 .length」⇒ 直接编译报
-                 Bad attr `wx:if` with message: unexpected token `.` -->
-            <view class="chips" wx:if="{{item.opts.length}}">
-              <view class="chip-x" wx:for="{{item.opts}}" wx:for-item="o" wx:key="label">
-                <text>{{o.label}}</text>
-                <text class="x" wx:if="{{canManage}}" data-key="{{item.key}}" data-label="{{o.label}}" catchtap="onOptDel">✕</text>
+
+          <!-- 已发布：给一条出路，别让人对着灰框发愣 -->
+          <view class="rc-warnbar" wx:if="{{published && canManage}}">
+            <text class="w">本批次已发布：名称 / 题目 / 时间锁定。</text>
+            <text class="go" bindtap="goNew">新建 ›</text>
+          </view>
+
+          <text class="rc-lb">批次名称</text>
+          <input class="rc-inp" value="{{title}}" disabled="{{lockedTitle || !canManage}}"
+                 placeholder="例如：2026 年秋季招新" maxlength="100" bindinput="onTitle" />
+
+          <text class="rc-lb mt">招新介绍（报名页顶部展示）</text>
+          <textarea class="rc-area" value="{{intro}}" disabled="{{!canManage}}"
+                    maxlength="10000" placeholder="一两句话说清这次招什么、什么时候面试"
+                    bindinput="onIntro" />
+
+          <!-- 报名时间：一个字段装整段 -->
+          <view class="rc-rng mt">
+            <view class="rc-rng-f {{lockedTime ? 'off' : ''}}" bindtap="onRngOpen">
+              <text class="lb">报名时间</text>
+              <text class="vl">{{rangeText}}</text>
+              <view class="cal"></view>
+            </view>
+
+            <!-- 字段下方原地展开的日历 -->
+            <view class="rc-pop" wx:if="{{rng.open}}">
+              <view class="rc-pop-hd">
+                <view class="rnav" data-step="-1" bindtap="onRngNav">‹</view>
+                <b>{{rngMonth}}</b>
+                <view class="rnav" data-step="1" bindtap="onRngNav">›</view>
+              </view>
+              <view class="rc-rgrid">
+                <view class="rc-rw" wx:for="{{[0,1,2,3,4,5,6]}}" wx:key="*this" wx:for-item="w">{{w}}</view>
+                <view class="rc-rd {{item.cls}}" wx:for="{{cells}}" wx:key="index"
+                      data-d="{{item.d}}" bindtap="onRngDay">{{item.d}}</view>
+              </view>
+              <view class="rc-rhint">{{rngHint}}</view>
+              <view class="rc-rfoot">
+                <button class="cbtn cancel" hover-class="pressed" bindtap="onRngClear">清空</button>
+                <view class="grow"></view>
+                <button class="cbtn cancel" hover-class="pressed" bindtap="onRngClose">取消</button>
+                <button class="cbtn ok" hover-class="pressed" bindtap="onRngOk"
+                        disabled="{{rng.a && rng.b ? false : true}}">确定</button>
               </view>
             </view>
-            <view class="chip-add" wx:if="{{canManage}}" data-key="{{item.key}}" bindtap="onOptAdd">＋ 添加</view>
-            <text class="f-tip" wx:else>没配选项＝学生自己填。</text>
-          </block>
+          </view>
+
+          <view class="rc-tip">{{lockedTime
+            ? '报名已开始或批次已截止，起止时间锁定（防收了一半改窗口）。'
+            : '点开这个字段：先点开始那天、再点截止那天；开始日零点起、截止日 24 点止——按天算，不用挑时刻。'}}</view>
         </view>
       </view>
 
-      <!-- 自定义问题 -->
-      <view class="card">
-        <view class="card-hd"><text class="hd-t">自定义问题</text><text class="hd-s">{{questions.length}} / 20</text></view>
-        <view class="q" wx:for="{{questions}}" wx:key="id">
-          <text class="q-no">{{index + 1 < 10 ? '0' : ''}}{{index + 1}}</text>
-          <view class="q-main">
-            <text class="q-t">{{item.title}}</text>
-            <text class="q-s">{{item.typeText}}{{item.required ? ' · 必填' : ' · 选填'}}{{item.optionText ? ' · ' + item.optionText : ''}}</text>
+      <!-- ③ 固定信息 -->
+      <view class="rc-layer">
+        <view class="rc-blk">
+          <view class="rc-blk-h"><text class="t">固定信息</text><text class="more">必填 + 选项</text></view>
+
+          <view class="rc-fixrow" wx:for="{{fixedList}}" wx:key="key">
+            <view class="rc-fixhd">
+              <text class="grow rc-fixt">{{item.label}}</text>
+              <text class="req">必填</text>
+              <view class="rc-sw {{item.required ? 'on' : ''}} {{published ? 'off' : ''}}"
+                    data-key="{{item.key}}" bindtap="onReqToggle"></view>
+            </view>
+
+            <!-- 年级：一排胶囊，单选，再点一下取消 -->
+            <block wx:if="{{item.key === 'grade'}}">
+              <view class="rc-ftags mt" wx:if="{{canManage && !published}}">
+                <view class="rc-ftag {{item.pick === g ? 'on' : ''}}" wx:for="{{item.opts}}" wx:for-item="g"
+                      wx:key="*this" data-v="{{g}}" bindtap="onGradePick">{{g}}</view>
+                <view class="rc-ftag" bindtap="onGradeAdd">＋ 添加</view>
+              </view>
+              <view class="rc-tip">{{canManage && !published
+                ? '只能选一个年级，再点一下取消（不选＝学生自己填）。'
+                : (item.pick ? '可报年级：' + item.pick : '没配选项＝学生自己填。')}}</view>
+            </block>
+
+            <!-- 班级：字段下方下拉 -->
+            <block wx:if="{{item.key === 'className'}}">
+              <view class="rc-dd" wx:if="{{canManage && !published}}">
+                <view class="rc-pick {{item.pick ? 'picked' : ''}} {{clsOpen ? 'open' : ''}}" bindtap="onClsOpen">
+                  <text>可报班级</text>
+                  <text class="v">{{item.pick || '点开选择'}}</text>
+                  <view class="arw"></view>
+                </view>
+                <view class="rc-panel" wx:if="{{clsOpen}}">
+                  <scroll-view class="rc-list" scroll-y>
+                    <view class="rc-opt {{item.pick === v ? 'on' : ''}}" wx:for="{{item.opts}}" wx:for-item="v" wx:key="*this">
+                      <view class="hit" data-v="{{v}}" bindtap="onClsPick">
+                        <text class="t">{{v}}</text><text class="ck">✓</text>
+                      </view>
+                      <view class="x" data-v="{{v}}" catchtap="onClsDel">✕</view>
+                    </view>
+                  </scroll-view>
+                  <view class="rc-opt rc-opt-add" bindtap="onClsAdd">＋ 添加班级</view>
+                </view>
+              </view>
+              <view class="rc-tip">{{canManage && !published
+                ? '点开下拉选一个班级，只能选一个；每行右边小叉叉把多出来的班删掉。'
+                : (item.pick ? '可报班级：' + item.pick : '没配选项＝学生自己填。')}}</view>
+            </block>
           </view>
-          <block wx:if="{{canManage}}">
-            <text class="q-a" data-i="{{index}}" bindtap="onQEdit">编辑</text>
-            <text class="q-d" data-i="{{index}}" catchtap="onQDel">删除</text>
-          </block>
         </view>
-        <view class="empty-q" wx:if="{{!questions.length}}">还没有自定义问题（上面四项固定信息仍然照收）</view>
-        <button class="btn btn-ghost mt-btn" wx:if="{{canManage}}" hover-class="pressed" bindtap="onQAdd">添加问题</button>
       </view>
 
-      <!-- 批次级面试统一安排 -->
-      <view class="card" wx:if="{{canManage}}">
-        <view class="card-hd"><text class="hd-t">面试统一安排</text><text class="hd-s">改完要点保存</text></view>
-        <view class="f-row">
-          <view class="f-half">
-            <text class="f-label">日期</text>
-            <picker mode="date" value="{{itvDate}}" bindchange="onItvDate">
-              <view class="f-input">{{itvDate || '选择'}}</view>
-            </picker>
+      <!-- ④ 自定义问题 -->
+      <view class="rc-layer">
+        <view class="rc-blk">
+          <view class="rc-blk-h">
+            <text class="t">自定义问题</text>
+            <text class="more">{{questions.length}} / 20</text>
           </view>
-          <view class="f-half">
-            <text class="f-label">时刻</text>
-            <picker mode="time" value="{{itvTime}}" bindchange="onItvTime">
-              <view class="f-input">{{itvTime || '选择'}}</view>
-            </picker>
+
+          <view class="rc-q" wx:for="{{questions}}" wx:key="id" hover-class="pressed"
+                data-i="{{index}}" bindtap="onQEdit">
+            <text class="no">{{item.no}}</text>
+            <view class="grow">
+              <text class="rc-q-t">{{item.title}}</text>
+              <text class="rc-q-s">{{item.typeText}}{{item.required ? ' · 必填' : ' · 选填'}}{{item.optCount ? ' · ' + item.optCount + ' 个选项' : ''}}</text>
+            </view>
+            <text class="rc-link" wx:if="{{canManage}}">编辑</text>
+            <text class="rc-del" wx:if="{{canManage}}" data-i="{{index}}" catchtap="onQDel">删除</text>
           </view>
+
+          <view class="rc-tip" wx:if="{{!questions.length}}">还没有自定义问题（上面四项固定信息仍然照收）</view>
+
+          <button class="rc-btn rc-btn-ghost mt" wx:if="{{canManage}}" hover-class="pressed"
+                  bindtap="onQNew">添加问题</button>
+          <view class="rc-tip" wx:if="{{canManage && lockedQuestions}}">已发布批次题目锁定；点「添加问题」会提示怎么开草稿。</view>
         </view>
-        <text class="f-label mt">地点</text>
-        <input class="f-input" value="{{itvPlace}}" placeholder="例如：广播站（教学楼 3 层）" bindinput="onItvPlace" />
-        <text class="f-label mt">说明（可空）</text>
-        <input class="f-input" value="{{itvNote}}" placeholder="例如：每人 5 分钟" bindinput="onItvNote" />
-        <view class="row-btns">
-          <button class="btn btn-primary flex1" hover-class="pressed" bindtap="onSaveItv" disabled="{{acting}}">保存统一安排</button>
-          <button class="btn btn-ghost flex1" wx:if="{{itvAt}}" hover-class="pressed" bindtap="onClearItv">清掉</button>
-        </view>
-        <text class="f-tip">统一安排只作用于没单独配置过的报名；单个人的时间在报名处理台里改。</text>
       </view>
 
-      <!-- 动作 -->
-      <view class="acts" wx:if="{{canManage}}">
-        <button class="btn btn-primary" hover-class="pressed" bindtap="onSave" disabled="{{saving || archived}}">保存配置</button>
-        <button class="btn btn-ghost" wx:if="{{state === 'draft'}}" hover-class="pressed" bindtap="onPublish" disabled="{{acting}}">发布批次</button>
-        <button class="btn btn-ghost" wx:if="{{state === 'open'}}" hover-class="pressed" bindtap="onClose" disabled="{{acting}}">提前截止报名</button>
-        <button class="btn btn-ghost" wx:if="{{state === 'closed' && !resultPublished}}" hover-class="pressed" bindtap="onResults" disabled="{{acting}}">发布录取结果</button>
-        <button class="btn btn-ghost" wx:if="{{!archived}}" hover-class="pressed" bindtap="onArchive" disabled="{{acting}}">归档批次</button>
+      <!-- ⑤ 保存 -->
+      <view class="rc-layer" wx:if="{{canManage}}">
+        <button class="rc-btn rc-btn-primary" hover-class="pressed" bindtap="onSave"
+                disabled="{{saving || archived}}">{{lockedTitle ? '保存允许修改的配置' : '保存草稿'}}</button>
       </view>
-      <view class="note" wx:else>只有超管能改配置；你能看批次、审报名、安排面试。</view>
+
+      <!-- ⑥ 批次操作：按状态位出现（v174 的 rcOps 同条件） -->
+      <view class="rc-layer" wx:if="{{canManage && !archived}}">
+        <view class="rc-mh"><text class="t">批次操作</text><text class="n">超管</text></view>
+        <view class="rc-rows">
+          <view class="rc-row" wx:if="{{!published}}" hover-class="pressed" bindtap="onPublish">
+            <view class="grow">
+              <text class="rc-opt-t">发布报名</text>
+              <text class="rc-opt-d">发布后开始按报名时间收报名，题目和名称随之锁定</text>
+            </view>
+            <text class="rc-tag ok">可执行</text>
+          </view>
+          <view class="rc-row" wx:if="{{published && state === 'open'}}" hover-class="pressed" bindtap="onClose">
+            <view class="grow">
+              <text class="rc-opt-t">截止报名</text>
+              <text class="rc-opt-d">提前结束收报名（到期会自动截止）</text>
+            </view>
+            <text class="rc-tag ok">可执行</text>
+          </view>
+          <view class="rc-row" wx:if="{{published && state === 'closed' && !resultPublished}}" hover-class="pressed" bindtap="onGenerate">
+            <view class="grow">
+              <text class="rc-opt-t">{{orderGenerated ? '重新生成面试顺序' : '生成随机面试顺序'}}</text>
+              <text class="rc-opt-d">{{orderGenerated ? '已有顺序，重新生成会覆盖（要再确认一次）' : '截止后按有效报名随机洗牌，序号固定不变'}}</text>
+            </view>
+            <text class="rc-tag ok">可执行</text>
+          </view>
+          <view class="rc-row" wx:if="{{published && state === 'closed' && !resultPublished}}" hover-class="pressed" bindtap="onResults">
+            <view class="grow">
+              <text class="rc-opt-t">统一发布录取结果</text>
+              <text class="rc-opt-d">发布后报名者凭查询码可见结果；还有没决定的人会拦住</text>
+            </view>
+            <text class="rc-tag ok">可执行</text>
+          </view>
+          <view class="rc-row" wx:if="{{resultPublished && !archived}}" hover-class="pressed" bindtap="onArchive">
+            <view class="grow">
+              <text class="rc-opt-t">归档批次</text>
+              <text class="rc-opt-d">归档后整批只读，移到「已归档」</text>
+            </view>
+            <text class="rc-tag ok">可执行</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="rc-layer">
+        <view class="rc-note">{{archived
+          ? '已归档批次整份只读：名称、题目、报名记录都不能再改。'
+          : (canManage
+              ? (lockedTitle
+                  ? '发布后名称与题目结构锁定；报名开始或手动截止后时间锁定。要改就回「批次管理」新建一份草稿。'
+                  : '草稿批次可以随时改；发布后名称与题目锁死，报名开始后时间锁死。')
+              : '只有超管能改配置；你能看批次、审报名、安排面试。')}}</view>
+      </view>
+      <view class="rc-pad"></view>
     </block>
-  </view>
-
-  <!-- 问题编辑弹层 -->
-  <view class="mask" wx:if="{{qSheet}}" bindtap="onQClose"></view>
-  <view class="sheet" wx:if="{{qSheet}}">
-    <view class="sheet-hd">
-      <text class="sh-c" bindtap="onQClose">取消</text>
-      <text class="sh-t">{{qEdit >= 0 ? '编辑问题' : '添加问题'}}</text>
-      <text class="sh-k" bindtap="onQOk">完成</text>
-    </view>
-    <view class="sheet-bd">
-      <text class="f-label">题干</text>
-      <textarea class="f-area" value="{{qTitle}}" placeholder="例如：你为什么想加入广播站？" bindinput="onQTitle" />
-      <text class="f-label mt">题型</text>
-      <view class="types">
-        <view class="type {{qType === item.key ? 'on' : ''}}" wx:for="{{types}}" wx:key="key"
-              data-t="{{item.key}}" bindtap="onQType">{{item.label}}</view>
-      </view>
-      <view class="fix-hd mt">
-        <text class="fix-t">必填</text>
-        <view class="grow"></view>
-        <switch class="sw" checked="{{qReq}}" color="#0066CC" bindchange="onQReq" />
-      </view>
-      <block wx:if="{{qType === 'single' || qType === 'multiple'}}">
-        <text class="f-label mt">选项（一行一个，2～20 个）</text>
-        <textarea class="f-area tall" value="{{qOpts}}" placeholder="选项一&#10;选项二" bindinput="onQOpts" />
-      </block>
-      <text class="f-tip">题目结构在批次发布后就锁定，改不了。</text>
-    </view>
   </view>
 </view>

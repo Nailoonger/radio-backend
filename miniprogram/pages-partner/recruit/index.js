@@ -1,41 +1,49 @@
-// pages-partner/recruit/index · v1（2026-11-14 招新总览）
+// pages-partner/recruit/index · v2（2026-11-14 照 preview/partner-hub-gounucai-v174 V.recruit）
 //
-// 招新这条线的入口页：一张「当前批次」卡 + 三个下级入口。
+// ═══════════════════════════════════════════════════════════════════════════
+// 逐条对齐 v174 的 `V.recruit`：
+//   ① 一张批次卡 `.hero.lt`：名称 / 报名时间 + 介绍 / 两个 tag / **四格统计**
+//      （报名 · 待审 · 待面试 · 已拟定），下段一条 hairline 与上段分隔——
+//      v162 把原来「身份卡 + 计数卡」合成一张，不再叠两张白卡。
+//   ② 三个入口行（报名列表 / 面试安排 / 批次管理），每行右端一句补充值。
+//   ③ 页底一句 cp-note：批次由超管建，社干能看能审。
+//   ④ **这页不放任何操作**（v170 把「批次操作」整块删掉，发布/截止/归档都不在这儿）。
+// ═══════════════════════════════════════════════════════════════════════════
 //
-// ⚠️ 数据只有一处：`GET /admin/recruitment/batches?archived=false`。
-//    服务端**没有**按状态分段的口径（query 只认 archived），所以「当前批次」是前端从
-//    未归档列表里挑出来的 —— 优先 报名中 > 未开始 > 草稿 > 已截止，同档取 createdAt 最新
-//    （服务端已按 createdAt desc 排好，取第一条即可）。
+// ⚠️ 四格数字怎么来（服务端没有「总计」接口）：
+//   `GET /admin/recruitment/applications` 一次只认一个 status，返回体带 total。
+//   所以并发拉 5 次 pageSize=1，只取 total —— 比「拉一页在前端数」准，报名超过一页时前者会少。
+//   ⚠️ 批次设了统一面试安排后，status=submitted 服务端**故意返回空页**
+//      （services/recruitment.js#applications 里那句注释）⇒ 待审显示 0 是对的，不是 bug。
 //
-// ⚠️ 名额/报名人数：服务端 admin 侧只给 `unresolvedCount`（还没定结果的条数），
-//    **没有总报名数**。所以卡片上只写「待定 N 人」，不写「共 N 人」——不编数据。
-//
-// ⚠️ 社干能进这一页（asAdmin 放行列表与详情），但新建/发布/截止/删除全是 asSuper。
-//    所以「新建批次」只给超管，其余人看到的是一句「等超管开批次」。
+// ⚠️ 社干看不到「新建批次」：createBatch 是 asSuper。入口不摆出来，免得点了才被 40301 拦。
 
-const { adminRequest } = require('../../utils/request.js');
+const { adminRequest, isConflict, isVersionConflict } = require('../../utils/request.js');
 const partnerRole = require('../../utils/partnerRole.js');
 const { fmtIso } = require('../../utils/format.js');
 
-const WINDOW_TEXT = { draft: '草稿', upcoming: '未开始', open: '报名中', closed: '已截止' };
-/* 挑「当前批次」的顺序：正在报名的最要紧，其次马上要开的，再次草稿，最后刚截止的 */
-const PICK_ORDER = ['open', 'upcoming', 'draft', 'closed'];
+const STATE_TEXT = { draft: '草稿', upcoming: '未开始', open: '报名中', closed: '已截止' };
+/* 状态 → v174 的 tag 色调：报名中 ok（accent 浅底）/ 草稿 warn / 已截止 no / 未开始 gray */
+const STATE_CLS = { draft: 'warn', upcoming: 'gray', open: 'ok', closed: 'no' };
+/* 挑「当前批次」的顺序：正在报名 > 马上开 > 草稿 > 刚截止（服务端已按 createdAt desc 排好） */
+const PICK = ['open', 'upcoming', 'draft', 'closed'];
+const STATUSES = ['submitted', 'interview', 'accepted', 'rejected', 'withdrawn'];
 
 function shortDay(iso) {
-  const s = fmtIso(iso);            // 'MM-DD HH:mm'（取墙钟字段，不做时区换算）
-  return s ? s.slice(0, 5) : '未设置';
+  const s = fmtIso(iso);                 // 'MM-DD HH:mm'
+  return s ? s.slice(0, 5) : '';
 }
 
 Page({
   data: {
     statusBarHeight: 20,
     loading: true,
-    ready: false,
-    canManage: false,
-    batch: null,
-    entries: [],
-    hasAny: false,
     err: '',
+    roleKey: '',
+    canManage: false,
+    b: null,
+    rows: [],
+    batchCount: 0,
   },
 
   onLoad() {
@@ -45,24 +53,22 @@ Page({
       return;
     }
     const info = (app.globalData && app.globalData.adminInfo) || {};
-    const roleNum = partnerRole.known(partnerRole.role()) ? partnerRole.role() : Number(info.role);
+    const r = partnerRole.known(partnerRole.role()) ? partnerRole.role() : Number(info.role);
     this.setData({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
-      canManage: roleNum === 0,
+      roleKey: partnerRole.roleKeyOf(r),
+      canManage: r === 0,
     });
     if (!partnerRole.known(partnerRole.role())) {
-      partnerRole.ensure().then((r) => {
-        if (r === 0 && !this.data.canManage) this.setData({ canManage: true });
+      partnerRole.ensure().then((n) => {
+        if (n === 0) this.setData({ canManage: true, roleKey: 'super' });
+        else if (partnerRole.known(n)) this.setData({ roleKey: partnerRole.roleKeyOf(n) });
       });
     }
     this.load();
   },
 
-  onShow() {
-    /* 从配置页返回时批次可能已经改了（发布/截止），回来重拉一次 */
-    if (this.data.ready) this.load();
-  },
-
+  onShow() { if (this._ready) this.load(); },
   onPullDownRefresh() { this.load().then(() => wx.stopPullDownRefresh()); },
 
   goBack() {
@@ -72,81 +78,101 @@ Page({
   },
 
   load() {
-    this.setData({ loading: true, err: '' });
-    return adminRequest('/admin/recruitment/batches?archived=false&pageSize=20', 'GET')
+    this.setData({ loading: !this._ready, err: '' });
+    return adminRequest('/admin/recruitment/batches?archived=false&pageSize=50', 'GET')
       .then((d) => {
         const items = ((d && d.items) || []).map((x) => ({
           id: x.id,
           title: x.title || '未命名批次',
           state: x.windowState,
-          stateText: WINDOW_TEXT[x.windowState] || x.windowState,
-          range: shortDay(x.opensAt) + ' — ' + shortDay(x.closesAt),
-          unresolved: Number(x.unresolvedCount) || 0,
+          published: !!x.publishedAt,
           archived: !!x.archivedAt,
           resultPublished: !!x.resultPublishedAt,
-          published: !!x.publishedAt,
           orderGenerated: !!x.orderGeneratedAt,
-          orderCount: Number(x.interviewOrderCount) || 0,
+          range: shortDay(x.opensAt) && shortDay(x.closesAt)
+            ? `${shortDay(x.opensAt)} ~ ${shortDay(x.closesAt)}` : '时间未设置',
+          intro: x.intro || '',
+          version: x.version,
+          interview: x.interview || null,
         }));
-        let batch = null;
-        for (let i = 0; i < PICK_ORDER.length && !batch; i += 1) {
-          batch = items.find((x) => x.state === PICK_ORDER[i]) || null;
+        let cur = null;
+        for (let i = 0; i < PICK.length && !cur; i += 1) cur = items.find((x) => x.state === PICK[i]) || null;
+        this.setData({ batchCount: items.length });
+        if (!cur) {
+          this._ready = true;
+          this.setData({
+            loading: false,
+            b: null,
+            rows: [{ key: 'batches', t: '批次管理', d: `共 ${items.length} 个批次` }],
+          });
+          return null;
         }
-        this.setData({
-          loading: false,
-          ready: true,
-          hasAny: items.length > 0,
-          batch,
-          entries: this.buildEntries(batch),
-        });
+        return this.loadCounts(cur, items.length);
       })
       .catch((err) => {
-        this.setData({ loading: false, ready: true, err: (err && err.message) || '加载失败' });
+        this.setData({ loading: false, err: (err && err.message) || '加载失败' });
       });
   },
 
-  /* 入口行：没有当前批次时只留「批次管理」，不做点进去空转的假入口。
-     ⚠️ 「面试顺序」只在批次**发布过**之后出现 —— 草稿/未开始时打开只会是空名单，
-        跟电脑端一致（Recruitment.vue: `v-if="selectedBatch.publishedAt"`）。 */
-  buildEntries(batch) {
-    const rows = [];
-    if (batch) {
-      rows.push({ key: 'list', t: '报名列表', d: '待审 · 待面试 · 拟录取', n: batch.unresolved, u: '待定' });
-      if (batch.published) {
-        rows.push({
-          key: 'order',
-          t: '面试顺序',
-          d: batch.orderGenerated ? '叫号名单 · 可导出' : '截止后生成随机顺序',
-          n: batch.orderGenerated ? batch.orderCount : null,
-          u: '人',
+  /* 四格数字：并发拉 5 个 status 的 total（pageSize=1，只要数） */
+  loadCounts(cur, batchCount) {
+    this._ready = true;
+    const base = `/admin/recruitment/applications?batchId=${encodeURIComponent(cur.id)}&page=1&pageSize=1`;
+    return Promise.all(STATUSES.map((s) => adminRequest(`${base}&status=${s}`, 'GET')
+      .then((r) => Number((r && r.total) || 0))
+      .catch(() => 0)))
+      .then((n) => {
+        const submitted = n[0];
+        const interview = n[1];
+        const accepted = n[2];
+        const rejected = n[3];
+        const withdrawn = n[4];
+        const all = submitted + interview + accepted + rejected + withdrawn;
+        const decided = accepted + rejected;
+        const itv = cur.interview || null;
+        const planText = itv && itv.at ? `统一 ${fmtIso(itv.at)}` : '统一未安排';
+        this.setData({
+          loading: false,
+          b: {
+            id: cur.id,
+            title: cur.title,
+            state: cur.state,
+            stateText: STATE_TEXT[cur.state] || cur.state,
+            stateCls: STATE_CLS[cur.state] || 'gray',
+            range: cur.range,
+            intro: cur.intro,
+            resultText: cur.resultPublished ? '结果已发布' : '结果未发布',
+            resultCls: cur.resultPublished ? 'done' : 'gray',
+            numbers: [
+              { l: '报名', n: String(all) },
+              { l: '待审', n: String(submitted) },
+              { l: '待面试', n: String(interview) },
+              { l: '已拟定', n: String(decided) },
+            ],
+          },
+          rows: [
+            { key: 'list', t: '报名列表', d: `${all} 人 · 待审 ${submitted}` },
+            { key: 'interview', t: '面试安排', d: `${planText} · ${cur.orderGenerated ? '序号已生成' : '序号未生成'}` },
+            { key: 'batches', t: '批次管理', d: `共 ${batchCount} 个批次` },
+          ],
         });
-      }
-      rows.push({ key: 'config', t: '批次配置', d: '报名时间 · 固定信息 · 题目', n: null, u: '' });
-    }
-    rows.push({ key: 'batches', t: '批次管理', d: '进行中 · 已截止 · 已归档', n: null, u: '' });
-    return rows;
+      })
+      .catch((err) => {
+        this.setData({ loading: false, err: (err && err.message) || '加载失败' });
+      });
   },
 
-  onEntry(e) {
+  onRow(e) {
     const key = e.currentTarget.dataset.key;
-    const batch = this.data.batch;
+    const b = this.data.b;
     if (key === 'batches') { wx.navigateTo({ url: '/pages-partner/recruit/batches/batches' }); return; }
-    if (!batch) return;
+    if (!b) return;
     if (key === 'list') {
-      wx.navigateTo({ url: `/pages-partner/recruit/list/list?batchId=${batch.id}` });
+      wx.navigateTo({ url: `/pages-partner/recruit/list/list?batchId=${b.id}` });
       return;
     }
-    if (key === 'config') {
-      wx.navigateTo({ url: `/pages-partner/recruit/config/config?batchId=${batch.id}` });
-      return;
+    if (key === 'interview') {
+      wx.navigateTo({ url: `/pages-partner/recruit/interview/interview?batchId=${b.id}` });
     }
-    if (key === 'order') {
-      wx.navigateTo({ url: `/pages-partner/recruit/order/order?batchId=${batch.id}` });
-    }
-  },
-
-  onNew() {
-    if (!this.data.canManage) return;
-    wx.navigateTo({ url: '/pages-partner/recruit/batches/batches?create=1' });
   },
 });

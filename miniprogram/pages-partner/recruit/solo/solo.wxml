@@ -1,0 +1,71 @@
+<!-- pages-partner/recruit/solo/solo.wxml · v1（2026-11-14 照 v174 V['recruit-solo']）
+     只覆盖这一个人的面试时间，批次统一安排保持不变。
+     ⚠️ 时间用两个 picker（日期 + 时刻）而不是填字符串 —— 真机上敲「11-04 17:20」太容易打歪。 -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">单人面试配置</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <view class="rc-hint" wx:if="{{loading}}">正在加载……</view>
+    <view class="rc-hint err" wx:elif="{{err}}">{{err}}</view>
+
+    <block wx:elif="{{a}}">
+      <!-- ① 报名人 -->
+      <view class="rc-layer">
+        <view class="rc-blk rc-pod">
+          <view class="rc-pod-hd">
+            <view class="rc-pod-av">{{a.initial}}</view>
+            <view class="grow">
+              <text class="rc-pod-nm">{{a.name}}</text>
+              <text class="rc-pod-sub">{{a.grade}}{{a.className ? ' · ' + a.className : ''}}{{a.qq ? ' · QQ ' + a.qq : ''}}</text>
+            </view>
+            <text class="rc-tag ok" wx:if="{{custom}}">单独配置</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- ② 表单 -->
+      <view class="rc-layer">
+        <view class="rc-blk">
+          <view class="rc-blk-h">
+            <text class="t">{{custom ? '改单独配置' : '单独配置'}}</text>
+            <text class="more">{{batchPlanAt ? '批次统一 ' + batchPlanAt : '批次未安排'}}</text>
+          </view>
+          <view class="rc-frow">
+            <view class="rc-fhalf">
+              <text class="rc-lb">面试日期</text>
+              <picker mode="date" value="{{date}}" bindchange="onDate">
+                <view class="rc-inp">{{date || '选择'}}</view>
+              </picker>
+            </view>
+            <view class="rc-fhalf">
+              <text class="rc-lb">时刻</text>
+              <picker mode="time" value="{{time}}" bindchange="onTime">
+                <view class="rc-inp">{{time || '选择'}}</view>
+              </picker>
+            </view>
+          </view>
+          <text class="rc-lb mt">面试地点</text>
+          <input class="rc-inp" value="{{place}}" placeholder="例如：教学楼 301 广播室" bindinput="onPlace" />
+          <text class="rc-lb mt">面试说明（报名者可见）</text>
+          <textarea class="rc-area" value="{{note}}" maxlength="2000"
+                    placeholder="例如：试音两段，各 1 分钟" bindinput="onNote" />
+          <view class="rc-btnrow mt">
+            <button class="rc-btn rc-btn-primary" hover-class="pressed" bindtap="onSave"
+                    disabled="{{saving}}">保存单独配置</button>
+            <button class="rc-btn rc-btn-ghost" wx:if="{{custom}}" hover-class="pressed"
+                    bindtap="onReset">恢复统一</button>
+          </view>
+          <view class="rc-tip">单独配置只影响这一个人。清除后进度交回「已提交」，批次有统一安排时由服务端派生出「待面试」——不会留下没时间的待面试状态。</view>
+        </view>
+      </view>
+      <view class="rc-pad"></view>
+    </block>
+  </view>
+</view>

@@ -1,0 +1,148 @@
+<!-- pages-partner/recruit/interview/interview.wxml · v1（2026-11-14 照 v174 V['recruit-interview']）
+     上段：批次统一安排（超管＝表单，社干＝只读三行）
+     下段：面试顺序 + 名单（按序号排，超管点行进单人配置）
+     页底：导出完整名单 / 生成或重新生成面试顺序（超管） -->
+<view class="page">
+  <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="navbar-back" hover-class="pressed" bindtap="goBack" aria-label="返回">
+      <view class="chev"></view>
+    </view>
+    <view class="navbar-title">面试安排</view>
+    <view class="navbar-spacer"></view>
+  </view>
+
+  <view class="body">
+    <view class="rc-hint" wx:if="{{loading && !list.length}}">正在加载……</view>
+    <view class="rc-hint err" wx:elif="{{err && !list.length}}">{{err}}</view>
+
+    <block wx:else>
+      <!-- ① 批次统一安排：超管表单 -->
+      <view class="rc-layer" wx:if="{{canManage}}">
+        <view class="rc-blk">
+          <view class="rc-blk-h">
+            <text class="t">批次统一安排</text>
+            <text class="more">{{savedPlan ? '已发布' : '未安排'}}</text>
+          </view>
+          <view class="rc-frow">
+            <view class="rc-fhalf">
+              <text class="rc-lb">面试日期</text>
+              <picker mode="date" value="{{planDate}}" bindchange="onPlanDate">
+                <view class="rc-inp">{{planDate || '选择'}}</view>
+              </picker>
+            </view>
+            <view class="rc-fhalf">
+              <text class="rc-lb">时刻</text>
+              <picker mode="time" value="{{planTime}}" bindchange="onPlanTime">
+                <view class="rc-inp">{{planTime || '选择'}}</view>
+              </picker>
+            </view>
+          </view>
+          <text class="rc-lb mt">面试地点</text>
+          <input class="rc-inp" value="{{planPlace}}" placeholder="例如：教学楼 301 广播室" bindinput="onPlanPlace" />
+          <text class="rc-lb mt">面试说明（报名者可见）</text>
+          <textarea class="rc-area" value="{{planNote}}" maxlength="2000"
+                    placeholder="例如：带一段自我介绍，每人 5 分钟" bindinput="onPlanNote" />
+          <view class="rc-btnrow mt">
+            <button class="rc-btn rc-btn-primary" hover-class="pressed" bindtap="onSavePlan"
+                    disabled="{{savingPlan}}">{{savedPlan ? '更新统一安排' : '发布统一安排'}}</button>
+            <button class="rc-btn rc-btn-ghost" wx:if="{{savedPlan}}" hover-class="pressed"
+                    bindtap="onClearPlan">清除</button>
+          </view>
+          <view class="rc-tip">统一安排只作用于没单独配置过的报名；单个人的时间在名单里点进去改。</view>
+        </view>
+      </view>
+
+      <!-- ① 批次统一安排：社干只读三行 -->
+      <view class="rc-layer" wx:else>
+        <view class="rc-blk">
+          <view class="rc-blk-h"><text class="t">批次统一安排</text><text class="more">超管维护</text></view>
+          <view class="rc-kv">
+            <text class="k">面试时间</text>
+            <text class="v">{{planAt || '未安排'}}</text>
+          </view>
+          <view class="rc-kv">
+            <text class="k">面试地点</text>
+            <text class="v">{{savedPlan ? (planPlace || '未定') : '—'}}</text>
+          </view>
+          <view class="rc-kv">
+            <text class="k">面试说明</text>
+            <text class="v">{{savedPlan ? (planNote || '—') : '—'}}</text>
+          </view>
+          <view class="rc-tip">统一安排与单人覆盖都只有超管能改，这里只读。</view>
+        </view>
+      </view>
+
+      <!-- ② 名单抬头 -->
+      <view class="rc-layer">
+        <view class="rc-hero">
+          <text class="today">{{generated ? '面试顺序 · 已固定 ' + total + ' 人' : '面试顺序 · 还没生成'}}</text>
+          <text class="bigd">{{generated
+            ? '随机洗牌生成于 ' + generatedAt + ' · 刷新与翻页保持同一顺序'
+            : '报名截止后由超管生成；生成后序号固定不变'}}</text>
+          <view class="rc-hero-tags">
+            <text class="rc-tag {{savedPlan ? 'ok' : 'gray'}}">{{savedPlan ? '统一 ' + planAt : '时间未安排'}}</text>
+            <text class="rc-tag" wx:if="{{customCount}}">单人覆盖 {{customCount}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- ③ 名单 -->
+      <view class="rc-layer">
+        <view class="rc-rows" wx:if="{{list.length}}">
+          <view class="rc-row rc-row-top" wx:for="{{list}}" wx:key="id" hover-class="pressed"
+                data-id="{{item.id}}" bindtap="onRow">
+            <text class="rc-seq {{item.seqW}}">{{item.seq}}</text>
+            <view class="grow">
+              <view class="rc-t1">
+                <b>{{item.name}}</b>
+                <text class="rc-tag {{item.statusCls}}">{{item.statusText}}</text>
+                <text class="rc-tag ok" wx:if="{{item.custom}}">单独配置</text>
+              </view>
+              <text class="rc-t2">{{item.grade}}{{item.className ? ' · ' + item.className : ''}}{{item.qq ? ' · QQ ' + item.qq : ''}}</text>
+              <text class="rc-t3" wx:if="{{item.at}}">面试 {{item.at}}{{item.place ? ' · ' + item.place : ''}}</text>
+              <text class="rc-t3" wx:else>面试时间待安排</text>
+            </view>
+            <view class="chev-r" wx:if="{{canManage}}"></view>
+          </view>
+        </view>
+
+        <view class="rc-blk" wx:else>
+          <view class="rc-empty">
+            <b>{{generated ? '面试名单为空' : '还没有面试顺序'}}</b>
+            <span>{{generated
+              ? '这批里的有效报名已经全部撤回或拟不录取。'
+              : (canGenerate ? '报名截止后，把有效报名洗牌生成序号；面试当天按这个顺序叫号。' : '等超管在报名截止后生成顺序，生成后这里就能看。')}}</span>
+          </view>
+        </view>
+      </view>
+
+      <!-- ④ 操作：导出 / 生成 -->
+      <view class="rc-layer">
+        <view class="rc-rows">
+          <view class="rc-row" hover-class="pressed" bindtap="onExport">
+            <view class="grow">
+              <text class="rc-opt-t">导出完整名单</text>
+              <text class="rc-opt-d">.xlsx · 序号 / 姓名 / QQ / 班级 / 时间</text>
+            </view>
+            <text class="rc-tag {{generated ? 'ok' : 'gray'}}">{{exporting ? '准备中…' : (generated ? '可导出' : '未生成')}}</text>
+          </view>
+          <view class="rc-row" wx:if="{{canManage}}" hover-class="pressed" bindtap="onGenerate">
+            <view class="grow">
+              <text class="rc-opt-t">{{generated ? '重新生成面试顺序' : '生成随机面试顺序'}}</text>
+              <text class="rc-opt-d">{{canGenerate
+                ? (generated ? '会覆盖现有顺序，要再确认一次' : '按有效报名随机洗牌，序号固定不变')
+                : '报名截止后、结果发布前才能生成'}}</text>
+            </view>
+            <text class="rc-tag {{canGenerate ? 'ok' : 'gray'}}">{{canGenerate ? '可执行' : '暂不可'}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="rc-layer">
+        <view class="rc-note">面试安排＝批次统一安排 + 单人覆盖：名单里点某一位只改这一个人，其余人跟着统一安排走。候选＝全部有效报名（排除拟不录取），随机洗牌后序号固定；重新生成只在结果发布前，会整份替换。清除统一安排后，没单独配置的人会退回「已提交」。</view>
+      </view>
+      <view class="rc-pad"></view>
+    </block>
+  </view>
+</view>

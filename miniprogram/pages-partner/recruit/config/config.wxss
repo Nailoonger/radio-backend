@@ -1,107 +1,24 @@
-/* pages-partner/recruit/config.wxss · v1（2026-11-14 批次配置）
-   ⚠️ 按钮类名只认 .btn + .btn-primary/.btn-ghost（连字符）——
-     写 .btn.primary 会得到一个没有底色的空块，而且不报错。 */
-.page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
-.body { flex: 1; padding: 19rpx 35rpx 80rpx; display: flex; flex-direction: column; gap: 23rpx; }
+/* pages-partner/recruit/config/config.wxss · v2（2026-11-14）
+   度量全在 styles/recruit.wxss（招新八屏共用），这里只放页面壳。 */
+@import "../../../styles/recruit.wxss";
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--parchment);
+}
+.body {
+  flex: 1;
+  padding: 19rpx 35rpx 46rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 23rpx;
+}
 .chev {
   width: 18rpx; height: 18rpx;
   border-left: 4rpx solid var(--ink-2);
   border-bottom: 4rpx solid var(--ink-2);
-  transform: rotate(-135deg); flex: none;
+  transform: rotate(-135deg);
+  flex: none;
 }
-.hint-note { font-size: 23rpx; color: #76767E; text-align: center; padding: 60rpx 0; }
-
-.state { display: flex; align-items: center; gap: 14rpx; padding: 0 4rpx; }
-.state-t { font-size: 21rpx; color: #76767E; }
-
-.card { background: #FFFFFF; border-radius: 35rpx; padding: 28rpx 31rpx 30rpx; display: flex; flex-direction: column; }
-.card-hd { display: flex; align-items: center; gap: 12rpx; margin-bottom: 6rpx; }
-.hd-t { flex: 1; font-size: 27rpx; font-weight: 600; color: #1D1D1F; }
-.hd-s { font-size: 21rpx; color: #76767E; }
-
-.f-label { font-size: 21rpx; color: #76767E; margin-bottom: 10rpx; display: block; }
-.f-label.mt { margin-top: 20rpx; }
-.f-input {
-  background: #F5F5F7; border-radius: 23rpx;
-  padding: 22rpx 26rpx; font-size: 26rpx; color: #1D1D1F;
-  min-height: 86rpx; box-sizing: border-box;
-}
-.f-input.ro { color: #76767E; }
-.f-area {
-  background: #F5F5F7; border-radius: 23rpx;
-  padding: 22rpx 26rpx; font-size: 26rpx; color: #1D1D1F;
-  width: 100%; box-sizing: border-box; height: 130rpx;
-}
-.f-area.tall { height: 200rpx; }
-.f-row { display: flex; gap: 18rpx; margin-top: 18rpx; }
-.f-half { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.f-tip { font-size: 21rpx; color: #76767E; line-height: 1.7; margin-top: 14rpx; }
-.grow { flex: 1; }
-
-/* 固定信息 */
-.fix + .fix { border-top: 2rpx solid #F0F0F0; margin-top: 8rpx; padding-top: 8rpx; }
-.fix-hd { display: flex; align-items: center; gap: 12rpx; padding: 12rpx 0; }
-.fix-t { flex: 1; font-size: 26rpx; color: #1D1D1F; }
-.fix-s { font-size: 21rpx; color: #76767E; }
-.sw { transform: scale(.8); transform-origin: right center; }
-
-.chips { display: flex; flex-wrap: wrap; gap: 12rpx; padding-bottom: 12rpx; }
-.chip-x {
-  display: flex; align-items: center; gap: 8rpx;
-  background: #F5F5F7; border-radius: 9999rpx;
-  padding: 10rpx 18rpx; font-size: 23rpx; color: #1D1D1F;
-}
-.chip-x .x { color: #C7C7CC; font-size: 20rpx; padding-left: 2rpx; }
-.chip-add {
-  align-self: flex-start;
-  font-size: 23rpx; color: #0066CC;
-  padding: 10rpx 18rpx; border-radius: 9999rpx;
-  border: 2rpx dashed #B9D2EE;
-}
-
-/* 问题列表 */
-.q { display: flex; align-items: flex-start; gap: 12rpx; padding: 18rpx 0; border-top: 2rpx solid #F0F0F0; }
-.q:first-of-type { border-top: 0; }
-.q-no { flex: none; font-size: 21rpx; color: #C7C7CC; padding-top: 4rpx; font-variant-numeric: tabular-nums; }
-.q-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6rpx; }
-.q-t { font-size: 25rpx; color: #1D1D1F; line-height: 1.5; }
-.q-s { font-size: 21rpx; color: #76767E; line-height: 1.5; }
-.q-a { flex: none; font-size: 23rpx; color: #0066CC; padding: 4rpx 0 4rpx 8rpx; }
-.q-d { flex: none; font-size: 23rpx; color: #B42318; padding: 4rpx 0 4rpx 8rpx; }
-.empty-q { font-size: 23rpx; color: #76767E; padding: 18rpx 0; }
-.mt-btn { margin-top: 18rpx; }
-
-/* 动作 */
-.acts { display: flex; flex-direction: column; gap: 16rpx; }
-.acts button.btn { width: 100%; }
-.row-btns { display: flex; gap: 16rpx; margin-top: 22rpx; }
-.flex1 { flex: 1; min-width: 0; }
-button.btn.flex1 { width: auto; font-size: 26rpx; padding: 20rpx 0; }
-.note { font-size: 21rpx; color: #76767E; line-height: 1.7; text-align: center; padding: 0 20rpx; }
-
-/* 弹层 */
-.mask { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.32); z-index: 90; }
-.sheet {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 91; background: #FFFFFF;
-  border-radius: 40rpx 40rpx 0 0; padding-bottom: 40rpx;
-  display: flex; flex-direction: column; max-height: 84vh;
-  animation: sheetUp 0.22s var(--ease, ease-out);
-}
-@keyframes sheetUp { from { transform: translateY(40rpx); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-.sheet-hd {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 30rpx 31rpx; border-bottom: 2rpx solid #F0F0F0;
-}
-.sh-c { font-size: 27rpx; color: #76767E; }
-.sh-t { font-size: 29rpx; font-weight: 600; color: #1D1D1F; }
-.sh-k { font-size: 27rpx; color: #0066CC; font-weight: 600; }
-.sheet-bd { padding: 26rpx 31rpx 8rpx; overflow-y: auto; display: flex; flex-direction: column; }
-
-/* 题型四段 */
-.types { display: flex; gap: 12rpx; }
-.type {
-  flex: 1; min-width: 0; text-align: center;
-  font-size: 23rpx; color: #76767E;
-  background: #F5F5F7; border-radius: 16rpx; padding: 18rpx 0;
-}
-.type.on { background: var(--accent-tint); color: #0066CC; font-weight: 600; }

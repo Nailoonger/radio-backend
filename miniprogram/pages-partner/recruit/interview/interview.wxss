@@ -1,0 +1,24 @@
+/* pages-partner/recruit/interview/interview.wxss · v1（2026-11-14）
+   度量全在 styles/recruit.wxss（招新八屏共用），这里只放页面壳。 */
+@import "../../../styles/recruit.wxss";
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--parchment);
+}
+.body {
+  flex: 1;
+  padding: 19rpx 35rpx 46rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 23rpx;
+}
+.chev {
+  width: 18rpx; height: 18rpx;
+  border-left: 4rpx solid var(--ink-2);
+  border-bottom: 4rpx solid var(--ink-2);
+  transform: rotate(-135deg);
+  flex: none;
+}

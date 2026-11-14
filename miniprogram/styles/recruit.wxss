@@ -1,0 +1,949 @@
+/* styles/recruit.wxss · 伙伴端招新的共用样式（2026-11-14）
+ *
+ * ═══════════════════════════════════════════════════════════════════
+ * 事实源：`preview/partner-hub-gounucai-v174/app.html` 的招新八屏
+ *   recruit / recruit-batches / recruit-config / recruit-q
+ *   recruit-list / recruit-detail / recruit-interview / recruit-solo
+ * 尺寸换算：设计稿 390pt 出图，1px ≈ 1.923rpx。下面每条都标了原 px。
+ * ═══════════════════════════════════════════════════════════════════
+ *
+ * ⚠️⚠️ 类名一律 `rc-` 前缀，**不复用 app.wxss 的 .tag / .row / .rows**：
+ *   app.wxss 的 .tag 是全圆胶囊 + 24rpx 字，而 v174 的招新状态标签是
+ *   **小方角灰块**（radius 7px = 13rpx、10px 字 = 19rpx）。同名会让两套口径互相压。
+ *
+ * ⚠️⚠️ 所有按钮写 `button.rc-btn`，不能只写 `.rc-btn`：
+ *   app.wxss 的 `button.btn{display:block;width:auto}` 特异性 (0,1,1) 会静默压掉
+ *   单类 `.rc-btn`(0,1,0) 的 display:flex ⇒ 退化成块级行盒，文字贴上沿。
+ *
+ * 层级（对应 v174 的 `sec(n, html)`）：一页拆成若干 `.rc-layer`，层间 12px = 23rpx。
+ */
+
+/* ═══════════ 层级 ═══════════ */
+.rc-layer { display: block; }
+.rc-layer + .rc-layer { margin-top: 23rpx; }
+
+/* ═══════════ 白卡（v174 .blk / .hero）═══════════ */
+.rc-blk {
+  background: #FFFFFF;
+  border-radius: 34rpx;          /* 18px */
+  padding: 0 31rpx 8rpx;         /* 0 16 4 */
+}
+.rc-blk-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 31rpx 0 23rpx;        /* 16 0 12 */
+}
+.rc-blk-h .t { font-size: 27rpx; font-weight: 600; }   /* 14px */
+.rc-blk-h .more { font-size: 21rpx; color: var(--accent); }  /* 11px */
+
+/* hero：总览那张批次卡（v174 .hero.lt，白底深字） */
+.rc-hero {
+  background: #FFFFFF;
+  border-radius: 34rpx;
+  padding: 35rpx;                /* 18px */
+  overflow: hidden;
+}
+.rc-hero .today {
+  display: block;
+  font-size: 29rpx;              /* 15px */
+  font-weight: 500;
+  margin-top: 12rpx;             /* 6px */
+  line-height: 1.6;
+}
+.rc-hero .bigd {
+  display: block;
+  font-size: 23rpx;              /* 12px */
+  color: var(--muted);
+  line-height: 1.8;
+  margin-top: 13rpx;             /* 7px */
+}
+
+/* ═══════════ 卡内列表（v174 .rows / .row）═══════════ */
+.rc-rows {
+  background: #FFFFFF;
+  border-radius: 34rpx;
+  padding: 0 31rpx;
+}
+.rc-row {
+  display: flex;
+  align-items: center;
+  gap: 19rpx;                    /* 10px */
+  padding: 31rpx 0;              /* 16px */
+  min-height: 108rpx;
+  box-sizing: border-box;
+}
+.rc-row + .rc-row { border-top: 2rpx solid var(--hairline); }   /* 1px */
+.rc-row-top { align-items: flex-start; flex-wrap: wrap; row-gap: 15rpx; }
+.rc-row .grow { flex: 1; min-width: 0; }
+.rc-row .sp { flex: 1; }
+.rc-row .rv { font-size: 23rpx; color: var(--muted); }          /* 12px */
+
+/* 行内三行文字：主 / 次 / 补 */
+.rc-t1 { display: flex; align-items: center; gap: 13rpx; flex-wrap: wrap; }
+.rc-t1 b { font-size: 26rpx; font-weight: 500; }                /* 13.5px */
+.rc-t2 { display: block; font-size: 21rpx; color: var(--muted); margin-top: 10rpx; }  /* 11px / 5px */
+.rc-t3 { display: block; font-size: 20rpx; color: var(--soft); margin-top: 6rpx; }    /* 10.5px / 3px */
+.rc-t3.warn { color: #B26A00; }
+.rc-t3.num { font-variant-numeric: tabular-nums; }
+
+/* ═══════════ 状态小方角标签（v174 .tag，不是全圆胶囊）═══════════ */
+.rc-tag {
+  flex: none;
+  font-size: 19rpx;              /* 10px */
+  font-weight: 400;
+  line-height: 1.5;
+  padding: 8rpx 13rpx;           /* 4 7 */
+  border-radius: 13rpx;          /* 7px */
+  white-space: nowrap;
+  background: #E8E8ED;
+  color: #3A3A3E;
+}
+.rc-tag.warn { background: #FDF3DC; color: #B26A00; }   /* 草稿 / 待审 */
+.rc-tag.done { background: #EAF7EF; color: #1E8E4E; }   /* 拟录取 / 结果已发布 */
+.rc-tag.no   { background: #FDECEA; color: #C0392B; }   /* 拟不录取 / 已归档 */
+.rc-tag.ok   { background: var(--accent-tint); color: var(--accent); }  /* 报名中 */
+.rc-tag.gray { background: var(--parchment); color: var(--muted); }
+
+/* ═══════════ 三段下划线标签（v174 .stabs，与 review 页同一套）═══════════ */
+.rc-stabs {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 2rpx solid #E3E3E8;
+  margin: 4rpx 0 8rpx;
+}
+.rc-stab {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;                    /* 6px */
+  padding: 21rpx 8rpx 25rpx;     /* 11 4 13 */
+  font-size: 25rpx;              /* 13px */
+  color: var(--muted);
+  position: relative;
+  box-sizing: border-box;
+}
+.rc-stab .n {
+  min-width: 38rpx;
+  height: 38rpx;
+  padding: 0 12rpx;
+  border-radius: 12rpx;
+  background: #E8E8ED;
+  color: var(--muted);
+  font-size: 22rpx;
+  font-weight: 500;
+  line-height: 38rpx;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+}
+.rc-stab.on { color: var(--accent); font-weight: 600; }
+.rc-stab.on .n { background: #EAF3FD; color: var(--accent); }
+.rc-stab.on::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: -2rpx;
+  width: calc(100% - 31rpx);
+  max-width: 165rpx;
+  height: 4rpx;
+  border-radius: 4rpx;
+  background: var(--accent);
+}
+
+/* ═══════════ 小方角筛选块（v174 .ftags）═══════════ */
+.rc-ftags { display: flex; gap: 15rpx; flex-wrap: wrap; }
+.rc-ftag {
+  background: #EBEBEF;           /* 比页面底深一档，未选中也看得见是胶囊 */
+  border-radius: 15rpx;          /* 8px */
+  padding: 14rpx 28rpx;          /* 7 14 */
+  font-size: 22rpx;              /* 11.5px */
+  color: #5F5F66;
+  line-height: 1;
+  flex: none;
+}
+.rc-ftag.on { background: #EAF3FD; color: var(--accent); font-weight: 600; }
+.rc-ftag .n { margin-left: 8rpx; font-variant-numeric: tabular-nums; opacity: .72; }
+
+/* ═══════════ 三个分开的圆胶囊（v174 .rt-pills）═══════════ */
+.rc-pills { display: flex; gap: 15rpx; }   /* 8px */
+.rc-pill {
+  flex: 1;
+  min-width: 0;
+  height: 85rpx;                 /* 44px */
+  border-radius: 9999rpx;
+  background: #E8E8ED;
+  font-size: 25rpx;              /* 13px */
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  line-height: 1;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+.rc-pill.on { background: var(--accent-tint); color: var(--accent); font-weight: 600; }
+
+/* ═══════════ 按钮（都是全圆胶囊）═══════════ */
+button.rc-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 92rpx;             /* 48px */
+  padding: 0 27rpx;
+  margin: 0;
+  border: 0;
+  border-radius: 9999rpx;
+  font-size: 26rpx;              /* 13.5px */
+  font-weight: 500;
+  line-height: 1;
+  box-sizing: border-box;
+}
+button.rc-btn::after { border: 0; }         /* 去掉微信默认的 1px 描边 */
+button.rc-btn-primary { background: var(--accent); color: #FFFFFF; }
+button.rc-btn-primary[disabled] { background: #B9D2EE; color: #FFFFFF; }
+button.rc-btn-ghost {
+  background: #FFFFFF;
+  color: var(--accent);
+  border: 2rpx solid var(--hairline);       /* ghost 必须有边界线，浅底上才看得出可点 */
+}
+button.rc-btn-ghost[disabled] { color: var(--soft); border-color: var(--divider); }
+
+/* 竖排按钮组（v174 .btnrow 竖着用） */
+.rc-btnrow { display: flex; align-items: stretch; gap: 15rpx; }
+.rc-btnrow button.rc-btn { flex: 1 1 0; min-width: 0; }
+
+/* ═══════════ 说明文字（v174 .cp-note）═══════════ */
+.rc-note {
+  margin-top: 19rpx;             /* 10px */
+  font-size: 21rpx;              /* 11px */
+  line-height: 1.7;
+  color: var(--muted);
+  padding: 0 8rpx;
+}
+
+/* ═══════════ 区块小标题（v174 .mh）═══════════ */
+.rc-mh {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 4rpx 19rpx;         /* 0 2 10 */
+}
+.rc-mh .t { font-size: 27rpx; font-weight: 600; line-height: 1.7; }
+.rc-mh .n { font-size: 19rpx; color: var(--muted); line-height: 1.7; }
+
+/* ═══════════ 键值行（v174 .kv：分隔线在**上**边，不是下边）═══════════ */
+.rc-kv {
+  display: flex;
+  gap: 19rpx;
+  padding: 25rpx 0;              /* 13px */
+  font-size: 23rpx;              /* 12px */
+  line-height: 1.6;
+  border-top: 2rpx solid var(--hairline);
+}
+.rc-kv .k { width: 142rpx; flex: none; color: var(--muted); }   /* 74px */
+.rc-kv .v { flex: 1; min-width: 0; }
+
+/* ═══════════ 报名人卡（v174 .pod-av / .pod-chip / .pod-stats）═══════════ */
+.rc-pod { padding: 31rpx; }
+.rc-pod-hd { display: flex; align-items: center; gap: 21rpx; }
+.rc-pod-av {
+  width: 73rpx; height: 73rpx; flex: none;         /* 38px */
+  border-radius: 9999rpx;
+  background: var(--parchment);
+  color: var(--ink-2);
+  font-size: 29rpx;                                /* 15px */
+  display: flex; align-items: center; justify-content: center;
+}
+.rc-pod-nm { font-size: 29rpx; font-weight: 600; line-height: 1.3; }   /* 15px */
+.rc-pod-sub { display: block; font-size: 22rpx; color: var(--muted); margin-top: 8rpx; }  /* 11.5px */
+.rc-pod-chip {
+  flex: none;
+  background: #E8E8ED;
+  color: var(--ink-2);
+  border-radius: 13rpx;                            /* 7px */
+  font-size: 19rpx;                                /* 10px */
+  padding: 8rpx 13rpx;                             /* 4 7 */
+  line-height: 1.2;
+}
+.rc-pod-stats {
+  display: flex;
+  margin-top: 29rpx;                               /* 15px */
+  padding-top: 27rpx;                              /* 14px */
+  border-top: 2rpx solid var(--hairline);
+}
+.rc-ps { flex: 1; min-width: 0; position: relative; }
+.rc-ps + .rc-ps { padding-left: 23rpx; }           /* 12px */
+.rc-ps + .rc-ps::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 4rpx; bottom: 4rpx;
+  width: 2rpx;
+  background: var(--hairline);
+}
+.rc-ps-l { font-size: 19rpx; color: var(--muted); line-height: 1; }     /* 10px */
+.rc-ps-d {
+  font-size: 24rpx;                               /* 12.5px */
+  margin-top: 12rpx;                              /* 6px */
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+.rc-ps-n {
+  font-size: 46rpx;                               /* 24px */
+  font-weight: 500;
+  letter-spacing: -1rpx;
+  margin-top: 12rpx;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══════════ 队列导航（v174 .qnav，上一条 / 下一条）═══════════ */
+.rc-qnav {
+  display: flex;
+  align-items: center;
+  gap: 19rpx;
+  padding: 0 4rpx;                /* 12px 字号见下 */
+}
+.rc-qnav .go { font-size: 23rpx; font-weight: 500; color: var(--accent); }   /* 12px */
+.rc-qnav .go.off { color: var(--soft); }
+.rc-qnav .pos {
+  flex: 1;
+  text-align: center;
+  font-size: 21rpx;               /* 11px */
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══════════ 输入框 / 标签（v174 .sn-inp / .sn-lb）═══════════ */
+.rc-lb { display: block; font-size: 23rpx; color: var(--muted); margin-bottom: 10rpx; }  /* 12px */
+.rc-inp {
+  width: 100%;
+  min-height: 85rpx;              /* 44px */
+  border: 2rpx solid var(--hairline);
+  border-radius: 23rpx;           /* 12px */
+  padding: 0 23rpx;
+  font-size: 27rpx;               /* 14px */
+  color: var(--ink);
+  background: #FFFFFF;
+  box-sizing: border-box;
+}
+.rc-area {
+  width: 100%;
+  border: 2rpx solid var(--hairline);
+  border-radius: 23rpx;
+  padding: 19rpx 23rpx;
+  font-size: 27rpx;
+  color: var(--ink);
+  background: #FFFFFF;
+  box-sizing: border-box;
+}
+.rc-inp[disabled], .rc-area[disabled] { opacity: .55; }
+
+/* ═══════════ 搜索框（v174 .rc-srch）═══════════ */
+.rc-srch {
+  display: flex;
+  align-items: center;
+  gap: 15rpx;
+  height: 81rpx;                  /* 42px */
+  padding: 0 23rpx;
+  background: #FFFFFF;
+  border-radius: 23rpx;
+  box-sizing: border-box;
+}
+.rc-srch .mg { flex: none; width: 28rpx; height: 28rpx; position: relative; }
+.rc-srch .mg::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0;
+  width: 19rpx; height: 19rpx;
+  border: 3rpx solid var(--muted);
+  border-radius: 9999rpx;
+}
+.rc-srch .mg::after {
+  content: '';
+  position: absolute;
+  right: 0; bottom: 1rpx;
+  width: 11rpx; height: 3rpx;
+  background: var(--muted);
+  transform: rotate(45deg);
+  border-radius: 3rpx;
+}
+.rc-srch input {
+  flex: 1;
+  min-width: 0;
+  height: 77rpx;
+  font-size: 26rpx;               /* 13.5px */
+  color: var(--ink);
+  border: 0;
+  background: none;
+}
+.rc-srch .clr {
+  display: none;
+  flex: none;
+  width: 36rpx; height: 36rpx;    /* 19px */
+  border-radius: 9999rpx;
+  background: #E8E8ED;
+  color: var(--muted);
+  font-size: 19rpx;
+  line-height: 1;
+  align-items: center;
+  justify-content: center;
+}
+.rc-srch.has .clr { display: flex; }
+
+/* ═══════════ 报名时间区间字段（v174 .rc-rng，点开原地展开日历）═══════════ */
+.rc-rng { position: relative; }
+.rc-rng-f {
+  display: flex;
+  align-items: center;
+  gap: 17rpx;
+  width: 100%;
+  height: 92rpx;                  /* 48px */
+  padding: 0 25rpx;
+  background: #FFFFFF;
+  border: 2rpx solid var(--hairline);
+  border-radius: 23rpx;
+  box-sizing: border-box;
+}
+.rc-rng-f .lb { flex: none; font-size: 23rpx; color: var(--muted); }
+.rc-rng-f .vl {
+  flex: 1;
+  min-width: 0;
+  font-size: 25rpx;               /* 13px */
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.2rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rc-rng-f .vl .dash { color: var(--soft); padding: 0 6rpx; }
+.rc-rng-f .cal {
+  flex: none;
+  width: 28rpx; height: 28rpx;    /* 16px 的日历轮廓 */
+  border: 3rpx solid var(--accent);
+  border-radius: 5rpx;
+  position: relative;
+}
+.rc-rng-f .cal::before {
+  content: '';
+  position: absolute;
+  left: -3rpx; right: -3rpx; top: 6rpx;
+  height: 3rpx;
+  background: var(--accent);
+}
+.rc-rng-f.off { opacity: .55; }
+
+/* 原地展开的日历层 */
+.rc-pop {
+  position: absolute;
+  left: 0; right: 0;
+  top: calc(100% + 12rpx);
+  z-index: 45;
+  background: #FFFFFF;
+  border-radius: 31rpx;           /* 16px */
+  padding: 15rpx 15rpx 19rpx;
+  box-shadow: 0 31rpx 65rpx -23rpx rgba(0, 0, 0, .30), 0 0 0 2rpx rgba(0, 0, 0, .05);
+}
+.rc-pop-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4rpx 4rpx 12rpx;
+}
+.rc-pop-hd b { font-size: 25rpx; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* ⚠️ 翻月按钮**不能叫 .nav**：全局 .nav 有 min-height:42px + padding:0 52px，
+    会把 28×28 的小圆点撑成大灰胶囊（v173 实测截到过）。这里叫 .rnav 并显式清零。 */
+.rc-pop-hd .rnav {
+  flex: none;
+  width: 54rpx; height: 54rpx;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 9999rpx;
+  background: #E8E8ED;
+  color: var(--ink);
+  font-size: 25rpx;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rc-rgrid { display: flex; flex-wrap: wrap; }
+.rc-rw {
+  width: 14.2857%;
+  text-align: center;
+  font-size: 19rpx;               /* 10px */
+  color: var(--soft);
+  padding: 4rpx 0 8rpx;
+  box-sizing: border-box;
+}
+.rc-rd {
+  width: 14.2857%;
+  height: 65rpx;                  /* 34px */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;               /* 12.5px */
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+}
+.rc-rd.blank { visibility: hidden; }
+.rc-rd.mid { background: var(--accent-tint); color: var(--accent); }
+.rc-rd.cap { background: var(--accent); color: #FFFFFF; font-weight: 600; }
+.rc-rd.a { border-radius: 17rpx 0 0 17rpx; }
+.rc-rd.b { border-radius: 0 17rpx 17rpx 0; }
+.rc-rd.solo { border-radius: 17rpx; }
+
+/* 日历下面那句说明（v174 时刻两行删掉后的替代） */
+.rc-rhint {
+  margin-top: 21rpx;
+  padding: 0 6rpx;
+  font-size: 21rpx;               /* 11px */
+  color: var(--muted);
+  line-height: 1.7;
+}
+.rc-rhint b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.rc-rfoot {
+  display: flex;
+  align-items: center;
+  gap: 15rpx;
+  margin-top: 12rpx;
+  padding: 19rpx 4rpx 0;
+  border-top: 2rpx solid var(--divider);
+}
+.rc-rfoot .grow { flex: 1; }
+.rc-rfoot .cbtn {
+  height: 65rpx;
+  padding: 0 31rpx;
+  border-radius: 9999rpx;
+  font-size: 24rpx;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+.rc-rfoot .cbtn::after { border: 0; }
+.rc-rfoot .cancel { background: #E8E8ED; color: var(--muted); }
+.rc-rfoot .ok { background: var(--accent); color: #FFFFFF; font-weight: 500; }
+.rc-rfoot .ok[disabled] { opacity: .4; }
+
+/* ═══════════ 班级下拉（v174 .rc-pick / .rc-panel，字段下方原地展开）═══════════ */
+.rc-dd { position: relative; margin-top: 17rpx; }
+.rc-pick {
+  display: flex;
+  align-items: center;
+  gap: 15rpx;
+  width: 100%;
+  height: 85rpx;                  /* 44px */
+  padding: 0 23rpx;
+  background: #FFFFFF;
+  border: 2rpx solid var(--hairline);
+  border-radius: 23rpx;
+  font-size: 26rpx;
+  color: var(--ink);
+  box-sizing: border-box;
+}
+.rc-pick .v {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: 26rpx;
+  color: var(--soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rc-pick.picked .v { color: var(--accent); font-weight: 600; }
+.rc-pick .arw {
+  flex: none;
+  width: 14rpx; height: 14rpx;
+  border-top: 4rpx solid var(--soft);
+  border-right: 4rpx solid var(--soft);
+  transform: rotate(45deg);
+}
+.rc-pick.picked .arw { border-color: var(--accent); }
+.rc-pick.open .arw { transform: rotate(135deg); }
+
+/* 面板：flex 列 + overflow:hidden ⇒ 列表自己滚，「＋ 添加班级」是固定底行。
+   ⚠️ 不能用 position:sticky 想把它钉在底部 —— 滚动容器里 sticky 不生效（v173 实测）。 */
+.rc-panel {
+  position: absolute;
+  left: 0; right: 0;
+  top: calc(100% + 12rpx);
+  z-index: 45;
+  background: #FFFFFF;
+  border-radius: 27rpx;           /* 14px */
+  padding: 12rpx;
+  max-height: 473rpx;             /* 246px */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 31rpx 65rpx -23rpx rgba(0, 0, 0, .30), 0 0 0 2rpx rgba(0, 0, 0, .05);
+  box-sizing: border-box;
+}
+.rc-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.rc-opt {
+  display: flex;
+  align-items: center;
+  gap: 15rpx;
+  height: 77rpx;                  /* 40px */
+  padding: 0 15rpx 0 0;
+  border-radius: 17rpx;
+  font-size: 26rpx;
+  color: var(--ink);
+  box-sizing: border-box;
+}
+/* ⚠️ 可点区必须挂在 .hit 上、与 ✕ 平级：把 data-* 写在行容器上，
+   点 ✕ 会先命中父行 ⇒ 变成"误选"（v173 踩过）。 */
+.rc-opt .hit {
+  display: flex;
+  align-items: center;
+  gap: 15rpx;
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  padding: 0 19rpx;
+}
+.rc-opt.on { background: var(--accent-tint); color: var(--accent); font-weight: 600; }
+.rc-opt .t { flex: 1; min-width: 0; }
+.rc-opt .ck { flex: none; font-size: 23rpx; color: var(--accent); font-weight: 600; opacity: 0; }
+.rc-opt.on .ck { opacity: 1; }
+.rc-opt .x {
+  width: 42rpx; height: 42rpx;    /* 22px */
+  flex: none;
+  border-radius: 9999rpx;
+  color: var(--soft);
+  font-size: 21rpx;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rc-opt .x:active { background: #D93025; color: #FFFFFF; }
+/* 「＋ 添加班级」是面板自己的固定底行，不跟着列表滚 */
+.rc-opt-add {
+  flex: none;
+  margin-top: 8rpx;
+  border-top: 2rpx solid var(--divider);
+  border-radius: 0 0 17rpx 17rpx;
+  color: var(--accent);
+  font-weight: 600;
+  justify-content: center;
+  padding: 0;
+  height: 77rpx;
+  display: flex;
+  align-items: center;
+}
+
+/* ═══════════ 行尾红色删除（v174 .qt-del 纯文字，不是胶囊）═══════════ */
+.rc-del {
+  flex: none;
+  font-size: 21rpx;               /* 11px */
+  line-height: 1.4;
+  color: #D93025;
+  padding: 8rpx 0 8rpx 8rpx;
+  white-space: nowrap;
+}
+.rc-del.link { color: var(--accent); }
+
+/* ═══════════ 必填开关（v174 .sw：40×24 拨杆，与电脑端同规格）═══════════ */
+.rc-sw {
+  flex: none;
+  width: 77rpx; height: 46rpx;    /* 40×24 */
+  border-radius: 9999rpx;
+  background: #DEDEE4;
+  position: relative;
+  box-sizing: border-box;
+}
+.rc-sw::after {
+  content: '';
+  position: absolute;
+  left: 4rpx; top: 4rpx;
+  width: 38rpx; height: 38rpx;
+  border-radius: 9999rpx;
+  background: #FFFFFF;
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, .18);
+  transition: transform .18s var(--ease);
+}
+.rc-sw.on { background: var(--accent); }
+.rc-sw.on::after { transform: translateX(31rpx); }
+.rc-sw.off { opacity: .45; }
+
+/* ═══════════ 空态（卡内居中两行）═══════════ */
+.rc-empty {
+  padding: 73rpx 31rpx;           /* 38px */
+  text-align: center;
+}
+.rc-empty b { display: block; font-size: 26rpx; font-weight: 600; }
+.rc-empty span {
+  display: block;
+  font-size: 22rpx;
+  color: var(--muted);
+  margin-top: 15rpx;
+  line-height: 1.8;
+}
+
+/* ═══════════ 加载 / 错误提示 ═══════════ */
+.rc-hint { font-size: 23rpx; color: var(--muted); text-align: center; padding: 115rpx 0; }
+.rc-hint.err { color: #B42318; }
+
+/* ═══════════ 底部操作位（让出 iPhone home 条）═══════════ */
+.rc-pad { height: 46rpx; }
+
+/* ═══════════ 底部抽屉（v174 .sheet，删除批次确认 / 添加班级输入用）═══════════ */
+.rc-mask {
+  position: fixed;
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(0, 0, 0, .34);
+  z-index: 120;
+}
+.rc-sheet {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 121;
+  background: #FFFFFF;
+  border-radius: 38rpx 38rpx 0 0;   /* 20px */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.rc-sheet-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 29rpx 35rpx 15rpx;
+}
+.rc-sheet-hd .c { font-size: 27rpx; color: var(--muted); }
+.rc-sheet-hd b { font-size: 29rpx; font-weight: 600; }
+.rc-sheet-hd .k { font-size: 27rpx; color: var(--accent); font-weight: 500; }
+.rc-sheet-tip {
+  padding: 0 35rpx 15rpx;
+  font-size: 21rpx;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.rc-sheet-bd { padding: 0 35rpx 31rpx; }
+.rc-sheet-ft {
+  display: flex;
+  align-items: stretch;
+  gap: 15rpx;
+  padding: 15rpx 35rpx 31rpx;
+}
+.rc-sheet-ft button {
+  flex: 1;
+  min-width: 0;
+  height: 92rpx;
+  border-radius: 9999rpx;
+  font-size: 27rpx;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  box-sizing: border-box;
+}
+.rc-sheet-ft button::after { border: 0; }
+.rc-sheet-ft .plain { background: #E8E8ED; color: var(--ink-2); }
+.rc-sheet-ft .go { background: var(--accent); color: #FFFFFF; font-weight: 500; }
+.rc-sheet-ft .go[disabled] { background: #B9D2EE; color: #FFFFFF; }
+
+/* ═══════════ 题目编辑页（v174 recruit-q）═══════════ */
+.rc-q-head { display: flex; align-items: center; gap: 15rpx; margin-bottom: 4rpx; }
+.rc-q-head .grow { flex: 1; }
+.rc-q-head .st { font-size: 21rpx; color: var(--muted); }
+
+/* 选项行：序号 + 输入框 + 删 */
+.rc-optrow { display: flex; align-items: center; gap: 15rpx; margin-bottom: 15rpx; }
+.rc-optrow .no {
+  flex: none;
+  width: 31rpx;
+  text-align: center;
+  font-size: 21rpx;
+  color: var(--soft);
+  font-variant-numeric: tabular-nums;
+}
+.rc-optrow .in {
+  flex: 1;
+  min-width: 0;
+  height: 77rpx;
+  border: 2rpx solid var(--hairline);
+  border-radius: 23rpx;
+  padding: 0 23rpx;
+  font-size: 26rpx;
+  color: var(--ink);
+  box-sizing: border-box;
+}
+.rc-optrow .del {
+  flex: none;
+  padding: 10rpx 19rpx;
+  border: 2rpx solid var(--hairline);
+  border-radius: 9999rpx;
+  font-size: 21rpx;
+  color: #D93025;
+  line-height: 1.2;
+}
+.rc-optrow .del[disabled] { opacity: .4; }
+
+/* 必填开关行 */
+.rc-swrow { display: flex; align-items: center; gap: 15rpx; margin-top: 31rpx; }
+.rc-swrow .lb { flex: 1; font-size: 25rpx; font-weight: 500; }
+.rc-swrow .hint { display: block; font-size: 21rpx; color: var(--muted); margin-top: 4rpx; line-height: 1.7; }
+
+/* 底部红色文字按钮（v174 .rc-trash） */
+.rc-trash {
+  display: block;
+  text-align: center;
+  font-size: 24rpx;
+  color: #D93025;
+  padding: 27rpx 0 0;
+  line-height: 1.4;
+}
+.rc-trash[disabled] { color: var(--soft); }
+
+/* ═══════════ 面试安排页（v174 recruit-interview）═══════════ */
+/* 序号列：按位数给档位，不靠 padding 撑（1 位 / 2 位 / 3 位） */
+.rc-seq {
+  flex: none;
+  width: 50rpx;
+  text-align: center;
+  font-size: 23rpx;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  padding-top: 4rpx;
+  box-sizing: border-box;
+}
+.rc-seq.w2 { width: 62rpx; }
+.rc-seq.w3 { width: 75rpx; }
+
+/* ═══════════ 单人面试配置（v174 recruit-solo）═══════════ */
+.rc-clock {
+  flex: none;
+  width: 28rpx; height: 28rpx;
+  border: 3rpx solid var(--soft);
+  border-radius: 9999rpx;
+  position: relative;
+}
+.rc-clock::after {
+  content: '';
+  position: absolute;
+  left: 11rpx; top: 5rpx;
+  width: 3rpx; height: 9rpx;
+  background: var(--soft);
+}
+
+/* 批次卡上那两个 tag 的排布（v174 里是 inline style margin-top:12px） */
+.rc-hero-tags { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 23rpx; }
+
+/* 入口行左侧标题（v174 那一行是 <span>文本</span>，13.5px 常规字重） */
+.rc-row-t { font-size: 26rpx; color: var(--ink); }
+
+/* ═══════════ 抽屉里的小字段（新建批次 / 删除确认共用）═══════════ */
+.rc-frow { display: flex; gap: 15rpx; margin-top: 23rpx; }
+.rc-fhalf { flex: 1; min-width: 0; }
+.rc-sheet-note {
+  font-size: 21rpx;
+  color: var(--muted);
+  line-height: 1.7;
+  margin-top: 15rpx;
+}
+
+/* ═══════════ 批次配置页专用（v174 V['recruit-config'] 的散装 inline style 收拢成类）═══════════ */
+.mt { margin-top: 23rpx; }             /* 12px 字段间距 */
+
+/* 返回条上的「‹ 批次管理」（v174 是 accent 色 13px） */
+.rc-back { font-size: 25rpx; color: var(--accent); font-weight: 500; }
+
+/* 已发布那条琥珀色警示（v174：warn-bg 底 + warn-fg 字 + 右侧下划线「新建 ›」） */
+.rc-warnbar {
+  display: flex;
+  align-items: center;
+  gap: 19rpx;
+  background: #FDF3DC;
+  color: #B26A00;
+  border-radius: 23rpx;          /* 12px */
+  padding: 19rpx 23rpx;          /* 10 12 */
+  margin-bottom: 23rpx;
+  font-size: 22rpx;              /* 11.5px */
+  line-height: 1.6;
+}
+.rc-warnbar .w { flex: 1; min-width: 0; }
+.rc-warnbar .go {
+  flex: none;
+  white-space: nowrap;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+/* 字段下方那句小字提示（v174 是 10.5px / 1.75，字色 muted） */
+.rc-tip {
+  font-size: 20rpx;
+  color: var(--muted);
+  line-height: 1.75;
+  margin-top: 15rpx;
+}
+
+/* 固定信息行：拨杆那一行 + 分隔线在上 */
+.rc-fixrow { padding: 17rpx 0; border-top: 2rpx solid var(--hairline); }
+.rc-fixrow:first-of-type { border-top: 0; }
+.rc-fixhd { display: flex; align-items: center; gap: 15rpx; }
+.rc-fixt { font-size: 25rpx; font-weight: 500; }   /* 13px */
+.rc-fixhd .req { font-size: 21rpx; color: var(--muted); margin-right: 4rpx; }
+
+/* 题目行：题号 + 题干/副行 + 编辑 + 删除 */
+.rc-q {
+  display: flex;
+  align-items: flex-start;
+  gap: 13rpx;
+  padding: 19rpx 0;
+  border-top: 2rpx solid var(--hairline);
+}
+.rc-q:first-of-type { border-top: 0; }
+.rc-q .no {
+  flex: none;
+  font-size: 21rpx;
+  color: var(--soft);
+  font-variant-numeric: tabular-nums;
+  padding-top: 4rpx;
+}
+.rc-q .grow { flex: 1; min-width: 0; }
+.rc-q-t { display: block; font-size: 25rpx; line-height: 1.5; }        /* 13px */
+.rc-q-s { display: block; font-size: 20rpx; color: var(--muted); margin-top: 8rpx; }  /* 10.5px */
+
+/* 「编辑」是纯文字 accent（不许胶囊 —— v174 明确） */
+.rc-link {
+  flex: none;
+  font-size: 21rpx;
+  color: var(--accent);
+  padding-top: 4rpx;
+  white-space: nowrap;
+}
+
+/* 批次操作行里的两行字 */
+.rc-opt-t { display: block; font-size: 25rpx; font-weight: 500; }      /* 13px */
+.rc-opt-d { display: block; font-size: 20rpx; color: var(--muted); margin-top: 6rpx; }  /* 10.5px */
+
+/* 题干输入区（v174 height:76px，字号 14px） */
+.rc-area.tall { height: 146rpx; padding-top: 17rpx; }
+
+/* ═══════════ 报名内容里的问答块（v174 是一段题干 + 一段回答，行高 1.9）═══════════ */
+.rc-qa { padding: 19rpx 0 4rpx; border-top: 2rpx solid var(--hairline); margin-top: 4rpx; }
+.rc-qa .qt { display: block; font-size: 21rpx; color: var(--muted); margin-bottom: 10rpx; }
+.rc-qa .qv { display: block; font-size: 25rpx; line-height: 1.9; }   /* 13px */

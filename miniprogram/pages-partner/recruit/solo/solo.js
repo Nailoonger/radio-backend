@@ -1,0 +1,169 @@
+// pages-partner/recruit/solo · v1（2026-11-14 照 preview/partner-hub-gounucai-v174 V['recruit-solo']）
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// v174 这一屏只干一件事：**只覆盖这一个人的面试时间**，批次统一安排保持不变。
+//   ① 报名人卡：首字头像 + 姓名 + 年级班级 · QQ + 右侧「单独配置」tag
+//   ② 表单：面试时间（日期 + 时刻）/ 地点 / 说明（报名者可见）
+//   ③ 两个动作：保存单独配置 / 恢复统一（只有已单独配置过才给）
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠️ 接口是 `PUT /admin/recruitment/applications/:id/interview`（asAdmin，带 version），
+//   不是批次级的那个 —— 批次级在「面试安排」页（`PUT /batches/:id/interview`）。
+//
+// ⚠️ `at: null` ＝清掉覆盖、退回跟批次；服务端会把这个人的进度交回「已提交」，
+//   批次有统一安排时由后端派生出「待面试」，不会留下没时间的脏状态。
+//
+// ⚠️ 每次成功必须重拉（拿到新 version），否则第二次保存必 40910。
+
+const { adminRequest, isConflict, isVersionConflict } = require('../../../utils/request.js');
+const { fmtIso } = require('../../../utils/format.js');
+
+Page({
+  data: {
+    statusBarHeight: 20,
+    loading: true,
+    err: '',
+    batchId: '',
+    id: '',
+    version: 0,
+    a: null,
+    batchPlanAt: '',
+    batchPlanPlace: '',
+    /* 表单 */
+    date: '',
+    time: '',
+    place: '',
+    note: '',
+    custom: false,
+    saving: false,
+  },
+
+  onLoad(q) {
+    const app = getApp();
+    if (!app || !app.isAdminLoggedIn || !app.isAdminLoggedIn()) {
+      wx.reLaunch({ url: '/pages-partner/login/login' });
+      return;
+    }
+    this.setData({
+      statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
+      batchId: (q && q.batchId) || '',
+      id: (q && q.id) || '',
+    });
+    this.load();
+  },
+
+  goBack() {
+    const pages = getCurrentPages();
+    if (pages.length > 1) wx.navigateBack({ delta: 1 });
+    else wx.reLaunch({ url: '/pages-partner/desk/desk' });
+  },
+
+  load() {
+    if (!this.data.id) return Promise.resolve();
+    this.setData({ loading: !this._ready, err: '' });
+    return adminRequest(`/admin/recruitment/applications/${encodeURIComponent(this.data.id)}`, 'GET')
+      .then((d) => {
+        const b = (d && d.batch) || {};
+        const own = d.interviewCustom ? (d.interview || {}) : null;
+        const batchItv = b.interview || null;
+        const at = own && own.at ? fmtIso(own.at) : '';
+        /* 没单独配置过就把批次统一那一条预填进来 —— 从这儿改，改完才是「单独配置」 */
+        const seed = at || (batchItv && batchItv.at ? fmtIso(batchItv.at) : '');
+        let date = '';
+        let time = '';
+        if (seed) {
+          const y = new Date().getFullYear();
+          date = `${y}-${String(seed).slice(0, 5)}`;
+          time = String(seed).slice(6, 11);
+        }
+        this._ready = true;
+        this.setData({
+          loading: false,
+          version: Number(d.version) || 0,
+          a: {
+            initial: String(d.name || '?').charAt(0),
+            name: d.name || '',
+            grade: d.grade || '',
+            className: d.className || '',
+            qq: d.qqNumber || '',
+          },
+          custom: !!d.interviewCustom,
+          batchPlanAt: batchItv && batchItv.at ? fmtIso(batchItv.at) : '',
+          batchPlanPlace: (batchItv && batchItv.location) || '',
+          date,
+          time,
+          place: (own ? own.location : (batchItv && batchItv.location)) || '',
+          note: (own ? own.note : (batchItv && batchItv.note)) || '',
+        });
+      })
+      .catch((err) => {
+        this.setData({ loading: false, err: (err && err.message) || '加载失败' });
+      });
+  },
+
+  onDate(e) { this.setData({ date: e.detail.value }); },
+  onTime(e) { this.setData({ time: e.detail.value }); },
+  onPlace(e) { this.setData({ place: e.detail.value }); },
+  onNote(e) { this.setData({ note: e.detail.value }); },
+
+  onSave() {
+    if (this.data.saving) return;
+    const d = this.data;
+    if (!d.date || !d.time) { wx.showToast({ title: '先选面试日期和时刻', icon: 'none' }); return; }
+    if (!String(d.place || '').trim()) { wx.showToast({ title: '面试地点不能空着', icon: 'none' }); return; }
+    this.setData({ saving: true });
+    wx.showLoading({ title: '保存中', mask: true });
+    adminRequest(`/admin/recruitment/applications/${encodeURIComponent(d.id)}/interview`, 'PUT', {
+      version: d.version,
+      at: `${d.date}T${d.time}:00+08:00`,
+      location: d.place,
+      note: d.note,
+    })
+      .then(() => {
+        wx.hideLoading();
+        this.setData({ saving: false });
+        wx.showToast({ title: '已保存单独配置', icon: 'success' });
+        this.load();
+      })
+      .catch((err) => {
+        wx.hideLoading();
+        this.setData({ saving: false });
+        if (isVersionConflict(err) || isConflict(err)) {
+          wx.showToast({ title: '这条刚被别人改过，已刷新', icon: 'none' });
+          this.load();
+          return;
+        }
+        wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' });
+      });
+  },
+
+  onReset() {
+    if (this.data.saving) return;
+    wx.showModal({
+      title: '恢复统一安排',
+      content: '清掉这一个人的单独安排，改回跟随批次的统一安排。批次也没排就是「未安排」。',
+      confirmText: '恢复',
+      success: (r) => {
+        if (!r.confirm) return;
+        this.setData({ saving: true });
+        wx.showLoading({ title: '处理中', mask: true });
+        adminRequest(`/admin/recruitment/applications/${encodeURIComponent(this.data.id)}/interview`, 'PUT', {
+          version: this.data.version,
+          at: null,
+        })
+          .then(() => {
+            wx.hideLoading();
+            this.setData({ saving: false });
+            wx.showToast({ title: '已恢复统一安排', icon: 'success' });
+            this.load();
+          })
+          .catch((err) => {
+            wx.hideLoading();
+            this.setData({ saving: false });
+            if (isVersionConflict(err) || isConflict(err)) { this.load(); return; }
+            wx.showToast({ title: (err && err.message) || '操作失败', icon: 'none' });
+          });
+      },
+    });
+  },
+});
