@@ -42,13 +42,23 @@
                     <view class="arw"></view>
                   </view>
                   <view class="rc-panel" wx:if="{{timeOpen}}">
-                    <scroll-view class="rc-list" scroll-y>
-                      <view class="rc-opt {{planTime === v ? 'on' : ''}}" wx:for="{{timeOpts}}" wx:for-item="v" wx:key="*this">
-                        <view class="hit" data-v="{{v}}" bindtap="onPlanTimePick">
-                          <text class="t">{{v}}</text><text class="ck">✓</text>
-                        </view>
+                    <view class="rc-time-cols">
+                      <view class="rc-time-side">
+                        <text class="rc-time-hd">时</text>
+                        <scroll-view class="rc-time-col" scroll-y>
+                          <view class="rc-topt {{selH === v ? 'on' : ''}}" wx:for="{{timeHours}}" wx:for-item="v" wx:key="*this"
+                                data-v="{{v}}" bindtap="onPlanTimeHour">{{v}}</view>
+                        </scroll-view>
                       </view>
-                    </scroll-view>
+                      <view class="rc-time-sep"></view>
+                      <view class="rc-time-side">
+                        <text class="rc-time-hd">分</text>
+                        <scroll-view class="rc-time-col" scroll-y>
+                          <view class="rc-topt {{selM === v ? 'on' : ''}}" wx:for="{{timeMinutes}}" wx:for-item="v" wx:key="*this"
+                                data-v="{{v}}" bindtap="onPlanTimeMinute">{{v}}</view>
+                        </scroll-view>
+                      </view>
+                    </view>
                   </view>
                 </view>
               </view>

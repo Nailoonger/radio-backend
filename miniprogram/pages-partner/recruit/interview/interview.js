@@ -79,9 +79,12 @@ Page({
     planCalMonth: '',
     planCalHint: '',
     planCalWeeks: WEEKDAYS,
-    /* 时刻下拉（参考图：点字段展开列表，选中自动回填） */
+    /* 时刻下拉：两栏（左时右分），点选即回填 */
     timeOpen: false,
-    timeOpts: [],
+    timeHours: [],
+    timeMinutes: [],
+    selH: '',
+    selM: '',
     /* 名单 */
     generated: false,
     generatedAt: '',
@@ -256,29 +259,49 @@ Page({
     });
   },
 
-  /* 时刻：点字段展开下拉列表，选中即回填（参考图样式，与班级下拉同一套组件）。
-     栅格 06:30–22:30 每 30 分钟一档；已存的值不在档位里就按序插进去，绝不静默丢。 */
+  /* 时刻：两栏（左时右分），点选即回填。
+     已有完整值时点任一栏立即提交；空值时两栏各点一下才提交。
+     已存的时/分不在档位里就按序插进去，绝不静默丢（v173 时刻栅格丢值是踩过的坑）。 */
   onPlanTimeOpen() {
     if (!this.data.canManage) return;
     const open = !this.data.timeOpen;
-    this.setData({ timeOpen: open, timeOpts: open ? this.buildTimeOpts(this.data.planTime) : [] });
+    if (!open) { this.setData({ timeOpen: false }); return; }
+    const cur = String(this.data.planTime || '');
+    this.setData({
+      timeOpen: true,
+      timeHours: this.buildHours(cur.slice(0, 2)),
+      timeMinutes: this.buildMinutes(cur.slice(3, 5)),
+      selH: cur.slice(0, 2),
+      selM: cur.slice(3, 5),
+    });
   },
-  onPlanTimePick(e) {
+  onPlanTimeHour(e) {
     const v = String(e.currentTarget.dataset.v || '');
     if (!v) return;
-    this.setData({ planTime: v, timeOpen: false, timeOpts: [] });
+    this.setData({ selH: v });
+    if (this.data.selM) this.commitPlanTime();
   },
-  buildTimeOpts(cur) {
+  onPlanTimeMinute(e) {
+    const v = String(e.currentTarget.dataset.v || '');
+    if (!v) return;
+    this.setData({ selM: v });
+    if (this.data.selH) this.commitPlanTime();
+  },
+  commitPlanTime() {
+    const { selH, selM } = this.data;
+    if (!selH || !selM) return;
+    this.setData({ planTime: `${selH}:${selM}`, timeOpen: false });
+  },
+  buildHours(cur) {
     const out = [];
-    for (let h = 6; h <= 22; h += 1) {
-      out.push(`${pad(h)}:00`, `${pad(h)}:30`);
-    }
-    out.push('23:00');
-    out.sort();
-    if (cur && out.indexOf(cur) < 0) {
-      out.push(cur);
-      out.sort();
-    }
+    for (let h = 6; h <= 23; h += 1) out.push(pad(h));
+    if (cur && /^\d{2}$/.test(cur) && out.indexOf(cur) < 0) { out.push(cur); out.sort(); }
+    return out;
+  },
+  buildMinutes(cur) {
+    const out = [];
+    for (let m = 0; m < 60; m += 5) out.push(pad(m));
+    if (cur && /^\d{2}$/.test(cur) && out.indexOf(cur) < 0) { out.push(cur); out.sort(); }
     return out;
   },
 
