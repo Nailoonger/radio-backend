@@ -277,12 +277,12 @@ button.rc-btn-ghost[disabled] { color: var(--soft); border-color: var(--divider)
 }
 .rc-pod-stats {
   display: flex;
-  margin-top: 29rpx;                               /* 15px */
-  padding-top: 27rpx;                              /* 14px */
+  margin-top: 29rpx;                               /* 15px（覆写层 808）*/
+  padding-top: 28rpx;                              /* 14px（覆写层 808）*/
   border-top: 2rpx solid var(--hairline);
+  text-align: center;                              /* ⚠️ v174 四格整体居中，别左对齐 */
 }
 .rc-ps { flex: 1; min-width: 0; position: relative; }
-.rc-ps + .rc-ps { padding-left: 23rpx; }           /* 12px */
 .rc-ps + .rc-ps::before {
   content: '';
   position: absolute;
@@ -290,18 +290,18 @@ button.rc-btn-ghost[disabled] { color: var(--soft); border-color: var(--divider)
   width: 2rpx;
   background: var(--hairline);
 }
-.rc-ps-l { font-size: 19rpx; color: var(--muted); line-height: 1; }     /* 10px */
+.rc-ps-l { font-size: 19rpx; color: var(--muted); line-height: 1; }     /* 10px（覆写层 810）*/
 .rc-ps-d {
   font-size: 24rpx;                               /* 12.5px */
   margin-top: 12rpx;                              /* 6px */
-  line-height: 1.3;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 .rc-ps-n {
-  font-size: 46rpx;                               /* 24px */
+  font-size: 46rpx;                               /* 24px（覆写层 811）——数字就是大号的 */
   font-weight: 500;
-  letter-spacing: -1rpx;
-  margin-top: 12rpx;
+  letter-spacing: -1rpx;                          /* -0.5px */
+  margin-top: 12rpx;                              /* 6px */
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
