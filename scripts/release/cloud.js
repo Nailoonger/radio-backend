@@ -230,6 +230,15 @@ function createCloudAdapter({
     const before = functionConfig(detail);
     const routesBefore = await readRoutes();
     logger('云函数：已验证运行配置、' + detail.Triggers.length + ' 个原有触发器和 API 入口');
+    // ⚠️ 触发器**不归 CI 管**（updateFunctionCode 只更代码，造不出触发器）——
+    //    这是 2026-09-28 起的有意边界：触发器只能由「cli deploy -r 整包部署」或控制台建立。
+    //    但线上为空集时**必须喊出来**，否则「定时兜底不跑」会继续静默：
+    //    症状是 scheduleLockAt 早已过点、周却一直不锁（2026-11-14 实测踩中）。
+    if (!detail.Triggers.length) {
+      logger('⚠️ 警告：线上 api 函数没有任何触发器 ⇒ 定时兜底（每分钟 sweep / 到点锁周）不会跑。');
+      logger('   修法：cli.bat cloud functions deploy --env <env> --names api --project <miniprogram> -r 整包部署，');
+      logger('        或在云开发控制台为 api 新建定时触发器 songSweepTick（cron 0 */1 * * * * *，必须 7 位）。');
+    }
     const result = await platform('更新云函数代码', () => manager.functions.updateFunctionCode({
       func: { name: 'api', handler: detail.Handler, runtime: detail.Runtime,
         installDependency: detail.InstallDependency, isWaitInstall: true },
