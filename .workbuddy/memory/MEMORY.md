@@ -25,6 +25,13 @@
   从没进过仓库 ⇒ CI 里 partner handler `require('./_kit')` 崩 ⇒ #16/#17/#18 三连红、`publish` 从未跑过）。
   碰了 `.gitignore` 或新增文件 ⇒ 必须 `git worktree add <干净树> <sha>` + `npm ci`（根 + admin-web）跑
   `regression.js --source` 再 push。判据：干净树 `git ls-files` 能列出所有被 require 的文件；`sync.js` 打包模块数是硬指标。
+  ⚠️ 同一类坑还有**"文件根本没 git add"**（不是被忽略）：2026-11-14 `utils/skeleton.js` 11-13 写好却从没入库，
+  提交 desk.js 时把它 require 进去 ⇒ CI #53 红、本机全绿。先跑 `node _opfit/chk-tracked-requires.cjs`（已跟踪 js 的
+  相对 require 目标是否也在仓库里）⇒ 必须 `ALL OK`；再 `git worktree add` 复现一次 `verify.js --scope mini`。
+- ⚠️⚠️ **WXML 模板只取值、不取属性**：`{{(a ? b : c).length}}` 直接编译报
+  `Bad attr 'wx:if' with message: unexpected token '.'`（2026-11-14 真机退回）。要算的都在 JS 里摊好再传
+  （如 `item.opts`）。连带模板不支持：`?.`、`??`、箭头函数、模板字符串、`.map()/.filter()`、`new`。
+  探针 `_opfit/chk-recruit.cjs` 第 [9] 段。
 - ⚠️⚠️ **给 `<button>` 写样式一律用 `button.xxx`**：`app.wxss` 的 `button.btn{display:block;width:auto}` 特异性 (0,1,1)
   会静默压掉单类 `.btn`(0,1,0) 的 `display:flex` ⇒ 退化成块级行盒，文字贴上沿、底下空一截，不报错只是"看着有点歪"。
 - ⚠️⚠️ **input 的 `maxlength` 只是存储上限，绝不当业务字数限制**：中文拼音字母远多于汉字（「午间」= wujian = 6 字母），
@@ -54,6 +61,10 @@
 - 站徽「菁悠」双色 浅 `#2497D5` / 深 `#093592`（仪器感元件用这组，别用 `#0066CC`）；`--live` 只给 ON AIR。
 - **不锈钢禁拉丝**（点名两次）；抛光＝冷中性灰底 + 宽而柔斜向扫光，反光带窄硬＝褶皱。
 - ⚠️⚠️ **「现有 X」唯一事实源 = 真机截图 + `miniprogram/` 源码**（`preview/*` 是二手还原，标"原样"的也有错）。判据：这版落过业务代码吗。
+- ⚠️ **加载骨架（23 屏已接）**：`sk` 在 data 里初值 `true`，内容层 `wx:if="{{!sk || skOut}}"`；
+  光只在块内走（`.sk::after` + `.sk{overflow:hidden}`）；卡内一律整块灰，只有页面级框架留真字。
+  ⚠️ **进场延迟档只有 i0–i7**：`i{{index > N ? 7 : index + K}}` 里 **N+K ≤ 7**，越界算出 i8 = 没有那个类
+  ⇒ 落到无延迟的 `.enter .in`（delay 0）先冒出来。`_skcheck.cjs` 已加判据，改完必跑。
 - 隐私口径文案不对外；源码/文档/提交信息**不写明文凭据**；默认密码不设默认值（留空随机 + 首次日志打印一次）；写死 bcrypt hash ＝ 写死密码。
 - `JWT_SECRET` 线上公开值已修（`src/config/index.js` 有护栏）；`${X:-兜底}` 把空串当未设置 ⇒ 写空会静默回落。MySQL `root123` 确认不改。
 - ⚠️⚠️ **测试不许依赖"今天是星期几"**：可排窗口「周一 0 点~周六 24 点、周日只读」，凡 `PUT /partner/availability` 的用例周日跑必崩
@@ -95,6 +106,12 @@ token 源：`miniprogram/app.wxss` → `admin-web/src/styles/theme.css`。`--acc
 预检 `node scripts/release/verify.js --scope mini`。线上网页 `https://admin-web-jy-radio-d1gdwmptl816ee6a9.webapps.tcloudbase.com`（少 `-1491709115` 返 418）；
 API 网关 `…-1491709115.ap-shanghai.app.tcloudbase.com`。管理后台线上＝静态托管（**不是**服务器 Docker）。
 手搓才用 `_hosting`（裸 `vite build` 出 direct 包必废，判据 `grep -oh jy-radio- _hosting/assets/*.js` 要命中）。
+- ⚠️⚠️ **改完「看不到」先量线上产物，别先怀疑没推/缓存**（2026-11-16 又一轮）：判据① `GET /release.json` 的 `revision`
+  是否 = 目标 commit 全长（发布脚本写的产物指纹，最硬）；判据② 目标 **chunk** 里含新文案、不含旧文案 ——
+  admin-web 是**代码分割**，主 bundle `index-<hash>.js` 只有路由表（全区仅 713 个 CJK 字），页面文案在
+  `assets/SubmitList-<hash>.js` 之类独立 chunk，**只搜主 bundle 一律误报 ❌**。`index.html` 是 `no-store`、
+  assets 带 hash ⇒ 缓存这个猜测基本不成立，剩下就是「push 完立刻看＝看到旧版」的时间差。
+  探测脚本 `scripts/_probe-web-bundle.cjs`（下划线开头，不进仓库）。
 - ⚠️⚠️ 首次打开弹「风险提醒」中间页**不是部署坏了**；探测必须带浏览器同款请求头 + Node `https`（curl 会得反向结论），细则 `cloud/docs/final-cutover.md` §②-b-1。
 - ⚠️⚠️ ⑧ 卡点是开关：`requestMode` 已 `'cloud'`，**只改代码不重新上传＝没生效，必须用微信客户端验**；学生走小程序（免备案）/老师走 admin-web 两条独立线。
 - ⚠️ `miniprogram/app.js:65-69` 有 `debug_requestMode` localStorage 覆盖。`jyradio.online` **未备案**（证书≠备案）。服务器那份 admin-web 已下线 ⇒ "改完看不到"先问地址栏。
@@ -109,6 +126,8 @@ API 网关 `…-1491709115.ap-shanghai.app.tcloudbase.com`。管理后台线上�
   **不给需要交互输入的命令**；**必须给判据**。
 - 同一文件多处改动**串行 Edit**（并发静默吞前一个）。vite 构建到"已存在"目录会被 safe-delete 垫片拦 ⇒ 构建到新目录。
   `admin-web/package.json` 有 `type:module` ⇒ 临时脚本用 `.cjs`。
+- ⚠️ **仓库里 LF / CRLF 混着**（`pages-partner/club-notice/*`、`leave.js`、`submit.js` 是 CRLF）⇒
+  批量插桩先探 `s.indexOf('\r\n')` 再决定分隔符，否则 `\n` 锚点**静默匹配失败**（throw 前不写盘，别慌）。
 - 不开 Docker 整链路：`DB_STORAGE=./data/_shot.db` + `db:init` + `seed` + `node src/app.js`；schema 变过先 `rm`。
 - jest 基线：56 条里 15 条失败全是已删 member 模块，别当新回归。
 - ⚠️⚠️ **push 本机做不了**（GCM 取不到凭据）⇒ commit 我负责、**push 陛下自己敲**（判据 `git status -sb` 无 `ahead N`）；
