@@ -402,10 +402,22 @@
             </span>
             <span class="cs-title">审核处理台</span>
             <span class="cs-sub">
-              第 {{ consoleIndex + 1 }} / {{ consoleRows.length }} 条待处理
+              待处理 {{ consoleQueue.length }} 条 · 按时段顺序 · 格满自动跳
             </span>
           </div>
           <el-button text circle @click="closeConsole"><IconClose :size="16" /></el-button>
+        </div>
+        <!-- 时段进度：一眼看清审到哪一格、哪几格已满 -->
+        <div class="cs-track" v-if="consoleTrack.length">
+          <span
+            v-for="c in consoleTrack" :key="c.value"
+            class="cs-chip"
+            :class="{ full: c.full, now: consoleRow && Number(consoleRow.type) === 1 && consoleRow.wantBroadcastTime === c.value }"
+          >
+            <span class="wk">{{ c.weekday }}</span>
+            <span class="ct">{{ c.seated }}/{{ c.cap || '∞' }}</span>
+          </span>
+          <span class="cs-track-hint" v-if="consoleRow && Number(consoleRow.type) !== 1">文稿没有时段，排在点歌后面</span>
         </div>
         <div class="cs-head-sub micro" v-if="consoleRow">
           #{{ consoleRow.id }} · {{ fmt(consoleRow.createTime) }} 提交 · 来自小程序投稿页
@@ -613,7 +625,12 @@
               <div class="bar" style="margin-top:8px" v-if="consoleSlotCell.capacity">
                 <i :style="{ width: pct(consoleSlotCell.scheduled ?? consoleSlotCell.seated, consoleSlotCell.capacity) }" />
               </div>
-              <div class="hint">
+              <div class="hint" v-if="consoleSlotCell.full && Number(consoleRow.status) !== ST.SCHEDULED">
+                <b style="color:var(--amber-fg)">这一格已经排满了</b> —— 现在点「通过」会被系统拒（40906）。
+                可以驳回，或点「下一条 ›」翻到下个时段。<br>
+                正常审的话直接用底部的<b>「通过并取下一条」</b>：它会自动跳过满格的时段，不会把你送到这里。
+              </div>
+              <div class="hint" v-else>
                 占位口径：<b>审核通过 且 已排期</b>。驳回 / 撤销会立刻释放位子并自动重跑该周调剂，不需要另跑 release。
               </div>
             </div>
@@ -728,7 +745,7 @@
         <div class="cs-foot">
           <div class="cs-nav">
             <el-button :disabled="consoleIndex <= 0" @click="consolePrev">‹ 上一条</el-button>
-            <el-button :disabled="consoleIndex >= consoleRows.length - 1" @click="consoleNext">下一条 ›</el-button>
+            <el-button :disabled="consoleIndex >= consoleQueue.length - 1" @click="consoleNext">下一条 ›</el-button>
           </div>
           <div class="cs-keys micro">快捷键：J / K 切换条目 · Enter 通过</div>
           <div class="cs-foot-right">
@@ -1940,22 +1957,141 @@ async function fetchConsoleDetail(row) {
 const TODO_STATUS = [ST.PENDING, ST.QUEUED, ST.PROMOTED];
 const isTodo = (r) => TODO_STATUS.includes(Number(r.status));
 
-/** 处理台里的条目集合 = 当前筛选下需要人工动手的条目（没有则退回当前页） */
-const consoleRows = computed(() => {
-  const todo = rows.value.filter(isTodo);
-  return todo.length ? todo : rows.value;
+/* ── 处理台队列：按「时段顺序」推进（2026-11-15 陛下定案） ──
+ *
+ * 旧行为：队列 = 当前页的待办，按提交时间排 ⇒ 管理员连着点同一个时段，
+ *   第 3 条开始每条都撞 40906「该时段已排满，请先审别的时段」，得自己跳。
+ * 新行为：队列按时段顺序（周一第一个时段 → … → 最后一个时段）分组，组内按提交时间；
+ *   取件时**跳过已经排满的格子**，直接给下一个时段的第一条。
+ *   ⇒ 满格的条目根本不会被取出来，那条 40906 提示从此不会在现场出现。
+ *
+ * ⚠️ 数据源不能再用 rows.value：那是「当前页」（默认 pageSize=10），跨不了时段。
+ *    打开处理台时单独拉一次全量待审（pageSize=200），在前端分组排序。
+ * ⚠️ 文稿（type=2）没有「格子」概念，一律排在点歌后面、按提交时间。
+ */
+const consolePool = ref([]);
+
+/** 时段值 → 周内下标（按矩阵顺序：周一第一个时段 → … → 最后一天最后一个时段） */
+const slotIndexMap = computed(() => {
+  const m = new Map();
+  let i = 0;
+  for (const d of schedule.value.days || []) {
+    for (const s of d.slots || []) m.set(s.value, i++);
+  }
+  return m;
 });
 
-function openConsole(row) {
-  const list = rows.value.filter(isTodo);
-  const source = list.length ? list : rows.value;
-  const idx = source.findIndex((r) => r.id === row.id);
-  consoleIndex.value = idx >= 0 ? idx : 0;
-  consoleRow.value = source[consoleIndex.value] || row;
+/** 时段进度条（处理台头部那一行） */
+const consoleTrack = computed(() => {
+  const out = [];
+  let i = 0;
+  for (const d of schedule.value.days || []) {
+    for (const s of d.slots || []) {
+      const capN = Number(s.capacity || schedule.value.capacity || 0);
+      const seated = Number(s.seated || 0);
+      out.push({
+        i: i++,
+        value: s.value,
+        weekday: d.weekday,
+        period: s.period,
+        seated,
+        cap: capN,
+        full: capN > 0 && seated >= capN,
+      });
+    }
+  }
+  return out;
+});
+
+/** 处理台队列 = 待办，按（时段顺序 → 提交时间 → id）排好 */
+const consoleQueue = computed(() => {
+  const idx = slotIndexMap.value;
+  const DOC_AT = 9998;       // 文稿排最后
+  const UNKNOWN_AT = 9999;   // 首选时段不在本周矩阵里（异常数据）也排最后
+  const keyed = consolePool.value.filter(isTodo).map((r) => {
+    let si;
+    if (Number(r.type) !== 1) si = DOC_AT;
+    else si = idx.has(r.wantBroadcastTime) ? idx.get(r.wantBroadcastTime) : UNKNOWN_AT;
+    return { r, si, t: r.createTime ? +new Date(r.createTime) : 0, id: Number(r.id) };
+  });
+  keyed.sort((a, b) => (a.si - b.si) || (a.t - b.t) || (a.id - b.id));
+  return keyed.map((x) => x.r);
+});
+
+/** 时段值 → 「周三 · 午间 12:10」 */
+function slotNameOf(value) {
+  for (const d of schedule.value.days || []) {
+    const hit = (d.slots || []).find((s) => s.value === value);
+    if (hit) return `${d.weekday} · ${hit.period} ${hit.time}`;
+  }
+  return value || '未选时段';
+}
+
+/** 这一格还放得下吗（容量 <= 0 视为不限） */
+function slotHasRoom(value) {
+  const cell = cellOf(value);
+  const capN = Number(cell?.capacity || schedule.value.capacity || 0);
+  if (!(capN > 0)) return true;
+  return Number(cell?.seated || 0) < capN;
+}
+
+/**
+ * 取下一条该审的：跳过已经排满的格子。
+ * 队列已经按时段排好，所以「跳过满格」自然就等于「进入下一个时段」。
+ */
+function nextReviewRow() {
+  for (const r of consoleQueue.value) {
+    if (Number(r.type) !== 1) return r;              // 文稿照审
+    if (slotHasRoom(r.wantBroadcastTime)) return r;  // 这格还有位 → 就审这条
+  }
+  return null;                                       // 所有时段都满 / 没得审了
+}
+
+/** 把 consoleRow 在队列里的位置同步给 consoleIndex（「第 N/M 条」与上下条按钮靠它） */
+function syncConsoleIndex() {
+  const i = consoleQueue.value.findIndex(
+    (r) => consoleRow.value && Number(r.id) === Number(consoleRow.value.id),
+  );
+  consoleIndex.value = i >= 0 ? i : 0;
+}
+
+/**
+ * 拉全量待办（跨页）；失败就退回当前页 —— 至少还能用。
+ * ⚠️ 待办分布在三个 status 桶里（0 待审 / 3 候补中 / 4 补位待审），
+ *    而后端 `status` 参数只支持等值、不支持 IN ⇒ **三个桶并发拉再合并**。
+ *    （踩过的坑：只按 `reviewStatus=0` 拉，会把「候补中」的人整个漏掉 ——
+ *      他们的审核维度是 1、只有排期维度是 WAITING。）
+ */
+async function loadConsolePool() {
+  const buckets = [ST.PENDING, ST.QUEUED, ST.PROMOTED];
+  try {
+    const pages = await Promise.all(buckets.map((st) => http.get('/admin/submit/list', {
+      params: { page: 1, pageSize: 200, status: String(st) },
+    }).catch(() => null)));
+    const merged = [];
+    const seen = new Set();
+    for (const d of pages) {
+      for (const r of (d?.list || d?.rows || [])) {
+        if (seen.has(Number(r.id))) continue;
+        seen.add(Number(r.id));
+        merged.push(r);
+      }
+    }
+    consolePool.value = merged.length ? merged : rows.value.filter(isTodo);
+  } catch {
+    consolePool.value = rows.value.filter(isTodo);
+  }
+}
+
+async function openConsole(row) {
   rejectReason.value = '';
   rejectMode.value = false;
   consoleVisible.value = true;
   window.addEventListener('keydown', onConsoleKey);
+  await loadConsolePool();
+  const hit = consoleQueue.value.find((r) => Number(r.id) === Number(row.id));
+  consoleRow.value = hit || nextReviewRow() || row;
+  syncConsoleIndex();
   fetchConsoleDetail(consoleRow.value);
 }
 
@@ -1967,18 +2103,19 @@ function closeConsole() {
 function consolePrev() {
   if (consoleIndex.value <= 0) return;
   consoleIndex.value -= 1;
-  consoleRow.value = consoleRows.value[consoleIndex.value];
+  consoleRow.value = consoleQueue.value[consoleIndex.value];
   rejectReason.value = '';
   rejectMode.value = false;
   fetchConsoleDetail(consoleRow.value);
 }
+/** 手动看下一条（**不跳过满格**）—— 自动跳格是主按钮的活，这里只是让人能来回翻 */
 function consoleNext() {
-  if (consoleIndex.value >= consoleRows.value.length - 1) {
+  if (consoleIndex.value >= consoleQueue.value.length - 1) {
     ElMessage.success('已经是最后一条了');
     return;
   }
   consoleIndex.value += 1;
-  consoleRow.value = consoleRows.value[consoleIndex.value];
+  consoleRow.value = consoleQueue.value[consoleIndex.value];
   rejectReason.value = '';
   rejectMode.value = false;
   fetchConsoleDetail(consoleRow.value);
@@ -1989,10 +2126,13 @@ async function consoleApprove() {
   const wasQueued = Number(consoleRow.value.status) === ST.QUEUED;
   acting.value = true;
   try {
-    await http.put(`/admin/submit/${consoleRow.value.id}/approve`);
+    const d = await http.put(`/admin/submit/${consoleRow.value.id}/approve`);
+    // ⚠️ 2026-11-15：这里原来写的是「已通过，等系统排期落座」—— 那是旧协议的话。
+    //    新口径「审核通过 = 当场占住首选格」，toast 必须把占到的格子报出来，
+    //    否则管理员看不出这次到底动了哪一格（服务端 approve 响应里的 slot 字段）。
     ElMessage.success(wasQueued
       ? '已记录审核，这条仍在候补队列里等空位'
-      : '已通过，等系统排期落座');
+      : (d?.slot ? `已通过，占住「${d.slot}」` : '已通过'));
     await refreshAll();
     await afterActioned();
   } catch (e) { /* 拦截器已提示 */ }
@@ -2016,18 +2156,44 @@ async function consoleReject() {
   } finally { acting.value = false; }
 }
 
-/** 处理完一条后的去向：还有需要动手的就取下一条，否则收工 */
+/**
+ * 处理完一条后的去向：重新拉一次待办，取「下一条该审的」。
+ * ⚠️ 必须重新拉 —— 审核通过会改写 rows / 座位数，服务端还可能顺带补派别人。
+ * ⚠️ 取件走 nextReviewRow()（跳过已排满的格子），不要再用「队列第 0 条」，
+ *    否则又会退回到「连着点同一个时段、条条撞 40906」的老毛病。
+ */
 async function afterActioned() {
-  const left = rows.value.filter(isTodo);
-  if (!left.length) {
+  const prev = consoleRow.value;
+  const prevSlot = prev && Number(prev.type) === 1 ? prev.wantBroadcastTime : null;
+
+  await loadConsolePool();
+  const nx = nextReviewRow();
+  if (!nx) {
     closeConsole();
-    ElMessage.success('这一批处理完了');
+    // 两种情况要分开说：真审完了 vs 格子都排满了（后者人还在待审，等锁定）
+    const left = consoleQueue.value.length;
+    ElMessage.success(left
+      ? `所有时段都排满了 —— 还剩 ${left} 条没位置，点「锁定本周」时系统会统一驳回`
+      : '这一批审完了');
     return;
   }
-  consoleIndex.value = 0;
-  consoleRow.value = left[0];
+
+  // 跨到下一个时段了 → 说一句"跳过了哪几格、几条"，别让人以为条目凭空消失
+  if (prevSlot && nx.wantBroadcastTime !== prevSlot) {
+    const q = consoleQueue.value;
+    const pos = q.findIndex((r) => Number(r.id) === Number(nx.id));
+    const skipped = pos > 0 ? q.slice(0, pos) : [];
+    const names = [...new Set(skipped.map((r) => r.wantBroadcastTime))].map(slotNameOf);
+    ElMessage.info(names.length
+      ? `「${names.join('」「')}」已排满 → 跳过 ${skipped.length} 条，接着审「${slotNameOf(nx.wantBroadcastTime)}」`
+      : `接着审「${slotNameOf(nx.wantBroadcastTime)}」`);
+  }
+
+  consoleRow.value = nx;
   rejectReason.value = '';
   rejectMode.value = false;
+  syncConsoleIndex();
+  fetchConsoleDetail(consoleRow.value);
 }
 
 async function consoleApproveAndNext() {
@@ -2329,6 +2495,20 @@ onBeforeUnmount(() => {
   font-size: var(--fs-xs); color: var(--muted-2);
   letter-spacing: var(--ls-wide-sm);
 }
+/* 时段进度条：白=待审、灰=已满、蓝=正在审 */
+.cs-track { display: flex; align-items: center; gap: 6px; padding: 10px 22px 0; flex-wrap: wrap; }
+.cs-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 10px;
+  border-radius: var(--r-pill); background: #fff; border: 1px solid var(--hairline);
+  font-size: var(--fs-2xs); color: var(--muted);
+}
+.cs-chip .wk { font-weight: 500; }
+.cs-chip .ct { font-family: var(--mono); font-size: var(--fs-2xs); color: var(--muted-2); }
+.cs-chip.full { background: var(--parchment); border-color: var(--parchment); color: var(--muted-2); }
+.cs-chip.full .ct { color: var(--muted); }
+.cs-chip.now { background: var(--accent); border-color: var(--accent); color: #fff; }
+.cs-chip.now .ct { color: #fff; opacity: .88; }
+.cs-track-hint { font-size: var(--fs-2xs); color: var(--muted-2); margin-left: 2px; }
 
 .cs-body {
   display: grid; grid-template-columns: minmax(0, 1fr) 306px;

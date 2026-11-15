@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>审核处理台 · 按时段推进 v1</title>
+<style>
+:root{
+  --ink:#1d1d1f; --ink-2:#333; --muted:#7a7a7a; --muted-2:#6e6e73;
+  --soft:#c7c7cc; --hairline:#e0e0e0; --divider:#f0f0f0;
+  --parchment:#f5f5f7; --canvas:#fff;
+  --tile:#272729; --tile-2:#3a3a3c;
+  --accent:#0066cc; --acc-bg:#e6f0fa; --live:#ff453a;
+  --amber-bg:#fef3c7; --amber-fg:#8a6100;
+  --green-bg:#e7f5ec; --green-fg:#1e7a46;
+  --red-bg:#fde8e8; --red-fg:#b42318;
+  --r-card:18px; --r-pill:9999px; --r-input:12px;
+  --font:-apple-system,BlinkMacSystemFont,"HarmonyOS Sans SC","MiSans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--parchment); color:var(--ink); font-family:var(--font);
+  font-size:13.5px; line-height:1.5; padding:20px;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px;margin:0 auto}
+
+/* ── 顶部 ── */
+.hd{display:flex;align-items:flex-end;gap:14px;margin-bottom:14px}
+.hd h1{font-size:19px;font-weight:600;letter-spacing:-.4px}
+.ver{
+  display:inline-flex;align-items:center;height:22px;padding:0 10px;border-radius:var(--r-pill);
+  background:#fff;border:1px solid var(--hairline);font-size:11.5px;color:var(--muted);letter-spacing:.5px;
+}
+.hd .sp{margin-left:auto;display:flex;gap:8px}
+
+/* ── 胶囊按钮 ── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  height:32px;padding:0 16px;border-radius:var(--r-pill);border:1px solid var(--hairline);
+  background:#fff;color:var(--ink);font-size:12.5px;font-family:inherit;cursor:pointer;
+  transition:background .16s,border-color .16s,color .16s;
+}
+.btn:hover{border-color:var(--soft)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
+.btn.pri:hover{background:#0052a3;border-color:#0052a3}
+.btn.danger{background:#fff;border-color:#f0c4c4;color:var(--red-fg)}
+.btn.danger:hover{background:var(--red-bg)}
+.btn.ghost{border-style:dashed;color:var(--muted)}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.btn.sm{height:26px;padding:0 12px;font-size:11.5px}
+
+/* ── 场景切换 ── */
+.scen{display:flex;gap:8px;margin-bottom:14px}
+.scen .tab{
+  display:inline-flex;align-items:center;height:30px;padding:0 14px;border-radius:var(--r-pill);
+  background:#fff;border:1px solid var(--hairline);font-size:12px;color:var(--muted);cursor:pointer;
+}
+.scen .tab.on{background:var(--acc-bg);border-color:#b3d1f0;color:var(--accent);font-weight:500}
+.scen .note{font-size:11.5px;color:var(--muted-2);align-self:center;margin-left:4px}
+
+/* ── 主区 ── */
+.main{display:grid;grid-template-columns:300px 1fr;gap:14px;align-items:start}
+
+/* 时段队列 */
+.panel{background:#fff;border-radius:var(--r-card);padding:16px 18px}
+.panel-t{font-size:12px;color:var(--muted);letter-spacing:.5px;margin-bottom:12px}
+.slot{
+  display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;
+  border:1px solid transparent;margin-bottom:3px;
+}
+.slot.now{background:var(--acc-bg);border-color:#b3d1f0}
+.slot.full{opacity:.55}
+.slot .nm{font-size:12.5px;font-weight:500;min-width:74px}
+.slot .cap{font-size:11.5px;color:var(--muted);font-family:var(--mono);margin-left:auto}
+.slot .bar{display:flex;gap:2px}
+.slot .bar i{width:12px;height:6px;border-radius:3px;background:var(--divider)}
+.slot .bar i.on{background:var(--accent)}
+.slot .tag{
+  font-size:10.5px;padding:1px 7px;border-radius:var(--r-pill);letter-spacing:.4px;
+  background:var(--divider);color:var(--muted-2);
+}
+.slot .tag.full{background:var(--green-bg);color:var(--green-fg)}
+.slot .tag.now{background:var(--accent);color:#fff}
+
+/* 阶段 */
+.stage{background:#fff;border-radius:var(--r-card);padding:20px 22px;min-height:392px;display:flex;flex-direction:column}
+.stage-hd{display:flex;align-items:baseline;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--divider)}
+.stage-hd .t{font-size:17px;font-weight:600;letter-spacing:-.3px}
+.stage-hd .s{font-size:12px;color:var(--muted)}
+.stage-hd .pd{margin-left:auto;font-size:12px;color:var(--muted);font-family:var(--mono)}
+
+/* 当前条目 */
+.card{margin-top:16px}
+.row1{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.avatar{
+  width:38px;height:38px;border-radius:50%;background:var(--tile);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500;flex:0 0 auto;
+}
+.who .n{font-size:14px;font-weight:600}
+.who .m{font-size:11.5px;color:var(--muted-2);margin-top:1px}
+.idtag{
+  margin-left:auto;font-size:11px;padding:3px 9px;border-radius:var(--r-pill);
+  background:var(--acc-bg);color:var(--accent);font-family:var(--mono);
+}
+.song{font-size:22px;font-weight:600;letter-spacing:-.5px;margin-bottom:3px}
+.singer{font-size:12.5px;color:var(--muted);margin-bottom:16px}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px}
+.f{display:flex;flex-direction:column;gap:3px}
+.f .k{font-size:11px;color:var(--muted-2);letter-spacing:.4px}
+.f .v{font-size:13px;font-weight:500}
+.f .v.acc{color:var(--accent)}
+.pill{
+  display:inline-flex;align-items:center;height:20px;padding:0 9px;border-radius:var(--r-pill);
+  font-size:10.5px;font-weight:500;letter-spacing:.3px;width:fit-content;
+}
+.pill.ok{background:var(--green-bg);color:var(--green-fg)}
+.pill.no{background:var(--amber-bg);color:var(--amber-fg)}
+
+/* 格占用条 */
+.cellbar{
+  margin-top:16px;display:flex;align-items:center;gap:10px;padding:11px 14px;
+  background:var(--parchment);border-radius:12px;font-size:12px;
+}
+.cellbar b{font-family:var(--mono);font-weight:600}
+.cellbar .dots{display:flex;gap:3px}
+.cellbar .dots i{width:16px;height:6px;border-radius:3px;background:var(--soft)}
+.cellbar .dots i.on{background:var(--accent)}
+.cellbar .hint{margin-left:auto;color:var(--muted-2);font-size:11.5px}
+
+/* 操作区 */
+.acts{margin-top:auto;padding-top:18px;display:flex;gap:10px;align-items:center}
+.acts .sp{margin-left:auto;font-size:11.5px;color:var(--muted-2)}
+
+/* 横幅提示 */
+.banner{
+  margin-top:14px;padding:11px 14px;border-radius:12px;font-size:12.5px;
+  background:var(--amber-bg);color:var(--amber-fg);display:flex;align-items:center;gap:9px;
+}
+.banner.info{background:var(--acc-bg);color:var(--accent)}
+.banner b{font-weight:600}
+
+/* 统筹结果 */
+.sum{margin-top:16px}
+.sum-hd{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.sum-hd .t{font-size:14px;font-weight:600}
+.sum-hd .s{font-size:11.5px;color:var(--muted)}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl th{
+  text-align:left;font-weight:500;color:var(--muted-2);font-size:11px;letter-spacing:.4px;
+  padding:0 10px 7px;border-bottom:1px solid var(--hairline);
+}
+.tbl td{padding:8px 10px;border-bottom:1px solid var(--divider);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl .mono{font-family:var(--mono);font-size:11.5px;color:var(--muted-2)}
+.tbl .id{font-family:var(--mono);font-size:11.5px;color:var(--muted-2);width:52px}
+.res{display:inline-flex;align-items:center;height:20px;padding:0 9px;border-radius:var(--r-pill);font-size:10.5px;font-weight:500}
+.res.moved{background:var(--acc-bg);color:var(--accent)}
+.res.rej{background:var(--red-bg);color:var(--red-fg)}
+.res.wait{background:var(--amber-bg);color:var(--amber-fg)}
+.arrow{color:var(--soft);margin:0 5px}
+
+/* 日志 */
+.log{margin-top:14px;background:#fff;border-radius:var(--r-card);padding:14px 18px}
+.log-t{font-size:11.5px;color:var(--muted);letter-spacing:.5px;margin-bottom:8px}
+.log ul{list-style:none;max-height:150px;overflow:auto}
+.log li{
+  font-size:12px;color:var(--ink-2);padding:5px 0;border-bottom:1px solid var(--divider);
+  display:flex;gap:9px;align-items:baseline;
+}
+.log li:last-child{border-bottom:none}
+.log li .n{font-family:var(--mono);font-size:10.5px;color:var(--soft);flex:0 0 22px}
+.log li.skip{color:var(--amber-fg)}
+.log li.done{color:var(--green-fg)}
+.log .empty{font-size:12px;color:var(--soft)}
+
+/* 收尾口径 */
+.pick{margin-top:16px;padding-top:16px;border-top:1px solid var(--hairline)}
+.pick-t{font-size:12px;color:var(--muted);letter-spacing:.5px;margin-bottom:4px}
+.pick-s{font-size:11.5px;color:var(--muted-2);margin-bottom:12px}
+.pick-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.opt{border:1px solid var(--hairline);border-radius:14px;padding:14px 16px;background:#fff}
+.opt.on{border-color:#b3d1f0;background:var(--acc-bg)}
+.opt-hd{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.opt-hd .n{font-size:13px;font-weight:600}
+.opt-hd .b{font-size:10.5px;padding:1px 8px;border-radius:var(--r-pill);background:var(--divider);color:var(--muted-2);letter-spacing:.3px}
+.opt.on .opt-hd .b{background:var(--accent);color:#fff}
+.opt p{font-size:12px;color:var(--ink-2);line-height:1.7}
+.opt .eff{margin-top:8px;font-size:11.5px;color:var(--muted-2)}
+.opt .eff b{color:var(--ink)}
+
+.rule{
+  margin-top:14px;background:#fff;border-radius:var(--r-card);padding:16px 18px;
+  font-size:12px;color:var(--ink-2);line-height:1.75;
+}
+.rule .t{font-size:11.5px;color:var(--muted);letter-spacing:.5px;margin-bottom:9px}
+.rule ol{padding-left:18px}
+.rule li{margin-bottom:3px}
+.rule b{color:var(--ink);font-weight:600}
+.rule .mono{font-family:var(--mono);font-size:11.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hd">
+    <h1>审核处理台</h1>
+    <span class="ver">v1 · 按时段推进</span>
+    <div class="sp">
+      <button class="btn sm" id="btnStep">一路审到底</button>
+      <button class="btn sm ghost" id="btnReset">重置</button>
+    </div>
+  </div>
+
+  <div class="scen">
+    <span class="tab on" data-scen="A">场景 A · 线上实况（20 条）</span>
+    <span class="tab" data-scen="B">场景 B · 周四没人投（演示调配）</span>
+    <span class="note" id="scenNote"></span>
+  </div>
+
+  <div class="main">
+    <aside class="panel">
+      <div class="panel-t">时段队列 · 按此顺序审</div>
+      <div id="queue"></div>
+    </aside>
+
+    <section class="stage" id="stage"></section>
+  </div>
+
+  <div class="log">
+    <div class="log-t">操作日志</div>
+    <ul id="logBox"><li><span class="empty">还没有操作</span></li></ul>
+  </div>
+
+  <div class="rule">
+    <div class="t">这套流程的三条规则</div>
+    <ol>
+      <li><b>取件顺序 = 时段顺序</b>：周一第一个时段 → 周二 → … → 最后一个时段。同一时段内按<b>申请时间先后</b>。</li>
+      <li><b>格满自动跳</b>：某格审满 <span class="mono">容量</span> 条后，这个时段剩下的人<b>不再取出来</b>（不会弹「该时段已排满，请先审别的时段」），直接进入下一个时段。</li>
+      <li><b>全部时段审完之后</b>，剩下的按 <b>① 是否接受调剂 → ② 申请时间先后 → ③ 优先最近时段</b> 的顺序统一调配。</li>
+    </ol>
+    <p style="margin-top:9px;font-size:11.5px;color:var(--muted-2);line-height:1.7">
+      ③ 的「最近」用的是既有的<span class="mono">分档成本表</span>，不是简单的天差：
+      同一天其他时段 <b>10</b> ＜ 前后一天同一时段 <b>20</b> ＜ 前后一天其他时段 <b>30</b> ＜ 更远日期 <b>50</b>。
+      现在每天只有一个「午间 12:10」，所以本页看起来就是"按天差挑最近的"，加了其它时段后仍以成本表为准。
+    </p>
+  </div>
+
+</div>
+
+<script>
+/* ══════════════════ 数据 ══════════════════ */
+const CAP = 2;
+
+const SLOTS = [
+  { i:0, day:'周一', date:'11-16', period:'午间', time:'12:10' },
+  { i:1, day:'周二', date:'11-17', period:'午间', time:'12:10' },
+  { i:2, day:'周三', date:'11-18', period:'午间', time:'12:10' },
+  { i:3, day:'周四', date:'11-19', period:'午间', time:'12:10' },
+  { i:4, day:'周五', date:'11-20', period:'午间', time:'12:10' },
+];
+const slotLabel = (i) => `${SLOTS[i].day} ${SLOTS[i].date} · ${SLOTS[i].period} ${SLOTS[i].time}`;
+const slotShort = (i) => `${SLOTS[i].day} ${SLOTS[i].period}`;
+
+// 场景 A：线上实况 20 条（id 与真实投稿一致）
+const ROWS_A = [
+  { id:126, song:'模拟曲一',   who:'20269901', name:'测试甲', si:0, allow:true  },
+  { id:127, song:'模拟曲二',   who:'20269902', name:'测试乙', si:0, allow:true  },
+  { id:128, song:'模拟曲三',   who:'20269903', name:'测试丙', si:0, allow:true  },
+  { id:129, song:'模拟曲四',   who:'20269904', name:'测试丁', si:1, allow:true  },
+  { id:130, song:'模拟曲五',   who:'20269901', name:'测试甲', si:1, allow:false },
+  { id:131, song:'模拟曲六',   who:'20269902', name:'测试乙', si:2, allow:true  },
+  { id:132, song:'模拟曲七',   who:'20269903', name:'测试丙', si:2, allow:true  },
+  { id:133, song:'模拟曲八',   who:'20269904', name:'测试丁', si:3, allow:true  },
+  { id:134, song:'模拟曲九',   who:'20269901', name:'测试甲', si:4, allow:true  },
+  { id:135, song:'模拟曲十',   who:'20269902', name:'测试乙', si:4, allow:true  },
+  { id:136, song:'模拟曲十一', who:'20269901', name:'测试甲', si:0, allow:true  },
+  { id:137, song:'模拟曲十二', who:'20269902', name:'测试乙', si:0, allow:false },
+  { id:138, song:'模拟曲十三', who:'20269903', name:'测试丙', si:1, allow:true  },
+  { id:139, song:'模拟曲十四', who:'20269904', name:'测试丁', si:1, allow:false },
+  { id:140, song:'模拟曲十五', who:'20269901', name:'测试甲', si:2, allow:true  },
+  { id:141, song:'模拟曲十六', who:'20269902', name:'测试乙', si:2, allow:false },
+  { id:142, song:'模拟曲十七', who:'20269903', name:'测试丙', si:3, allow:true  },
+  { id:143, song:'模拟曲十八', who:'20269904', name:'测试丁', si:3, allow:false },
+  { id:144, song:'模拟曲十九', who:'20269901', name:'测试甲', si:4, allow:true  },
+  { id:145, song:'模拟曲二十', who:'20269902', name:'测试乙', si:4, allow:false },
+];
+
+// 场景 B：把周四 3 条、周二 3 条拿掉（示意数据），造出 3 个空位，用来看"调配"
+const DROP = new Set([133,142,143,130,138,139]);
+const ROWS_B = ROWS_A.filter((r) => !DROP.has(r.id));
+
+/* ══════════════════ 状态 ══════════════════ */
+let S = null;
+
+function reset(scen) {
+  const rows = scen === 'B' ? ROWS_B : ROWS_A;
+  S = {
+    scen,
+    rows,
+    seated: SLOTS.map(() => 0),
+    done: new Map(),      // id -> {res, to?, reason?}
+    logs: [],
+    phase: 'review',
+    banner: null,
+    pick: 'A',
+  };
+  render();
+}
+
+function setPick(v) { S.pick = v; render(); }
+
+/* 取下一件：从时段顺序往后找「还没审 且 该格还有位」的；跳过满格的 */
+function nextRow() {
+  for (let i = 0; i < SLOTS.length; i++) {
+    if (S.seated[i] >= CAP) continue;                 // 该格满了，整格跳过
+    const r = S.rows.find((x) => x.si === i && !S.done.has(x.id));
+    if (r) return r;
+  }
+  return null;
+}
+
+/* 这一格还剩多少条没审（用来算"跳过了几条"） */
+const unjudgedIn = (si) => S.rows.filter((x) => x.si === si && !S.done.has(x.id));
+
+/* ══════════════════ 动作 ══════════════════ */
+function approve() {
+  const r = nextRow();
+  if (!r) return;
+  S.seated[r.si] += 1;
+  S.done.set(r.id, { res: 'seated', to: r.si });
+  log(`#${r.id}《${r.song}》通过 → 占住「${slotShort(r.si)}」${S.seated[r.si]}/${CAP}`);
+  S.banner = null;
+
+  const nx = nextRow();
+  if (!nx) return finish();
+
+  if (nx.si !== r.si) {
+    // 刚审的这一格满了 → 报"跳过了谁"，而不是让人去撞"该时段已排满"
+    const skipped = unjudgedIn(r.si).length;
+    log(`「${slotShort(r.si)}」已满 ${CAP}/${CAP} → 自动跳过 ${skipped} 条，前往「${slotShort(nx.si)}」`, 'skip');
+    S.banner = {
+      kind: 'warn',
+      html: `<span>「<b>${slotLabel(r.si)}</b>」已占满 <b>${CAP}/${CAP}</b></span>
+             <span class="hint" style="margin-left:auto">已自动跳过 <b>${skipped}</b> 条 · 下一时段「<b>${slotShort(nx.si)}</b>」</span>`,
+    };
+  }
+  render();
+}
+
+function reject() {
+  const r = nextRow();
+  if (!r) return;
+  S.done.set(r.id, { res: 'rejected', reason: '人工驳回' });
+  log(`#${r.id}《${r.song}》驳回（人工）`);
+  S.banner = null;
+  const nx = nextRow();
+  if (!nx) return finish();
+  render();
+}
+
+/* 全部时段审完 → 进统筹 */
+function finish() {
+  S.phase = 'settle';
+  const left = S.rows.filter((x) => !S.done.has(x.id));
+  log(`所有时段已审完 · 剩余 ${left.length} 条进入统筹`, 'done');
+  // ⚠️ 必须在调 settle() **之前**记下"开始统筹时还有没有空位" ——
+  //    统筹会把空位填满，之后再数就永远是"全满"，文案会张冠李戴。
+  S.hadRoom = SLOTS.some((s) => S.seated[s.i] < CAP);
+  S.settle = settle(left);
+  render();
+}
+
+/* 统筹：照真实 reconcile 的顺序 —— 先判有没有空位，再判是否接受调剂，最后就近 */
+function settle(pool) {
+  const free = () => SLOTS.map((s, i) => i).filter((i) => S.seated[i] < CAP);
+  const out = [];
+  for (const r of pool.slice().sort((a, b) => a.id - b.id)) {   // ② 申请时间先后
+    const f = free();
+    if (!f.length) {                                            // ① 先看有没有位子
+      out.push({ r, res: 'noSlot', to: null });
+      continue;
+    }
+    if (!r.allow) {                                             // 不接受调剂
+      out.push({ r, res: 'noReschedule', to: null });
+      continue;
+    }
+    // ③ 优先最近时段：按周内下标距离，距离相同取靠前
+    const target = f.slice().sort((a, b) => (Math.abs(a - r.si) - Math.abs(b - r.si)) || (a - b))[0];
+    S.seated[target] += 1;
+    out.push({ r, res: 'moved', from: r.si, to: target });
+  }
+  return out;
+}
+
+function log(text, kind) {
+  S.logs.push({ text, kind });
+}
+
+/* ══════════════════ 渲染 ══════════════════ */
+const $ = (id) => document.getElementById(id);
+
+function render() {
+  // 场景说明
+  $('scenNote').textContent = S.scen === 'B'
+    ? `示意数据：拿掉周四 3 条、周二 3 条 ⇒ 周四空 2 格、周二空 1 格`
+    : `真实数据：id 126–145，5 格 × 容量 2`;
+
+  // 时段队列
+  const cur = S.phase === 'review' ? nextRow() : null;
+  $('queue').innerHTML = SLOTS.map((s) => {
+    const n = S.seated[s.i];
+    const full = n >= CAP;
+    const isNow = cur && cur.si === s.i;
+    const bars = Array.from({ length: CAP }, (_, k) => `<i class="${k < n ? 'on' : ''}"></i>`).join('');
+    return `<div class="slot ${isNow ? 'now' : ''} ${full && !isNow ? 'full' : ''}">
+      <span class="nm">${s.day} ${s.period}</span>
+      <span class="bar">${bars}</span>
+      <span class="cap">${n}/${CAP}</span>
+      ${isNow ? '<span class="tag now">正在审</span>' : (full ? '<span class="tag full">已满</span>' : '')}
+    </div>`;
+  }).join('');
+
+  // 主区
+  if (S.phase === 'review') {
+    const r = cur;
+    if (!r) { $('stage').innerHTML = '<div style="color:var(--muted)">没有待审的了</div>'; return; }
+    const total = S.rows.length;
+    const judged = S.done.size;
+    $('stage').innerHTML = `
+      <div class="stage-hd">
+        <span class="t">正在审「${slotLabel(r.si)}」</span>
+        <span class="s">该格 ${S.seated[r.si]}/${CAP}</span>
+        <span class="pd">已处理 ${judged} / ${total}</span>
+      </div>
+      <div class="card">
+        <div class="row1">
+          <span class="avatar">${r.name.charAt(0)}</span>
+          <div class="who">
+            <div class="n">${r.name}</div>
+            <div class="m">学号 ${r.who}</div>
+          </div>
+          <span class="idtag">#${r.id}</span>
+        </div>
+        <div class="song">《${r.song}》</div>
+        <div class="singer">测试歌手 · 点歌</div>
+        <div class="fields">
+          <div class="f">
+            <span class="k">首选时段</span>
+            <span class="v acc">${slotLabel(r.si)}</span>
+          </div>
+          <div class="f">
+            <span class="k">是否接受调剂</span>
+            <span class="v">${r.allow
+              ? '<span class="pill ok">接受调剂</span>'
+              : '<span class="pill no">不接受调剂</span>'}</span>
+          </div>
+        </div>
+        <div class="cellbar">
+          <span>该格已占</span>
+          <div class="dots">${Array.from({ length: CAP }, (_, k) => `<i class="${k < S.seated[r.si] ? 'on' : ''}"></i>`).join('')}</div>
+          <b>${S.seated[r.si]}/${CAP}</b>
+          <span class="hint">通过后立刻占住这一格</span>
+        </div>
+        ${S.banner ? `<div class="banner ${S.banner.kind === 'info' ? 'info' : ''}">${S.banner.html}</div>` : ''}
+      </div>
+      <div class="acts">
+        <button class="btn pri" onclick="approve()">通过并取下一条</button>
+        <button class="btn danger" onclick="reject()">驳回</button>
+        <span class="sp">键盘 ↑/↓ 可切换 · 这是预览，不写库</span>
+      </div>`;
+  } else {
+    // 统筹结果
+    const rows = S.settle;
+    const moved = rows.filter((x) => x.res === 'moved').length;
+    const rej = rows.filter((x) => x.res !== 'moved').length;
+    const allFull = !S.hadRoom;
+    $('stage').innerHTML = `
+      <div class="stage-hd">
+        <span class="t">所有时段已审完 · 统筹结果</span>
+        <span class="s">剩余 ${rows.length} 条</span>
+        <span class="pd">${allFull ? '开审时已全满' : '开审时还有空位'}</span>
+      </div>
+      <div class="sum">
+        <div class="sum-hd">
+          <span class="t">${moved} 条调配成功 · ${rej} 条未排上</span>
+          <span class="s">${allFull
+            ? '五格都满了 —— 调配无处可去，全部按"没位子"处理'
+            : '按 申请时间 → 最近时段 依次补进空位'}</span>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>id</th><th>歌曲</th><th>首选</th><th>调剂</th><th>结果</th></tr></thead>
+          <tbody>
+            ${rows.map((x) => `<tr>
+              <td class="id">#${x.r.id}</td>
+              <td>${x.r.song}</td>
+              <td class="mono">${slotShort(x.r.si)}</td>
+              <td>${x.r.allow ? '<span class="pill ok">接受</span>' : '<span class="pill no">不接受</span>'}</td>
+              <td>${x.res === 'moved'
+                ? `<span class="res moved">调到 ${slotShort(x.to)}</span>`
+                : `<span class="res rej">${x.res === 'noReschedule' ? '首选已满 · 不接受调剂' : '所有时段已满'}</span>`}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+        ${allFull ? `<div class="banner" style="margin-top:14px">
+            <span>全部时段都满了，没有人可以再调配进来。</span>
+            <span class="hint" style="margin-left:auto">这 ${rows.length} 条的去向 → 见下方「收尾口径」</span>
+          </div>
+          <div class="pick">
+            <div class="pick-t">收尾口径 · 这一处要陛下拍板</div>
+            <div class="pick-s">「全格满」时剩下的这些人，是当场驳回、还是留到锁定那一刻再批量驳回？其它情况下系统都是当场补位、补不上就驳，没有差别。</div>
+            <div class="pick-grid">
+              <div class="opt ${S.pick === 'A' ? 'on' : ''}" onclick="setPick('A')">
+                <div class="opt-hd"><span class="n">A · 留到锁定</span><span class="b">现在的线上行为</span></div>
+                <p>这 ${rows.length} 条<b>一律留在待审</b>，等到「锁定本周」那一刻系统才批量驳回，
+                   驳回理由「排期已锁定，没有可用位置」。</p>
+                <div class="eff">好处：锁定前还能撤回、还能补位。代价：学生要等到锁定才知道没排上。</div>
+              </div>
+              <div class="opt ${S.pick === 'B' ? 'on' : ''}" onclick="setPick('B')">
+                <div class="opt-hd"><span class="n">B · 审完即驳</span><span class="b">按这句话的字面意思</span></div>
+                <p>审完最后一个时段的<b>当场就把这 ${rows.length} 条驳回</b>（理由「所有时段都已排满，本次未能排上」），
+                   不用等锁定。</p>
+                <div class="eff">好处：学生马上知道结果。代价：之后想撤回补位，人已经被驳走了。</div>
+              </div>
+            </div>
+          </div>` : ''}
+      </div>
+      <div class="acts">
+        <button class="btn" onclick="reset(S.scen)">重来一遍</button>
+        <span class="sp">这是预览，不写库</span>
+      </div>`;
+  }
+
+  // 日志
+  const box = $('logBox');
+  box.innerHTML = S.logs.length
+    ? S.logs.map((l, i) => `<li class="${l.kind || ''}"><span class="n">${String(i + 1).padStart(2, '0')}</span><span>${l.text}</span></li>`).join('')
+    : '<li><span class="empty">还没有操作</span></li>';
+  box.scrollTop = box.scrollHeight;
+}
+
+/* ══════════════════ 事件 ══════════════════ */
+document.querySelectorAll('.scen .tab').forEach((el) => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.scen .tab').forEach((x) => x.classList.remove('on'));
+    el.classList.add('on');
+    reset(el.dataset.scen);
+  });
+});
+$('btnReset').addEventListener('click', () => reset(S.scen));
+$('btnStep').addEventListener('click', () => {
+  if (S.phase === 'settle') return reset(S.scen);
+  const t = setInterval(() => {
+    if (S.phase === 'settle') return clearInterval(t);
+    approve();
+    // 每格第 2 条之后会跳过，节奏留一眼
+  }, 520);
+});
+
+/* 预览快捷入口：#auto / #autob 直接跑到审完（只为截图和演示省事） */
+(function boot() {
+  const h = location.hash || '';
+  const scen = h.indexOf('b') >= 0 ? 'B' : 'A';
+  const tab = document.querySelector(`.scen .tab[data-scen="${scen}"]`);
+  if (tab) {
+    document.querySelectorAll('.scen .tab').forEach((x) => x.classList.remove('on'));
+    tab.classList.add('on');
+  }
+  reset(scen);
+  if (h.indexOf('auto') >= 0) {
+    for (let k = 0; k < 40 && S.phase === 'review'; k++) approve();
+  }
+})();
+</script>
+</body>
+</html>
