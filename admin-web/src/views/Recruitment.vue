@@ -3,56 +3,72 @@
     <el-alert v-if="!recruitmentAvailable" :title="recruitmentUnavailableMessage" type="warning" :closable="false" show-icon />
     <template v-else>
       <div class="section-toolbar">
-        <div class="filters">
-          <button class="filter" :class="{ on: !batchQuery.archived }" @click="changeArchive(false)">当前批次</button>
-          <button class="filter" :class="{ on: batchQuery.archived }" @click="changeArchive(true)">历史归档</button>
+        <div class="segment">
+          <button type="button" :class="{ on: !batchQuery.archived }" @click="changeArchive(false)">当前批次</button>
+          <button type="button" :class="{ on: batchQuery.archived }" @click="changeArchive(true)">历史归档</button>
         </div>
         <div class="actions">
+          <span v-if="batchQuery.archived" class="micro">历史批次只读，可查名单与结果</span>
           <el-button :loading="batchLoading" @click="refresh">刷新</el-button>
           <el-button v-if="auth.isSuperAdmin" type="primary" @click="openConfig()">新建招新批次</el-button>
         </div>
       </div>
 
-      <div class="panel" v-loading="batchLoading">
-        <el-table v-if="batches.length" :data="batches" row-key="id" highlight-current-row :current-row-key="selectedBatch?.id" @row-click="selectBatch">
-          <el-table-column label="招新批次" min-width="210">
-            <template #default="{ row }"><span class="strong">{{ row.title }}</span></template>
-          </el-table-column>
-          <el-table-column label="报名时间（北京时间）" min-width="290">
-            <template #default="{ row }"><div>{{ formatTime(row.opensAt) }}</div><div class="micro">至 {{ formatTime(row.closesAt) }}</div></template>
-          </el-table-column>
-          <el-table-column label="状态" width="125">
-            <template #default="{ row }"><span class="tag" :class="batchTag(row)">{{ batchState(row) }}</span></template>
-          </el-table-column>
-          <el-table-column label="待决定" width="90">
-            <template #default="{ row }">{{ row.unresolvedCount ?? 0 }}</template>
-          </el-table-column>
-          <el-table-column label="操作" width="200" align="right">
-            <template #default="{ row }">
-              <div class="row-actions">
-                <button class="pill" @click.stop="selectBatch(row)">查看报名</button>
-                <button v-if="auth.isSuperAdmin" class="pill pill-danger" @click.stop="removeBatch(row)">删除</button>
-              </div>
-            </template>
-          </el-table-column>
-        </el-table>
-        <EmptyState v-else variant="content" :title="batchQuery.archived ? '暂无历史批次' : '暂无招新批次'" :description="auth.isSuperAdmin ? '新建批次，配置报名问题后发布。' : '超级管理员发布招新批次后，可在这里查看和审核报名。'" />
-        <el-pagination v-if="batchTotal > batchQuery.pageSize" v-model:current-page="batchQuery.page" :page-size="batchQuery.pageSize" :total="batchTotal" layout="total, prev, pager, next" class="pager" @current-change="loadBatches" />
+      <!-- 多批次时才有这一排：只有一个批次时不占位置（原先是常驻表格，一行数据撑满整屏） -->
+      <div v-if="batches.length > 1" class="batch-switch">
+        <button
+          v-for="item in batches"
+          :key="item.id"
+          type="button"
+          class="batch-chip"
+          :class="{ on: item.id === selectedBatch?.id }"
+          @click="selectBatch(item)"
+        >
+          <span class="batch-chip-title">{{ item.title }}</span>
+          <span class="batch-chip-state">{{ batchState(item) }}</span>
+        </button>
+        <el-pagination
+          v-if="batchTotal > batchQuery.pageSize"
+          v-model:current-page="batchQuery.page"
+          :page-size="batchQuery.pageSize"
+          :total="batchTotal"
+          layout="prev, pager, next"
+          small
+          class="batch-pager"
+          @current-change="loadBatches"
+        />
       </div>
 
       <template v-if="selectedBatch">
-        <div class="batch-summary">
-          <div class="summary-main">
-            <div class="summary-caption">统一招录 · {{ batchState(selectedBatch) }}</div>
-            <h2>{{ selectedBatch.title }}</h2>
-            <p>{{ formatTime(selectedBatch.opensAt) }} 至 {{ formatTime(selectedBatch.closesAt) }}（北京时间）</p>
-            <p v-if="selectedBatch.closedAt">已于 {{ formatTime(selectedBatch.closedAt) }} 手动截止，报名资料已保留。</p>
-            <p>{{ gradeScopeText }} · 无需学生账号 · {{ selectedBatch.questions?.length || 0 }} 道自定义问题</p>
+        <!-- ══════════ 批次带：状态 / 标题 / 关键事实 / 四个数 ══════════ -->
+        <section class="batch-band" v-loading="batchLoading">
+          <div class="batch-main">
+            <div class="batch-title-row">
+              <span class="tag" :class="batchTag(selectedBatch)">{{ batchState(selectedBatch) }}</span>
+              <h2 class="batch-title">{{ selectedBatch.title }}</h2>
+            </div>
+            <div class="batch-meta">
+              <span>报名 <b>{{ formatTime(selectedBatch.opensAt) }}</b> 至 <b>{{ formatTime(selectedBatch.closesAt) }}</b></span><i></i>
+              <span>面向 <b>{{ gradeScopeText }}</b></span><i></i>
+              <span>自定义问题 <b>{{ selectedBatch.questions?.length || 0 }}</b> 道</span><i></i>
+              <span>无需学生账号</span>
+            </div>
+            <p class="batch-note">{{ batchNote }}</p>
           </div>
-          <div class="summary-count"><strong>{{ selectedBatch.unresolvedCount ?? 0 }}</strong><span>份报名待决定</span></div>
-        </div>
-        <div class="batch-actions">
-          <span class="micro">{{ selectedBatch.resultPublishedAt ? '结果已统一发布，审核和面试安排已锁定。' : isClosed(selectedBatch) ? '报名已截止，可安排面试、审核并拟定录取结果。' : '报名截止后开始审核；结果发布前，报名者看不到内部录取决定。' }}</span>
+          <div class="kpis">
+            <div class="kpi"><b>{{ batchStats.total }}</b><span>报名总数</span></div>
+            <div class="kpi" :class="{ alert: (selectedBatch.unresolvedCount || 0) > 0 }"><b>{{ selectedBatch.unresolvedCount ?? 0 }}</b><span>待决定</span></div>
+            <button type="button" class="kpi kpi-btn" :class="{ mute: !selectedBatch.interviewOrderCount }" :disabled="!selectedBatch.publishedAt" @click="openOrder">
+              <b>{{ selectedBatch.interviewOrderCount || 0 }}</b><span>已排面试顺序</span>
+            </button>
+            <button type="button" class="kpi kpi-btn" :class="{ mute: !batchStats.accepted }" @click="filterByStatus('accepted')">
+              <b>{{ batchStats.accepted }}</b><span>已拟录取</span>
+            </button>
+          </div>
+        </section>
+
+        <div class="batch-bar">
+          <span class="micro">{{ batchHint }}</span>
           <div class="actions">
             <el-button v-if="selectedBatch.publishedAt" @click="openPlan">面试安排{{ selectedBatch.interview ? '（已发布）' : '' }}</el-button>
             <el-button v-if="selectedBatch.publishedAt" @click="openOrder">面试顺序{{ selectedBatch.orderGeneratedAt ? `（${selectedBatch.interviewOrderCount || 0} 人）` : '' }}</el-button>
@@ -68,48 +84,114 @@
           </div>
         </div>
 
-        <div class="section-toolbar application-toolbar">
-          <h3>报名名单 <span class="micro">共 {{ applicationTotal }} 份</span></h3>
-          <div class="actions">
-            <el-select v-model="applicationQuery.grade" placeholder="全部年级" clearable class="grade-filter" @change="filterApplications">
-              <el-option v-for="item in gradeOptions" :key="item" :label="item" :value="item" />
-            </el-select>
-            <el-select v-model="applicationQuery.status" placeholder="全部状态" clearable class="status-filter" @change="filterApplications">
-              <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
-            </el-select>
-            <el-button @click="filterApplications">筛选</el-button>
-          </div>
-        </div>
-        <div class="panel" v-loading="applicationLoading">
-          <el-table v-if="applications.length" :data="applications" row-key="id">
-            <el-table-column prop="name" label="姓名" min-width="90" />
-            <el-table-column label="QQ 号" min-width="130"><template #default="{ row }">{{ row.qqNumber || '未填写' }}<div v-if="row.legacyStudentNo" class="micro">历史学号：{{ row.legacyStudentNo }}</div></template></el-table-column>
-            <el-table-column prop="grade" label="年级" min-width="100" />
-            <el-table-column prop="className" label="班级" min-width="100" />
-            <el-table-column label="面试序号" width="100"><template #default="{ row }">{{ row.interviewSequence || '—' }}</template></el-table-column>
-            <el-table-column label="审核状态" min-width="125">
-              <template #default="{ row }"><span class="tag" :class="applicationTag(row)">{{ applicationState(row) }}</span></template>
-            </el-table-column>
-            <el-table-column label="面试安排（北京时间）" min-width="200">
-              <template #default="{ row }">
-                <template v-if="row.interview">
-                  <div>{{ formatTime(row.interview.at) }}<span v-if="row.interviewCustom" class="solo">单独配置</span></div>
-                  <div class="micro">{{ row.interview.location }}</div>
-                </template>
-                <span v-else class="micro">未安排</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="提交时间" min-width="165">
-              <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
-            </el-table-column>
-            <el-table-column label="操作" width="140" align="right">
-              <template #default="{ row }"><button class="pill pill-acc" @click.stop="openApplication(row)">查看 / 审核</button></template>
-            </el-table-column>
-          </el-table>
-          <EmptyState v-else :title="selectedBatch.publishedAt ? '暂无符合条件的报名' : '批次尚未发布'" :description="selectedBatch.publishedAt ? '可以调整年级或状态筛选条件。' : '发布后，学生可从「我的」页面的「加入我们」报名。'" />
-          <el-pagination v-if="applicationTotal" v-model:current-page="applicationQuery.page" v-model:page-size="applicationQuery.pageSize" :page-sizes="[20, 50, 100]" :total="applicationTotal" layout="total, sizes, prev, pager, next" class="pager" @current-change="loadApplications" @size-change="filterApplications" />
+        <!-- ══════════ 主区：名单卡撑满 + 右栏流程 ══════════ -->
+        <div class="workspace">
+          <section class="card" v-loading="applicationLoading">
+            <div class="list-head">
+              <div class="list-title">
+                <h3>报名名单</h3>
+                <span class="micro">{{ applicationTotalText }}</span>
+              </div>
+              <div class="filters">
+                <el-select v-model="applicationQuery.grade" placeholder="全部年级" clearable class="grade-filter" @change="filterApplications">
+                  <el-option v-for="item in gradeOptions" :key="item" :label="item" :value="item" />
+                </el-select>
+                <el-select v-model="applicationQuery.status" placeholder="全部状态" clearable class="status-filter" @change="filterApplications">
+                  <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
+                </el-select>
+              </div>
+            </div>
+
+            <div ref="listBody" class="table-wrap">
+              <el-table v-if="applications.length" :data="applications" row-key="id" :height="tableHeight">
+                <el-table-column label="报名者" min-width="150">
+                  <template #default="{ row }">
+                    <div class="who">
+                      <span class="who-av">{{ (row.name || '?').charAt(0) }}</span>
+                      <div class="who-main">
+                        <div class="who-name">{{ row.name }}</div>
+                        <div class="who-sub">{{ row.grade }} · {{ row.className }}<span v-if="row.legacyStudentNo"> · 历史学号 {{ row.legacyStudentNo }}</span></div>
+                      </div>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="QQ 号" width="110"><template #default="{ row }"><span class="num">{{ row.qqNumber || '未填写' }}</span></template></el-table-column>
+                <el-table-column label="面试序号" width="86"><template #default="{ row }"><span class="seq">{{ row.interviewSequence ? `#${String(row.interviewSequence).padStart(2, '0')}` : '—' }}</span></template></el-table-column>
+                <el-table-column label="面试安排（北京时间）" min-width="190">
+                  <template #default="{ row }">
+                    <div v-if="row.interview" class="iv">{{ formatTime(row.interview.at) }}<span v-if="row.interviewCustom" class="solo">单独配置</span><span class="micro">{{ row.interview.location }}</span></div>
+                    <span v-else class="micro">未安排</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="审核状态" width="134">
+                  <template #default="{ row }"><span class="tag" :class="applicationTag(row)">{{ applicationState(row) }}</span></template>
+                </el-table-column>
+                <el-table-column label="提交时间" width="144"><template #default="{ row }"><span class="num">{{ formatTime(row.createdAt) }}</span></template></el-table-column>
+                <el-table-column label="操作" width="122" align="right">
+                  <template #default="{ row }"><button class="pill pill-acc" @click.stop="openApplication(row)">查看 / 审核</button></template>
+                </el-table-column>
+              </el-table>
+              <EmptyState
+                v-else
+                :title="emptyTitle"
+                :description="emptyDescription"
+              />
+            </div>
+
+            <div class="list-foot">
+              <span class="micro">{{ applications.length ? `本页 ${applications.length} 条` : '暂无记录' }}</span>
+              <el-pagination
+                v-if="applicationTotal"
+                v-model:current-page="applicationQuery.page"
+                v-model:page-size="applicationQuery.pageSize"
+                :page-sizes="[20, 50, 100]"
+                :total="applicationTotal"
+                layout="total, sizes, prev, pager, next"
+                small
+                @current-change="loadApplications"
+                @size-change="filterApplications"
+              />
+            </div>
+          </section>
+
+          <aside class="rail">
+            <div class="rail-card">
+              <div class="rail-head"><h3>招新流程</h3><span class="micro">{{ flowHint }}</span></div>
+              <div class="steps">
+                <div v-for="(step, index) in flowSteps" :key="index" class="step" :class="step.cls">
+                  <span class="step-mark">
+                    <svg v-if="step.cls === 'done'" viewBox="0 0 10 10" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1.6 5.2l2.2 2.2L8.4 2.8" /></svg>
+                    <svg v-else-if="step.cls === 'now'" viewBox="0 0 6 6" width="6" height="6"><circle cx="3" cy="3" r="2.4" fill="currentColor" /></svg>
+                  </span>
+                  <div>
+                    <div class="step-title">{{ step.label }}</div>
+                    <div class="step-sub">{{ step.sub }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="rail-card">
+              <div class="rail-head"><h3>批次信息</h3></div>
+              <dl>
+                <div class="info-row"><dt>报名时间</dt><dd>{{ formatTime(selectedBatch.opensAt) }}<br />至 {{ formatTime(selectedBatch.closesAt) }}</dd></div>
+                <div class="info-row"><dt>报名范围</dt><dd>{{ gradeScopeText }}</dd></div>
+                <div class="info-row"><dt>面试安排</dt><dd>{{ selectedBatch.interview ? '已发布' : '未安排' }}</dd></div>
+                <div class="info-row"><dt>面试顺序</dt><dd>{{ selectedBatch.orderGeneratedAt ? `${selectedBatch.interviewOrderCount || 0} 人` : '未生成' }}</dd></div>
+                <div class="info-row"><dt>结果查询</dt><dd>报名者凭查询码查看</dd></div>
+              </dl>
+            </div>
+          </aside>
         </div>
       </template>
+
+      <section v-else class="card empty-card" v-loading="batchLoading">
+        <EmptyState
+          variant="content"
+          :title="batchQuery.archived ? '暂无历史批次' : '暂无招新批次'"
+          :description="auth.isSuperAdmin ? '新建批次，配置报名问题后发布。' : '超级管理员发布招新批次后，可在这里查看和审核报名。'"
+        />
+      </section>
     </template>
 
     <!-- ══════════ 批次配置（处理台样式：题头 + 同底色两栏） ══════════ -->
@@ -341,7 +423,7 @@
               <p class="micro desk-note">面试时间在批次级的「面试安排」里统一设置，本页不再单独安排。</p>
               <el-form label-position="top" :disabled="!canReview || detailSaving">
                 <el-form-item label="内部备注（仅管理员可见，最多 2000 字）"><el-input v-model="reviewForm.internalNote" type="textarea" :rows="6" placeholder="审核记录、面试评价等。" /></el-form-item>
-                <el-form-item label="审核决定"><el-select v-model="reviewForm.decision" :clearable="!detail.decision" placeholder="暂不决定，仅保存备注"><el-option v-if="detail.progress === 'interview'" label="拟录取" value="accepted" /><el-option label="拟不录取" value="rejected" /></el-select><p class="micro">{{ detail.progress === 'interview' ? '可拟定录取或不录取，统一发布前可以修正决定。' : '可先拟定不录取；录取须先在「面试安排」里设置面试时间。' }}</p></el-form-item>
+                <el-form-item label="审核决定"><el-select v-model="reviewForm.decision" :clearable="!detail.decision" placeholder="暂不决定，仅保存备注"><el-option v-if="detail.progress === 'interview' || detail.decision === 'accepted'" label="拟录取" value="accepted" /><el-option label="拟不录取" value="rejected" /></el-select><p class="micro">{{ detail.progress === 'interview' ? '可拟定录取或不录取，统一发布前可以修正决定。' : '可先拟定不录取；录取须先在「面试安排」里设置面试时间。' }}</p></el-form-item>
                 <el-form-item label="结果说明（统一发布后报名者可见，最多 2000 字）"><el-input v-model="reviewForm.publicNote" type="textarea" :rows="4" placeholder="填写录取后的要求，或未录取的对外说明。" /></el-form-item>
               </el-form>
               <div v-if="canReview" class="actions"><el-button type="primary" :loading="detailSaving" @click="saveReview">保存审核</el-button><el-button v-if="detail.decision" :disabled="detailSaving" @click="retractDecision">撤销拟定结果</el-button></div>
@@ -365,7 +447,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import EmptyState from '@/components/EmptyState.vue';
 import { useAuthStore } from '@/stores/auth';
@@ -388,9 +470,25 @@ const applications = ref([]);
 const applicationTotal = ref(0);
 const applicationLoading = ref(false);
 const applicationQuery = reactive({ page: 1, pageSize: 20, grade: '', status: '' });
+// 批次级统计：报名总数与「已拟录取」都不走全量拉取，用 pageSize=1 的计数查询拿 total。
+const batchStats = reactive({ total: 0, accepted: 0 });
+let statsRequest = 0;
 let batchRequest = 0;
 let selectionRequest = 0;
 let applicationRequest = 0;
+
+const listBody = ref(null);
+const tableHeight = ref(420);
+let tableObserver = null;
+function measureTable() {
+  const height = listBody.value?.clientHeight || 0;
+  if (height > 0 && Math.abs(height - tableHeight.value) > 1) tableHeight.value = height;
+}
+watch(listBody, (el, previous) => {
+  if (!tableObserver) tableObserver = new ResizeObserver(measureTable);
+  if (previous) tableObserver.unobserve(previous);
+  if (el) { tableObserver.observe(el); measureTable(); } else { tableHeight.value = 420; }
+});
 
 const statusOptions = [
   { value: 'submitted', label: '已提交' }, { value: 'interview', label: '待面试' },
@@ -481,6 +579,70 @@ function applicationTag(application) {
   return status === 'withdrawn' ? 'tag-mute' : status === 'accepted' ? 'tag-pass' : status === 'rejected' ? 'tag-reject' : 'tag-wait';
 }
 
+// ---- 批次带与右栏的派生文案：只说批次自身的字段，不编业务事实 ----
+const isFiltered = computed(() => !!(applicationQuery.grade || applicationQuery.status));
+const applicationTotalText = computed(() => isFiltered.value
+  ? `筛选后 ${applicationTotal.value} / ${batchStats.total} 份`
+  : `共 ${batchStats.total} 份`);
+const emptyTitle = computed(() => {
+  if (isFiltered.value) return '暂无符合条件的报名';
+  return selectedBatch.value?.publishedAt ? '报名名单还是空的' : '批次尚未发布';
+});
+const emptyDescription = computed(() => {
+  if (isFiltered.value) return '调整年级或状态筛选条件。';
+  return selectedBatch.value?.publishedAt
+    ? '报名窗口内，学生可从「我的」页面的「加入我们」报名。'
+    : '发布后，学生可从「我的」页面的「加入我们」报名。';
+});
+// 批次带下面那一行说明：把原来三条重复的文案收成一条，按状态各说各的
+const batchNote = computed(() => {
+  const batch = selectedBatch.value;
+  if (!batch) return '';
+  if (batch.archivedAt) return `批次已于 ${formatTime(batch.archivedAt)} 归档，题目、时间与审核决定只读。`;
+  if (batch.resultPublishedAt) return `结果已于 ${formatTime(batch.resultPublishedAt)} 统一发布，审核与面试安排已锁定。`;
+  if (!batch.publishedAt) return '批次还是草稿：配置题目与报名时间后发布，学生即可在报名窗口内公开报名。';
+  if (batch.closedAt) return `已于 ${formatTime(batch.closedAt)} 手动截止，报名资料已保留；统一发布结果前，报名者看不到内部录取决定。`;
+  if (isClosed(batch)) return `报名已于 ${formatTime(batch.closesAt)} 截止，可安排面试、审核报名并拟定录取结果；统一发布结果前，报名者看不到内部录取决定。`;
+  return `报名进行中，${formatTime(batch.closesAt)} 截止后即可安排面试与审核。`;
+});
+const batchHint = computed(() => {
+  const batch = selectedBatch.value;
+  if (!batch) return '';
+  if (batch.archivedAt) return '已归档批次不可再改题目、时间与审核结果，只能查看名单与导出。';
+  if (batch.resultPublishedAt) return '结果已统一发布，审核与面试安排已锁定。';
+  if (!batch.publishedAt) return '发布报名后，学生才能在报名窗口内提交报名。';
+  if (!isClosed(batch)) return '报名进行中；截止后即可安排面试、审核并拟定录取结果。';
+  const unresolved = batch.unresolvedCount ?? 0;
+  return unresolved
+    ? `还有 ${unresolved} 份报名待决定；全部有决定后才能统一发布结果。`
+    : '全部报名已有决定，可以统一发布录取结果。';
+});
+// 右栏五步：全部由批次字段推出来，不给后端加接口
+const flowSteps = computed(() => {
+  const batch = selectedBatch.value;
+  if (!batch) return [];
+  const published = !!batch.publishedAt;
+  const closed = isClosed(batch);
+  const results = !!batch.resultPublishedAt;
+  const archived = !!batch.archivedAt;
+  const unresolved = batch.unresolvedCount ?? 0;
+  const decided = closed && unresolved === 0;
+  const steps = [
+    { label: '发布报名', sub: published ? `${formatTime(batch.publishedAt)} 发布` : '草稿，尚未发布', done: published, now: !published },
+    { label: '报名截止', sub: published ? (closed ? `${formatTime(batch.closedAt || batch.closesAt)} 截止` : `报名窗口至 ${formatTime(batch.closesAt)}`) : '发布后才开始计时', done: closed, now: published && !closed },
+    { label: '审核与面试', sub: closed ? (unresolved ? `还有 ${unresolved} 份待决定` : '全部报名已决定') : '报名截止后开始审核', done: decided, now: closed && !decided },
+    { label: '统一发布结果', sub: results ? `${formatTime(batch.resultPublishedAt)} 已发布` : decided ? '可以发布了' : '待所有报名都有决定', done: results, now: !results && decided },
+    { label: '归档批次', sub: archived ? `${formatTime(batch.archivedAt)} 已归档` : '结果发布后可归档', done: archived, now: !archived && results },
+  ];
+  return steps.map((step) => ({ ...step, cls: step.done ? 'done' : step.now ? 'now' : '' }));
+});
+const flowHint = computed(() => {
+  const steps = flowSteps.value;
+  if (!steps.length) return '';
+  if (steps.every((step) => step.done)) return '已完成';
+  return `第 ${steps.findIndex((step) => !step.done) + 1} / ${steps.length} 步`;
+});
+
 async function loadBatches() {
   if (!recruitmentAvailable) return;
   const request = ++batchRequest;
@@ -507,6 +669,9 @@ function changeArchive(archived) {
   selectedBatch.value = null;
   applications.value = [];
   applicationTotal.value = 0;
+  batchStats.total = 0;
+  batchStats.accepted = 0;
+  statsRequest++;
   loadBatches();
 }
 async function selectBatch(row) {
@@ -518,6 +683,9 @@ async function selectBatch(row) {
   applicationQuery.status = '';
   applications.value = [];
   applicationTotal.value = 0;
+  batchStats.total = 0;
+  batchStats.accepted = 0;
+  statsRequest++;
   try {
     const batch = await getBatch(row.id);
     if (request !== selectionRequest) return;
@@ -544,11 +712,27 @@ async function loadApplications() {
     if (request !== applicationRequest || selectedBatch.value?.id !== id) return;
     applications.value = data.items || [];
     applicationTotal.value = data.total || 0;
+    // 未筛选时这一页的 total 就是全批次报名数；翻页/筛选不必再算
+    if (!isFiltered.value) batchStats.total = applicationTotal.value;
+    if (applicationQuery.page === 1) loadAcceptedCount(id);
     await refreshSelectedBatch();
   } catch { /* 请求层已提示。 */ }
   finally { if (request === applicationRequest) applicationLoading.value = false; }
 }
 function filterApplications() { applicationQuery.page = 1; loadApplications(); }
+// 「已拟录取」点一下就筛名单，再点一次撤销
+function filterByStatus(status) {
+  applicationQuery.status = applicationQuery.status === status ? '' : status;
+  filterApplications();
+}
+async function loadAcceptedCount(id) {
+  const request = ++statsRequest;
+  try {
+    const data = await listApplications({ batchId: id, page: 1, pageSize: 1, status: 'accepted' });
+    if (request !== statsRequest || selectedBatch.value?.id !== id) return;
+    batchStats.accepted = data.total || 0;
+  } catch { /* 统计失败不打断主流程 */ }
+}
 async function refresh() { await loadBatches(); if (selectedBatch.value) await loadApplications(); }
 
 // ---- 批次配置 ----
@@ -994,20 +1178,130 @@ async function retractDecision() {
 }
 
 onMounted(() => { setPageHeader({ title: '招新管理', subtitle: '公开报名、面试安排与统一录取' }); loadBatches(); });
-onBeforeUnmount(() => { batchRequest++; selectionRequest++; applicationRequest++; detailRequest++; orderRequest++; planRequest++; clearPageHeader(); });
+onBeforeUnmount(() => {
+  batchRequest++; selectionRequest++; applicationRequest++; detailRequest++; orderRequest++; planRequest++; statsRequest++;
+  tableObserver?.disconnect();
+  tableObserver = null;
+  clearPageHeader();
+});
 </script>
 
 <style scoped>
-.recruitment-page { max-width: 1440px; margin: 0 auto; }
-.section-toolbar, .batch-actions, .question-top, .desk-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
-.section-toolbar { margin-bottom: 14px; }
-.actions, .filters, .question-settings, .question-tools, .row-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* ══════════════════════════════════════════════════════════
+   招新管理 · 页面骨架
+   纵向三段（工具条 / 批次带 / 主区），主区吃掉剩余高度 ⇒ 一屏内没有死白。
+   原先「批次表格 + 深色摘要卡 + 说明行」把同一个批次讲了三遍，短名单会缩成一条细带。
+   ══════════════════════════════════════════════════════════ */
+.recruitment-page { display: flex; flex-direction: column; gap: 14px; height: 100%; min-height: 0; }
+.section-toolbar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.section-toolbar, .batch-bar, .desk-head, .question-top { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.actions, .filters, .question-settings, .question-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .actions :deep(.el-button + .el-button) { margin-left: 0; }
-.filter { height: 32px; padding: 0 16px; border: 1px solid var(--hairline); border-radius: var(--r-pill); background: var(--canvas); color: var(--ink-2); font: inherit; cursor: pointer; }
-.filter:hover { border-color: var(--soft); }
-.filter.on { background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 600; }
-.row-actions { justify-content: flex-end; flex-wrap: nowrap; }
-/* 表格操作列的胶囊：文字与内边距一并重做，靠 inline-flex + line-height 1 保证文字真正居中 */
+
+/* 分段切换：羊皮纸轨道 + 白胶囊选中（选中态靠底色，不靠墨黑反白） */
+.segment { display: inline-flex; gap: 4px; padding: 4px; background: var(--parchment); border-radius: var(--r-pill); }
+.segment button { height: 30px; padding: 0 16px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); font: inherit; font-size: var(--fs-md); letter-spacing: var(--ls-wide-sm); cursor: pointer; transition: background .18s var(--ease), color .18s var(--ease); }
+.segment button:hover { color: var(--ink); }
+.segment button.on { background: var(--canvas); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .06); }
+
+/* 多批次切换：只有一个批次时整排不渲染 */
+.batch-switch { flex: none; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.batch-chip { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 13px; border: 1px solid var(--hairline); border-radius: var(--r-pill); background: var(--canvas); color: var(--ink-2); font: inherit; font-size: var(--fs-md); cursor: pointer; transition: border-color .18s var(--ease), color .18s var(--ease); }
+.batch-chip:hover { border-color: var(--soft); }
+.batch-chip.on { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+.batch-chip-state { font-size: var(--fs-xs); color: var(--muted-2); letter-spacing: var(--ls-wide-sm); }
+.batch-chip.on .batch-chip-state { color: var(--accent); }
+.batch-pager { margin-left: auto; }
+
+/* ══════════ 批次带：状态 / 标题 / 关键事实 + 四个数 ══════════ */
+.batch-band { flex: none; display: flex; align-items: flex-start; gap: 28px; flex-wrap: wrap; padding: 20px 22px; background: var(--parchment); border-radius: var(--r-card); }
+.batch-main { flex: 1; min-width: 320px; }
+.batch-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.batch-title { margin: 0; font-size: 22px; line-height: 1.25; letter-spacing: -.5px; color: var(--ink); }
+.batch-meta { display: flex; align-items: center; flex-wrap: wrap; margin-top: 12px; font-size: var(--fs-sm); color: var(--muted-2); }
+.batch-meta i { display: inline-block; width: 1px; height: 11px; margin: 0 11px; background: var(--soft); opacity: .7; }
+.batch-meta b { font-weight: 500; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.batch-note { margin: 11px 0 0; max-width: 780px; font-size: var(--fs-sm); line-height: 1.65; color: var(--muted); }
+.batch-note strong { font-weight: 500; color: var(--ink-2); }
+
+/* 四个数：竖线分隔，不再套第四层卡片 */
+.kpis { flex: none; display: flex; align-items: stretch; }
+.kpi { min-width: 92px; padding: 2px 20px; border: 0; border-left: 1px solid #e3e3e6; background: transparent; text-align: left; font: inherit; }
+.kpi:first-child { padding-left: 0; border-left: 0; }
+.kpi b { display: block; font-size: 27px; font-weight: 600; line-height: 1.1; letter-spacing: -.8px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.kpi span { display: block; margin-top: 5px; font-size: var(--fs-xs); color: var(--muted-2); letter-spacing: var(--ls-wide-sm); }
+.kpi.alert b { color: var(--accent); }
+.kpi.mute b { color: var(--soft); }
+.kpi-btn { cursor: pointer; transition: color .18s var(--ease); }
+.kpi-btn:hover b { color: var(--accent); }
+.kpi-btn:disabled { cursor: default; }
+.kpi-btn:disabled:hover b { color: var(--soft); }
+
+/* ══════════ 操作条 ══════════ */
+.batch-bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.batch-bar > .micro { flex: 1; min-width: 220px; line-height: 1.6; }
+
+/* ══════════ 主区：名单卡撑满 + 右栏 ══════════ */
+.workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 332px; gap: 14px; align-items: stretch; }
+.card { display: flex; flex-direction: column; min-height: 320px; background: var(--canvas); border: 1px solid var(--hairline); border-radius: var(--r-card); overflow: hidden; }
+.empty-card { flex: 1; min-height: 320px; }
+
+.list-head { flex: none; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 13px 16px; border-bottom: 1px solid var(--divider); }
+.list-title { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
+.list-title h3 { margin: 0; font-size: var(--fs-lg); font-weight: 600; letter-spacing: var(--ls-tight-sm); color: var(--ink); }
+.list-title .micro { font-variant-numeric: tabular-nums; }
+.filters { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.grade-filter { width: 132px; }
+.status-filter { width: 172px; }
+
+/* 表格：由外层 flex 给定高度，表头 sticky 由 el-table 自己管（height 走 ResizeObserver 量出来的像素值） */
+.table-wrap { flex: 1; min-height: 0; }
+/* 最后一行用遮罩淡出，不让半行表格被卡脚硬切（遮罩比叠一层白渐变稳，不受 stacking 影响） */
+.table-wrap { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent 100%); mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent 100%); }
+.who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.who-av { width: 28px; height: 28px; border-radius: 50%; flex: none; display: inline-flex; align-items: center; justify-content: center; background: var(--parchment); color: var(--muted-2); font-size: var(--fs-sm); }
+.who-main { min-width: 0; }
+.who-name { font-size: var(--fs-md); font-weight: 500; line-height: 1.3; color: var(--ink); white-space: nowrap; }
+.who-sub { margin-top: 2px; font-size: var(--fs-2xs); line-height: 1.35; color: var(--muted-2); letter-spacing: var(--ls-wide-sm); }
+.num { font-variant-numeric: tabular-nums; }
+.seq { font-size: var(--fs-sm); color: var(--muted-2); font-variant-numeric: tabular-nums; }
+.iv { line-height: 1.35; font-variant-numeric: tabular-nums; }
+.iv .micro { display: block; margin-top: 2px; }
+/* 「单独配置」四个字标红（浅底表格里） */
+.solo { margin-left: 6px; font-size: var(--fs-2xs); color: var(--red-fg); letter-spacing: var(--ls-wide-sm); }
+
+/* 滚动区底部压一条白渐变：不让半行表格被卡脚硬切 */
+.list-foot { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; border-top: 1px solid var(--divider); background: #fcfcfd; }
+
+/* ══════════ 右栏：流程 + 批次信息 ══════════ */
+.rail { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.rail-card { padding: 16px 18px; background: var(--canvas); border: 1px solid var(--hairline); border-radius: var(--r-card); }
+.rail-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.rail-head h3 { margin: 0; font-size: var(--fs-md); font-weight: 600; color: var(--ink); letter-spacing: var(--ls-wide-sm); }
+
+/* 五步竖排：实心点＝已完成，空心＝待办，强调色外环＝当前 */
+.steps { display: flex; flex-direction: column; }
+.step { position: relative; display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; padding-bottom: 14px; }
+.step:last-child { padding-bottom: 0; }
+.step::before { content: ''; position: absolute; left: 7.5px; top: 15px; bottom: 0; width: 1px; background: var(--divider); }
+.step:last-child::before { display: none; }
+.step-mark { position: relative; z-index: 1; display: grid; place-items: center; width: 16px; height: 16px; margin-top: 1px; flex: none; border-radius: 50%; border: 1px solid var(--soft); background: var(--canvas); }
+.step.done .step-mark { background: var(--ink); border-color: var(--ink); color: #fff; }
+.step.now .step-mark { background: var(--canvas); border: 1.5px solid var(--accent); color: var(--accent); }
+.step-title { font-size: var(--fs-md); line-height: 1.35; color: var(--soft); }
+.step.done .step-title, .step.now .step-title { color: var(--ink); font-weight: 500; }
+.step.now .step-title { color: var(--accent); }
+.step-sub { margin-top: 3px; font-size: var(--fs-xs); line-height: 1.55; color: var(--muted-2); font-variant-numeric: tabular-nums; }
+.step.now .step-sub { color: var(--ink-2); }
+
+.rail-card dl { margin: 0; }
+.info-row { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--divider); }
+.info-row:first-child { padding-top: 0; }
+.info-row:last-child { padding-bottom: 0; border-bottom: 0; }
+.info-row dt { flex: none; font-size: var(--fs-sm); color: var(--muted); }
+.info-row dd { margin: 0; font-size: var(--fs-sm); line-height: 1.55; color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ══════════ 表格操作列的胶囊（处理台也复用） ══════════ */
 .pill { display: inline-flex; align-items: center; justify-content: center; height: 28px; padding: 0 13px; border: 1px solid var(--hairline); border-radius: var(--r-pill); background: var(--canvas); color: var(--ink-2); font: inherit; font-size: var(--fs-md); line-height: 1; letter-spacing: var(--ls-wide-sm); white-space: nowrap; cursor: pointer; transition: border-color .18s var(--ease), background .18s var(--ease), color .18s var(--ease); }
 .pill:hover { border-color: var(--soft); color: var(--ink); }
 .pill:disabled { border-color: var(--divider); color: var(--soft); cursor: not-allowed; }
@@ -1017,7 +1311,7 @@ onBeforeUnmount(() => { batchRequest++; selectionRequest++; applicationRequest++
 .pill-danger:hover { background: #fbd9d9; border-color: #fbd9d9; color: var(--red-fg); }
 /* 问题卡那一栏：胶囊文字与「问题 N」同号，避免一大一小 */
 .pill-lg { height: 30px; padding: 0 14px; font-size: var(--fs-lg); }
-.tag { display: inline-flex; align-items: center; height: 23px; padding: 0 10px; border-radius: var(--r-pill); font-size: var(--fs-xs); letter-spacing: var(--ls-wide-sm); white-space: nowrap; }
+.tag { display: inline-flex; align-items: center; gap: 5px; height: 23px; padding: 0 10px; border-radius: var(--r-pill); font-size: var(--fs-xs); letter-spacing: var(--ls-wide-sm); white-space: nowrap; }
 .tag-pass { background: var(--green-bg); color: var(--green-fg); }
 .tag-reject { background: var(--red-bg); color: var(--red-fg); }
 .tag-wait { background: var(--amber-bg); color: var(--amber-fg); }
@@ -1025,19 +1319,8 @@ onBeforeUnmount(() => { batchRequest++; selectionRequest++; applicationRequest++
 .panel { border: 1px solid var(--hairline); border-radius: var(--r-card); overflow: hidden; }
 .strong { font-weight: 600; color: var(--ink); }
 .pager { padding: 16px; justify-content: flex-end; flex-wrap: wrap; }
-.batch-summary { background: var(--tile); color: #fff; border-radius: var(--r-tile); padding: 24px 26px; margin-top: 24px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-.summary-caption { color: rgba(255, 255, 255, .6); font-size: var(--fs-sm); }
-.batch-summary h2 { margin: 8px 0 12px; font-size: 23px; }
-.batch-summary p { color: rgba(255, 255, 255, .7); margin: 5px 0; line-height: 1.6; font-size: var(--fs-sm); }
-.summary-count { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; gap: 6px; }
-.summary-count strong { font-size: 36px; font-variant-numeric: tabular-nums; }
-.summary-count span { color: rgba(255, 255, 255, .6); font-size: var(--fs-xs); }
-.batch-actions { margin: 14px 0 24px; }
-.batch-actions > .micro { flex: 1; min-width: 220px; line-height: 1.7; }
 h3 { font-size: var(--fs-lg); margin: 0; color: var(--ink); }
 h3 .micro { margin-left: 8px; font-weight: 400; }
-.grade-filter { width: 160px; }
-.status-filter { width: 195px; }
 .form-alert { margin: 16px 0 0; }
 .two-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .two-columns :deep(.el-date-editor) { width: 100%; }
@@ -1079,7 +1362,6 @@ h3 .micro { margin-left: 8px; font-weight: 400; }
 .order-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .order-heading p { line-height: 1.7; margin-bottom: 0; }
 .order-note { line-height: 1.7; margin-bottom: 10px; }
-
 /* ---- 处理台外壳：题头 + 同底色两栏（与投稿处理台同一套语言） ---- */
 :deep(.recruitment-console) { border-radius: var(--r-tile); padding: 0; overflow: hidden; box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .45); }
 :deep(.recruitment-console .el-dialog__header) { margin: 0; padding: 14px 22px; border-bottom: 1px solid var(--divider); }
@@ -1114,6 +1396,12 @@ h3 .micro { margin-left: 8px; font-weight: 400; }
 .desk-note { color: var(--muted-2); margin: 0 0 14px; }
 .desk-card :deep(.el-form-item:last-child) { margin-bottom: 0; }
 .desk-card :deep(.el-form-item .micro) { width: 100%; margin: 8px 0 0; line-height: 1.7; }
+/* 卡片内按钮组与上方最后一行控件之间必须有呼吸：上一行把 last form-item 的 margin-bottom 抹平了，
+   .actions 自己又没有上边距 ⇒ 按钮上沿正好压住输入框底边框（2026-11-16 陛下退回「黏住上面的框底」）。
+   取 18px 与卡片自身 padding 同值，按钮块上下留白对称。 */
+.desk-card > .actions { margin-top: 18px; }
+/* 同类：锁定期（canPlan=false）按钮组整个不渲染，提示语直接跟在表单后面，同样是 0 间距 */
+.desk-card > .el-form + .desk-note { margin-top: 12px; }
 /* 深色人物卡：姓名/年级/状态标签全部包在一块深色卡里（原先名字落在卡外） */
 .person-card { background: var(--tile); color: #fff; border-radius: 14px; padding: 16px 18px; }
 .person-row { display: flex; align-items: center; gap: 13px; }
@@ -1133,13 +1421,22 @@ h3 .micro { margin-left: 8px; font-weight: 400; }
 .answer:last-child { margin-bottom: 0; }
 .answer-title { font-weight: 500; line-height: 1.7; }
 .answer-content { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; margin-top: 6px; background: var(--parchment); border-radius: 10px; padding: 12px 14px; }
+/* 1520 以下：不再固定一屏高，整页自然滚动，右栏并成两张横排卡 */
+@media (max-width: 1520px) {
+  .recruitment-page { height: auto; }
+  .workspace { grid-template-columns: minmax(0, 1fr); }
+  .rail { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+  .card { min-height: 560px; }
+}
+/* 1180 以下：四个数换行到批次带底下，右栏收成一列 */
+@media (max-width: 1180px) {
+  .kpis { width: 100%; padding-top: 14px; border-top: 1px solid #e3e3e6; }
+  .rail { grid-template-columns: 1fr; }
+}
 @media (max-width: 900px) {
-  .batch-summary { padding: 20px; }
   .two-columns { grid-template-columns: 1fr; gap: 0; }
   .option-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .application-toolbar { align-items: flex-start; }
-  .application-toolbar > .actions { width: 100%; }
-  .grade-filter, .status-filter { flex: 1; min-width: 160px; }
+  .grade-filter, .status-filter { flex: 1; min-width: 150px; }
 }
 @media (max-width: 760px) {
   /* 窄屏单列堆叠：取消固定一屏高与「各自滚动」，回到整页自然滚动 */
