@@ -167,11 +167,55 @@ function fallbackPhrase(row) {
   return `${dim}：${from} → ${to}`;
 }
 
-/** 单条流水的短语（同一次操作里多维度会各出一条，由 describeHistory 去重合并） */
+/**
+ * 单条流水的短语（同一次操作里多维度会各出一条，由 describeHistory 去重合并）
+ *
+ * ⚠️⚠️ `MANUAL` 必须按**维度**分开说（2026-11-16 修）：
+ *    原来只判断 `toStatus === 'PLAYED'`，于是「人工指派」那条
+ *    （dimension=schedule、toStatus=APPROVED）被说成「取消已播放标记」——
+ *    以前 admin-web 不显示这句所以没人发现，现在要下发 reasonText 就必须说对。
+ */
 function reasonPhrase(row) {
   const reason = String(row.reason || '');
-  if (reason === 'MANUAL') return row.toStatus === 'PLAYED' ? '标记为已播放' : '取消已播放标记';
+  if (reason === 'MANUAL') {
+    const dim = String(row.dimension || '');
+    if (dim === 'play') return row.toStatus === 'PLAYED' ? '标记为已播放' : '取消已播放标记';
+    if (dim === 'schedule') return '管理员手动指派时段';
+    if (dim === 'review') return '管理员手动改审核结论';
+    return '管理员手动调整';
+  }
   return REASON_TEXT[reason] || fallbackPhrase(row);
+}
+
+/**
+ * 单条流水的「人话」版（给 GET /admin/submit/:id/status-logs 下发用）。
+ *
+ * ⚠️⚠️ 为什么要有它（2026-11-16 陛下截图：「改成人能看懂的」）：
+ *    电脑端处理台右侧「这条的完整轨迹」原来直接渲染原始行，屏上就是
+ *      `PENDING_REVIEW → APPROVED` + `SCHEDULE_LOCKED_NO_AVAILABLE_SLOT`
+ *    这种谁也看不懂的代号。措辞**只能在这个文件里有一份**（见上方 REASON_TEXT 注释），
+ *    所以由这里翻好再下发，前端只管显示，不再自己拼。
+ *
+ * ⚠️ 原始字段（dimension / fromStatus / toStatus / reason）**原样保留** ——
+ *    老前端、日志导出、排查脚本都还在用；这里只做加法。
+ */
+function decorateLog(row) {
+  const r = row || {};
+  const dim = String(r.dimension || '');
+  const stateMap = STATE_CN[dim] || {};
+  const from = String(r.fromStatus || '');
+  const to = String(r.toStatus || '');
+  return Object.assign({}, r, {
+    dimensionText: DIM_CN[dim] || dim || '状态',
+    fromText: stateMap[from] || from || '—',
+    toText: stateMap[to] || to || '—',
+    reasonText: reasonPhrase(r),
+  });
+}
+
+/** 批量版 */
+function decorateLogs(rows) {
+  return (Array.isArray(rows) ? rows : []).map(decorateLog);
 }
 
 /**
@@ -375,6 +419,9 @@ module.exports = {
   historyOf,
   // 状态流水 → 人话（2026-11-02）：措辞只在这里有一份，前端直接渲染，不再自己拼
   REASON_TEXT,
+  // 单条流水的人话版（2026-11-16）：status-logs 接口下发 dimensionText / fromText / toText / reasonText
+  decorateLog,
+  decorateLogs,
   STATE_CN,
   newOpId,
   reasonPhrase,

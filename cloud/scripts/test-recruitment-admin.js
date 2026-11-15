@@ -69,6 +69,10 @@ function createPage({ superAdmin = true, overrides = {}, confirm = async () => {
   const module = { exports: {} };
   const context = vm.createContext({
     ref: vue.ref, reactive: vue.reactive, computed: vue.computed,
+    // ⚠️ 2026-11-16：招募页新增了 `watch(listBody, …)`（表格高度自适应）来观察模板 ref。
+    //    这里漏注入 `watch` ⇒ 执行 script-setup 时直接 `watch is not defined`，
+    //    9 条断言成组失败（不是逻辑错，是硬环境缺件）。真实 Vue 里当然有 watch。
+    watch: vue.watch,
     onMounted: () => {}, onBeforeUnmount: () => {},
     ElMessage: { warning: (message) => warnings.push(message), success: () => {} },
     ElMessageBox: {

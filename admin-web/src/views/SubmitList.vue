@@ -986,19 +986,18 @@
         <div class="as-side">
           <div class="as-sub-title">这条的完整轨迹</div>
           <div class="as-logs" v-if="assignLogs.length">
-            <div class="as-log" v-for="(g, i) in assignLogs" :key="g.id || i">
-              <div class="micro">{{ dimCn(g.dimension) }}</div>
-              <div class="as-log-v">{{ g.from_status || g.fromStatus || '—' }} → {{ g.to_status || g.toStatus }}</div>
+            <div class="as-log" v-for="g in assignLogs" :key="g.key">
+              <div class="micro">{{ g.dim }}</div>
+              <div class="as-log-v">{{ g.from }} → {{ g.to }}</div>
               <div class="micro">
-                {{ fmt(g.created_at || g.create_time) }} · {{ opCn(g.operator_name || g.operatorName) }}<template v-if="g.reason"> · {{ g.reason }}</template>
+                {{ g.time }}<template v-if="g.who"> · {{ g.who }}</template><template v-if="g.reason"> · {{ g.reason }}</template>
               </div>
             </div>
           </div>
           <div class="micro as-empty" v-else>还没有状态变更记录。</div>
 
           <div class="micro as-note">
-            轨迹读 <code>GET /admin/submit/:id/status-logs</code>；
-            时段的变动另记在 <code>assignment_logs</code>（from_slot → to_slot）。
+            每条都记了谁在什么时候动了什么；播出时段的变动另有一份换位记录。
           </div>
 
           <div class="as-side-acts" v-if="assignRow && Number(assignRow.type) === 1">
@@ -1503,9 +1502,29 @@ function opCn(o) { return OP_CN[o] || o || '系统'; }
 async function fetchAssignLogs(id) {
   try {
     const d = await http.get(`/admin/submit/${id}/status-logs`);
-    // ⚠️ 服务端 raw:true 返回的是**下划线列名**，同时模型里 timestamps 又加了 create_time，
-    //    所以时间字段两个都取一下，别只认一个。
-    assignLogs.value = Array.isArray(d) ? d : [];
+    const rows = Array.isArray(d) ? d : [];
+    // 在 JS 里摊平成「维度 / 原→新 / 时间·操作人·原因」，模板只取值。
+    // ⚠️ 2026-11-16 陛下：「改成人能看懂的」—— 原来直接渲染原始行，屏上是
+    //    `PENDING_REVIEW → APPROVED` + `SCHEDULE_LOCKED_NO_AVAILABLE_SLOT` 这种代号。
+    //    中文措辞由后端 services/songStatus.js#decorateLogs 下发（措辞只在那里有一份），
+    //    这里只做兜底：老云函数没这些字段时退回原始代号，不至于空白。
+    // ⚠️ 时间字段是 `createTime`（云开发驼峰）—— 原来只试 created_at / create_time，
+    //    结果时间那格永远显示「—」。
+    assignLogs.value = rows.map((g, i) => {
+      const who = OP_CN[g.operatorName || g.operator_name] || g.operatorName || g.operator_name || '系统';
+      const reason = g.reasonText || g.reason || '';
+      // 「系统 · 系统驳回（…）」会重复一遍主语 ⇒ 原因已经以操作人开头时就不再单独写操作人
+      const showWho = who && !(reason && reason.indexOf(who) === 0) ? who : '';
+      return {
+        key: g.id || `${g.dimension || 'log'}-${i}`,
+        dim: g.dimensionText || DIM_CN[g.dimension] || g.dimension || '状态',
+        from: g.fromText || g.fromStatus || g.from_status || '—',
+        to: g.toText || g.toStatus || g.to_status || '—',
+        time: fmt(g.createTime || g.create_time || g.created_at),
+        who: showWho,
+        reason,
+      };
+    });
   } catch { assignLogs.value = []; }
 }
 

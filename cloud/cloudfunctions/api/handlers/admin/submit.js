@@ -1040,7 +1040,11 @@ async function played(ctx) {
 async function statusLogs(ctx) {
   asAdmin(ctx);
   const id = parseId(ctx.params && ctx.params.id);
-  return S.historyOf(id === null ? -1 : id, 100);
+  const rows = await S.historyOf(id === null ? -1 : id, 100);
+  // ⚠️ 下发人话字段（2026-11-16 陛下：「改成人能看懂的」）——
+  //    原来直接回原始行，处理台右侧就显示 PENDING_REVIEW → APPROVED 这种代号。
+  //    措辞只在 services/songStatus.js 的 REASON_TEXT / STATE_CN 里有一份。
+  return S.decorateLogs(rows);
 }
 
 /* ------------------------------------------------------------------ *
