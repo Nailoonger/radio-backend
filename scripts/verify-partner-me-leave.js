@@ -185,7 +185,10 @@ ok('周切换在 page 顶部、tabs 之上',
   wkAt >= 0 && tabAt > wkAt,
   `wk-nav@${wkAt} / stabs@${tabAt} —— 周切换必须在两档 tab 的头上（陛下 2026-11-01）`);
 ok('周切换只在待审批档显示（已审批不分周，留它＝假控件）',
-  /<view class="wk-nav"[^>]*wx:if="\{\{tabIdx === 0\}\}"/.test(reviewWxml));
+  // ⚠️ 2026-11-16：骨架改造给内容层加了进场类（`class="wk-nav in i0"`），
+  //    原来写死的 `class="wk-nav"` 正则会漏命 → 报「假控件」但其实控件是对的。
+  //    改成容忍额外 class，**但 `wx:if="{{tabIdx === 0}}"` 这个条件必须还在**（这才是这条断言的本意）。
+  /<view class="wk-nav[^"]*"[^>]*wx:if="\{\{tabIdx === 0\}\}"/.test(reviewWxml));
 ok('tabs 不再有 margin-top（否则和周条之间多一层缝）',
   /\.stabs\s*\{[\s\S]{0,220}margin:\s*0 0 8rpx/.test(read('miniprogram/pages-partner/leave-review/leave-review.wxss')));
 
