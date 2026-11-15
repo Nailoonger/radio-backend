@@ -68,6 +68,10 @@ Page({
     pos: 0,
     queueTotal: 0,
     ids: [],
+    // 顶部中间那行文案在 JS 里拼好（WXML 只取值 —— 模板嵌套三元容易翻车）
+    navText: '',
+    // 这条的首选时段是否已排满（满了就在顶部标红，别让人点通过去撞 40906）
+    slotFull: false,
     // 时段矩阵：值 → { i, seated, cap, full, label }（只给取件顺序用，不进 UI）
     slotMap: null,
 
@@ -122,7 +126,47 @@ Page({
       });
   },
 
-  /** 待审队列的 id 列表（只用于定位与翻页，不进 UI 数据） */
+  /**
+   * 本周时段矩阵：每格已占几个 / 上限 / 是否满。
+   *
+   * ⚠️⚠️ 取件顺序要靠它（2026-11-16 陛下：「伙伴端的审核处理台也得改一下」）：
+   *    原来只按 reviewStatus=0 拉一页、按后端给的 createTime 顺序逐条审 ⇒
+   *    「周一这格满了」之后还一直取周一的，每次都撞 40906「该时段已排满（2/2），
+   *    请先审别的时段」，得人手跳到另一个时段。
+   *    现在按矩阵顺序排 + 满格跳过，与电脑端 admin-web 处理台同一套口径。
+   */
+  loadSlots() {
+    if (this.data.isDraft) { this.setData({ slotMap: null }); return Promise.resolve(null); }
+    return adminRequest('/admin/submit/schedule', 'GET')
+      .then((d) => {
+        const map = {};
+        const fallback = Number((d && d.capacity) || 0);
+        let i = 0;
+        ((d && d.days) || []).forEach((day) => {
+          (day.slots || []).forEach((s) => {
+            const cap = Number(s.capacity || fallback || 0);
+            const seated = Number(s.seated || 0);
+            map[s.value] = {
+              i: i++,
+              seated,
+              cap,
+              full: cap > 0 && seated >= cap,
+              label: `${day.weekday} · ${s.period} ${s.time}`,
+              // 短名给 toast 用（「周三 12:10」），完整名给正文用
+              short: `${day.weekday} ${s.time}`,
+            };
+          });
+        });
+        this.setData({ slotMap: map });
+        return map;
+      })
+      .catch(() => { this.setData({ slotMap: null }); return null; });
+  },
+
+  /**
+   * 待审队列：按「时段顺序 → 提交时间 → id」排好（只用于定位与翻页，不进 UI 数据）。
+   * ⚠️ 排序规则必须和电脑端 admin-web 处理台逐字一致，否则手机和电脑的「下一条」不是同一条。
+   */
   loadQueue() {
     // ⚠️ 内部稿件走自己的审稿队列（/partner/draft/review，status=1 是待审；
     //    它和 submit 的 reviewStatus 不是同一套数字，别混）
@@ -131,14 +175,44 @@ Page({
       : adminRequest('/admin/submit/list', 'GET', { reviewStatus: 0, page: 1, pageSize: 100 });
     return req
       .then((d) => {
-        const ids = ((d && d.list) || []).map((x) => x.id);
-        this.setData({ ids, queueTotal: ids.length });
-        return ids;
+        const rows = (d && d.list) || [];
+        const map = this.data.slotMap;
+        const keyed = rows.map((x) => {
+          const want = x.wantBroadcastTime || '';
+          let si = 9999;                                   // 首选不在本周矩阵里 → 排最后
+          if (!this.data.isDraft && map && want && map[want]) si = map[want].i;
+          return { id: x.id, want, si, t: tsOf(x.createTime), n: Number(x.id) || 0 };
+        });
+        keyed.sort((a, b) => (a.si - b.si) || (a.t - b.t) || (a.n - b.n));
+        this._queue = keyed;
+        this.setData({ ids: keyed.map((k) => k.id), queueTotal: keyed.length });
+        return keyed;
       })
       .catch(() => {
+        this._queue = [];
         this.setData({ ids: [], queueTotal: 0 });
         return [];
       });
+  },
+
+  /**
+   * 取下一条该审的：跳过已经排满的格子。
+   * 队列已经按时段排好，所以「跳过满格」天然等于「进入下一个时段」。
+   * @returns {{item: object|null, skipped: number, nextLabel: string}}
+   */
+  pickNext() {
+    const q = this._queue || [];
+    const map = this.data.slotMap;
+    let skipped = 0;
+    let nextLabel = '';
+    for (let k = 0; k < q.length; k++) {
+      const x = q[k];
+      const cell = (!this.data.isDraft && map && x.want) ? map[x.want] : null;
+      if (cell && cell.full) { skipped++; continue; }
+      if (cell) nextLabel = cell.short || cell.label;
+      return { item: x, skipped, nextLabel };
+    }
+    return { item: null, skipped, nextLabel: '' };
   },
 
   loadDetail(id) {
@@ -160,10 +234,23 @@ Page({
         }
         const view = decorate(d, this.data.isDraft);
         const idx = this.data.ids.indexOf(id);
+        const pos = idx >= 0 ? idx + 1 : 0;
+        const total = this.data.queueTotal;
+        // 这条的首选时段满没满（满了点上通过只会换来 40906，先在顶部说清楚）
+        const cell = (!this.data.isDraft && this.data.slotMap && d.wantBroadcastTime)
+          ? this.data.slotMap[d.wantBroadcastTime]
+          : null;
+        const full = !!(cell && cell.full);
         this.setData({
           id: d.id,
           loading: false,
-          pos: idx >= 0 ? idx + 1 : 0,
+          pos,
+          slotFull: full,
+          navText: pos > 0
+            ? (full
+              ? '第 ' + pos + ' / ' + total + ' 条 · 该时段已满'
+              : '第 ' + pos + ' / ' + total + ' 条待处理')
+            : '不在待处理队列',
           isSong: view.isSong,
           kindText: view.kindText,
           person: view.person,
@@ -212,6 +299,9 @@ Page({
   // ── 通过 / 驳回 ────────────────────────────────────────────
   doApprove() {
     if (this.data.submitting) return;
+    // 首选时段已经排满：点通过必被服务端拒（40906「该时段已排满」，人还得自己找别的时段）
+    // ⇒ 直接跳到下一条「还有空位」的（陛下：一个时段满了自动跳到下一个时段）
+    if (this.data.slotFull) return this.skipFullSlot();
     this.setData({ submitting: true });
     wx.showLoading({ title: '处理中', mask: true });
 
@@ -226,8 +316,32 @@ Page({
         wx.hideLoading();
         this.setData({ submitting: false });
         if (isConflict(err)) return this.onConflict(err);
-        wx.showToast({ title: (err && err.message) || '操作失败', icon: 'none' });
+        tip((err && err.message) || '操作失败');
       });
+  },
+
+  /**
+   * 当前这条的首选时段已经排满 ⇒ 跳过它，直接审下一条还有空位的。
+   *
+   * 为什么不在按钮上禁用：驳回仍然有效（这条确实该驳就驳），
+   * 只是「通过」没有意义 —— 服务端一定回 40906。所以按钮文案同步变成「跳过满格 · 审下一条」。
+   */
+  skipFullSlot() {
+    const pick = this.pickNext();     // 满格的（含当前这条）会被自动跳过
+    if (!pick.item) {
+      wx.showModal({
+        title: '本周排满了',
+        content: '所有时段都已排满，没有格子能放。锁定排期时系统会统一驳回这些没位子的。',
+        showCancel: false,
+        confirmText: '知道了',
+        confirmColor: '#0066CC',
+        success: () => this.backToList(),
+      });
+      return;
+    }
+    wx.showToast({ title: `跳过满格 · 接着审${pick.nextLabel}`, icon: 'none' });
+    wx.pageScrollTo({ scrollTop: 0, duration: 180 });
+    this.loadDetail(pick.item.id);
   },
 
   doReject() {
@@ -250,7 +364,7 @@ Page({
         wx.hideLoading();
         this.setData({ submitting: false });
         if (isConflict(err)) return this.onConflict(err);
-        wx.showToast({ title: (err && err.message) || '操作失败', icon: 'none' });
+        tip((err && err.message) || '操作失败');
       });
   },
 
@@ -260,11 +374,16 @@ Page({
    * 用户会以为是自己没点成功。重新拉这一条，让他看到真实结论。
    */
   onConflict(err) {
-    wx.showToast({ title: (err && err.message) || '这条刚被处理过', icon: 'none' });
+    tip((err && err.message) || '这条刚被处理过');
     this.loadDetail(this.data.id);
   },
 
-  /** 处理完一条：通知列表刷新 → 队列里取下一条；没了就退回列表 */
+  /**
+   * 处理完一条：通知列表刷新 → 重新拉矩阵 → 取下一条「还有位」的。
+   *
+   * ⚠️ 必须**先重拉矩阵**再取件：刚通过的这条已经占掉一个位，
+   *    拿旧矩阵算「满没满」会把刚排满的格子当成还有空，又会取到它。
+   */
   afterDone(msg) {
     wx.hideLoading();
 
@@ -274,20 +393,47 @@ Page({
       if (channel && channel.emit) channel.emit('reviewed');
     } catch (e) { /* 没有上游页面，忽略 */ }
 
-    const cur = this.data.ids.indexOf(this.data.id);
-    const ids = this.data.ids.slice();
-    if (cur >= 0) ids.splice(cur, 1);
+    // 从队列里摘掉刚处理完的这条
+    this._queue = (this._queue || []).filter((x) => Number(x.id) !== Number(this.data.id));
 
-    if (!ids.length) {
-      wx.showToast({ title: msg, icon: 'success' });
-      setTimeout(() => this.backToList(), 620);
-      return;
-    }
+    return this.loadSlots().then(() => {
+      const pick = this.pickNext();
 
-    const nextIdx = Math.min(Math.max(cur, 0), ids.length - 1);
-    this.setData({ ids, queueTotal: ids.length, submitting: false });
-    wx.showToast({ title: `${msg}，取下一条`, icon: 'success' });
-    this.loadDetail(ids[nextIdx]);
+      if (!pick.item) {
+        this.setData({ submitting: false });
+        if (!this._queue.length) {
+          tip(msg, { success: true });
+          setTimeout(() => this.backToList(), 620);
+          return;
+        }
+        // 还有待审但一格都放不下 —— 留在处理台只会反复撞 40906，直接退回列表
+        const left = this._queue.length;
+        wx.showModal({
+          title: '本周排满了',
+          content: `还剩 ${left} 条待审，但所有时段都已排满，没有格子能放。`
+            + '锁定排期时系统会统一驳回这些没位子的。',
+          showCancel: false,
+          confirmText: '知道了',
+          confirmColor: '#0066CC',
+          success: () => this.backToList(),
+        });
+        return;
+      }
+
+      const ids = this._queue.map((x) => x.id);
+      this.setData({ ids, queueTotal: ids.length, submitting: false });
+
+      // 跳过了别的时段 ⇒ 明确告诉审稿人，否则他会以为漏审了。
+      // ⚠️ 这里报的 N 是「为了找到这条、跳过了多少条满格条目」，会随着审下去变大
+      //    （满格的条目一直留在队列里，等锁定统一驳回）—— 所以措辞写「满格」而不是「跳过」，
+      //    别让人以为是重复跳同一批。
+      if (pick.skipped > 0 && pick.nextLabel) {
+        wx.showToast({ title: `跳过 ${pick.skipped} 条满格 · 接着审${pick.nextLabel}`, icon: 'none' });
+      } else {
+        wx.showToast({ title: `${msg}，取下一条`, icon: 'success' });
+      }
+      this.loadDetail(pick.item.id);
+    });
   },
 
   backToList() {
@@ -308,9 +454,23 @@ Page({
  * 接口 → 视图
  * ---------------------------------------------------------------- */
 
+/**
+ * 时间戳 → 毫秒（排候选用）。
+ *
+ * ⚠️ **不要直接 `new Date('2026-11-16 00:39:00')`** —— iOS 解析不了「- 分隔 + 空格」
+ *    这种格式，得到 NaN ⇒ 排序退化成全靠 id，看起来"偶尔顺序不对"。
+ *    统一把 `-` 换成 `/`、去掉 `T` 和毫秒小数，iOS / 安卓都能解析。
+ */
+function tsOf(v) {
+  if (!v) return 0;
+  if (typeof v === 'number') return v;
+  const s = String(v).replace(/-/g, '/').replace('T', ' ').replace(/\.\d+.*$/, '');
+  const t = new Date(s).getTime();
+  return isNaN(t) ? 0 : t;
+}
+
 /** 秒 → m:ss（稿件卡上「预计时长」，与稿件页同一口径） */
-function mmssOf(sec) {
-  const s = Math.max(0, Math.round(Number(sec) || 0));
+function mmssOf(sec) {  const s = Math.max(0, Math.round(Number(sec) || 0));
   return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 }
 

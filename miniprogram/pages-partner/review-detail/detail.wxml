@@ -84,7 +84,7 @@
       <view class="cs-nav in i0">
         <text class="cs-nav-b {{pos <= 1 ? 'off' : ''}}" bindtap="prevOne">‹ 上一条</text>
         <!-- ⚠️ 内容必须写在同一行：<text> 会保留换行，拆行写会多出一个空行把这一行撑高 -->
-        <text class="cs-nav-c">{{pos > 0 ? '第 ' + pos + ' / ' + queueTotal + ' 条待处理' : '不在待处理队列'}}</text>
+        <text class="cs-nav-c {{slotFull ? 'is-full' : ''}}">{{navText}}</text>
         <text class="cs-nav-b {{pos >= queueTotal ? 'off' : ''}}" bindtap="nextOne">下一条 ›</text>
       </view>
 
@@ -187,7 +187,7 @@
       <button class="btn-lg2 rej" hover-class="pressed"
               bindtap="doReject" disabled="{{!canReject || submitting}}">驳 回</button>
       <button class="btn-lg2 pass" hover-class="pressed"
-              bindtap="doApprove" disabled="{{submitting}}">通过并取下一条</button>
+              bindtap="doApprove" disabled="{{submitting}}">{{slotFull ? '跳过满格 · 审下一条' : '通过并取下一条'}}</button>
     </view>
   </block>
   </block>

@@ -51,6 +51,8 @@
 .cs-nav-b { color: var(--accent); }
 .cs-nav-b.off { color: var(--soft); }
 .cs-nav-c { font-size: 23rpx; color: var(--muted); }
+/* 这条的首选时段已经排满：中间那行变红字，提醒「点通过会报错」 */
+.cs-nav-c.is-full { color: var(--red-fg); font-weight: 600; }
 
 /* ══════════ 主卡：白底 + 第 3 档投影 ══════════ */
 .pod,
