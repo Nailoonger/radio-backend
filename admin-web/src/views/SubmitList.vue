@@ -949,8 +949,7 @@
               v-for="o in assignOptions" :key="o.value"
               type="button"
               class="slotbtn"
-              :class="{ cur: o.isPreferred, selected: o.selected }"
-              :disabled="o.disabled"
+              :class="{ cur: o.isPreferred, selected: o.selected, full: o.full }"
               @click="assignSlot = o.value"
             >
               <span class="slotbtn-l">
@@ -958,7 +957,8 @@
               </span>
               <span class="micro num">
                 {{ o.seated }} / {{ o.capacity || '不限' }}
-                · <template v-if="o.disabled">已满</template><template v-else-if="!o.seated">空位</template><template v-else>还可排 {{ o.left }}</template>
+                · <template v-if="o.full">已满</template><template v-else-if="!o.seated">空位</template><template v-else>还可排 {{ o.left }}</template>
+                <template v-if="o.full && o.selected"> → 超卖</template>
                 <template v-if="o.waiting"> · {{ o.waiting }} 人在候补</template>
               </span>
             </button>
@@ -972,7 +972,13 @@
           </div>
           <div class="micro as-note">
             指派后：这条立刻置为<b>已排期</b>并占住所选格子；若它原本在候补队列里，队列会自动重排。
-            已满的格子不能指派（按钮置灰）—— 避免把原来占着的人挤掉。
+            <b>已满的格子也能选</b> —— 管理员可以强制指派，这格会挤成超卖（如 2/2 → 3/2），
+            服务端照收并记为 <code>MANUAL</code>，排期矩阵上会标红、当天会多播一首。
+          </div>
+          <div class="as-over" v-if="assignTargetFull">
+            <b>「{{ assignTarget.label }}」现在是 {{ assignTarget.seated }} / {{ assignTarget.capacity }} 已满。</b>
+            保存后会变成 <b>{{ assignTarget.seated + 1 }} / {{ assignTarget.capacity }}</b>，
+            这格当天要多播一首。确定要这么派就继续。
           </div>
         </div>
 
@@ -1451,7 +1457,15 @@ const assignSlot = ref('');
 const assignLogs = ref([]);
 const assigning = ref(false);
 
-/** 可选时段列表：从排期矩阵展开，标出「当前首选 / 已满不可选 / 已选中」 */
+/**
+ * 可选时段列表：从排期矩阵展开，标出「当前首选 / 已满 / 已选中」
+ *
+ * ⚠️ 已满的格子**不再置灰**（2026-11-16 陛下拍板：人工指派允许强制超卖）。
+ *    原来的规则是 `disabled: full && !isPreferred` —— 本意是「这条本来就占着这格，
+ *    重选等于回到原位，不该灰」，但写成了「是不是他的首选」。而人在候补（slot=null）时
+ *    首选 ≠ 占位 ⇒ 首选那格 2/2 照样可点、可保存，后端 manualAssign 又不校验容量，
+ *    于是直接落成 3/2 超卖（周一那次 3/2 就是这么来的）。现在统一：满格可选 + 保存前二次确认。
+ */
 const assignOptions = computed(() => {
   const r = assignRow.value;
   const out = [];
@@ -1467,14 +1481,17 @@ const assignOptions = computed(() => {
         left: s.left,
         waiting: s.waiting || 0,
         isPreferred,
-        // 已满的格子不能指派进去（除非它本来就是这条的首选，那只是「回到原位」）
-        disabled: !!s.full && !isPreferred,
+        full: !!s.full,
         selected: assignSlot.value === s.value,
       });
     }
   }
   return out;
 });
+
+/** 当前选中的那格 / 它是不是已经满了（满了要走二次确认） */
+const assignTarget = computed(() => assignOptions.value.find((o) => o.selected) || null);
+const assignTargetFull = computed(() => !!assignTarget.value && assignTarget.value.full);
 
 const noReschedule = computed(() => Number(assignRow.value?.allowReschedule) === 0);
 
@@ -1508,10 +1525,24 @@ async function openAssign(row, readonly = false) {
 
 async function saveAssign() {
   if (!assignSlot.value) return ElMessage.warning('请先选一个新时段');
+  // 满格 = 超卖，必须让管理员明确点一次「强制指派」
+  const t = assignTarget.value;
+  if (t && t.full) {
+    try {
+      await ElMessageBox.confirm(
+        `「${t.label}」现在已排满 ${t.seated} / ${t.capacity}，强制指派后会变成 ${t.seated + 1} / ${t.capacity}（超卖），`
+        + '这格当天要多播一首，排期矩阵上会标红。',
+        '这一格已经满了',
+        { type: 'warning', confirmButtonText: '强制指派（超卖）', cancelButtonText: '再想想' },
+      );
+    } catch { return; }
+  }
   assigning.value = true;
   try {
     await http.post(`/admin/submit/${assignRow.value.id}/assign`, { slot: assignSlot.value });
-    ElMessage.success('已调整播出时段，该周调剂已重跑');
+    ElMessage.success(t && t.full
+      ? `已强制指派到「${t.label}」（该格超卖成 ${t.seated + 1} / ${t.capacity}）`
+      : '已调整播出时段，该周调剂已重跑');
     assignVisible.value = false;
     await refreshAll();
   } catch { /* 拦截器已提示 */ }
@@ -2870,10 +2901,22 @@ onBeforeUnmount(() => {
 .slotbtn-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 当前首选：强调浅底 —— 一眼看出它现在在哪一格 */
 .slotbtn.cur { border-color: var(--accent); background: var(--acc-bg); color: var(--accent); font-weight: 600; }
-/* 要指派过去的那一格：深色实心，和「当前首选」区分开 */
-.slotbtn.selected { border-color: var(--ink); background: var(--ink); color: #fff; font-weight: 600; }
-.slotbtn.selected .micro { color: rgba(255, 255, 255, 0.66); }
+/* 要指派过去的那一格：实心强调色，和「当前首选」的浅底区分开 */
+.slotbtn.selected { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 600; }
+.slotbtn.selected .micro { color: rgba(255, 255, 255, 0.72); }
+/* 已满：仍可点（管理员可强制超卖），数字标红 + 虚线边提示「这一格吃不下」 */
+.slotbtn.full { border-style: dashed; }
+.slotbtn.full .num { color: var(--red-fg); }
+.slotbtn.full.selected { border-style: solid; }
+.slotbtn.full.selected .num { color: #ffd9d6; }
 .slotbtn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* 选中已满格时压在底部的超卖警告 */
+.as-over {
+  background: var(--red-bg); color: var(--red-fg);
+  border-radius: 10px; padding: 10px 12px; line-height: 1.7;
+  letter-spacing: var(--ls-wide-sm);
+}
 
 .as-note {
   background: var(--parchment); border-radius: 10px; padding: 10px 12px;
