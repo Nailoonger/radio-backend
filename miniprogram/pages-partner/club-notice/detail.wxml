@@ -1,5 +1,5 @@
 <!-- pages-partner/club-notice/detail.wxml -->
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
   <view class="navbar">
@@ -10,7 +10,49 @@
     <view class="navbar-spacer"></view>
   </view>
 
-  <view class="body pd-body">
+  <!-- ============ 骨架层（2026-11-16 · preview/loading-skeleton-v3 口径） ============
+       ⚠️ fixed 不是 absolute；伙伴端底色 #F5F5F7。
+          导航标题与「走到哪一步了」是真字；状态徽章、正文纸、时间线内容摆灰块。
+          排播表单按状态才出现，骨架里不猜它的形态。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navbar">
+      <view class="navbar-back"></view>
+      <view class="navbar-title">{{record.status === 0 ? '审核' : '通知详情'}}</view>
+      <view class="navbar-spacer"></view>
+    </view>
+    <view class="body pd-body">
+      <view class="head">
+        <view class="sk sk-r" style="width:120rpx;height:34rpx"></view>
+        <view class="sk sk-s" style="width:170rpx"></view>
+        <view class="sp"></view>
+        <view class="sk sk-r" style="width:88rpx;height:34rpx"></view>
+      </view>
+      <view class="paper">
+        <view class="sk sk-l sk-p" style="width:90%"></view>
+        <view class="sk-para" style="margin-top:22rpx">
+          <view class="sk sk-s sk-p" style="width:100%"></view>
+          <view class="sk sk-s sk-p" style="width:96%"></view>
+          <view class="sk sk-s sk-p" style="width:100%"></view>
+          <view class="sk sk-s sk-p" style="width:58%"></view>
+        </view>
+        <view class="paper-m" style="margin-top:24rpx">
+          <view class="sk sk-s sk-p" style="width:60rpx"></view>
+          <view class="sk sk-s sk-p" style="width:90rpx"></view>
+          <view class="sk sk-s sk-p" style="width:120rpx"></view>
+        </view>
+      </view>
+      <view class="grp-t">走到哪一步了</view>
+      <view class="tl">
+        <view class="tl-i" wx:for="{{[1,2,3]}}" wx:key="*this">
+          <view class="tl-dot"></view>
+          <view class="sk sk-s" style="width:150rpx"></view>
+          <view class="sk sk-s" style="width:250rpx;margin-top:12rpx"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view class="body pd-body" wx:if="{{!sk || skOut}}">
 
     <view class="loading" wx:if="{{loading && !record}}">加载中……</view>
 
@@ -20,14 +62,14 @@
 
     <block wx:elif="{{record}}">
 
-      <view class="head">
+      <view class="head in i0">
         <text class="orgtag">{{record.clubName}}</text>
         <text class="head-t">{{statusTime}}</text>
         <text class="sp"></text>
         <view class="st {{stCls}}">{{record.statusText}}</view>
       </view>
 
-      <view class="paper">
+      <view class="paper in i1">
         <view class="paper-t">{{record.title}}</view>
         <view class="paper-b">{{record.body}}</view>
         <view class="paper-m">
@@ -84,8 +126,8 @@
         <view class="rb-v">{{record.rejectReason}}</view>
       </view>
 
-      <view class="grp-t">走到哪一步了</view>
-      <view class="tl">
+      <view class="grp-t in i2">走到哪一步了</view>
+      <view class="tl in i3">
         <view class="tl-i {{item.cls}}" wx:for="{{timeline}}" wx:key="key">
           <view class="tl-dot"></view>
           <view class="tl-tt">{{item.title}}</view>

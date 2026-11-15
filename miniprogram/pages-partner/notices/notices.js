@@ -17,6 +17,7 @@
 // 依赖接口：GET /admin/notice/list · POST /admin/notice/create · PUT /admin/notice/:id
 
 const { adminRequest } = require('../../utils/request.js');
+const skeleton = require('../../utils/skeleton.js');
 
 function fmtTime(v) {
   if (!v) return '';
@@ -33,6 +34,11 @@ Page({
     list: [],
     openId: 0,        // 当前展开正文的那条（0 = 全收起）
     canEdit: false,   // 社干 / 超管才给「新建 · 编辑」
+
+    // 骨架（2026-11-16）：sk 初值 true —— 骨架从第一帧就在，内容层整块 wx:if 掉
+    sk: true,
+    skOut: false,
+    enter: false,
   },
 
   onLoad() {
@@ -48,6 +54,8 @@ Page({
       // 0 超管 / 1 社干 能写；2 站员只读（三档必须写满，别落成 `role !== 2`）
       canEdit: role === 0 || role === 1,
     });
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
     this.load();
   },
 
@@ -85,11 +93,11 @@ Page({
           };
         });
         this._loaded = true;
-        this.setData({ loading: false, list: rows });
+        this.setData({ loading: false, list: rows }, () => this.skGate.check());
       })
       .catch((err) => {
         this._loaded = true;
-        this.setData({ loading: false });
+        this.setData({ loading: false }, () => this.skGate.check());
         wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' });
       });
   },

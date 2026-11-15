@@ -1,12 +1,17 @@
 const tabMotion = require('../../utils/tabMotion.js');
 // pages/members/members.js - 风采展示（二层 tab：社干 / 部门人员）
 const { request } = require('../../utils/request.js');
+const skeleton = require('../../utils/skeleton.js');
 
 Page({
   data: {
     tabMotion: '',
     statusBarHeight: 20,
     loading: true,
+    // 加载骨架三件套（utils/skeleton.js）：sk 显不显示 / skOut 淡出中 / enter 挂进场
+    sk: true,   // ⚠️ 初值必须 true：骨架首帧就画，不能先渲染内容再盖上来（2026-11-13 陛下退回）
+    skOut: false,
+    enter: false,
 
     // 模块开关（member）：关闭时页面框架照旧渲染（标题 / 分段 tab / 筛选），
     // 但不请求数据、不渲染成员卡片
@@ -33,6 +38,9 @@ Page({
       statusBarHeight: getApp().globalData.statusBarHeight || 20,
       navBarHeight: getApp().globalData.navBarHeight || 44,
     });
+    // 骨架闸门：等开关 + 首屏取数两道都落定（loading 归 false）
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
     // 取数统一放 onShow（tab 页首次显示必定 onLoad → onShow，放两处会重复请求一次）
   },
 
@@ -73,6 +81,8 @@ Page({
         staffGroups: [],
         departments: [],
         visibleGroups: [],
+      }, () => {
+        if (this.skGate) this.skGate.check();
       });
       return;
     }
@@ -114,10 +124,14 @@ Page({
         staffGroups,
         departments: staffGroups.map((g) => g.dept),
         loading: false,
+      }, () => {
+        if (this.skGate) this.skGate.check();
       });
       this.applyFilter();
     } catch (e) {
-      this.setData({ loading: false });
+      this.setData({ loading: false }, () => {
+        if (this.skGate) this.skGate.check();
+      });
     }
   },
 

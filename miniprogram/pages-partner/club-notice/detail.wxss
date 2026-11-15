@@ -51,3 +51,6 @@
   height: calc(220rpx + constant(safe-area-inset-bottom));
   height: calc(220rpx + env(safe-area-inset-bottom));
 }
+
+/* ── 加载骨架（2026-11-16）：伙伴端页面底是 #F5F5F7，覆盖全局 .sklayer 的白底 ── */
+.sklayer { background: #F5F5F7; }

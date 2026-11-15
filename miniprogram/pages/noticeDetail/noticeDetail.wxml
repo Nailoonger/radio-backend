@@ -1,5 +1,36 @@
 <!-- pages/noticeDetail/noticeDetail.wxml -->
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
+
+  <!-- ============ 骨架层（2026-11-16 · preview/loading-skeleton-v3 口径） ============
+       ⚠️ fixed 不是 absolute（会跟页面滚）。导航标题「公告详情」与返回箭头是结构件，照常显示，
+          只有正文区（标题 / 时间 / 正文）摆灰块 —— 抹掉导航会让数据落地时「突然往下跳一行」。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navbar">
+      <view class="navbar-back"></view>
+      <view class="navbar-title">公告详情</view>
+      <view class="navbar-spacer"></view>
+    </view>
+    <view class="body">
+      <!-- 页头：标题 42rpx（两行）+ 时间 23rpx -->
+      <view class="sk-hd">
+        <view class="sk sk-l" style="width:100%"></view>
+        <view class="sk sk-l" style="width:58%"></view>
+        <view class="sk sk-s" style="width:240rpx"></view>
+      </view>
+      <!-- 正文：30rpx / line-height 1.75，行距 22rpx -->
+      <view class="sk-para" style="margin-top:36rpx">
+        <view class="sk sk-l" style="width:100%"></view>
+        <view class="sk sk-l" style="width:96%"></view>
+        <view class="sk sk-l" style="width:100%"></view>
+        <view class="sk sk-l" style="width:88%"></view>
+        <view class="sk sk-l" style="width:100%"></view>
+        <view class="sk sk-l" style="width:94%"></view>
+        <view class="sk sk-l" style="width:52%"></view>
+      </view>
+    </view>
+  </view>
+
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
   <view class="navbar">
@@ -10,18 +41,18 @@
     <view class="navbar-spacer"></view>
   </view>
 
-  <view class="body">
+  <view class="body" wx:if="{{!sk || skOut}}">
 
     <block wx:if="{{notice}}">
       <view class="stack" style="gap: 14rpx;">
-        <view class="t-title">{{notice.title}}</view>
-        <view class="t-cap">{{notice.publishTimeFmt}}</view>
+        <view class="t-title in i0">{{notice.title}}</view>
+        <view class="t-cap in i1">{{notice.publishTimeFmt}}</view>
       </view>
-      <view class="content">{{notice.content}}</view>
+      <view class="content in i2">{{notice.content}}</view>
     </block>
 
+    <!-- 骨架取代了原来那行「加载中……」：300ms 内回来直接出内容，不再先闪一行灰字 -->
     <view class="empty" wx:elif="{{!loading}}">公告不存在或已被删除</view>
-    <view class="loading" wx:else>加载中……</view>
 
   </view>
 </view>

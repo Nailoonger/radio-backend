@@ -27,6 +27,7 @@
 
 const { adminRequest } = require('../../utils/request.js');
 const { addDays, md, rangeText } = require('../../utils/dates.js');
+const skeleton = require('../../utils/skeleton.js');
 
 const DAY_NAMES = ['周一', '周二', '周三', '周四', '周五'];
 
@@ -78,6 +79,11 @@ Page({
     mineWeek: 0,
     monthShifts: 0,
     minePresent: 0,
+
+    // 骨架（2026-11-16）：sk 初值 true —— 骨架从第一帧就在，内容层整块 wx:if 掉
+    sk: true,
+    skOut: false,
+    enter: false,
   },
 
   /**
@@ -105,6 +111,8 @@ Page({
       // 站员（role=2）没有录入权；`mode=my` 时谁都是「我的考勤」
       isManager: canEntry && wantEntry,
     });
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
     this.load();
   },
 
@@ -158,10 +166,10 @@ Page({
             mineWeek: Number(r && r.weekShifts) || 0,
             monthShifts: Number(r && r.monthShifts) || 0,
             minePresent: list.filter((x) => x.statusText === '到岗').length,
-          });
+          }, () => this.skGate.check());
         })
         .catch((err) => {
-          this.setData({ loading: false });
+          this.setData({ loading: false }, () => this.skGate.check());
           wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' });
         });
     }
@@ -187,9 +195,9 @@ Page({
         attDay,
         dirty: {},                       // 服务端结果回来了，之前攒的改动已经落库/作废
         overview: ((o && o.people) || []).slice(0, 20),
-      }, () => this.rebuild());
+      }, () => { this.rebuild(); this.skGate.check(); });
     }).catch((err) => {
-      this.setData({ loading: false });
+      this.setData({ loading: false }, () => this.skGate.check());
       wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' });
     });
   },

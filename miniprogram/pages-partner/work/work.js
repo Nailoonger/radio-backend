@@ -14,6 +14,7 @@
 const { adminRequest } = require('../../utils/request.js');
 const partnerTodo = require('../../utils/partnerTodo.js');
 const partnerRole = require('../../utils/partnerRole.js');
+const skeleton = require('../../utils/skeleton.js');
 
 const TABS = [
   { key: 'draft',    status: 0, label: '草稿箱', cntKey: 'draft' },
@@ -49,6 +50,10 @@ Page({
     list: [],
     latest: null,
     loading: true,
+    // 加载骨架三件套（utils/skeleton.js）：sk 显不显示 / skOut 淡出中 / enter 挂进场
+    sk: true,   // ⚠️ 初值必须 true：骨架首帧就画，不能先渲染内容再盖上来（2026-11-13 陛下退回）
+    skOut: false,
+    enter: false,
     page: 1,
     pageSize: 20,
     hasMore: false,
@@ -71,6 +76,9 @@ Page({
       //    口径与 me.js / schedule/index.js / desk.js#roleKeyOf 一致，别在这里另发明一套。
       roleKey: Number(info.role) === 0 ? 'super' : (Number(info.role) === 2 ? 'member' : 'manager'),
     });
+    // 骨架闸门：等首屏那次 fetchList 落定
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
     this.fetchList(true);
     this.refreshBadges();
   },
@@ -151,11 +159,15 @@ Page({
           tabs,
           // ⚠️ 顺序与 TABS 一一对应（草稿箱在最前）；漏一项就会串到下一档的文案
           emptyText: ['草稿箱是空的，点上面「写新稿」起一篇', '没有在审的稿', '还没有通过的稿', '没有被驳的稿'][this.data.tabIdx] || '还没有稿件',
+        }, () => {
+          if (this.skGate) this.skGate.check();
         });
         return d;
       })
       .catch((err) => {
-        this.setData({ loading: false });
+        this.setData({ loading: false }, () => {
+          if (this.skGate) this.skGate.check();
+        });
         wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' });
       });
   },

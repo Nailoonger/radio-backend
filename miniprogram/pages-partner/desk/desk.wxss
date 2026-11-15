@@ -364,3 +364,20 @@
 
 /* 浮动 dock 让位（dock 高约 123rpx + bottom 38rpx） */
 .dock-gap { height: 220rpx; }
+
+/* ============ 加载骨架（2026-11-13 · preview/loading-skeleton-v1、v2 落地） ============
+   块和进场动画在 app.wxss（全局唯一一份）；这一页只补三处特例。 */
+
+/* 伙伴端页面底是羊皮纸灰，骨架层要同色，否则淡出时会看到一圈白边 */
+.sklayer { background: #F5F5F7; }
+
+/* 「已发布 · 第 N 版」是数据算出来的胶囊 —— 骨架期不能带强调蓝底，
+   但要把"这里有一个胶囊"的形状留着（用页面底色中立化） */
+.sk-tag-off { background: #F5F5F7; }
+
+/* 圆点选中态（18rpx 蓝长条）同样是数据决定的，骨架期回到普通灰点 */
+.sklayer .dot-i.on { width: 13rpx; background: #B3B3B8; }
+
+/* 骨架层没有真的 swiper，得自己补那 100rpx 的下留白，
+   否则圆点（margin-top -57rpx）会被拉到卡片里 —— 与真实版式对不上 */
+.sklayer .bigwrap { padding-bottom: 100rpx; }

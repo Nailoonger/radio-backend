@@ -401,3 +401,134 @@ button.btn-block,
   from { opacity: .6; transform: translateX(-20rpx); }
   to { opacity: 1; transform: translateX(0); }
 }
+
+/* ============================================================
+   加载骨架 + 进场（2026-11-13 · preview/loading-skeleton-v1、v2 落地）
+   ------------------------------------------------------------
+   两种写法，别混：
+     · 纯骨架   <view class="sk-row h-title"><view class="sk" style="width:400rpx"></view></view>
+     · 同构     <view class="sk-row"><view class="sk" style="width:300rpx"></view>
+                  <text>真文字</text></view>     ← 数据到了把 .sk 删掉即可，行高由 .sk-row 决定
+   零位移的前提是 .sk 不参与行高计算 —— 见下面 ⚠️⚠️。
+   ============================================================ */
+
+/* 骨架行：高度由 line-height 决定，块只挂在基线上，不撑行盒 */
+.sk-row { display: block; }
+.sk-row.h-page  { line-height: 1.25; }
+.sk-row.h-title { line-height: 1.3; }
+.sk-row.h-sec   { line-height: 1.35; }
+.sk-row.h-body  { line-height: 1.5; }
+
+/* 骨架块。
+   ⚠️⚠️ vertical-align 必须是 baseline：用 middle 会让 inline-block 撑高行盒
+   （实测某一行多出 4px，数据落地时整页往下跳）。baseline 对齐时块只从基线往上长，
+   行盒仍由 line-height 决定 ⇒ 换成真文字零位移。
+   top 用 relative 微调视觉居中 —— relative 不参与布局，不影响高度。 */
+.sk {
+  display: inline-block;
+  vertical-align: baseline;
+  position: relative;
+  top: .16em;
+  height: .62em;
+  /* flex:none —— 骨架块经常被放进 flex 行（.msl / .ebrow / .mod-f），
+     不写它会被当成可压缩项挤扁，宽度最后全靠运气 */
+  flex: none;
+  border-radius: 6rpx;
+  background-color: #EAEAED;
+  /* ⚠️ 必须裁：块内亮带超出块边界的部分要切掉 —— 光只在骨架里走，不在页面上扫。
+     实测：空的 inline-block 加 overflow:hidden 后基线仍在底边，
+     行盒高度与块位置跟 visible 相比差 0.00px ⇒ 不会破坏「骨架↔真内容零位移」的 baseline 对齐
+     （探针 _opfit/sk-baseline.html，7 组对照）。 */
+  overflow: hidden;
+}
+/* 底色分三档：#EAEAED 白底 / #E2E2E7 羊皮纸底（#EAEAED 在 #F5F5F7 上几乎看不见）/
+   rgba(255,255,255,.24) 深底 */
+.sk.sk-p { background-color: #E2E2E7; }
+.sk.sk-d { background-color: rgba(255, 255, 255, .24); }
+/* 胶囊 / 圆盘 / 方角小件 */
+.sk.sk-r { border-radius: 9999rpx; }
+.sk.sk-c { border-radius: 50%; }
+.sk.sk-sq { border-radius: 8rpx; }
+
+/* ── 骨架排版件（2026-11-16）：只给**尺寸与排布**，不给色 ──
+   ⚠️ 这里再写 background / border-radius，就等于把 .sk 的底色和块内扫光一起压掉
+      （同特异性、页面样式写在后 ⇒ 静默生效、页面看着像一排不动的灰条）。
+   高度按真实字号的字面高给：标题 42rpx→30rpx，正文/时间 23~30rpx→22rpx。 */
+.sk-l { height: 30rpx; top: 0; }   /* 标题行 / 正文行 */
+.sk-s { height: 22rpx; top: 0; }   /* 时间、来源、计数 */
+/* 多行正文：flex 列 + gap，行距 = 真实的 line-height 差，落地时纵向不跳 */
+.sk-para { display: flex; flex-direction: column; gap: 22rpx; }
+.sk-hd   { display: flex; flex-direction: column; gap: 26rpx; }
+/* 进 flex 列后基线微调没意义了，行距完全由 gap 决定 ⇒ 归零，免得整段下移 4rpx */
+.sk-para .sk, .sk-hd .sk { top: 0; }
+
+/* ══════════ 块内扫光（2026-11-16 v3 定案 · preview/loading-skeleton-v3）══════════
+   光**只在这个灰块内部**从左缘进、右缘出，扫完接下一轮。页面底色（卡片之间、卡片外侧）
+   上一条光带都不出现 —— 靠上面的 overflow:hidden 物理裁掉，不是靠"注意别扫出去"。
+   ⚠️ 只动 transform 一个属性 ⇒ 全程合成层，主线程零参与，不重绘不重排。
+   ⚠️⚠️ 别改回整层光带（`.sklayer::after` 铺一条扫过去）：那会扫到页面底色，等于擦屏幕，v2 已否。
+   ⚠️ 也别改回每个块 `background-position` 动画：那块与块不同步，还每帧重绘背景，v1 已否。
+   窄块（角标 / 小胶囊）靠 min-width 兜底：亮带比块还宽时被裁成一整块亮一下，这不是 bug。 */
+.sk::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 60%;
+  min-width: 64rpx;
+  background: linear-gradient(100deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, .88) 50%,
+    rgba(255, 255, 255, 0) 100%);
+  transform: translate3d(-100%, 0, 0);
+  will-change: transform;
+  animation: skInner 1.4s linear infinite;
+  pointer-events: none;
+}
+@keyframes skInner {
+  from { transform: translate3d(-100%, 0, 0); }
+  to   { transform: translate3d(170%, 0, 0); }
+}
+
+/* 骨架层：盖住首屏。⚠️ 用 fixed 不是 absolute —— absolute 会跟着页面滚，
+   用户往下滑就滑到「还没画骨架的空白」上。z-index 25 < 底栏 30，底栏仍可点。 */
+.sklayer {
+  position: fixed;
+  left: 0; right: 0; top: 0;
+  height: 100vh;
+  z-index: 25;
+  background: var(--canvas);   /* 学生端白页；伙伴端页面自己覆盖成 #F5F5F7 */
+  overflow: hidden;
+  transition: opacity .12s linear;
+}
+.sklayer-out { opacity: 0; pointer-events: none; }
+
+/* ============ 进场：一行一个单元，从上到下依次顶出来 ============
+   规则：一个视觉行 = 一个入场单元（两列网格同一行的两张卡同时，不一张接一张 ——
+   否则一高一低错开半个节拍，看着像加载乱了）。行间隔 55ms、单行 340ms。
+   ⚠️ 只动 transform + opacity，绝不做 height / margin 动画（逐帧重排，卡片一多就掉帧）。
+   ⚠️ fill-mode 用 backwards 不用 both：动画被系统禁用时 both 会停在 from（opacity:0）
+       ⇒ 整屏空白；backwards 结束后回到元素默认的可见状态，最坏情况只是没有动画。 */
+@keyframes cardIn {
+  from { opacity: 0; transform: translate3d(0, 28rpx, 0) scale(.985); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+.enter .in { animation: cardIn 340ms cubic-bezier(.22, 1, .36, 1) backwards; }
+/* 延迟用类，不用 CSS 变量：wxml 内联自定义属性在部分安卓 WebView 上不保证生效 */
+.enter .in.i0 { animation-delay: 0ms; }
+.enter .in.i1 { animation-delay: 55ms; }
+.enter .in.i2 { animation-delay: 110ms; }
+.enter .in.i3 { animation-delay: 165ms; }
+.enter .in.i4 { animation-delay: 220ms; }
+.enter .in.i5 { animation-delay: 275ms; }
+.enter .in.i6 { animation-delay: 330ms; }
+.enter .in.i7 { animation-delay: 385ms; }
+
+/* 系统开「减少动态效果」：块内扫光停、进场不做。
+   （亮带停在 from 位置 = 完全在块左缘外，等于不可见；骨架块本身有底色，不会消失。
+     进场用 backwards 也不会停在透明帧） */
+@media (prefers-reduced-motion: reduce) {
+  .sk::after { animation: none; }
+  .enter .in { animation: none; }
+}

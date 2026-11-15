@@ -13,6 +13,7 @@
 
 const { adminRequest } = require('../../utils/request.js');
 const partnerRole = require('../../utils/partnerRole.js');
+const skeleton = require('../../utils/skeleton.js');
 
 Page({
   data: {
@@ -24,6 +25,11 @@ Page({
     denyText: '',
     /** 超管才显示「＋ 新建社团」那一行 */
     isSuper: false,
+
+    // 骨架（2026-11-16）：sk 初值 true —— 骨架从第一帧就在，内容层整块 wx:if 掉
+    sk: true,
+    skOut: false,
+    enter: false,
   },
 
   onLoad() {
@@ -32,6 +38,8 @@ Page({
       statusBarHeight: getApp().globalData.statusBarHeight || 20,
       isSuper: role === 0,
     });
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
     /* 缓存里没有 role（老版本写下的）时问一次 /partner/me 自愈。
        ⚠️ 只在「拿不到角色」这一种情况下发请求；正常路径零延迟。
           拿不到就保持 false —— 宁可少一个入口，也别让社干看见不该有的按钮。 */
@@ -75,7 +83,7 @@ Page({
         }
         wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' });
       })
-      .then(() => this.setData({ loading: false }));
+      .then(() => this.setData({ loading: false }, () => this.skGate.check()));
   },
 
   open(e) {

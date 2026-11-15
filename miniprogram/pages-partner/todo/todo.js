@@ -14,12 +14,17 @@
 //    与学生端 token 分键，同机双登不会互相顶掉。
 
 const { adminRequest } = require('../../utils/request.js');
+const skeleton = require('../../utils/skeleton.js');
 
 Page({
   data: {
     statusBarHeight: 20,
     adminName: '管理员',
     loading: true,
+    // 加载骨架三件套（utils/skeleton.js）：本页只骨架化数字，入口文案是写死的照常显示
+    sk: true,   // ⚠️ 初值必须 true：骨架首帧就画，不能先渲染内容再盖上来（2026-11-13 陛下退回）
+    skOut: false,
+    enter: false,
     submitPending: 0,
     messagePending: 0,
     total: 0,

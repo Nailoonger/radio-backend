@@ -1,6 +1,7 @@
 // pages/programs/programs.js
 // 节目单：未来 7 天的节目预告（GET /api/user/program/schedule）
 const { request } = require('../../utils/request.js');
+const skeleton = require('../../utils/skeleton.js');
 
 const WEEK = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
@@ -9,10 +10,16 @@ Page({
     statusBarHeight: 20,
     groups: [],      // [{ date, label, list }]
     loading: true,
+    // 加载骨架三件套（见 utils/skeleton.js）
+    sk: true,   // ⚠️ 初值必须 true：骨架首帧就画，不能先渲染内容再盖上来（2026-11-13 陛下退回）
+    skOut: false,
+    enter: false,
   },
 
   onLoad() {
     this.setData({ statusBarHeight: getApp().globalData.statusBarHeight || 20 });
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
     this.fetch();
   },
 
@@ -25,9 +32,10 @@ Page({
     // 不带参数，后端默认返回今天起 7 天
     return request('/user/program/schedule')
       .then((data) => {
-        this.setData({ groups: this.groupByDate(data.list || []), loading: false });
+        this.setData({ groups: this.groupByDate(data.list || []), loading: false },
+          () => { this.skGate && this.skGate.check(); });
       })
-      .catch(() => this.setData({ loading: false }));
+      .catch(() => this.setData({ loading: false }, () => { this.skGate && this.skGate.check(); }));
   },
 
   /** 按日期分组，今天/明天单独标注 */

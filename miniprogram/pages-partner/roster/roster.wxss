@@ -143,3 +143,6 @@ button.pbtn.pressed { opacity: 0.86; }
   color: #76767E;
   padding-top: 22rpx;
 }
+
+/* ── 加载骨架（2026-11-16）：伙伴端页面底是 #F5F5F7，覆盖全局 .sklayer 的白底 ── */
+.sklayer { background: #F5F5F7; }

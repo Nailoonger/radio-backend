@@ -104,13 +104,9 @@ button.nologin-btn { margin-top: 16rpx; width: 420rpx; }
 .row-hover { opacity: 0.72; }
 .pressed { opacity: 0.6; }
 
-/* ── v8 方案 ⑥：列表骨架（尺寸=真实条目，底色 --divider，不动画） ── */
-.sk-item { pointer-events: none; }
-.sk { border-radius: 10rpx; background: var(--divider); }
-.sk-tag { width: 108rpx; height: 40rpx; border-radius: 999rpx; }
-.sk-time { width: 200rpx; height: 26rpx; }
-.sk-title { height: 34rpx; margin-top: 22rpx; width: 62%; }
-.sk-line { height: 28rpx; margin-top: 16rpx; width: 86%; }
+/* ── 列表骨架已统一到 app.wxss 的 .sk 系统（2026-11-13） ──
+   ⚠️ 这里原本有一份页面级 `.sk { background: var(--divider) }`，与全局 .sk 同名同特异性、写在后 ⇒
+      会把全局的骨架底色与 baseline 对齐全部压掉。已删，别再往这里加 .sk 覆盖。 */
 
 /* ── 退出登录：白色卡里的红字行，无右箭头（它不是去别的页，是动作） ── */
 .entry-logout { justify-content: center; }

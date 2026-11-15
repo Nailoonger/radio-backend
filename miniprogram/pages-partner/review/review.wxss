@@ -231,3 +231,6 @@ button.sm2.q { color: #76767E; font-weight: 400; }
 }
 .deny-t { font-size: 31rpx; font-weight: 600; color: #1D1D1F; }
 .deny-d { font-size: 23rpx; color: #76767E; line-height: 1.7; text-align: center; }
+
+/* ── 加载骨架（2026-11-13）：伙伴端页面底 #F5F5F7 ── */
+.sklayer { background: #F5F5F7; }

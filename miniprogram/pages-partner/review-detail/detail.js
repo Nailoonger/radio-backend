@@ -22,6 +22,9 @@
 
 const { adminRequest, isConflict } = require('../../utils/request.js');
 const { fmtMd, fmtIso, fmtSlot } = require('../../utils/format.js');
+const skeleton = require('../../utils/skeleton.js');
+// 长文案不能塞 showToast（> 两行截断，2026-11-16 陛下截图退回）
+const { tip } = require('../../utils/tip.js');
 
 /** 驳回理由预设 —— 与 admin-web SubmitList.vue 保持同一套，不新增语义 */
 const PRESETS = [
@@ -53,6 +56,11 @@ Page({
     submitting: false,
     notFound: false,
 
+    // 骨架（2026-11-16）：sk 初值 true —— 骨架从第一帧就在，内容层整块 wx:if 掉
+    sk: true,
+    skOut: false,
+    enter: false,
+
     // 'submit' | 'draft'（内部稿件）
     isDraft: false,
 
@@ -60,6 +68,8 @@ Page({
     pos: 0,
     queueTotal: 0,
     ids: [],
+    // 时段矩阵：值 → { i, seated, cap, full, label }（只给取件顺序用，不进 UI）
+    slotMap: null,
 
     isSong: true,
     kindText: '点歌',
@@ -95,8 +105,12 @@ Page({
       presets: isDraft ? PRESETS_DRAFT : PRESETS,
     });
 
-    // 先拿待审队列（用于「第 N / M 条」和翻页），再拉详情
-    this.loadQueue()
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
+
+    // 先拿时段矩阵（取件顺序要靠它判断「这格满没满」），再拿队列，最后拉详情
+    this.loadSlots()
+      .then(() => this.loadQueue())
       .then(() => this.loadDetail(id))
       .then(() => {
         if (focus === 'reject') {
@@ -129,7 +143,7 @@ Page({
 
   loadDetail(id) {
     if (!id) {
-      this.setData({ loading: false, notFound: true });
+      this.setData({ loading: false, notFound: true }, () => this.skGate.check());
       return Promise.resolve();
     }
     this.setData({ loading: true, notFound: false, presetIndex: -1, reason: '', canReject: false });
@@ -141,7 +155,7 @@ Page({
     return req
       .then((d) => {
         if (!d || !d.id) {
-          this.setData({ loading: false, notFound: true });
+          this.setData({ loading: false, notFound: true }, () => this.skGate.check());
           return;
         }
         const view = decorate(d, this.data.isDraft);
@@ -159,10 +173,10 @@ Page({
           docCol: view.docCol,
           quota: view.quota,
           recordLines: view.recordLines,
-        });
+        }, () => this.skGate.check());
       })
       .catch((err) => {
-        this.setData({ loading: false, notFound: true });
+        this.setData({ loading: false, notFound: true }, () => this.skGate.check());
         wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' });
       });
   },

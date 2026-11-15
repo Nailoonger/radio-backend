@@ -6,7 +6,45 @@
      2026-10-30 按 v151 删过「草稿」，2026-11-01 陛下要求加回来 —— 顶部那张「继续写」
      只能带最近一篇，草稿一多就找不到别的，所以草稿要占一个正式格子。
      不做：AI 找稿 / AI 续写 —— 没有 AI 服务，不给假入口。 -->
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
+  <!-- ============ 骨架层（2026-11-13 · preview/loading-skeleton-v1 伙伴端第 01 屏） ============
+       导航标题「稿件」照常显示；两张入口卡 / 状态 tab / 4 行稿件全部骨架化。
+       ⚠️ tab 上的数字是数据（counts），骨架期只留空胶囊，不编数字。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navbar">
+      <view class="navbar-spacer"></view>
+      <view class="navbar-title">稿件</view>
+      <view class="navbar-spacer"></view>
+    </view>
+    <view class="body">
+      <view class="mods">
+        <!-- 卡内一律灰（2026-11-13 第二次退回）：入口卡的名字也是"卡的内容"，
+             跟着卡一起等数据；混搭真字与灰块看着像坏了。 -->
+        <view class="mod" wx:for="{{[1,2]}}" wx:key="*this">
+          <view class="sk" style="width:150rpx;height:30rpx"></view>
+          <view class="sk" style="width:110rpx;margin-top:12rpx"></view>
+          <view class="mod-f"><view class="sk" style="width:104rpx"></view></view>
+        </view>
+      </view>
+      <view class="stabs">
+        <view class="stab" wx:for="{{[1,2,3,4]}}" wx:key="*this">
+          <view class="sk sk-p" style="width:64rpx"></view>
+          <text class="n"></text>
+        </view>
+      </view>
+      <view class="rows">
+        <view class="row" wx:for="{{[1,2,3,4]}}" wx:key="*this">
+          <view class="r-main">
+            <view class="sk" style="width:68%"></view>
+            <view class="sk" style="width:46%;margin-top:12rpx"></view>
+          </view>
+          <view class="sk sk-r" style="width:88rpx;height:32rpx"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
   <view class="navbar">
@@ -15,10 +53,10 @@
     <view class="navbar-spacer"></view>
   </view>
 
-  <view class="body">
+  <view class="body" wx:if="{{!sk || skOut}}">
     <!-- 顶部两张入口卡（照 v151：AI 找稿 / 继续写今天这篇）
          ⚠️ AI 找稿服务未接入 ⇒ 按钮照方案摆着，点了提示「暂未开放」，不留空白也不装死 -->
-    <view class="mods">
+    <view class="mods in i0">
       <view class="mod" hover-class="row-hover" bindtap="onAiFind">
         <text class="mod-t">AI 找稿</text>
         <text class="mod-d">联网找素材</text>
@@ -36,7 +74,7 @@
     </view>
 
     <!-- 状态（照原型 .stabs：文字 tab + 方块数字 + 下划线） -->
-    <view class="stabs">
+    <view class="stabs in i1">
       <view class="stab {{tabIdx === index ? 'on' : ''}}"
             wx:for="{{tabs}}" wx:key="key"
             data-idx="{{index}}" bindtap="switchTab">
@@ -49,7 +87,7 @@
     <view class="hint-note" wx:elif="{{list.length === 0}}">{{emptyText}}</view>
 
     <view class="rows" wx:else>
-      <view class="row" wx:for="{{list}}" wx:key="id"
+      <view class="row in i{{index > 4 ? 7 : index + 3}}" wx:for="{{list}}" wx:key="id"
             hover-class="row-hover" data-id="{{item.id}}" bindtap="onOpen">
         <view class="r-main">
           <text class="r-title">{{item.title}}</text>
@@ -61,7 +99,7 @@
     </view>
 
     <!-- 沉底：导出已通过的稿（纯前端拼文本，不造假接口） -->
-    <view class="rows" wx:if="{{counts.approved > 0}}">
+    <view class="rows in i7" wx:if="{{counts.approved > 0}}">
       <view class="row" hover-class="row-hover" bindtap="onExport">
         <text class="r-main r-export">导出已通过的稿</text>
         <text class="r-meta2">{{counts.approved}} 篇 ›</text>
@@ -69,7 +107,7 @@
     </view>
 
     <!-- 新写一篇（v151 没有独立入口，稿是从找稿/续写进来的；这里补一行，否则写了草稿才有入口） -->
-    <view class="rows">
+    <view class="rows in i7">
       <view class="row" hover-class="row-hover" bindtap="onNew">
         <image class="ric2" src="/assets/partner/ic-plus.png"/>
         <text class="r-main r-export">写一篇新的</text>

@@ -8,6 +8,7 @@
 // ⚠️ playStatus：0 未播 / 1 已播（已排的再分这两态）。
 
 const { adminRequest } = require('../../utils/request.js');
+const skeleton = require('../../utils/skeleton.js');
 
 const SCHEDULE = { UNASSIGNED: 0, APPROVED: 1, WAITING: 2, AUTO_REJECTED: 3 };
 
@@ -19,6 +20,11 @@ Page({
     waiting: [],
     seatedCount: 0,
     waitingCount: 0,
+
+    // 骨架（2026-11-16）：sk 初值 true —— 骨架从第一帧就在
+    sk: true,
+    skOut: false,
+    enter: false,
   },
 
   onLoad() {
@@ -35,6 +41,8 @@ Page({
       return;
     }
     this.setData({ statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20 });
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
     this.load();
   },
 
@@ -77,10 +85,10 @@ Page({
           waiting,
           seatedCount: seated.length,
           waitingCount: waiting.length,
-        });
+        }, () => this.skGate.check());
       })
       .catch((err) => {
-        this.setData({ loading: false });
+        this.setData({ loading: false }, () => this.skGate.check());
         wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' });
       });
   },

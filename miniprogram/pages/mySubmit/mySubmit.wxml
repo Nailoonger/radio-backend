@@ -1,13 +1,67 @@
 <!-- pages/mySubmit/mySubmit.wxml -->
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
+
+  <!-- ============ 骨架层（2026-11-13 · preview/loading-skeleton-v1 第 05 屏） ============
+       照真实版式：用户卡 → 窗口条 → 三格分段 → 3 个条目。
+       ⚠️ 深色头像圆保留深色底、只把首字抹掉（v1 口径：结构件底色不动）；
+          「菁悠成员」胶囊和分段文字是静态的，照常显示。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navreserve" style="height: {{navBarHeight}}px"></view>
+    <view class="body">
+      <view class="hero">
+        <view class="hero-top">
+          <!-- 深色头像圆保留深色底、只把首字抹掉（结构件底色不动） -->
+          <view class="avatar"></view>
+          <view class="hero-id">
+            <view class="hero-name"><view class="sk" style="width:140rpx"></view></view>
+            <view class="hero-meta"><view class="sk" style="width:230rpx;margin-top:8rpx"></view></view>
+          </view>
+          <view class="hero-badge"><view class="sk sk-r" style="width:72rpx;height:16rpx"></view></view>
+        </view>
+        <!-- ⚠️ 卡内一律灰（2026-11-13 第二次退回）：名字/学号虽然本地就有，但它属于这张卡的内容，
+             和三个统计数字是同一块信息 —— 一半真一半灰看着像坏了，不像在加载。 -->
+        <view class="hero-stats">
+          <view class="stat"><view class="n"><view class="sk sk-p" style="width:44rpx"></view></view><view class="l">全部</view></view>
+          <view class="stat"><view class="n"><view class="sk sk-p" style="width:44rpx"></view></view><view class="l">待审核</view></view>
+          <view class="stat"><view class="n"><view class="sk sk-p" style="width:44rpx"></view></view><view class="l">已播出</view></view>
+        </view>
+        <view class="hero-note"><view class="sk" style="width:76%"></view></view>
+      </view>
+
+      <view class="win-bar">
+        <view class="win-dot"></view>
+        <view class="win-main">
+          <view class="win-txt"><view class="sk" style="width:78%"></view></view>
+          <view class="win-sub"><view class="sk" style="width:56%;margin-top:8rpx"></view></view>
+        </view>
+      </view>
+
+      <view class="segment">
+        <view class="segment-item on">全部</view>
+        <view class="segment-item">待审核</view>
+        <view class="segment-item">已播出</view>
+      </view>
+
+      <view class="item" wx:for="{{[1,2,3]}}" wx:key="*this">
+        <view class="between">
+          <view class="sk sk-p sk-r" style="width:108rpx;height:34rpx"></view>
+          <view class="sk sk-p" style="width:150rpx"></view>
+        </view>
+        <view class="sk sk-p" style="width:64%;margin-top:20rpx"></view>
+        <view class="sk sk-p" style="width:84%;margin-top:14rpx"></view>
+      </view>
+    </view>
+  </view>
+
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
   <view class="navreserve" style="height: {{navBarHeight}}px"></view>
 
-  <view class="body {{tabMotion}}">
+  <view class="body {{tabMotion}}" wx:if="{{!sk || skOut}}">
 
     <!-- 未登录 -->
     <block wx:if="{{!loggedIn}}">
-      <view class="nologin">
+      <view class="nologin in i0">
         <image class="nologin-logo" src="/assets/station-badge.png" mode="aspectFit" />
         <view class="t-title">登录后查看你的投稿</view>
         <button class="btn btn-primary nologin-btn" hover-class="pressed" bindtap="doLogin">使用学号登录</button>
@@ -17,7 +71,7 @@
     <block wx:else>
       <!-- 用户 Hero 卡（L1：白卡大投影，全页唯一焦点）
            三格统计 = 全部 / 待审核 / 已播出，三桶互斥穷尽（7 + 3 = 10） -->
-      <view class="hero">
+      <view class="hero in i0">
         <view class="hero-top">
           <view class="avatar">{{nicknameInitial}}</view>
           <view class="hero-id">
@@ -36,7 +90,7 @@
       </view>
 
       <!-- 点歌时间窗口状态条（常驻；文案服务端下发，前端不硬编码星期与时刻） -->
-      <view class="win-bar {{winOpen ? 'open' : ''}}" wx:if="{{winEnabled}}">
+      <view class="win-bar in i1 {{winOpen ? 'open' : ''}}" wx:if="{{winEnabled}}">
         <view class="win-dot"></view>
         <view class="win-main">
           <view class="win-txt">点歌时间：{{winLine1}}</view>
@@ -45,26 +99,14 @@
       </view>
 
       <!-- 三格筛选（协议版：全部 / 待审核 / 已播出） -->
-      <view class="segment">
+      <view class="segment in i2">
         <view class="segment-indicator" style="width: calc((100% - 16rpx) / 3); transform: translateX({{statusIndex * 100}}%);"></view>
         <view class="segment-item {{statusFilter === '' ? 'on' : ''}}" data-status="" bindtap="switchFilter" hover-class="none">全部</view>
         <view class="segment-item {{statusFilter === 'pending' ? 'on' : ''}}" data-status="pending" bindtap="switchFilter" hover-class="none">待审核</view>
         <view class="segment-item {{statusFilter === 'played' ? 'on' : ''}}" data-status="played" bindtap="switchFilter" hover-class="none">已播出</view>
       </view>
 
-      <!-- 列表骨架（张数 = 上一次条数，最多 5 张；不铺满整屏） -->
-      <block wx:if="{{skList}}">
-        <view class="item sk-item" wx:for="{{[1,2,3,4,5]}}" wx:key="*this" wx:if="{{index < skCount}}">
-          <view class="between">
-            <view class="sk sk-tag"></view>
-            <view class="sk sk-time"></view>
-          </view>
-          <view class="sk sk-title"></view>
-          <view class="sk sk-line"></view>
-        </view>
-      </block>
-
-      <view class="loading" wx:if="{{loading && !skList}}">加载中……</view>
+      <!-- 骨架由上面的 .sklayer 负责（2026-11-13 统一口径），这里不再放 300ms 定时器那一套 -->
 
       <view class="empty" wx:if="{{!list.length && !loading}}">这里还没有投稿记录</view>
 
@@ -72,7 +114,7 @@
       <block wx:for="{{list}}" wx:key="id">
 
         <!-- ① 候补中（深色卡当主角：位次 + 前面几人 + 首选 + 是否接受调剂 + 锁定时刻） -->
-        <view class="tile" wx:if="{{item.qv.kind === 'waiting'}}">
+        <view class="tile in i{{index > 4 ? 7 : index + 3}}" wx:if="{{item.qv.kind === 'waiting'}}">
           <view class="tile-chips">
             <view class="chip" wx:for="{{item.qv.chips}}" wx:key="*this" wx:for-item="cp">{{cp}}</view>
           </view>
@@ -90,7 +132,7 @@
 
         <!-- ② 已排期（标题放实际时段：学生最想知道的就是「排到哪一场」；
              被调剂过的把「首选 → 实际」都写出来，否则学生会以为排错了） -->
-        <view class="tile" wx:elif="{{item.qv.kind === 'scheduled'}}">
+        <view class="tile in i{{index > 4 ? 7 : index + 3}}" wx:elif="{{item.qv.kind === 'scheduled'}}">
           <view class="tile-chips">
             <view class="chip" wx:for="{{item.qv.chips}}" wx:key="*this" wx:for-item="cp">{{cp}}</view>
           </view>
@@ -103,7 +145,7 @@
         </view>
 
         <!-- ③ 未排上 / 已驳回（失败不抢主角位，用羊皮纸卡；红胶囊区分系统驳与人工驳） -->
-        <view class="qc-fail" wx:elif="{{item.qv.kind === 'failed'}}">
+        <view class="qc-fail in i{{index > 4 ? 7 : index + 3}}" wx:elif="{{item.qv.kind === 'failed'}}">
           <view class="between">
             <text class="t-strong">{{item.qv.title}}</text>
             <text class="tag tag-reject">{{item.qv.tagText}}</text>
@@ -113,7 +155,7 @@
         </view>
 
         <!-- ④ 普通行（待审核 / 待排期 / 已播放 / 已取消） -->
-        <view class="item" wx:else>
+        <view class="item in i{{index > 4 ? 7 : index + 3}}" wx:else>
           <view class="between">
             <text class="tag {{item.statusClass}}">{{item.statusText}}</text>
             <text class="t-micro">{{item.createTimeText}}</text>
@@ -140,7 +182,7 @@
       </block>
 
       <!-- 入口 -->
-      <view class="entries">
+      <view class="entries in i{{list.length > 4 ? 7 : list.length + 3}}">
         <view class="entry" hover-class="row-hover" bindtap="goAbout">
           <text class="t-strong">关于菁悠广播站</text>
           <view class="chev-r"></view>
@@ -155,7 +197,7 @@
     <!-- 公开入口，独立于学生登录状态。
          ⚠️「广播通知」在前：它要**社团密钥**才进得去，与学生登录是两件事
             （未登录也能先看轮播、输密钥；真正提报时会要求登录）。 -->
-    <view class="card-flush">
+    <view class="card-flush in i{{loggedIn ? 7 : 1}}">
       <view class="card-row" hover-class="row-hover" bindtap="goClubCode">
         <view class="grow stack">
           <text class="t-strong t-link">广播通知</text>

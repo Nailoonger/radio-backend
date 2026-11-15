@@ -1,5 +1,5 @@
 <!-- pages/club-notice/club-notice.wxml -->
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
   <view class="navbar">
@@ -10,20 +10,59 @@
     <view class="navbar-spacer"></view>
   </view>
 
-  <view class="body detail-body">
+  <!-- ============ 骨架层（2026-11-16 · preview/loading-skeleton-v3 口径） ============
+       ⚠️ fixed 不是 absolute。状态徽章与正文纸的位置、圆角、分隔线都是真结构，先摆好；
+          只有徽章里的字、纸上的字换成灰块（羊皮纸底用 sk-p）。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navbar">
+      <view class="navbar-back"></view>
+      <view class="navbar-title">通知进度</view>
+      <view class="navbar-spacer"></view>
+    </view>
+    <view class="body detail-body">
+      <view class="head">
+        <view class="sk sk-r" style="width:104rpx;height:40rpx"></view>
+        <view class="sk sk-s" style="width:180rpx"></view>
+      </view>
 
-    <view class="loading" wx:if="{{loading && !record}}">加载中……</view>
+      <view class="paper">
+        <view class="sk sk-l sk-p" style="width:88%"></view>
+        <view class="sk-para" style="margin-top:22rpx">
+          <view class="sk sk-s sk-p" style="width:100%"></view>
+          <view class="sk sk-s sk-p" style="width:97%"></view>
+          <view class="sk sk-s sk-p" style="width:100%"></view>
+          <view class="sk sk-s sk-p" style="width:62%"></view>
+        </view>
+        <view class="paper-m" style="margin-top:24rpx">
+          <view class="sk sk-s sk-p" style="width:150rpx"></view>
+          <view class="sk sk-s sk-p" style="width:56rpx"></view>
+        </view>
+      </view>
+
+      <view class="grp-t">走到哪一步了</view>
+      <view class="tl">
+        <view class="tl-i" wx:for="{{[1,2,3]}}" wx:key="*this">
+          <view class="tl-dot"></view>
+          <view class="sk sk-s" style="width:150rpx"></view>
+          <view class="sk sk-s" style="width:260rpx;margin-top:12rpx"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="body detail-body" wx:if="{{!sk || skOut}}">
 
     <block wx:if="{{record}}">
 
       <!-- 状态 + 时刻 -->
-      <view class="head">
+      <view class="head in i0">
         <view class="st {{stCls}}">{{record.statusText}}</view>
         <text class="head-t">{{statusTime}}</text>
       </view>
 
       <!-- 正文纸 -->
-      <view class="paper">
+      <view class="paper in i1">
         <view class="paper-t">{{record.title}}</view>
         <view class="paper-b">{{record.body}}</view>
         <view class="paper-m">

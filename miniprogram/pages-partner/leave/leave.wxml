@@ -2,7 +2,7 @@
      三个角色同一套：从我本周的班次里挑一场 + 写事由 → 提交；下面是我这周的请假。
      审批已拆出去：pages-partner/leave-review/（工作台「站内协作 · 请假审批」进）。
      接口：GET /partner/schedule/mine · GET /partner/leave/mine · POST /partner/leave · DELETE /partner/leave/:id -->
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
   <view class="navbar">
@@ -13,10 +13,55 @@
     <view class="navbar-spacer"></view>
   </view>
 
-  <view class="body">
+  <!-- ============ 骨架层（2026-11-16 · preview/loading-skeleton-v3 口径） ============
+       ⚠️ fixed 不是 absolute；伙伴端底色 #F5F5F7。
+          写死的分区标题（我要请假 / 我这周的请假）与周切换左右文字链照常显示，
+          只有班次胶囊、输入框、按钮、已请次数和请假行摆灰块。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navbar">
+      <view class="navbar-back"></view>
+      <view class="navbar-title">请假</view>
+      <view class="navbar-spacer"></view>
+    </view>
+    <view class="body">
+      <view class="wk-nav">
+        <text class="wk-b">‹ 上一周</text>
+        <view class="wk-mid">
+          <view class="sk sk-r" style="width:76rpx;height:30rpx"></view>
+          <view class="sk sk-s" style="width:120rpx"></view>
+        </view>
+        <text class="wk-b r">下一周 ›</text>
+      </view>
+
+      <view class="card">
+        <view class="sec-h"><text class="sec-t">我要请假</text></view>
+        <view class="chips">
+          <view class="sk sk-r" style="width:150rpx;height:52rpx" wx:for="{{[1,2,3]}}" wx:key="*this"></view>
+        </view>
+        <view class="sk" style="width:100%;height:132rpx;border-radius:18rpx;margin-top:16rpx;top:0"></view>
+        <view class="sk sk-r" style="width:100%;height:88rpx;margin-top:18rpx"></view>
+        <view class="sk sk-s" style="width:180rpx;margin-top:20rpx"></view>
+      </view>
+
+      <view class="sec-h2"><text class="sec-t">我这周的请假</text></view>
+      <view class="rows">
+        <view class="row" wx:for="{{[1,2]}}" wx:key="*this">
+          <view class="r-main">
+            <view class="sk sk-l" style="width:56%"></view>
+            <view class="sk sk-s" style="width:82%;margin-top:10rpx"></view>
+          </view>
+          <view class="r-right">
+            <view class="sk sk-r" style="width:76rpx;height:34rpx"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view class="body" wx:if="{{!sk || skOut}}">
     <!-- 周切换（2026-10-30 统一）：左右文字链 + 中间「本周 / 非本周」胶囊 + 月日，
          与值班时间代录、考勤、排班工作台四页同一套写法。 -->
-    <view class="wk-nav">
+    <view class="wk-nav in i0">
       <text class="wk-b" bindtap="prevWeek">‹ 上一周</text>
       <view class="wk-mid">
         <text class="wk-tag {{isThisWeek ? 'on' : 'off'}}">{{isThisWeek ? '本周' : '非本周'}}</text>
@@ -25,7 +70,7 @@
       <text class="wk-b r {{isThisWeek ? 'off' : ''}}" bindtap="nextWeek">下一周 ›</text>
     </view>
 
-    <view class="card">
+    <view class="card in i1">
       <view class="sec-h"><text class="sec-t">我要请假</text></view>
       <view class="hint-note" wx:if="{{shifts.length === 0}}">这一周没有你的班次，没什么可请</view>
       <view class="chips" wx:else>
@@ -42,9 +87,9 @@
       <view class="note">本月已请 {{monthUsed}} 次。</view>
     </view>
 
-    <view class="sec-h2"><text class="sec-t">我这周的请假</text></view>
-    <view class="hint-note" wx:if="{{mine.length === 0}}">这一周没请过假</view>
-    <view class="rows" wx:else>
+    <view class="sec-h2 in i2"><text class="sec-t">我这周的请假</text></view>
+    <view class="hint-note in i3" wx:if="{{mine.length === 0}}">这一周没请过假</view>
+    <view class="rows in i3" wx:else>
       <view class="row" wx:for="{{mine}}" wx:key="id">
         <view class="r-main">
           <text class="r-note">{{item.dayText}} {{item.slot}}</text>

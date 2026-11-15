@@ -1,5 +1,5 @@
 <!-- pages-partner/club-keys/keys.wxml -->
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
   <view class="navbar">
@@ -10,21 +10,55 @@
     <view class="navbar-spacer"></view>
   </view>
 
-  <view class="body">
+  <!-- ============ 骨架层（2026-11-16 · preview/loading-skeleton-v3 口径） ============
+       ⚠️ fixed 不是 absolute；伙伴端底色 #F5F5F7。
+          「密钥怎么流转」这张卡是写死的说明文案，照常显示真字；计数与社团行摆灰块。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navbar">
+      <view class="navbar-back"></view>
+      <view class="navbar-title">社团密钥</view>
+      <view class="navbar-spacer"></view>
+    </view>
+    <view class="body">
+      <view class="sec-h">
+        <view class="sk sk-l" style="width:280rpx"></view>
+        <text class="sec-l">刷新</text>
+      </view>
+      <view class="kcard">
+        <view class="krow" wx:for="{{[1,2,3]}}" wx:key="*this">
+          <view class="kav"><view class="sk sk-c" style="width:76rpx;height:76rpx"></view></view>
+          <view class="km">
+            <view class="sk sk-l" style="width:180rpx"></view>
+            <view class="sk sk-s" style="width:240rpx;margin-top:10rpx"></view>
+          </view>
+          <view class="sk sk-r" style="width:76rpx;height:34rpx"></view>
+          <view class="chev-r"></view>
+        </view>
+      </view>
+      <view class="hintcard">
+        <view class="hint-t">密钥怎么流转</view>
+        <view class="hint-li">后台给每个社团生成一把，长期有效，不用每次申请</view>
+        <view class="hint-li">社长与指导老师各持一把，换人时由社干重置</view>
+        <view class="hint-li">谁泄露了就地作废，旧密钥立刻打不开</view>
+      </view>
+    </view>
+  </view>
+  <view class="body" wx:if="{{!sk || skOut}}">
 
     <view class="denied" wx:if="{{denied}}">
       <view class="denied-t">{{denyText}}</view>
     </view>
 
     <block wx:else>
-      <view class="sec-h">
+      <view class="sec-h in i0">
         <text class="sec-t">{{count.total}} 个社团 · 每社团一把</text>
         <text class="sec-l" bindtap="reload">刷新</text>
       </view>
 
       <view class="loading" wx:if="{{loading && !list.length}}">加载中……</view>
 
-      <view class="kcard {{isSuper ? 'has-add' : ''}}" wx:else>
+      <view class="kcard {{isSuper ? 'has-add' : ''}} in i1" wx:else>
         <view class="krow" wx:for="{{list}}" wx:key="id" data-id="{{item.id}}" bindtap="open" hover-class="row-hover">
           <view class="kav">
             <image wx:if="{{item.avatar}}" class="kav-img" src="{{item.avatar}}" mode="aspectFill" />
@@ -49,7 +83,7 @@
         </view>
       </view>
 
-      <view class="hintcard">
+      <view class="hintcard in i2">
         <view class="hint-t">密钥怎么流转</view>
         <view class="hint-li">后台给每个社团生成一把，长期有效，不用每次申请</view>
         <view class="hint-li">社长与指导老师各持一把，换人时由社干重置</view>

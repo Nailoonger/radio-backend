@@ -2,7 +2,7 @@
      两档 tab：待审批（按周，先请先批）/ 已审批（不分周，按处理时间倒序）
      接口：GET /partner/leave/pending · GET /partner/leave/reviewed · PUT /partner/leave/:id/review
      ⚠️ 样式与 leave 页同一套（.wk-nav / .rows / .row / .tag / button.sm2），不要另起一套数值。 -->
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
   <view class="navbar">
@@ -13,10 +13,52 @@
     <view class="navbar-spacer"></view>
   </view>
 
-  <view class="body">
+  <!-- ============ 骨架层（2026-11-16 · preview/loading-skeleton-v3 口径） ============
+       ⚠️ fixed 不是 absolute；伙伴端底色 #F5F5F7。周切换文字链与两档 tab 的标题是真字，
+          只有计数、请假行摆灰块。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navbar">
+      <view class="navbar-back"></view>
+      <view class="navbar-title">请假审批</view>
+      <view class="navbar-spacer"></view>
+    </view>
+    <view class="body">
+      <view class="wk-nav">
+        <text class="wk-b">‹ 上一周</text>
+        <view class="wk-mid">
+          <view class="sk sk-r" style="width:76rpx;height:30rpx"></view>
+          <view class="sk sk-s" style="width:120rpx"></view>
+        </view>
+        <text class="wk-b r">下一周 ›</text>
+      </view>
+      <view class="stabs">
+        <view class="stab on"><text>待审批</text></view>
+        <view class="stab"><text>已审批</text></view>
+      </view>
+      <view class="rows">
+        <view class="row" wx:for="{{[1,2]}}" wx:key="*this">
+          <view class="r-main">
+            <view class="r-top">
+              <view class="sk sk-l" style="width:110rpx"></view>
+              <view class="sk sk-r" style="width:76rpx;height:34rpx"></view>
+            </view>
+            <view class="sk sk-s" style="width:150rpx;margin-top:12rpx"></view>
+            <view class="sk sk-s" style="width:86%;margin-top:10rpx"></view>
+            <view class="sk sk-s" style="width:120rpx;margin-top:10rpx"></view>
+          </view>
+          <view class="r-act">
+            <view class="sk sk-r" style="width:88rpx;height:52rpx"></view>
+            <view class="sk sk-r" style="width:88rpx;height:52rpx"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view class="body" wx:if="{{!sk || skOut}}">
     <!-- 2026-11-01 陛下改：周切换从「待审批」区块里提出来，**贴在两档 tab 的头上**（顶到最上）。
          ⚠️ 只在待审批档显示：已审批是处理记录、不分周，留着一条改了没反应的周条＝假控件。 -->
-    <view class="wk-nav" wx:if="{{tabIdx === 0}}">
+    <view class="wk-nav in i0" wx:if="{{tabIdx === 0}}">
       <text class="wk-b" bindtap="prevWeek">‹ 上一周</text>
       <view class="wk-mid">
         <text class="wk-tag {{isThisWeek ? 'on' : 'off'}}">{{isThisWeek ? '本周' : '非本周'}}</text>
@@ -26,7 +68,7 @@
     </view>
 
     <!-- 两档 tab（照稿件页 .stabs：文字 + 方块数字 + 蓝下划线） -->
-    <view class="stabs">
+    <view class="stabs in i1">
       <view class="stab {{tabIdx === 0 ? 'on' : ''}}" data-i="0" bindtap="onTab">
         <text>待审批</text>
         <text class="n" wx:if="{{pendingCount > 0}}">{{pendingCount}}</text>
@@ -40,8 +82,8 @@
     <!-- ───────── 待审批 ───────── -->
     <block wx:if="{{tabIdx === 0}}">
       <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
-      <view class="hint-note" wx:elif="{{pending.length === 0}}">这一周没有待批的请假</view>
-      <view class="rows" wx:else>
+      <view class="hint-note in i2" wx:elif="{{pending.length === 0}}">这一周没有待批的请假</view>
+      <view class="rows in i2" wx:else>
         <view class="row" wx:for="{{pending}}" wx:key="id">
           <view class="r-main">
             <view class="r-top">
@@ -63,7 +105,7 @@
     <!-- ───────── 已审批 ───────── -->
     <block wx:else>
       <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
-      <view class="hint-note" wx:elif="{{reviewed.length === 0}}">还没有处理过的请假</view>
+      <view class="hint-note in i2" wx:elif="{{reviewed.length === 0}}">还没有处理过的请假</view>
       <view class="rows" wx:else>
         <view class="row" wx:for="{{reviewed}}" wx:key="id">
           <view class="r-main">

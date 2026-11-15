@@ -1,27 +1,75 @@
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
   <view class="navbar">
     <view class="navbar-back" bindtap="goBack" hover-class="pressed" aria-label="返回"><view class="chev-l"></view></view>
     <view class="navbar-title">加入我们</view>
     <view class="navbar-spacer"></view>
   </view>
-  <view class="body recruitment-body">
-    <view class="tile">
+
+  <!-- ============ 骨架层（2026-11-16 · preview/loading-skeleton-v3 口径） ============
+       ⚠️ fixed 不是 absolute。深色招新头卡（含标语）是**写死的版式**，照常显示真字；
+          只有接口给的批次信息（标题 / 简介 / 时间窗 / 按钮）摆灰块。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navbar">
+      <view class="navbar-back"></view>
+      <view class="navbar-title">加入我们</view>
+      <view class="navbar-spacer"></view>
+    </view>
+    <view class="body recruitment-body">
+      <view class="tile">
+        <view class="tile-chips"><view class="chip">菁悠广播站·统一招录</view></view>
+        <view class="tile-title"><view>让你的声音，</view><view>成为校园的回响。</view></view>
+        <view class="sk sk-s sk-d" style="width:300rpx"></view>
+      </view>
+
+      <view class="stack recruitment-gap">
+        <view class="sk" style="width:72%;height:40rpx;top:0"></view>
+        <view class="sk-para" style="margin-top:20rpx">
+          <view class="sk sk-s" style="width:100%"></view>
+          <view class="sk sk-s" style="width:88%"></view>
+        </view>
+      </view>
+
+      <view class="win-bar">
+        <view class="win-dot"></view>
+        <view class="win-main">
+          <view class="sk sk-l" style="width:220rpx"></view>
+          <view class="sk sk-s" style="width:300rpx;margin-top:12rpx"></view>
+          <view class="sk sk-s" style="width:260rpx;margin-top:12rpx"></view>
+        </view>
+      </view>
+
+      <view class="sk sk-r" style="width:100%;height:88rpx;margin-top:24rpx"></view>
+
+      <view class="card-flush">
+        <view class="card-row">
+          <view class="grow stack" style="gap:10rpx">
+            <view class="sk sk-l" style="width:60%"></view>
+            <view class="sk sk-s" style="width:100%"></view>
+          </view>
+          <view class="chev-r"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="body recruitment-body" wx:if="{{!sk || skOut}}">
+    <view class="tile in i0">
       <view class="tile-chips"><view class="chip">菁悠广播站·统一招录</view></view>
       <view class="tile-title"><view>让你的声音，</view><view>成为校园的回响。</view></view>
       <view class="tile-meta">{{gradeText || '公开报名，无需登录。'}}</view>
     </view>
-    <view class="loading" wx:if="{{loading}}">加载中……</view>
-    <view class="card stack recruitment-gap" wx:elif="{{error}}">
+    <view class="card stack recruitment-gap" wx:if="{{error}}">
       <view class="t-sub">{{error}}</view>
       <button class="btn btn-primary" bindtap="load">重新加载</button>
     </view>
     <block wx:elif="{{batch}}">
-      <view class="stack recruitment-gap">
+      <view class="stack recruitment-gap in i1">
         <view class="t-title">{{batch.title}}</view>
         <view class="t-body recruitment-intro">{{batch.intro}}</view>
       </view>
-      <view class="win-bar {{batch.windowState === 'open' ? 'open' : ''}}">
+      <view class="win-bar in i2 {{batch.windowState === 'open' ? 'open' : ''}}">
         <view class="win-dot"></view>
         <view class="win-main">
           <view class="win-txt">{{windowText}}</view>
@@ -29,18 +77,18 @@
           <view class="win-sub">截止：{{closesText}}（北京时间）</view>
         </view>
       </view>
-      <button class="btn btn-primary btn-block" disabled="{{batch.windowState !== 'open'}}" bindtap="apply">{{batch.windowState === 'open' ? '填写报名表' : windowText}}</button>
+      <button class="btn btn-primary btn-block in i3" disabled="{{batch.windowState !== 'open'}}" bindtap="apply">{{batch.windowState === 'open' ? '填写报名表' : windowText}}</button>
     </block>
     <view class="card stack recruitment-gap" wx:else>
       <view class="t-section">暂无招新计划</view>
       <view class="t-sub">招新开放后，可以在这里填写报名表。</view>
     </view>
-    <view class="card stack recruitment-gap" wx:if="{{pending}}">
+    <view class="card stack recruitment-gap in i4" wx:if="{{pending}}">
       <view class="t-strong">上次提交尚未确认</view>
       <view class="t-cap">继续原提交以确认结果，请勿重复填写报名。</view>
       <button class="btn btn-primary" bindtap="resume">继续上次提交</button>
     </view>
-    <view class="card-flush">
+    <view class="card-flush in i5">
       <view class="card-row" hover-class="row-hover" bindtap="query">
         <view class="grow stack"><view class="t-strong t-link">查询我的报名</view><view class="t-cap">凭查询码查看面试安排和录取结果</view></view>
         <view class="chev-r"></view>

@@ -1,6 +1,7 @@
 // pages/programDetail/programDetail.js
 const { request } = require('../../utils/request.js');
 const { fmtDate } = require('../../utils/format.js');
+const skeleton = require('../../utils/skeleton.js');
 const app = getApp();
 
 Page({
@@ -9,6 +10,11 @@ Page({
     program: null,
     messages: [],
     loading: true,
+
+    // 骨架（2026-11-16）：sk 初值 true —— 骨架从第一帧就在
+    sk: true,
+    skOut: false,
+    enter: false,
 
     // 留言
     inputContent: '',
@@ -23,6 +29,9 @@ Page({
       loggedIn: !!app.globalData.token,
     });
 
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
+
     request(`/user/program/${options.id}`)
       .then((data) => {
         this.setData({
@@ -34,9 +43,9 @@ Page({
             initial: (m.nickname || '').trim().charAt(0) || '同',
           })),
           loading: false,
-        });
+        }, () => this.skGate.check());
       })
-      .catch(() => this.setData({ loading: false }));
+      .catch(() => this.setData({ loading: false }, () => this.skGate.check()));
 
     // 留言模块开关（读取接口不受开关影响，这里只是提前把输入框置灰）
     app.fetchSwitches().then((sw) => {

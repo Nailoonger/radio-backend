@@ -14,6 +14,7 @@
 
 const { adminRequest } = require('../../utils/request.js');
 const clubTime = require('../../utils/clubTime.js');
+const skeleton = require('../../utils/skeleton.js');
 
 const ST_CLS = { 0: 'wait', 1: 'air', 2: 'rej', 3: 'done', 9: 'mute' };
 const SLOTS = ['早读 07:30', '午间 12:20', '傍晚 17:30'];
@@ -37,6 +38,11 @@ Page({
     denyText: '',
     // 今天（北京），日期选择器的起点 —— 不允许排到过去
     today: '',
+
+    // 骨架（2026-11-16）：sk 初值 true —— 骨架从第一帧就在，内容层整块 wx:if 掉
+    sk: true,
+    skOut: false,
+    enter: false,
   },
 
   onLoad(q) {
@@ -47,6 +53,8 @@ Page({
       today: d,
       date: d,
     });
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
     if (!this.data.id) { wx.showToast({ title: '参数不对', icon: 'none' }); return; }
     this.reload();
   },
@@ -81,7 +89,7 @@ Page({
         }
         wx.showToast({ title: (err && err.message) || '打不开这条', icon: 'none' });
       })
-      .then(() => this.setData({ loading: false }));
+      .then(() => this.setData({ loading: false }, () => this.skGate.check()));
   },
 
   onDate(e) {

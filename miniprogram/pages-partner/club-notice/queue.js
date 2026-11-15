@@ -12,6 +12,7 @@
 
 const { adminRequest } = require('../../utils/request.js');
 const clubTime = require('../../utils/clubTime.js');
+const skeleton = require('../../utils/skeleton.js');
 
 const ST_CLS = { 0: 'wait', 1: 'air', 2: 'rej', 3: 'done', 9: 'mute' };
 const TABS = [
@@ -31,10 +32,17 @@ Page({
     loading: true,
     denied: false,
     denyText: '',
+
+    // 骨架（2026-11-16）：sk 初值 true —— 骨架从第一帧就在，内容层整块 wx:if 掉
+    sk: true,
+    skOut: false,
+    enter: false,
   },
 
   onLoad() {
     this.setData({ statusBarHeight: getApp().globalData.statusBarHeight || 20 });
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
   },
 
   onShow() {
@@ -61,7 +69,7 @@ Page({
         }
         wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' });
       })
-      .then(() => this.setData({ loading: false }));
+      .then(() => this.setData({ loading: false }, () => this.skGate.check()));
   },
 
   applyTab() {

@@ -16,6 +16,7 @@
 //    手写 value + setData 会跟输入法 composition 抢，中文/数字输入都可能被打断。
 
 const { adminRequest } = require('../../utils/request.js');
+const skeleton = require('../../utils/skeleton.js');
 
 /** 11 位、1 开头、第二位 3–9（与后端 normalizePhone 同一套规则） */
 function phoneOK(v) {
@@ -54,6 +55,11 @@ Page({
     me: { personId: 0, name: '', username: '', phone: '', needPhone: true },
     // 手机号弹层；null = 不显示
     sheet: null,
+
+    // 骨架（2026-11-16）：sk 初值 true —— 骨架从第一帧就在，内容层整块 wx:if 掉
+    sk: true,
+    skOut: false,
+    enter: false,
   },
 
   onLoad() {
@@ -63,6 +69,8 @@ Page({
       return;
     }
     this.setData({ statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20 });
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
     this.load();
   },
 
@@ -123,13 +131,13 @@ Page({
           superCount: raw.filter((x) => x.isSuper).length,
           deptCount: Object.keys(depts).length,
           me: me || { personId: 0, name: '', username: '', phone: '', needPhone: true },
-        });
+        }, () => this.skGate.check());
 
         // 没填过 → 立刻弹「先留个手机号」，且这一层关不掉
         if (!me || me.needPhone) this.openSheet(false);
       })
       .catch((err) => {
-        this.setData({ loading: false });
+        this.setData({ loading: false }, () => this.skGate.check());
         wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' });
       });
   },

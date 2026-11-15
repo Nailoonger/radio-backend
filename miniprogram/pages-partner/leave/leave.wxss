@@ -140,3 +140,6 @@ button.btn[disabled] { opacity: .45; }
 .note { font-size: 21rpx; color: #76767E; line-height: 1.7; text-align: center; }
 .hint-note { text-align: center; font-size: 23rpx; color: #76767E; padding: 30rpx 0; }
 .pressed { opacity: .72; }
+
+/* ── 加载骨架（2026-11-16）：伙伴端页面底是 #F5F5F7，覆盖全局 .sklayer 的白底 ── */
+.sklayer { background: #F5F5F7; }

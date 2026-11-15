@@ -1,5 +1,5 @@
 <!-- pages-partner/club-notice/queue.wxml -->
-<view class="page pq-page">
+<view class="page pq-page {{enter ? 'enter' : ''}}">
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
   <view class="navbar">
@@ -10,7 +10,39 @@
     <view class="navbar-spacer"></view>
   </view>
 
-  <view class="body">
+  <!-- ============ 骨架层（2026-11-16 · preview/loading-skeleton-v3 口径） ============
+       ⚠️ fixed 不是 absolute；伙伴端底色 #F5F5F7。三段标签是真字（写死在 TABS 里），
+          角标计数与通知卡摆灰块。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navbar">
+      <view class="navbar-back"></view>
+      <view class="navbar-title">广播通知</view>
+      <view class="navbar-spacer"></view>
+    </view>
+    <view class="body">
+      <view class="segs">
+        <view class="segs-v on">待审核</view>
+        <view class="segs-v">待播</view>
+        <view class="segs-v">已播出</view>
+      </view>
+      <view class="qcard" wx:for="{{[1,2]}}" wx:key="*this">
+        <view class="qtop">
+          <view class="sk sk-r sk-p" style="width:110rpx;height:32rpx"></view>
+          <view class="sk sk-l sk-p" style="width:100%"></view>
+        </view>
+        <view class="sk-para" style="margin-top:18rpx">
+          <view class="sk sk-s sk-p" style="width:100%"></view>
+          <view class="sk sk-s sk-p" style="width:72%"></view>
+        </view>
+        <view class="qfoot">
+          <view class="sk sk-s sk-p" style="width:150rpx"></view>
+          <view class="sk sk-s sk-p" style="width:110rpx"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view class="body" wx:if="{{!sk || skOut}}">
 
     <!-- 权限被关掉：整页只留这一句（与后端 deny 文案同一句） -->
     <view class="denied" wx:if="{{denied}}">
@@ -18,7 +50,7 @@
     </view>
 
     <block wx:else>
-      <view class="segs">
+      <view class="segs in i0">
         <view
           class="segs-v {{tabIdx === index ? 'on' : ''}}"
           wx:for="{{tabs}}"
@@ -30,12 +62,12 @@
 
       <view class="loading" wx:if="{{loading && !list.length}}">加载中……</view>
 
-      <view class="empty" wx:elif="{{!list.length}}">
+      <view class="empty in i1" wx:elif="{{!list.length}}">
         {{tabIdx === 0 ? '没有待审核的通知' : (tabIdx === 1 ? '没有待播的通知' : '还没有播过的通知')}}
       </view>
 
       <block wx:for="{{list}}" wx:key="id">
-        <view class="qcard" data-id="{{item.id}}" bindtap="open" hover-class="row-hover">
+        <view class="qcard in i{{index > 4 ? 7 : index + 1}}" data-id="{{item.id}}" bindtap="open" hover-class="row-hover">
           <view class="qtop">
             <text class="orgtag">{{item.clubName}}</text>
             <view class="qt">{{item.title}}</view>

@@ -7,7 +7,44 @@
 
      类型三档照 v151「点歌 / 文稿 / 留言」；原型里的「内部稿件 / 加油稿」后端没有对应表，
      不给假入口。留言走 /admin/message/*（另一张表），状态第三档文案是「已屏蔽」。 -->
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
+  <!-- ============ 骨架层（2026-11-13 · preview/loading-skeleton-v1 伙伴端第 02 屏） ============
+       导航标题「审核」照常；状态 tab / 类型筛选 / 4 行待审骨架化。
+       权限被关时这一层根本不会亮（loading 立刻归 false ⇒ 闸门不进骨架）。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navbar">
+      <view class="navbar-spacer"></view>
+      <view class="navbar-title">审核</view>
+      <view class="navbar-spacer"></view>
+    </view>
+    <view class="body">
+      <view class="stabs">
+        <view class="stab" wx:for="{{[1,2,3]}}" wx:key="*this">
+          <view class="sk sk-p" style="width:64rpx"></view>
+          <text class="n"></text>
+        </view>
+      </view>
+      <view class="ftags">
+        <view class="ftag" wx:for="{{[1,2,3]}}" wx:key="*this">
+          <view class="sk sk-p" style="width:56rpx"></view>
+        </view>
+      </view>
+      <view class="rows">
+        <view class="row" wx:for="{{[1,2,3,4]}}" wx:key="*this">
+          <view class="r-main">
+            <view class="r-top">
+              <view class="sk sk-r" style="width:72rpx;height:30rpx"></view>
+              <view class="sk" style="width:52%"></view>
+            </view>
+            <view class="sk" style="width:78%;margin-top:14rpx"></view>
+            <view class="sk" style="width:44%;margin-top:12rpx"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
   <!-- ⚠️ 审核是**底部 tab 页**（v151 TABS），不是二级页 ⇒ 没有返回箭头，
@@ -18,7 +55,7 @@
     <view class="navbar-spacer"></view>
   </view>
 
-  <view class="body">
+  <view class="body" wx:if="{{!sk || skOut}}">
     <!-- 2026-11-01：权限被关掉时**只有「暂无权限」这四个字**，不再写「找超管开通」之类的副句。
          空列表会让人以为「今天没人投稿」，所以宁可整页就一句实话。 -->
     <view class="deny" wx:if="{{denied}}">
@@ -27,7 +64,7 @@
 
     <block wx:else>
     <!-- 状态：待审核 / 已通过 / 已驳回（留言为「已屏蔽」） -->
-    <view class="stabs">
+    <view class="stabs in i0">
       <view class="stab {{stateIdx === index ? 'on' : ''}}"
             wx:for="{{stateLabels}}" wx:key="*this"
             data-idx="{{index}}" bindtap="switchState">
@@ -37,7 +74,7 @@
     </view>
 
     <!-- 类型：点歌 / 文稿 / 留言 -->
-    <view class="ftags">
+    <view class="ftags in i1">
       <view class="ftag {{kindIdx === index ? 'on' : ''}}"
             wx:for="{{kindLabels}}" wx:key="*this"
             data-idx="{{index}}" bindtap="switchKind">{{item}}</view>
@@ -50,7 +87,7 @@
     </view>
 
     <view class="rows" wx:else>
-      <view class="row {{item.pending ? 'tap' : ''}}"
+      <view class="row in i{{index > 4 ? 7 : index + 2}} {{item.pending ? 'tap' : ''}}"
             wx:for="{{list}}" wx:key="id"
             hover-class="row-hover"
             data-id="{{item.id}}" bindtap="onItemTap">

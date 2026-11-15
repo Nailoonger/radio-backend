@@ -1,5 +1,33 @@
 <!-- pages/notices/notices.wxml -->
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
+
+  <!-- ============ 骨架层（2026-11-13 · preview/loading-skeleton-v1） ============
+       ⚠️ fixed 不是 absolute（会跟页面滚）；结构照真实版式：导航 → 标题 → 羊皮纸卡 → 6 行。
+       ⚠️ 静态件照常显示：导航标题「公告」、返回钮、行尾箭头 —— 抹掉它们数据落地会「突然冒出来」。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navbar">
+      <view class="navbar-back"></view>
+      <view class="navbar-title">公告</view>
+      <view class="navbar-spacer"></view>
+    </view>
+    <view class="body">
+      <view class="stack">
+        <view class="t-page">公告</view>
+        <view class="t-sub">校园广播相关的通知与安排</view>
+      </view>
+      <view class="card-flush">
+        <view class="card-row" wx:for="{{[1,2,3,4,5,6]}}" wx:key="*this">
+          <view class="grow">
+            <view class="sk sk-p" style="width:82%"></view>
+            <view class="sk sk-p" style="width:180rpx;margin-top:14rpx"></view>
+          </view>
+          <view class="chev-r"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
   <view class="navbar">
@@ -10,21 +38,21 @@
     <view class="navbar-spacer"></view>
   </view>
 
-  <view class="body">
+  <view class="body" wx:if="{{!sk || skOut}}">
 
-    <view class="stack">
+    <view class="stack in i0">
       <view class="t-page">公告</view>
       <view class="t-sub">校园广播相关的通知与安排</view>
     </view>
 
-    <view class="loading" wx:if="{{loading}}">加载中……</view>
+    <!-- 骨架取代了原来那行「加载中……」：300ms 内回来时什么都不显示，直接出内容，
+         不再先闪一行灰字（2026-11-13） -->
+    <view class="empty" wx:if="{{!loading && !list.length}}">暂无公告</view>
 
-    <view class="empty" wx:elif="{{!list.length}}">暂无公告</view>
-
-    <block wx:else>
+    <block wx:if="{{!loading && list.length}}">
       <view class="card-flush">
         <view
-          class="card-row"
+          class="card-row in i{{index > 6 ? 7 : index + 1}}"
           wx:for="{{list}}"
           wx:key="id"
           hover-class="row-hover"

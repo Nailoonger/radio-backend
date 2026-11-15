@@ -2,6 +2,7 @@
 // 公告列表：分页（GET /api/user/notice/list?page=&pageSize=）
 const { request } = require('../../utils/request.js');
 const { fmtDate } = require('../../utils/format.js');
+const skeleton = require('../../utils/skeleton.js');
 
 Page({
   data: {
@@ -12,10 +13,18 @@ Page({
     total: 0,
     finished: false,
     loading: true,
+    // 加载骨架三件套（见 utils/skeleton.js）：sk 显不显示 / skOut 淡出中 / enter 挂进场
+    sk: true,   // ⚠️ 初值必须 true：骨架首帧就画，不能先渲染内容再盖上来（2026-11-13 陛下退回）
+    skOut: false,
+    enter: false,
   },
 
   onLoad() {
     this.setData({ statusBarHeight: getApp().globalData.statusBarHeight || 20 });
+    // ⚠️ 闸门要在 reload 之前装好；落定条件就用「首屏那次 fetch 结束」——
+    //    列表为空也要落定，否则空态页会一直盖着骨架。
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
     this.reload();
   },
 
@@ -42,9 +51,9 @@ Page({
           total: data.total,
           finished: list.length >= data.total,
           loading: false,
-        });
+        }, () => { this.skGate && this.skGate.check(); });
       })
-      .catch(() => this.setData({ loading: false }));
+      .catch(() => this.setData({ loading: false }, () => { this.skGate && this.skGate.check(); }));
   },
 
   loadMore() {

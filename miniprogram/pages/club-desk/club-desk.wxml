@@ -1,5 +1,5 @@
 <!-- pages/club-desk/club-desk.wxml -->
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
   <view class="navbar">
@@ -10,10 +10,54 @@
     <view class="navbar-spacer"></view>
   </view>
 
-  <view class="body">
+  <!-- ============ 骨架层（2026-11-16 · preview/loading-skeleton-v3 口径） ============
+       ⚠️ fixed 不是 absolute。导航标题、「我的提交 / 刷新」、右上 + 都是页面框架与控件，照常显示；
+          社团抬头与提交卡里的字换成灰块（羊皮纸卡内用 sk-p，白底上才看得见）。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navbar">
+      <view class="navbar-back"></view>
+      <view class="navbar-title">广播通知</view>
+      <view class="navbar-spacer"></view>
+    </view>
+    <view class="body">
+      <view class="club-org">
+        <view class="avwrap">
+          <view class="sk sk-c" style="width:90rpx;height:90rpx"></view>
+        </view>
+        <view class="grow" style="display:flex;flex-direction:column;gap:14rpx">
+          <view class="sk" style="width:240rpx;height:32rpx;top:0"></view>
+          <view class="sk sk-s" style="width:330rpx"></view>
+        </view>
+        <view class="addbtn"><view class="plus"></view></view>
+      </view>
+
+      <view class="sec-h">
+        <text class="sec-t">我的提交</text>
+        <text class="sec-l">刷新</text>
+      </view>
+
+      <view class="qcard" wx:for="{{[1,2]}}" wx:key="*this">
+        <view class="qtop">
+          <view class="sk sk-l sk-p" style="width:72%"></view>
+          <view class="sk sk-r sk-p" style="width:88rpx;height:34rpx"></view>
+        </view>
+        <view class="sk-para" style="margin-top:18rpx">
+          <view class="sk sk-s sk-p" style="width:100%"></view>
+          <view class="sk sk-s sk-p" style="width:74%"></view>
+        </view>
+        <view class="qfoot">
+          <view class="sk sk-s sk-p" style="width:150rpx"></view>
+          <view class="sk sk-s sk-p" style="width:56rpx"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="body" wx:if="{{!sk || skOut}}">
 
     <!-- 社团抬头：头像可点换（换的是自己这一家，后端只认票据） -->
-    <view class="club-org">
+    <view class="club-org in i0">
       <view class="avwrap" hover-class="pressed" bindtap="changeAvatar">
         <view class="club-av">
           <image wx:if="{{club.avatar}}" class="club-av-img" src="{{club.avatar}}" mode="aspectFill" />
@@ -33,19 +77,18 @@
     </view>
 
     <!-- 我的提交 -->
-    <view class="sec-h">
+    <view class="sec-h in i1">
       <text class="sec-t">我的提交 {{count.total}} 条</text>
       <text class="sec-l" bindtap="reload">刷新</text>
     </view>
 
-    <view class="loading" wx:if="{{loading && !list.length}}">加载中……</view>
-
-    <view class="empty" wx:elif="{{!list.length}}">还没有提报过，点右上角 + 写一条</view>
+    <!-- 骨架取代了原来那行「加载中……」 -->
+    <view class="empty" wx:if="{{!loading && !list.length}}">还没有提报过，点右上角 + 写一条</view>
 
     <block wx:for="{{list}}" wx:key="id">
 
       <!-- 待审核：可改可撤 -->
-      <view class="qcard" data-id="{{item.id}}" bindtap="goDetail">
+      <view class="qcard in i{{index > 5 ? 7 : index + 2}}" data-id="{{item.id}}" bindtap="goDetail">
         <view class="qtop">
           <view class="qt">{{item.title}}</view>
           <view class="st {{item.stCls}}">{{item.statusText}}</view>

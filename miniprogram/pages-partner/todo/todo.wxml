@@ -1,5 +1,68 @@
 <!-- pages-partner/todo/todo.wxml -->
-<view class="page lift">
+<view class="page lift {{enter ? 'enter' : ''}}">
+  <!-- ============ 骨架层（2026-11-13） ============
+       这一页的数据只有「几条待办」，入口文案全是写死的 ⇒ 只把数字骨架化：
+       顶栏、四条入口的名字与说明照常显示，否则整页会白一屏再一起跳出来。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="topbar">
+      <image class="badge" src="/assets/station-badge.png" mode="aspectFit" />
+      <view class="topbar-txt">
+        <text class="topbar-name">导播台</text>
+        <text class="topbar-role">{{roleText}}</text>
+      </view>
+    </view>
+    <view class="body">
+      <view class="tile">
+        <view class="tl-top">
+          <view class="tl-eyebrow">
+            <view class="tl-dot"></view>
+            <text>今日待办</text>
+          </view>
+        </view>
+        <view class="tl-num"><view class="sk" style="width:104rpx;height:66rpx"></view><text class="tl-unit">条待你处理</text></view>
+        <view class="tl-split">
+          <view class="sk" style="width:190rpx"></view>
+          <view class="sk" style="width:110rpx"></view>
+        </view>
+      </view>
+
+      <view class="entry" wx:for="{{[1,2]}}" wx:key="*this">
+        <view class="e-ico"><view class="ic-doc"></view></view>
+        <view class="e-txt">
+          <view class="e-name"><view class="sk" style="width:180rpx"></view></view>
+          <view class="e-sub"><view class="sk sk-p" style="width:240rpx;margin-top:10rpx"></view></view>
+        </view>
+        <view class="sk" style="width:30rpx"></view>
+        <view class="e-arrow"></view>
+      </view>
+
+      <view class="sec">
+        <view class="sec-t"><view class="sk sk-p" style="width:110rpx"></view></view>
+        <view class="sec-s"><view class="sk sk-p" style="width:180rpx"></view></view>
+      </view>
+
+      <view class="entry">
+        <view class="e-ico"><view class="ic-cal"></view></view>
+        <view class="e-txt">
+          <view class="e-name"><view class="sk" style="width:150rpx"></view></view>
+          <view class="e-sub"><view class="sk sk-p" style="width:270rpx;margin-top:10rpx"></view></view>
+        </view>
+        <text class="e-tag" wx:if="{{!isSuper}}">只读</text>
+        <view class="e-arrow"></view>
+      </view>
+
+      <view class="entry">
+        <view class="e-ico"><view class="ic-grid"></view></view>
+        <view class="e-txt">
+          <view class="e-name"><view class="sk" style="width:150rpx"></view></view>
+          <view class="e-sub"><view class="sk sk-p" style="width:300rpx;margin-top:10rpx"></view></view>
+        </view>
+        <view class="e-arrow"></view>
+      </view>
+    </view>
+  </view>
+
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
   <!-- 顶栏：徽章跨两行 + 「导播台 / 指导老师」两行文字（2026-10-01 定版，预览 v12 的 C 案）
@@ -16,9 +79,9 @@
     </view>
   </view>
 
-  <view class="body">
+  <view class="body" wx:if="{{!sk || skOut}}">
     <!-- 待办卡：L1 白卡 + 大投影（整屏唯一浮起来的一张，靠海拔当主角） -->
-    <view class="tile">
+    <view class="tile in i0">
       <view class="tl-top">
         <view class="tl-eyebrow">
           <view class="tl-dot"></view>
@@ -37,7 +100,7 @@
     </view>
 
     <!-- 入口一：投稿 & 点歌审核 -->
-    <view class="entry" hover-class="pressed" bindtap="goReview">
+    <view class="entry in i1" hover-class="pressed" bindtap="goReview">
       <view class="e-ico"><view class="ic-doc"></view></view>
       <view class="e-txt">
         <view class="e-name">投稿 & 点歌审核</view>
@@ -48,7 +111,7 @@
     </view>
 
     <!-- 入口二：留言审核 -->
-    <view class="entry" hover-class="pressed" bindtap="goMessage">
+    <view class="entry in i2" hover-class="pressed" bindtap="goMessage">
       <view class="e-ico"><view class="ic-chat"></view></view>
       <view class="e-txt">
         <view class="e-name">留言审核</view>
@@ -61,12 +124,12 @@
     <!-- ── 人员排班（P1，2026-10-27）──
          角色分流只体现在「文案 + 只读标记」上，入口本身两边都能进：
          超管进 slots 是编辑态，社干进 slots 是只读态（页面内按 /partner/slots 的 canEdit 决定） -->
-    <view class="sec">
+    <view class="sec in i3">
       <text class="sec-t">人员排班</text>
       <text class="sec-s">{{isSuper ? '超管可配置时段' : '社干可代录可排时间'}}</text>
     </view>
 
-    <view class="entry" hover-class="pressed" bindtap="goSlots">
+    <view class="entry in i4" hover-class="pressed" bindtap="goSlots">
       <view class="e-ico"><view class="ic-cal"></view></view>
       <view class="e-txt">
         <view class="e-name">值班时段</view>
@@ -76,7 +139,7 @@
       <view class="e-arrow"></view>
     </view>
 
-    <view class="entry" hover-class="pressed" bindtap="goAvailability">
+    <view class="entry in i5" hover-class="pressed" bindtap="goAvailability">
       <view class="e-ico"><view class="ic-grid"></view></view>
       <view class="e-txt">
         <view class="e-name">可排时间</view>
@@ -85,9 +148,9 @@
       <view class="e-arrow"></view>
     </view>
 
-    <view class="divider-note">排期、批量、学生账号、系统设置仍在电脑端</view>
+    <view class="divider-note in i6">排期、批量、学生账号、系统设置仍在电脑端</view>
 
-    <view class="footbar">
+    <view class="footbar in i7">
       <text class="foot-link" hover-class="pressed" bindtap="doLogout">退出登录</text>
     </view>
   </view>

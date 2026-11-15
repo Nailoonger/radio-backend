@@ -1,9 +1,13 @@
 const recruitment = require('../../utils/recruitment.js');
+const skeleton = require('../../utils/skeleton.js');
 
 Page({
-  data: { statusBarHeight: 20, loading: true, error: '', batch: null, opensText: '', closesText: '', windowText: '', gradeText: '', pending: false },
+  // 骨架（2026-11-16）：sk 初值 true —— 骨架从第一帧就在，内容层整块 wx:if 掉
+  data: { statusBarHeight: 20, loading: true, error: '', batch: null, opensText: '', closesText: '', windowText: '', gradeText: '', pending: false, sk: true, skOut: false, enter: false },
   onLoad() {
     this.setData({ statusBarHeight: getApp().globalData.statusBarHeight || 20 });
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
     this.load();
   },
   onShow() { this.setData({ pending: !!recruitment.pendingSubmission() }); },
@@ -21,7 +25,7 @@ Page({
         gradeText: batch ? recruitment.gradeScopeText(batch.fixedFields) : '',
       });
     } catch (error) { this.setData({ error: recruitment.errorText(error) }); }
-    finally { this.setData({ loading: false }); }
+    finally { this.setData({ loading: false }, () => this.skGate.check()); }
   },
   apply() {
     if (!this.data.batch || this.data.batch.windowState !== 'open') return;

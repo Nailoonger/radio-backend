@@ -18,6 +18,10 @@ const { fmtMd } = require('../../utils/format.js');
 const perm = require('../../utils/perm.js');
 const partnerTodo = require('../../utils/partnerTodo.js');
 const partnerRole = require('../../utils/partnerRole.js');
+const skeleton = require('../../utils/skeleton.js');
+// ⚠️ 长文案不能直接塞 showToast：> 两行会被截断（2026-11-16 陛下截图退回）。
+//    「本周所有时段都已排满（5 格 × 2 首），剩下的不用再审…」就是被截成「剩下的不用再…」。
+const { tip } = require('../../utils/tip.js');
 
 /* 类型顺序照 v151 .ftags。
    ⚠️ 各类型的三档状态值不一样：
@@ -47,6 +51,10 @@ Page({
     stateIdx: 0,
     counts: [0, 0, 0],
     loading: true,
+    // 加载骨架三件套（utils/skeleton.js）：sk 显不显示 / skOut 淡出中 / enter 挂进场
+    sk: true,   // ⚠️ 初值必须 true：骨架首帧就画，不能先渲染内容再盖上来（2026-11-13 陛下退回）
+    skOut: false,
+    enter: false,
     list: [],
     page: 1,
     pageSize: 20,
@@ -91,6 +99,10 @@ Page({
       stateLabels: KINDS[kindIdx].key === 'message' ? STATE_MESSAGE : STATE_SUBMIT,
     });
 
+    // 骨架闸门：任何一条出口（无权限 / 列表到头 / 请求失败）都会把 loading 归 false
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
+
     /**
      * 2026-10-31：社干被关掉「审核权限」⇒ 整页就一句「暂无权限」，**一个请求都不发**。
      * 只靠列表接口返回空是骗人的（看着像「今天没人投稿」），所以做成显式的拒绝态。
@@ -101,7 +113,9 @@ Page({
      *    这里兜的是「绕过底栏直接进这页」的情况：给同样一句话，不额外解释谁该找谁。
      */
     if (Number(info.role) === 2) {
-      this.setData({ loading: false, denied: true, denyReview: '暂无权限' });
+      this.setData({ loading: false, denied: true, denyReview: '暂无权限' }, () => {
+        if (this.skGate) this.skGate.check();
+      });
       return;
     }
     if (Number(info.role) === 1) {
@@ -112,6 +126,8 @@ Page({
             loading: false,
             denied: true,
             denyReview: (pm.text && pm.text.review) || '暂无权限',
+          }, () => {
+            if (this.skGate) this.skGate.check();
           });
           return;
         }
@@ -344,10 +360,14 @@ Page({
           total,
           hasMore: merged.length < total,
           loading: false,
+        }, () => {
+          if (this.skGate) this.skGate.check();
         });
       })
       .catch((err) => {
-        this.setData({ loading: false });
+        this.setData({ loading: false }, () => {
+          if (this.skGate) this.skGate.check();
+        });
         wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' });
       });
   },
@@ -384,12 +404,12 @@ Page({
       .catch((err) => {
         wx.hideLoading();
         if (isConflict(err)) {
-          wx.showToast({ title: (err && err.message) || '这条刚被处理过，已刷新', icon: 'none' });
+          tip((err && err.message) || '这条刚被处理过，已刷新');
           this.fetchList(true);
           this.fetchCounts();
           return;
         }
-        wx.showToast({ title: (err && err.message) || '操作失败', icon: 'none' });
+        tip((err && err.message) || '操作失败');
       });
   },
 
@@ -432,12 +452,12 @@ Page({
           .catch((err) => {
             wx.hideLoading();
             if (isConflict(err)) {
-              wx.showToast({ title: (err && err.message) || '这条刚被处理过，已刷新', icon: 'none' });
+              tip((err && err.message) || '这条刚被处理过，已刷新');
               this.fetchList(true);
               this.fetchCounts();
               return;
             }
-            wx.showToast({ title: (err && err.message) || '操作失败', icon: 'none' });
+            tip((err && err.message) || '操作失败');
           });
       },
     });

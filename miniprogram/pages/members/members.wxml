@@ -1,12 +1,37 @@
 <!-- pages/members/members.wxml -->
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
+  <!-- ============ 骨架层（2026-11-13 · preview/loading-skeleton-v1 第 04 屏） ============
+       标题 / 分段 tab 是静态框架，照常显示；只把「社干 6 格」盖成骨架。
+       筛选条不画：它要等部门数据才知道有几个部门，提前画出来必然错位。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navreserve" style="height: {{navBarHeight}}px"></view>
+    <view class="body">
+      <view class="stack">
+        <view class="t-page">风采</view>
+        <view class="t-sub">认识广播站里的每一位伙伴</view>
+      </view>
+      <view class="segment">
+        <view class="segment-item on">社干</view>
+        <view class="segment-item">部门人员</view>
+      </view>
+      <view class="grid">
+        <view class="mcard" wx:for="{{[1,2,3,4,5,6]}}" wx:key="*this">
+          <view class="mphoto-wrap"><view class="mphoto sk sk-c"></view></view>
+          <view class="sk" style="width:76%"></view>
+          <view class="sk" style="width:52%"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
   <view class="navreserve" style="height: {{navBarHeight}}px"></view>
 
-  <view class="body {{tabMotion}}">
+  <view class="body {{tabMotion}}" wx:if="{{!sk || skOut}}">
 
     <!-- 页面标题 -->
-    <view class="stack">
+    <view class="stack in i0">
       <view class="t-page">风采</view>
       <view class="t-sub">认识广播站里的每一位伙伴</view>
     </view>
@@ -18,7 +43,7 @@
     </view>
 
     <!-- 顶层 tab：社干 / 部门人员（滑动分段） -->
-    <view class="segment">
+    <view class="segment in i1">
       <view class="segment-indicator" style="width: calc((100% - 16rpx) / 2); transform: translateX({{categoryIndex * 100}}%);"></view>
       <view
         wx:for="{{categories}}"
@@ -50,17 +75,16 @@
       </view>
     </scroll-view>
 
-    <view class="loading" wx:if="{{loading}}">加载中……</view>
-
     <!-- 模块关闭时：分段 tab / 筛选条照旧渲染（框架保留），数据区刻意留空 -->
+    <!-- 骨架由上面的 .sklayer 负责（2026-11-13 统一口径），这里不再放「加载中……」一行灰字 -->
 
     <!-- ============ 社干分支 ============ -->
     <block wx:if="{{!loading && !disabled && activeCategory === 'cadre'}}">
-      <view class="empty" wx:if="{{!cadre.length}}">暂无社干</view>
+      <view class="empty in i2" wx:if="{{!cadre.length}}">暂无社干</view>
       <block wx:else>
         <view class="grid">
           <view
-            class="mcard"
+            class="mcard in i{{index > 5 ? 7 : index + 2}}"
             wx:for="{{cadre}}"
             wx:key="id"
             hover-class="mcard-hover"
@@ -81,16 +105,16 @@
 
     <!-- ============ 部门人员分支 ============ -->
     <block wx:if="{{!loading && !disabled && activeCategory === 'staff'}}">
-      <view class="empty" wx:if="{{!visibleGroups.length}}">该部门暂无人员</view>
+      <view class="empty in i2" wx:if="{{!visibleGroups.length}}">该部门暂无人员</view>
       <block wx:else>
-        <view class="section" wx:for="{{visibleGroups}}" wx:for-item="g" wx:key="dept">
+        <view class="section in i2" wx:for="{{visibleGroups}}" wx:for-item="g" wx:key="dept">
           <view class="section-head">
             <text class="t-section">{{g.dept}}</text>
             <text class="t-micro">{{g.list.length}} 人</text>
           </view>
           <view class="grid">
             <view
-              class="mcard"
+              class="mcard in i{{index > 5 ? 7 : index + 2}}"
               wx:for="{{g.list}}"
               wx:for-item="m"
               wx:key="id"

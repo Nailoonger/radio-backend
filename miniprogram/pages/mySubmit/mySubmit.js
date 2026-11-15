@@ -1,6 +1,7 @@
 const tabMotion = require('../../utils/tabMotion.js');
 // pages/mySubmit/mySubmit.js
 const { request } = require('../../utils/request.js');
+const skeleton = require('../../utils/skeleton.js');
 const { submitStatusText, submitStatusClass, fmtDate, fmtIso, fmtSlot, fmtMd } = require('../../utils/format.js');
 const windowBar = require('../../utils/windowBar.js');
 const clubTicket = require('../../utils/clubTicket.js');
@@ -32,8 +33,10 @@ Page({
     statusIndex: 0, // 滑动指示器格位
     list: [],
     loading: true,
-    skList: false, // 列表骨架（>300ms 才显示）
-    skCount: 3,
+    // 加载骨架三件套（见 utils/skeleton.js）：sk 显不显示 / skOut 淡出中 / enter 挂进场
+    sk: true,   // ⚠️ 初值必须 true：骨架首帧就画，不能先渲染内容再盖上来（2026-11-13 陛下退回）
+    skOut: false,
+    enter: false,
     statusFilter: '', // '' 全部 / 'pending' 待审核 / 'played' 已播出
     loggedIn: false,
     // Hero 卡三格统计（前端汇总，零额外接口）
@@ -50,6 +53,9 @@ Page({
   onLoad() {
     this.wb = windowBar.create(this);
     this.allRows = [];
+    // 骨架闸门：等首屏那次 reload 的请求结束。⚠️ 未登录分支也要落定，否则整页被骨架盖死。
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       navBarHeight: app.globalData.navBarHeight || 44,
@@ -90,14 +96,8 @@ Page({
     if (!app.globalData.token) {
       this.allRows = [];
       this.setData({ list: [], loading: false, stats: { all: 0, pending: 0, played: 0 } });
+      if (this.skGate) this.skGate.done();
       return Promise.resolve();
-    }
-    // 列表骨架 —— 张数 = 上一次的条数（最多 5 张），超过 300ms 才显示
-    const skCount = Math.min(this.data.list.length || 3, 5);
-    if (!this._skTimer) {
-      this._skTimer = setTimeout(() => {
-        if (this.data.loading) this.setData({ skList: true, skCount });
-      }, 300);
     }
     this.setData({ loading: true });
     return this.fetch();
@@ -218,9 +218,12 @@ Page({
     return { kind: 'none' };
   },
 
+  /**
+   * 骨架落定。方法名沿用旧名（fetch / doLogout 三处调用点不用改），
+   * 内部换成统一闸门：没亮过骨架就不放进场，亮过就退场 + 进场（见 utils/skeleton.js）。
+   */
   clearSkeleton() {
-    if (this._skTimer) { clearTimeout(this._skTimer); this._skTimer = null; }
-    if (this.data.skList) this.setData({ skList: false });
+    if (this.skGate) this.skGate.check();
   },
 
   switchFilter(e) {

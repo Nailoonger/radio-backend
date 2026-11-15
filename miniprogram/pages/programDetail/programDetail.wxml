@@ -1,5 +1,49 @@
 <!-- pages/programDetail/programDetail.wxml -->
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
+
+  <!-- ============ 骨架层（2026-11-16 · preview/loading-skeleton-v3 口径） ============
+       ⚠️ fixed 不是 absolute。深色节目头卡是**结构件**，真底色照画（卡内只用 sk-d 白 24% 占位）；
+          导航标题、分区标题「留言」也照常显示 —— 它们是页面框架，不是待加载的数据。
+          底部留言输入栏是常驻控件（z-index 90 压过骨架层 25），骨架期间照常可用。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navbar">
+      <view class="navbar-back"></view>
+      <view class="navbar-title">节目详情</view>
+      <view class="navbar-spacer"></view>
+    </view>
+    <view class="body">
+      <view class="tile">
+        <view class="sk sk-l sk-d" style="width:260rpx"></view>
+        <view class="sk sk-l sk-d" style="width:100%;height:38rpx"></view>
+        <view class="sk sk-s sk-d" style="width:170rpx"></view>
+      </view>
+
+      <view class="sk-para" style="margin-top:32rpx">
+        <view class="sk sk-l" style="width:100%"></view>
+        <view class="sk sk-l" style="width:92%"></view>
+        <view class="sk sk-l" style="width:58%"></view>
+      </view>
+
+      <view class="section">
+        <view class="section-head">
+          <text class="t-section">留言</text>
+          <view class="sk sk-s" style="width:70rpx"></view>
+        </view>
+        <view class="comments">
+          <view class="cmt" wx:for="{{[1,2]}}" wx:key="*this">
+            <view class="cmt-avatar-wrap"><view class="sk sk-c" style="width:72rpx;height:72rpx"></view></view>
+            <view class="stack grow" style="gap:12rpx">
+              <view class="sk sk-s" style="width:180rpx"></view>
+              <view class="sk sk-l" style="width:100%"></view>
+              <view class="sk sk-s" style="width:110rpx"></view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
   <view class="navbar">
@@ -10,11 +54,11 @@
     <view class="navbar-spacer"></view>
   </view>
 
-  <view class="body">
+  <view class="body" wx:if="{{!sk || skOut}}">
 
     <block wx:if="{{program}}">
       <!-- 节目头卡 -->
-      <view class="tile">
+      <view class="tile in i0">
         <view class="tile-status">
           <view class="dot-live" wx:if="{{program.isLive === 1}}"></view>
           <text>{{program.isLive === 1 ? '正在直播·' + program.broadcastTime : program.broadcastTime}}</text>
@@ -27,17 +71,17 @@
       </view>
 
       <!-- 节目简介 -->
-      <view class="t-body intro" wx:if="{{program.desc}}">{{program.desc}}</view>
+      <view class="t-body intro in i1" wx:if="{{program.desc}}">{{program.desc}}</view>
 
       <!-- 留言 -->
       <view class="section">
-        <view class="section-head">
+        <view class="section-head in i2">
           <text class="t-section">留言</text>
           <text class="t-cap">{{messages.length}} 条</text>
         </view>
 
         <view class="comments" wx:if="{{messages.length}}">
-          <view class="cmt" wx:for="{{messages}}" wx:key="id">
+          <view class="cmt in i{{index > 4 ? 7 : index + 3}}" wx:for="{{messages}}" wx:key="id">
             <view class="cmt-avatar-wrap">
               <image wx:if="{{item.avatar}}" class="cmt-avatar" src="{{item.avatar}}" mode="aspectFill" />
               <view wx:else class="cmt-avatar cmt-avatar-fallback">{{item.initial}}</view>
@@ -54,8 +98,8 @@
       </view>
     </block>
 
+    <!-- 骨架取代了原来那行「加载中……」 -->
     <view class="empty" wx:elif="{{!loading}}">节目不存在或已下线</view>
-    <view class="loading" wx:else>加载中……</view>
 
   </view>
 

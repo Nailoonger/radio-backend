@@ -54,9 +54,9 @@ Page({
     slotDays: [],           // [{date, weekday, monthDay, items:[{key,label,value,selected}]}]
     slotCapacity: 0,        // 每场名额上限（0 = 不限）
 
-    // ── 表单骨架（v8 方案 ⑤：>300ms 才显示） ──
+    // ── 表单骨架（2026-11-16 口径：sk 初值 true，首帧就在；不再「>300ms 才盖」） ──
     formReady: false,
-    skForm: false,
+    skForm: true,
 
     // ── 点歌时间窗口（v2，常驻展示） ──
     winEnabled: false,      // 服务端是否限制了时间窗口（false = 一直开放）
@@ -112,21 +112,18 @@ Page({
   },
   onUnload() {
     this.onHide();
-    clearTimeout(this._skTimer);
   },
 
   /** 点歌侧的前置数据：次数提示 + 可选时段 + 时间窗口（不阻塞表单，静默失败） */
   prepareSong() {
-    if (!app.globalData.token) return;
-    // v8 方案 ⑤：表单骨架 —— 超过 300ms 才显示，短于 300ms 宁可空白
-    if (!this._skTimer) {
-      this._skTimer = setTimeout(() => {
-        if (!this.data.formReady) this.setData({ skForm: true });
-      }, 300);
+    // ⚠️ 未登录时这里直接返回：skForm 初值已经是 true，不等一等就永远摘不掉骨架（表单会变成一片灰到死）
+    if (!app.globalData.token) {
+      this.setData({ skForm: false });
+      return;
     }
+    // 2026-11-16 口径：骨架首帧就在（data 里 skForm: true），这里只负责数据到齐后摘掉它。
+    // 旧版「>300ms 才把骨架盖上来」＝内容先出、后盖骨架，已否，别再改回去。
     Promise.allSettled([this.loadQuota(), this.loadSlots(), this.wb.load()]).then(() => {
-      clearTimeout(this._skTimer);
-      this._skTimer = null;
       this.setData({ formReady: true, skForm: false });
     });
     this.ensureNotice();

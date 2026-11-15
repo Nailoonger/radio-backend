@@ -101,10 +101,10 @@
       <!-- 表单卡：点歌 / 文稿 共用一张卡，「希望播出时间」也在卡内 -->
       <!-- 表单骨架（尺寸=真实组件：标签 15 / 输入 44 / 正文 44 / 按钮 46） -->
       <view class="form" wx:if="{{skForm}}">
-        <view class="field"><view class="sk sk-label"></view><view class="sk sk-input"></view></view>
-        <view class="field"><view class="sk sk-label"></view><view class="sk sk-input"></view></view>
-        <view class="field"><view class="sk sk-label"></view><view class="sk sk-area"></view></view>
-        <view class="field"><view class="sk sk-label"></view><view class="sk sk-input"></view></view>
+        <view class="field"><view class="sk fsk fsk-label"></view><view class="sk fsk fsk-input"></view></view>
+        <view class="field"><view class="sk fsk fsk-label"></view><view class="sk fsk fsk-input"></view></view>
+        <view class="field"><view class="sk fsk fsk-label"></view><view class="sk fsk fsk-area"></view></view>
+        <view class="field"><view class="sk fsk fsk-label"></view><view class="sk fsk fsk-input"></view></view>
       </view>
 
       <view class="form" wx:else>

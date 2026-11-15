@@ -4,7 +4,7 @@
        · 未发布的（isShow=0）照样列出来，用灰标签标「未发布」—— 不然发完就消失
        · 点行 = 展开 / 收起正文；右上「编辑」进编辑页（站员看不到）
      ⚠️ 不要改回 /pages/notices/notices —— 那一页走学生端 token，社干/超管点进来是 40101。 -->
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
   <view class="navbar">
@@ -15,8 +15,38 @@
     <view class="navbar-spacer"></view>
   </view>
 
-  <view class="body">
-    <view class="top" wx:if="{{canEdit}}">
+  <!-- ============ 骨架层（2026-11-16 · preview/loading-skeleton-v3 口径） ============
+       ⚠️ fixed 不是 absolute；伙伴端底色 #F5F5F7。「新建公告」是真按钮，照常显示；
+          条数与公告行摆灰块。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navbar">
+      <view class="navbar-back"></view>
+      <view class="navbar-title">站内公告</view>
+      <view class="navbar-spacer"></view>
+    </view>
+    <view class="body">
+      <view class="top" wx:if="{{canEdit}}">
+        <view class="sk sk-s" style="width:120rpx"></view>
+        <view class="new-btn">
+          <text class="new-plus">＋</text><text>新建公告</text>
+        </view>
+      </view>
+      <view class="rows">
+        <view class="row" wx:for="{{[1,2,3]}}" wx:key="*this">
+          <view class="r-main">
+            <view class="r-top">
+              <view class="sk sk-l" style="width:72%"></view>
+            </view>
+            <view class="sk sk-s" style="width:150rpx;margin-top:12rpx"></view>
+            <view class="sk sk-s" style="width:92%;margin-top:12rpx"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view class="body" wx:if="{{!sk || skOut}}">
+    <view class="top in i0" wx:if="{{canEdit}}">
       <text class="top-n">{{loading ? '' : list.length + ' 条公告'}}</text>
       <view class="new-btn" hover-class="pressed" bindtap="onNew">
         <text class="new-plus">＋</text><text>新建公告</text>
@@ -24,8 +54,8 @@
     </view>
 
     <view class="hint-note" wx:if="{{loading}}">正在加载……</view>
-    <view class="hint-note" wx:elif="{{list.length === 0}}">还没有公告</view>
-    <view class="rows" wx:else>
+    <view class="hint-note in i1" wx:elif="{{list.length === 0}}">还没有公告</view>
+    <view class="rows in i1" wx:else>
       <view class="row" wx:for="{{list}}" wx:key="k">
         <view class="r-main" hover-class="row-hover" data-id="{{item.id}}" bindtap="onToggle">
           <view class="r-top">

@@ -13,6 +13,7 @@
 const { request } = require('../../utils/request.js');
 const clubTicket = require('../../utils/clubTicket.js');
 const clubTime = require('../../utils/clubTime.js');
+const skeleton = require('../../utils/skeleton.js');
 
 const ST_CLS = { 0: 'wait', 1: 'air', 2: 'rej', 3: 'done', 9: 'mute' };
 
@@ -26,6 +27,11 @@ Page({
     loading: true,
     uploading: false,
 
+    // 骨架（2026-11-16）：sk 初值 true —— 骨架从第一帧就在
+    sk: true,
+    skOut: false,
+    enter: false,
+
     // ══ 调整头像全屏层（不进页面栈，关掉就回到本页） ══
     cropOn: false,
     cropSrc: '',
@@ -37,6 +43,11 @@ Page({
 
   onLoad() {
     this.setData({ statusBarHeight: getApp().globalData.statusBarHeight || 20 });
+    // 没票据时会直接 redirectTo 输码页 —— 别把骨架留在半路上，条件里带上票据判断
+    this.skGate = skeleton.create(this, {
+      when: () => !this.data.loading || !clubTicket.getTicket(),
+    });
+    this.skGate.boot();
   },
 
   onShow() {
@@ -87,7 +98,7 @@ Page({
         }
         wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' });
       })
-      .then(() => this.setData({ loading: false }));
+      .then(() => this.setData({ loading: false }, () => this.skGate.check()));
   },
 
   decorate(x) {

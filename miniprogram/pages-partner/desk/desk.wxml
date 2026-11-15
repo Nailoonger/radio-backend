@@ -8,8 +8,85 @@
      v3 wel 又加负 margin 把欢迎语顶出屏幕左缘；swiper 不给高 ⇒ 整卡塌陷
      v4 bigwrap 后多写一个 </view> ⇒ .page 提前关闭，整页结构错乱
      ⚠️ 每次改完必须跑标签配对自检，不能只盯着改的那一行 -->
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
 
+  <!-- ============ 骨架层（2026-11-13 · preview/loading-skeleton-v1、v2） ============
+       ⚠️ fixed 不是 absolute：absolute 会跟着页面滚，用户往下滑就滑到没画骨架的空白上。
+       ⚠️ 结构照真实版式（欢迎带 → 大白卡 → 组头 → 两列卡），不是通用三行灰条卡；
+          静态件（导航标题、校舍水印、箭头 ›）骨架期照常显示 —— 抹掉它们，数据落地会「突然冒出来」。
+       ⚠️ 这里只做社干 / 超管版（站员通道还没开，见 js 注释）；站员版骨架等通道定了再补。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="sb" style="height: {{statusBarHeight}}px"></view>
+    <view class="nav"><text class="nav-t">菁悠伙伴端</text></view>
+
+    <view class="wel">
+      <image class="wel-bg" src="/assets/campus-faded.png" mode="widthFix"/>
+      <!-- ⚠️ 欢迎带**不做骨架**（2026-11-13 陛下当场退回）：角色 / 名字 / 问候语 / 副句全是本地算的
+           （roleTag 取 admin 角色、name 取 adminInfo、greet/care 由当前钟点算），跟接口一点关系都没有。
+           把它盖成三行灰条 = 本地就能显示的东西被故意藏起来，落地时再"冒出来"一次。 -->
+      <text class="eb">菁悠广播站 · {{roleTag}}</text>
+      <view class="big">{{name}}，{{greet}}。</view>
+      <text class="sub">{{care}}</text>
+    </view>
+
+    <!-- 大白卡：白卡上取 #EAEAED 那一档 -->
+    <view class="bigwrap">
+      <view class="bigc">
+        <view class="ebrow">
+          <!-- ⚠️ 骨架的语言是「这一块还没有内容」⇒ **卡内一律整块灰**，连卡头文案也算。
+               只有页面级的东西（导航标题、欢迎带身份信息）才照常显示真字。
+               混搭（标题真、数字灰）看着像坏了，不像在加载。 -->
+          <view class="eb2"><view class="sk" style="width:148rpx"></view></view>
+          <!-- 「已发布·第 N 版」胶囊同属卡内 ⇒ 底色也中性化 -->
+          <view class="tag-ok sk-tag-off"><view class="sk sk-r" style="width:120rpx;height:18rpx"></view></view>
+        </view>
+        <view class="b2"><view class="sk" style="width:320rpx"></view></view>
+        <view class="myslots">
+          <view class="msl">
+            <view class="sk" style="width:52rpx"></view>
+            <view class="sk" style="width:88rpx"></view>
+            <view class="sk" style="width:64rpx;margin-left:auto"></view>
+          </view>
+          <view class="msl">
+            <view class="sk" style="width:52rpx"></view>
+            <view class="sk" style="width:88rpx"></view>
+            <view class="sk" style="width:64rpx;margin-left:auto"></view>
+          </view>
+        </view>
+      </view>
+      <!-- 圆点是结构件（有几张卡就有几个点），骨架期照常显示，但选中态的中性化在 wxss 里 -->
+      <view class="dots">
+        <view class="dot"><view class="dot-i on"></view></view>
+        <view class="dot"><view class="dot-i"></view></view>
+      </view>
+    </view>
+
+    <!-- 分区卡：张数与分组用真实清单（skSections），但**卡内一律灰** ——
+         卡名和说明虽然在 js 里写死，它们属于"卡的内容"，跟着卡一起等数据。 -->
+    <block wx:for="{{skSections}}" wx:key="head" wx:for-item="sec" wx:for-index="ssi">
+      <view class="mh">
+        <view class="t"><view class="sk sk-p" style="width:112rpx"></view></view>
+        <view class="n"><view class="sk sk-p" style="width:96rpx"></view></view>
+      </view>
+      <view class="mods">
+        <view class="mod" wx:for="{{sec.mods}}" wx:key="t" wx:for-item="m">
+          <view class="mod-t"><view class="sk" style="width:58%"></view></view>
+          <view class="mod-d"><view class="sk" style="width:72%"></view></view>
+          <view class="mod-f">
+            <!-- u 非空 = 这张卡有计数（不编数字，只画一个灰块） -->
+            <view wx:if="{{m.u}}" class="mod-n"><view class="sk" style="width:40rpx"></view></view>
+            <view wx:else class="mod-n none"></view>
+            <text class="mod-arrow">›</text>
+          </view>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <!-- ⚠️⚠️ 内容层整块 wx:if 掉（2026-11-13 第二次退回）：
+       不是"被骨架盖住"，是"骨架期间根本不存在"。
+       旧写法骨架 300ms 后才挂上去、内容早就渲染好了 ⇒ 陛下看到的正是「内容都出来了，再跑骨架」。 -->
+  <block wx:if="{{!sk || skOut}}">
   <view class="sb" style="height: {{statusBarHeight}}px"></view>
 
   <!-- 导航：居中标题（v151 .nav 实测 h=42px、padding 0 52px、标题 16px/600；无站徽无按钮） -->
@@ -21,7 +98,7 @@
        实测：wel 顶距 = view 的 10px + wel 的 -14px + wel 的 padding-top 20px = 16px
              wel 左右 padding 18px ⇒ 文字左缘距屏幕 18px（.page 无横向 padding，别再加负 margin）
              水印盒 282×160、right:-34px、bottom:0 —— campus-faded.png 已把裁切与双向渐隐烘进 alpha -->
-  <view class="wel">
+  <view class="wel in i0">
     <image class="wel-bg" src="/assets/campus-faded.png" mode="widthFix"/>
     <text class="eb">菁悠广播站 · {{roleTag}}</text>
     <view class="big">{{name}}，{{greet}}。</view>
@@ -30,7 +107,7 @@
 
   <!-- 大白卡轮播（v151 .carousel：margin-top -24px 压接欢迎带；卡片左右各内缩 18px）
        ⚠️ swiper 必须有固定高（v3 教训：height:auto 整卡塌陷）⇒ 高度由 js 按当前卡算好传进来 -->
-  <view class="bigwrap">
+  <view class="bigwrap in i1">
     <!-- ⚠️ 自动轮播（2026-11-01 陛下要求）：班表卡 ↔ 排歌卡 每 5 秒自己换一张。
          只有一张卡时 autoplay 关掉（不然会来回空转）；circular 让最后一张接回第一张。
          手指拖动期间系统会自动暂停，松手继续 —— 这是 swiper 自带行为，不用自己写定时器。 -->
@@ -71,11 +148,11 @@
 
   <!-- 站员版：需要你处理（v151 home 屏 .need-h / .td） -->
   <block wx:if="{{roleKey === 'member'}}">
-    <view class="need-h">
+    <view class="need-h in i2">
       <text class="t">需要你处理</text>
       <text class="n">{{needCount ? needCount + ' 项' : '暂无'}}</text>
     </view>
-    <view class="td">
+    <view class="td in i3">
       <block wx:if="{{needs.length}}">
         <view class="td-i" wx:for="{{needs}}" wx:key="go"
               hover-class="pressed" data-go="{{item.go}}" bindtap="onNav">
@@ -93,12 +170,14 @@
 
   <!-- 社干 / 超管版：三联模块卡（v151 .mh / .mods / .mod） -->
   <block wx:else>
-    <block wx:for="{{sections}}" wx:key="head" wx:for-item="sec">
-      <view class="mh">
+    <!-- 进场：一个视觉行 = 一个单元（组头 i{2k}、组体 i{2k+1}），最多到 i7；
+         i 的延迟见 app.wxss（0/55/110…385ms），写成类不用 CSS 变量（安卓 WebView 对内联 --i 不保证生效） -->
+    <block wx:for="{{sections}}" wx:key="head" wx:for-item="sec" wx:for-index="si">
+      <view class="mh in i{{2 + si * 2}}">
         <text class="t">{{sec.head}}</text>
         <text class="n">{{sec.right}}</text>
       </view>
-      <view class="mods">
+      <view class="mods in i{{3 + si * 2}}">
         <view class="mod" wx:for="{{sec.mods}}" wx:key="t"
               hover-class="pressed" data-go="{{item.go}}" bindtap="onNav">
           <text class="mod-t">{{item.t}}</text>
@@ -117,6 +196,7 @@
 
   <!-- 给浮动 dock 让位（dock 是 fixed，盖在内容上） -->
   <view class="dock-gap"></view>
+  </block>
 </view>
 
 <partner-tabbar wx:if="{{ready}}" role="{{roleKey}}" active="{{tabActive}}" badges="{{badges}}" bind:switch="onTab"/>

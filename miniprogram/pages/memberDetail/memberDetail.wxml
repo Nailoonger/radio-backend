@@ -1,5 +1,32 @@
 <!-- pages/memberDetail/memberDetail.wxml -->
-<view class="page">
+<view class="page {{enter ? 'enter' : ''}}">
+
+  <!-- ============ 骨架层（2026-11-16 · preview/loading-skeleton-v3 口径） ============
+       ⚠️ fixed 不是 absolute。导航标题由 type 参数同步决定（不用等接口），照常显示真字；
+          头像圆盘与信息行分隔线是真结构，骨架期间照画，只把人名 / 值换成灰块。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navbar">
+      <view class="navbar-back"></view>
+      <view class="navbar-title">{{type === 'staff' ? '部员详情' : '社干详情'}}</view>
+      <view class="navbar-spacer"></view>
+    </view>
+    <view class="body">
+      <view class="hero">
+        <view class="sk sk-c" style="width:220rpx;height:220rpx;margin-bottom:12rpx"></view>
+        <view class="sk" style="width:220rpx;height:38rpx;top:0"></view>
+        <view class="sk sk-s" style="width:140rpx"></view>
+      </view>
+
+      <view class="card info">
+        <view class="info-row" wx:for="{{[1,2,3,4]}}" wx:key="*this">
+          <view class="sk sk-s" style="width:130rpx"></view>
+          <view class="sk sk-s" style="width:220rpx"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
   <view class="navbar">
@@ -10,11 +37,11 @@
     <view class="navbar-spacer"></view>
   </view>
 
-  <view class="body">
+  <view class="body" wx:if="{{!sk || skOut}}">
 
     <block wx:if="{{member}}">
       <!-- 成员 hero -->
-      <view class="hero">
+      <view class="hero in i0">
         <view class="hero-photo-wrap">
           <image wx:if="{{member.avatar}}" class="hero-photo" src="{{member.avatar}}" mode="aspectFill" />
           <view wx:else class="hero-photo hero-photo-fallback">{{member.initial}}</view>
@@ -24,7 +51,7 @@
       </view>
 
       <!-- 信息 -->
-      <view class="card info">
+      <view class="card info in i1">
         <view class="info-row">
           <text class="info-label">职务</text>
           <text class="info-value">{{member.role || '未填写'}}</text>
@@ -51,8 +78,8 @@
       </view>
     </block>
 
+    <!-- 骨架取代了原来那行「加载中……」 -->
     <view class="empty" wx:elif="{{!loading}}">成员不存在或已下架</view>
-    <view class="loading" wx:else>加载中……</view>
 
   </view>
 </view>

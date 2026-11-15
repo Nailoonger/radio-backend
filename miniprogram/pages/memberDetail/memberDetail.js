@@ -3,6 +3,7 @@
 //   /pages/memberDetail/memberDetail?id=1&type=cadre  → 社干（cadre 表）
 //   /pages/memberDetail/memberDetail?id=1&type=staff  → 部员（staff 表）
 const { request } = require('../../utils/request.js');
+const skeleton = require('../../utils/skeleton.js');
 
 Page({
   data: {
@@ -11,6 +12,11 @@ Page({
     member: null,
     loading: true,
     programList: [],   // 负责栏目（仅部员的 staff.programs 字段，按逗号切分）
+
+    // 骨架（2026-11-16）：sk 初值 true —— 骨架从第一帧就在
+    sk: true,
+    skOut: false,
+    enter: false,
   },
 
   onLoad(options) {
@@ -18,6 +24,9 @@ Page({
       statusBarHeight: getApp().globalData.statusBarHeight || 20,
       type: options.type === 'staff' ? 'staff' : 'cadre',
     });
+
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
 
     const endpoint = this.data.type === 'staff'
       ? `/user/staff/${options.id}`
@@ -36,9 +45,9 @@ Page({
           m.avatar = origin + m.avatar;
         }
         m.initial = (m.name || '?').charAt(0);   // 没传照片时的首字兜底
-        this.setData({ member: m, programList, loading: false });
+        this.setData({ member: m, programList, loading: false }, () => this.skGate.check());
       })
-      .catch(() => this.setData({ loading: false }));
+      .catch(() => this.setData({ loading: false }, () => this.skGate.check()));
   },
 
   goBack() {

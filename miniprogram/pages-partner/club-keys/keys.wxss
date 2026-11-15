@@ -59,3 +59,6 @@
    否则两条 1rpx 叠成 2rpx，比别处的线明显深一档。
    （⚠️ 不能用 .krow:nth-last-child(2)：社干看不到新建行时，那条规则会把第 4、5 家之间的线也抹掉） */
 .kcard.has-add .krow:nth-last-child(2) { border-bottom: 0; }
+
+/* ── 加载骨架（2026-11-16）：伙伴端页面底是 #F5F5F7，覆盖全局 .sklayer 的白底 ── */
+.sklayer { background: #F5F5F7; }

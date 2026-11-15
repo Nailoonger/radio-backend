@@ -32,13 +32,30 @@
       </view>
     </view>
 
-    <!-- 本周点歌排期（后台开关 home_song_schedule 服务端把关，关 → visible=false 整块不渲染） -->
-    <view class="section" wx:if="{{schedule.visible}}">
+    <!-- 本周点歌排期（后台开关 home_song_schedule 服务端把关，关 → visible=false 整块不渲染）
+         ⚠️ 加载态只有「本周点歌排期 / 本周节目单 / 校园公告」三块盖骨架（B 档）：
+            品牌头与欢迎卡是本地就能渲染的，盖了反而让品牌闪一下。 -->
+    <view class="section" wx:if="{{schedule.visible || sk}}">
       <view class="section-head">
         <text class="t-section">本周点歌排期</text>
         <text class="t-range">{{schedule.rangeText}}</text>
       </view>
-      <view class="card-flush" wx:if="{{schedule.hasAny}}">
+      <view class="card-flush" wx:if="{{sk}}">
+        <view class="sched-day-wrap" wx:for="{{[1,2]}}" wx:key="*this">
+          <view class="sched-day-head">
+            <view class="sk" style="width:88rpx;height:24rpx"></view>
+            <view class="sk" style="width:104rpx;height:18rpx"></view>
+          </view>
+          <view class="sched-row" wx:for="{{[1,2]}}" wx:for-index="ri" wx:key="*this">
+            <view class="sched-when">
+              <view class="sk" style="width:96rpx;height:26rpx"></view>
+              <view class="sk" style="width:58rpx;height:18rpx;margin-top:8rpx"></view>
+            </view>
+            <view class="grow sched-song"><view class="sk" style="width:58%"></view></view>
+          </view>
+        </view>
+      </view>
+      <view class="card-flush" wx:elif="{{schedule.hasAny}}">
         <block wx:for="{{schedule.days}}" wx:key="date" wx:for-item="day">
           <view class="sched-day-wrap {{day.isToday ? 'sched-today' : ''}}">
             <view class="sched-day-head">
@@ -72,7 +89,17 @@
         <text class="t-section">本周节目单</text>
         <text class="t-link" hover-class="pressed" bindtap="goPrograms">查看全部</text>
       </view>
-      <view class="card-flush" wx:if="{{weekly.length}}">
+      <view class="card-flush" wx:if="{{sk}}">
+        <view class="card-row" wx:for="{{[1,2,3]}}" wx:key="*this">
+          <view class="row-time"><view class="sk" style="width:84rpx"></view></view>
+          <view class="stack grow">
+            <view class="sk" style="width:62%"></view>
+            <view class="sk" style="width:34%;margin-top:10rpx"></view>
+          </view>
+          <view class="chev-r"></view>
+        </view>
+      </view>
+      <view class="card-flush" wx:elif="{{weekly.length}}">
         <view
           class="card-row"
           wx:for="{{weekly}}"
@@ -100,7 +127,13 @@
         <text class="t-section">校园公告</text>
         <text class="t-link" hover-class="pressed" bindtap="goNotices">全部公告</text>
       </view>
-      <view class="card-flush" wx:if="{{notices.length}}">
+      <view class="card-flush" wx:if="{{sk}}">
+        <view class="card-row" wx:for="{{[1,2,3]}}" wx:key="*this">
+          <view class="grow notice-txt"><view class="sk" style="width:76%"></view></view>
+          <view class="chev-r"></view>
+        </view>
+      </view>
+      <view class="card-flush" wx:elif="{{notices.length}}">
         <view
           class="card-row"
           wx:for="{{notices}}"

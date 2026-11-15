@@ -13,6 +13,7 @@
 const { request } = require('../../utils/request.js');
 const clubTicket = require('../../utils/clubTicket.js');
 const clubTime = require('../../utils/clubTime.js');
+const skeleton = require('../../utils/skeleton.js');
 
 const ST_CLS = { 0: 'wait', 1: 'air', 2: 'rej', 3: 'done', 9: 'mute' };
 
@@ -25,6 +26,11 @@ Page({
     stCls: 'mute',
     loading: true,
     statusTime: '',
+
+    // 骨架（2026-11-16）：sk 初值 true —— 骨架从第一帧就在
+    sk: true,
+    skOut: false,
+    enter: false,
   },
 
   onLoad(q) {
@@ -32,6 +38,11 @@ Page({
       statusBarHeight: getApp().globalData.statusBarHeight || 20,
       id: q && q.id ? Number(q.id) : null,
     });
+    this.skGate = skeleton.create(this, {
+      when: () => !this.data.loading || !clubTicket.getTicket() || !this.data.id,
+    });
+    this.skGate.boot();
+
     const ticket = clubTicket.getTicket();
     if (!ticket) {
       wx.redirectTo({ url: '/pages/club-code/club-code' });
@@ -79,7 +90,7 @@ Page({
         }
         wx.showToast({ title: (err && err.message) || '打不开这条', icon: 'none' });
       })
-      .then(() => this.setData({ loading: false }));
+      .then(() => this.setData({ loading: false }, () => this.skGate.check()));
   },
 
   copy() {

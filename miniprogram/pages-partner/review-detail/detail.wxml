@@ -1,7 +1,7 @@
 <!-- pages-partner/review-detail/detail.wxml
      审核处理台 —— L1「白卡大投影」：页面底是羊皮纸灰，卡片浮起来（第 3 档投影），
      描边全去；卡内的名额条 / 文本域退回灰底（白卡里嵌灰块）。 -->
-<view class="page lift">
+<view class="page lift {{enter ? 'enter' : ''}}">
   <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
 
   <view class="navbar">
@@ -15,18 +15,73 @@
     <view class="navbar-spacer"></view>
   </view>
 
-  <view class="body" wx:if="{{loading}}">
-    <view class="hint-note">正在加载……</view>
-  </view>
+  <!-- ============ 骨架层（2026-11-16 · preview/loading-skeleton-v3 口径） ============
+       ⚠️ fixed 不是 absolute；伙伴端底色 #F5F5F7。
+          底部操作条在骨架层之下（z-index 25 盖住它），所以骨架期间不会出现「看起来能点」的假按钮。
+          「驳回原因 / 必填 / 审核记录」这些卡内标题也摆灰块 —— 卡内一律整块灰。 -->
+  <view class="sklayer {{skOut ? 'sklayer-out' : ''}}" wx:if="{{sk}}">
+    <view class="statusbar" style="height: {{statusBarHeight}}px"></view>
+    <view class="navbar">
+      <view class="navbar-back"></view>
+      <view class="navbar-title">审核处理台</view>
+      <view class="navbar-spacer"></view>
+    </view>
+    <view class="body">
+      <view class="cs-nav">
+        <text class="cs-nav-b">‹ 上一条</text>
+        <view class="sk sk-s" style="width:240rpx"></view>
+        <text class="cs-nav-b">下一条 ›</text>
+      </view>
+      <view class="pod">
+        <view class="pod-person">
+          <view class="pod-av"><view class="sk sk-c" style="width:88rpx;height:88rpx"></view></view>
+          <view class="grow">
+            <view class="sk sk-l" style="width:160rpx"></view>
+            <view class="sk sk-s" style="width:220rpx;margin-top:10rpx"></view>
+          </view>
+          <view class="sk sk-r" style="width:88rpx;height:36rpx"></view>
+        </view>
+        <view class="pod-stats">
+          <view class="pod-stat" wx:for="{{[1,2,3]}}" wx:key="*this">
+            <view class="sk sk-s" style="width:80rpx"></view>
+            <view class="sk sk-l" style="width:56rpx;margin-top:12rpx"></view>
+          </view>
+        </view>
+      </view>
 
-  <view class="body" wx:elif="{{notFound}}">
+      <view class="card-sec">
+        <view class="sk" style="width:240rpx;height:32rpx;top:0"></view>
+        <view class="sk-para" style="margin-top:24rpx">
+          <view class="sk sk-l" style="width:100%"></view>
+          <view class="sk sk-l" style="width:100%"></view>
+          <view class="sk sk-l" style="width:64%"></view>
+        </view>
+      </view>
+
+      <view class="card-sec">
+        <view class="sk" style="width:180rpx;height:32rpx;top:0"></view>
+        <view class="presets" style="margin-top:24rpx">
+          <view class="sk sk-r" style="width:132rpx;height:52rpx" wx:for="{{[1,2,3]}}" wx:key="*this"></view>
+        </view>
+        <view class="sk" style="width:100%;height:132rpx;border-radius:12rpx;margin-top:18rpx;top:0"></view>
+      </view>
+
+      <view class="card-sec">
+        <view class="sk" style="width:150rpx;height:32rpx;top:0"></view>
+        <view class="sk sk-s" style="width:80%;margin-top:20rpx"></view>
+        <view class="sk sk-s" style="width:62%;margin-top:14rpx"></view>
+      </view>
+    </view>
+  </view>
+  <block wx:if="{{!sk || skOut}}">
+  <view class="body" wx:if="{{notFound}}">
     <view class="hint-note">这条{{isDraft ? '稿件' : '投稿'}}不存在，或已被删除</view>
   </view>
 
   <block wx:else>
     <view class="body">
       <!-- 上一条 / 位置 / 下一条 -->
-      <view class="cs-nav">
+      <view class="cs-nav in i0">
         <text class="cs-nav-b {{pos <= 1 ? 'off' : ''}}" bindtap="prevOne">‹ 上一条</text>
         <!-- ⚠️ 内容必须写在同一行：<text> 会保留换行，拆行写会多出一个空行把这一行撑高 -->
         <text class="cs-nav-c">{{pos > 0 ? '第 ' + pos + ' / ' + queueTotal + ' 条待处理' : '不在待处理队列'}}</text>
@@ -34,7 +89,7 @@
       </view>
 
       <!-- 投稿人卡（白卡 + 大投影） -->
-      <view class="pod">
+      <view class="pod in i1">
         <view class="pod-person">
           <view class="pod-av">{{person.initial}}</view>
           <view class="grow">
@@ -54,7 +109,7 @@
       </view>
 
       <!-- 内容（白卡 + 大投影） -->
-      <view class="card-sec">
+      <view class="card-sec in i2">
         <view class="sec-head">
           <text class="sh-t">内容（{{kindText}}）</text>
           <!-- 内部稿件的栏目挪到这儿：正文那块已经不再挂「栏目」这一行了 -->
@@ -79,7 +134,7 @@
       </view>
 
       <!-- 处理结果：本周名额（仅点歌） -->
-      <view class="card-sec" wx:if="{{quota}}">
+      <view class="card-sec in i3" wx:if="{{quota}}">
         <view class="sec-head"><text class="sh-t">处理结果</text></view>
         <view class="quota">
           <view class="quota-row">
@@ -92,7 +147,7 @@
       </view>
 
       <!-- 驳回原因（白卡 + 大投影；预设胶囊保持羊皮纸灰） -->
-      <view class="reject-box" id="rejectBox">
+      <view class="reject-box in i4" id="rejectBox">
         <view class="rb-head">
           <text class="rb-t">驳回原因</text>
           <text class="rb-req">必填</text>
@@ -112,7 +167,7 @@
       </view>
 
       <!-- 审核记录 -->
-      <view class="card-sec">
+      <view class="card-sec in i5">
         <view class="sec-head"><text class="sh-t">审核记录</text></view>
         <view class="record">
           <view class="rec-line {{item.tm ? '' : 'now'}}" wx:for="{{recordLines}}" wx:key="index">
@@ -134,5 +189,6 @@
       <button class="btn-lg2 pass" hover-class="pressed"
               bindtap="doApprove" disabled="{{submitting}}">通过并取下一条</button>
     </view>
+  </block>
   </block>
 </view>

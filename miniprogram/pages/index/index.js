@@ -2,6 +2,7 @@ const tabMotion = require('../../utils/tabMotion.js');
 // pages/index/index.js
 const { request } = require('../../utils/request.js');
 const { fmtDate, orDash } = require('../../utils/format.js');
+const skeleton = require('../../utils/skeleton.js');
 
 // 启动动画最短停留时长：入场 1.7s 播完再淡出，避免闪一下就没了
 const LAUNCH_MIN_MS = 1700;
@@ -17,6 +18,10 @@ Page({
     notices: [],           // 公告
     schedule: { visible: false, rangeText: '', days: [], hasAny: false },  // 本周点歌排期
     loading: true,
+    // 加载骨架（B 档：只盖三块数据区，品牌头与欢迎卡照常显示）
+    sk: true,   // ⚠️ 初值必须 true：骨架首帧就画，不能先渲染内容再盖上来（2026-11-13 陛下退回）
+    skOut: false,
+    enter: false,
     // 欢迎卡（2026-11-01）：问候语 + 「下一次什么时候见」
     welcomeHi: '',
     welcomeLine: '',
@@ -41,6 +46,9 @@ Page({
     this._launchedAt = Date.now();
     this._launchDismissed = false;
     this.setTabBar({ hidden: true });
+    // 骨架闸门：正常情况这层一直藏在启动动画底下；只有接口拖到 4s 兜底才看得见
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
     // 接口超时兜底
     setTimeout(() => this.dismissLaunch(), LAUNCH_MAX_MS);
     this.loadAll();
@@ -84,6 +92,8 @@ Page({
         loading: false,
         welcomeHi: this.greeting(),
         welcomeLine: this.nextLine(current, weeklyList, upcomingList),
+      }, () => {
+        if (this.skGate) this.skGate.check();
       });
       // 数据就绪：启动动画可以退场了（里面会补足最短停留时长）
       this.dismissLaunch();

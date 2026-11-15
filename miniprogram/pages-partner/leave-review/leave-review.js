@@ -17,6 +17,7 @@
 
 const { adminRequest } = require('../../utils/request.js');
 const { addDays, md, rangeText } = require('../../utils/dates.js');
+const skeleton = require('../../utils/skeleton.js');
 
 const DAY_NAMES = ['周一', '周二', '周三', '周四', '周五'];
 
@@ -53,6 +54,11 @@ Page({
     pendingCount: 0,
     reviewed: [],
     reviewedCount: 0,
+
+    // 骨架（2026-11-16）：sk 初值 true —— 骨架从第一帧就在，内容层整块 wx:if 掉
+    sk: true,
+    skOut: false,
+    enter: false,
   },
 
   _baseWeek: '',
@@ -66,6 +72,8 @@ Page({
     this.setData({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
     });
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
     this.load();
   },
 
@@ -119,10 +127,10 @@ Page({
           pendingCount: Number((r && r.counts && r.counts.pending) || list.length),
           weekStart: ws,
           weekText: rangeText(ws, 5),
-        });
+        }, () => this.skGate.check());
       })
       .catch((err) => {
-        this.setData({ loading: false });
+        this.setData({ loading: false }, () => this.skGate.check());
         wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' });
       });
   },
@@ -141,10 +149,10 @@ Page({
           loading: false,
           reviewed: list,
           reviewedCount: list.length,
-        });
+        }, () => this.skGate.check());
       })
       .catch((err) => {
-        this.setData({ loading: false });
+        this.setData({ loading: false }, () => this.skGate.check());
         wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' });
       });
   },

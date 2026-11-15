@@ -13,6 +13,7 @@
 
 const { adminRequest } = require('../../utils/request.js');
 const { addDays, md, rangeText } = require('../../utils/dates.js');
+const skeleton = require('../../utils/skeleton.js');
 
 const DAY_NAMES = ['周一', '周二', '周三', '周四', '周五'];
 
@@ -41,6 +42,11 @@ Page({
     reason: '',
     monthUsed: 0,
     mine: [],
+
+    // 骨架（2026-11-16）：sk 初值 true —— 骨架从第一帧就在，内容层整块 wx:if 掉
+    sk: true,
+    skOut: false,
+    enter: false,
   },
 
   onLoad() {
@@ -54,6 +60,8 @@ Page({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
       myId: Number(info.id) || 0,
     });
+    this.skGate = skeleton.create(this, { when: () => !this.data.loading });
+    this.skGate.boot();
     this.load();
   },
 
@@ -123,7 +131,7 @@ Page({
         mine,
         monthUsed: Number(lv && lv.monthUsed) || 0,
         pickKey: shifts.length && shifts.some((s) => s.key === this.data.pickKey) ? this.data.pickKey : '',
-      });
+      }, () => this.skGate.check());
     });
   },
 
