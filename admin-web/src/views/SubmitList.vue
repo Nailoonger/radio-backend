@@ -1512,14 +1512,18 @@ async function fetchAssignLogs(id) {
     //    结果时间那格永远显示「—」。
     assignLogs.value = rows.map((g, i) => {
       const who = OP_CN[g.operatorName || g.operator_name] || g.operatorName || g.operator_name || '系统';
-      const reason = g.reasonText || g.reason || '';
-      // 「系统 · 系统驳回（…）」会重复一遍主语 ⇒ 原因已经以操作人开头时就不再单独写操作人
-      const showWho = who && !(reason && reason.indexOf(who) === 0) ? who : '';
+      const to = g.toText || g.toStatus || g.to_status || '—';
+      const raw = g.reasonText || g.reason || '';
+      // 两处去重，都是为了别在屏幕上说两遍同一件事：
+      //   ① 「系统 · 系统驳回（…）」—— 原因已以操作人开头时不再单独写操作人
+      //   ② 「待审核 → 已通过」后面又跟「通过」—— 原因已被新状态涵盖时不再重复
+      const showWho = who && !(raw && raw.indexOf(who) === 0) ? who : '';
+      const reason = raw && String(to).indexOf(raw) < 0 ? raw : '';
       return {
         key: g.id || `${g.dimension || 'log'}-${i}`,
         dim: g.dimensionText || DIM_CN[g.dimension] || g.dimension || '状态',
         from: g.fromText || g.fromStatus || g.from_status || '—',
-        to: g.toText || g.toStatus || g.to_status || '—',
+        to,
         time: fmt(g.createTime || g.create_time || g.created_at),
         who: showWho,
         reason,

@@ -38,6 +38,10 @@ data/radio.db*
 # =============== 构建产物 ===============
 dist/
 admin-web/dist/
+# 本地临时构建目录（`vite build --outDir dist-check-*` 做改动后验证用）
+# ⚠️ 加这条是因为 safe-delete 垫片有时删不掉这些目录（genie-trash 失败会 fail-closed），
+#    不忽略的话 `git status` 里会一直挂着一串 `?? admin-web/dist-check-xxx/`。
+/admin-web/dist-check-*/
 # 云函数打包产物，由 cloud/scripts/sync.js 从正式源码生成
 /miniprogram/cloudfunctions/api/
 *.tsbuildinfo
