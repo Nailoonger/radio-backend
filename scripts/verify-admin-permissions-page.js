@@ -91,8 +91,26 @@ test('保存失败必须把开关拨回去（否则界面在骗人）', () => {
 test('生效值口径与后端 effectivePerm 一致（三态：true / false / 跟随全局）', () => {
   const code = codeOf(read(PAGE));
   assert.ok(/\(v === true \|\| v === false\)\s*\?\s*v\s*:\s*!!g\[k\]/.test(code), 'true/false 用单人的，其它跟全局');
-  assert.ok(/const BLANK_OVER = \{ schedule: null, review: null, proxy: null \}/.test(code), '缺省三位都是 null（跟随）');
   assert.ok(/\[key\]:\s*null/.test(code), '「跟回全局」要把这一位写成 null');
+  // ⚠️⚠️ 2026-11-16 改：这里原来断言页面里有
+  //   `const BLANK_OVER = { schedule: null, review: null, proxy: null }`
+  // —— 它想钉的是「缺省＝跟随」这个语义，但自己把权限位写死成三位。
+  // 后端 2026-11-07 加了第四位 `clubkey`（社团密钥）之后，这条断言既不报错也守不住，
+  // 页面就带着「第 4 位总开关能拨、生效人数恒 0、按人格子点了不亮」悄悄上线了。
+  // 现在改成守真正该守的两件事：键表必须从接口 meta 派生，页面里不许再写死一份。
+  assert.ok(
+    /const KEYS = computed\(\(\) => meta\.value\.map\(\(m\) => m\.key\)\)/.test(code),
+    '权限位键表必须从接口 meta 派生（写死就会漏掉后端新加的位，2026-11-16 的 clubkey 就是这么坏的）',
+  );
+  assert.ok(
+    !/\[\s*['"]schedule['"]\s*,\s*['"]review['"]/.test(code),
+    '页面里不许再写死权限位数组，一律吃接口 meta',
+  );
+  // 未设过的位（null / undefined / 脏值）一律落到「跟全局」，不能当 true —— 后端 triPerm 同一口径
+  assert.ok(
+    !/\[key\]:\s*true/.test(code),
+    '缺省值不许写成 true，否则「没设过」会变成「单独开」',
+  );
 });
 
 /* ══════════ F. 后端那三个口子还在（被删了页面就空转）══════════ */
