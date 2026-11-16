@@ -71,6 +71,11 @@
   **侧边方案/试验稿只本地 present_files，禁止 deploy**。线上目录 `preview/partner-hub-gounucai-v5/`，新版本先 cp 回 v5 再发；
   工作副本不是 v5（约 v150 起每版独立目录，2026-11-07 = v169·88 屏）。
 - ✅✅ **只看一条：`git push` master 自动发布**（`cloud-release.yml`：verify → 只发变更那端）。**别再手动上传静态托管/部署云函数**。
+- ✅✅ **push 我自己敲，不让陛下代劳**（2026-11-16 纠正旧误判）：之前「GCM 取不到凭据」的真因是
+  `credential.helper` **从来没配过**（local/global 都空、Windows 凭据管理器 0 条 github），
+  `git config --global credential.helper manager` 之后 `GIT_TERMINAL_PROMPT=0 git push --dry-run` ⇒ `Everything up-to-date`。
+  判据：dry-run 能出 `Everything up-to-date` = 凭据可用，可直接真 push。
+  ⚠️ **不要向陛下要 GitHub 密码/PAT**：密码认证已停用，PAT 等于仓库写权限，拿到即等于拿到账号。
 - ⚠️⚠️ **改完「看不到」先量线上产物**（2026-11-16 又一轮）：①`GET /release.json` 的 `revision` 是否 = 目标 commit 全长（最硬）；
   ②目标 **chunk** 含新文案、不含旧文案 —— admin-web 是代码分割，主 bundle `index-<hash>.js` 只有路由表（全区仅 713 CJK 字），
   **只搜主 bundle 一律误报 ❌**。`index.html` 是 `no-store`、assets 带 hash ⇒ 缓存猜疑基本不成立，剩下是「push 完立刻看＝旧版」的时间差。
