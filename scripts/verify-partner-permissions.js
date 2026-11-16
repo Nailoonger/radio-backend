@@ -167,9 +167,12 @@ const onGlobalBody = permPageJs.slice(
   permPageJs.indexOf('onGlobal(e)'),
   permPageJs.indexOf('onPerson(e)')
 );
+/* ⚠️ 只检「保存路径用本地重算、不整页重拉」这个行为，不锁 recompute 的形参个数：
+   2026-11-16 把键表改成从 meta 派生后签名多了 meta，断言写死 `(people, global)` 就红了 ——
+   守的是行为，不是某一行字符。 */
 ok('保存后不整页重拉（否则每拨一次开关页面闪一下）',
-  /function recompute\(people, global\)/.test(permPageJs)
-  && onGlobalBody.length > 0
+  /function recompute\(/.test(permPageJs)
+  && /recompute\(/.test(onGlobalBody)
   && !/this\.load\(/.test(onGlobalBody),
   '又变回「保存就 load()」了 —— loading 会闪，陛下会说「怎么每次都要重新加载」');
 ok('按人拨位走独立接口', /\/partner\/permissions\/person\/\$\{personId\}/.test(permPageJs));
@@ -286,9 +289,23 @@ ok('权限页：胶囊按 meta 循环（加第四个开关不用改页面）',
   '又写死成两格了');
 ok('权限页：跟回全局也按 meta 循环', /wx:if="\{\{p\.over\[m\.key\] !== null\}\}"/.test(permWxml));
 ok('权限页：保存锁是**按格**的，不是一把全局锁',
-  /globalBusy: \{ schedule: false, review: false, proxy: false \}/.test(permPageJs)
+  /globalBusy: \{\}/.test(permPageJs)
+  && /busy: \{\}/.test(permPageJs)
   && !/this\.data\.saving\) return;/.test(permPageJs),
   '又用全局 saving 拦所有格 ⇒ 先点排班再点代录，第二下被静默吞掉（陛下报的「代录点不亮」就是这个）');
+/* ⚠️⚠️ 2026-11-16：键表写死三位曾经悄悄坏掉整列 —— 后端加 clubkey 后
+   ① 拨任意总开关，那一列全员变「不可用」（本地重算只算三位）；② 只单独设过 clubkey
+   的人撤不回（isOverridden 只看三位 ⇒ 「跟回全局」按钮不出现）。守的是「不写死」。 */
+ok('权限页：键表从 meta 派生，不写死几位',
+  /function keysOf\(meta\)/.test(permPageJs)
+  && !/const KEYS = \[/.test(permPageJs)
+  && !/KEYS\.(forEach|some|map)\(/.test(permPageJs),
+  '又写死键表了 ⇒ 后端加权限位时这一页会静默错一整列');
+ok('权限页：全局/按人/生效值都不按写死键位兜底',
+  !/global: \{ schedule: true/.test(permPageJs)
+  && !/over: x\.over \|\| \{ schedule/.test(permPageJs)
+  && !/scheduleOn: 0, reviewOn: 0/.test(permPageJs),
+  '缺省对象里写死三位 ⇒ 接口少回一位就漏键');
 ok('权限页：保存失败有常驻提示，不只有 1.5 秒 toast',
   /saveError/.test(permPageJs) && /class="err-bar"/.test(permWxml),
   '失败一闪而过 ⇒ 看起来就是「点了没反应」');

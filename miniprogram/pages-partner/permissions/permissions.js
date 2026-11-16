@@ -15,27 +15,40 @@ const { adminRequest } = require('../../utils/request.js');
 const perm = require('../../utils/perm.js');
 
 /**
- * 三个权限位 —— 与后端 `_kit.PERM_KEYS` 同序。
- * ⚠️ 只用来做**本地重算**（拨完开关立刻更新那一格，不再打一次 GET 把整页重刷）。
+ * 权限位的键序 —— **只从接口 meta 派生**。
+ *
+ * ⚠️⚠️ 原来这里写死 `['schedule','review','proxy']`。2026-11-07 后端加了第四位
+ *    `clubkey`（社团密钥）之后，这一页悄悄坏了三处：
+ *      ① 拨任意一个总开关 ⇒ `recompute()` 用三位重算，把每个人的 `eff` 整个换成
+ *         只有三位的对象 ⇒ 第四位取到 undefined ⇒ 那一列全员显示「不可用」；
+ *         退出重进又好了（重进吃的是服务端回来的四位 eff），所以极难复现。
+ *      ② `isOverridden` 只看三位 ⇒ 只单独设过 clubkey 的人 `overridden=false`
+ *         ⇒ 模板里「单独设置」标记和「跟回全局」按钮都不出来 ⇒ 那一位在小程序里
+ *         根本撤不回来。
+ *      ③ 计数里没有 clubkeyOn。
+ *    《菁悠》铁律：权限位文案与键序只有一个源头 `_kit.PERM_TEXT / PERM_KEYS`，
+ *    页面一律吃 meta。加第五位时这页不用改。
  */
-const KEYS = ['schedule', 'review', 'proxy'];
+function keysOf(meta) {
+  return (meta || []).map((m) => m.key);
+}
 
 /** 按人设置 + 全局 → 生效值（与后端 effectivePerm 同一口径，别自己发明第三个版本） */
-function effOf(over, global) {
+function effOf(over, global, keys) {
   const o = over || {};
   const g = global || {};
   const out = {};
-  KEYS.forEach((k) => {
+  (keys || []).forEach((k) => {
     const v = o[k];
     out[k] = (v === true || v === false) ? v : !!g[k];
   });
   return out;
 }
 
-/** 这一行有没有任何一位是「单独设置」（三位全是 null = 完全跟全局） */
-function isOverridden(over) {
+/** 这一行有没有任何一位是「单独设置」（某位是 null/缺省 = 跟全局） */
+function isOverridden(over, keys) {
   const o = over || {};
-  return KEYS.some((k) => o[k] === true || o[k] === false);
+  return (keys || []).some((k) => o[k] === true || o[k] === false);
 }
 
 /**
@@ -46,18 +59,18 @@ function isOverridden(over) {
  *    表现就是「每拨一次开关，页面闪一下重载」（陛下 2026-10-31 反馈的正是这个）。
  *    这里只改受影响的那几行，DOM 不会整页重建。
  */
-function recompute(people, global) {
+function recompute(people, global, meta) {
+  const keys = keysOf(meta);
   const next = (people || []).map((p) => Object.assign({}, p, {
-    eff: effOf(p.over, global),
-    overridden: isOverridden(p.over),
+    eff: effOf(p.over, global, keys),
+    overridden: isOverridden(p.over, keys),
   }));
   const count = {
     managers: next.length,
-    scheduleOn: next.filter((x) => x.eff.schedule).length,
-    reviewOn: next.filter((x) => x.eff.review).length,
-    proxyOn: next.filter((x) => x.eff.proxy).length,
     overridden: next.filter((x) => x.overridden).length,
   };
+  // 每一位各算一个 xxxOn（以前写死 scheduleOn / reviewOn / proxyOn，加位就漏）
+  keys.forEach((k) => { count[`${k}On`] = next.filter((x) => x.eff[k]).length; });
   return { people: next, count };
 }
 
@@ -67,15 +80,15 @@ Page({
     ready: false,
     loading: true,
     loadError: '',
-    /** 全局总闸（缺行 = 全开，服务端已经归一好）。三位都要列——少一位就是「显示开、实际关」 */
-    global: { schedule: true, review: true, proxy: true },
+    /** 全局总闸（缺行 = 全开，服务端已经归一好）。键位来自 meta，页面不写死 */
+    global: {},
     /** 权限位文案：{ key, name, desc, deny }，服务端给，页面不硬编码 */
     meta: [],
     /* ⚠️ 2026-11-01：删掉页尾那段说明后，这三个 deny 字段已无引用，一并清掉。
        三档拒绝文案统一成「暂无权限」四个字，源头在 _kit.PERM_TEXT，页面不另存一份。 */
     /** 社干名单 */
     people: [],
-    count: { managers: 0, scheduleOn: 0, reviewOn: 0, proxyOn: 0, overridden: 0 },
+    count: { managers: 0, overridden: 0 },
     /**
      * 权限表还没建（云开发新集合必须先建，否则查询抛 -502005 → 整页「服务器繁忙」）。
      * 2026-10-31 实际踩到。页面不白屏，改成一句「拨一下开关会自动建好」。
@@ -98,7 +111,7 @@ Page({
      *    改成每一格自己的标记：三格可以并行保存，互不阻塞；
      *    只有同一格正在保存时才会忽略重复点击（那是对的，防连点）。
      */
-    globalBusy: { schedule: false, review: false, proxy: false },
+    globalBusy: {},
   },
 
   onLoad() {
@@ -149,23 +162,37 @@ Page({
       .then((d) => {
         if (this._gone) return;
         const meta = (d && d.meta) || [];
+        const keys = keysOf(meta);
+        // 全局：服务端给的行以它为准，缺行按「全开」补齐（与 _kit 口径一致）
+        const g = (d && d.global) || {};
+        const global = {};
+        keys.forEach((k) => { global[k] = g[k] !== false; });
         this.setData({
           loading: false,
-          global: (d && d.global) || { schedule: true, review: true, proxy: true },
+          global,
           meta,
-          people: ((d && d.people) || []).map((x) => ({
-            personId: x.personId,
-            name: x.name,
-            username: x.username,
-            department: x.department || '',
-            // over 原样透传（每位是 true / false / null），模板直接用它判「跟回全局」要不要露
-            over: x.over || { schedule: null, review: null, proxy: null },
-            eff: x.eff || { schedule: false, review: false, proxy: false },
-            overridden: !!x.overridden,
-            // 每位自己的「保存中」标记，见 data.globalBusy 头注
-            busy: { schedule: false, review: false, proxy: false },
-          })),
-          count: (d && d.count) || { managers: 0, scheduleOn: 0, reviewOn: 0, overridden: 0 },
+          people: ((d && d.people) || []).map((x) => {
+            // over 归一成「meta 全键 + null 缺省」，模板才能直接判「跟回全局」要不要露
+            const raw = x.over || {};
+            const over = {};
+            keys.forEach((k) => {
+              const v = raw[k];
+              over[k] = (v === true || v === false) ? v : null;
+            });
+            return {
+              personId: x.personId,
+              name: x.name,
+              username: x.username,
+              department: x.department || '',
+              over,
+              // 生效值本地按同一口径算，不依赖服务端回来几位（少一位就是整列变灰）
+              eff: effOf(over, global, keys),
+              overridden: isOverridden(over, keys),
+              // 每位自己的「保存中」标记，见 data.globalBusy 头注
+              busy: {},
+            };
+          }),
+          count: (d && d.count) || { managers: 0, overridden: 0 },
           buildNeeded: !!(d && d.buildNeeded),
         });
       })
@@ -191,7 +218,7 @@ Page({
     gb[key] = true;
     // ⚠️ 整块替换 globalBusy，不用 `globalBusy.x` 路径写法：
     //    同一个 setData 里既给 people 又给嵌套路径，容易踩到「先合并数组再写路径」的顺序坑。
-    this.setData(Object.assign({ global, globalBusy: gb }, recompute(this.data.people, global)));
+    this.setData(Object.assign({ global, globalBusy: gb }, recompute(this.data.people, global, this.data.meta)));
 
     perm.load(true);          // 本机权限缓存作废（本页是超管，改完自己也要立刻生效）
 
@@ -205,7 +232,7 @@ Page({
         const g = (d && d.global) || global;
         const done = Object.assign({}, this.data.globalBusy);
         done[key] = false;
-        this.setData(Object.assign({ saveError: '', global: g, globalBusy: done }, recompute(this.data.people, g)));
+        this.setData(Object.assign({ saveError: '', global: g, globalBusy: done }, recompute(this.data.people, g, this.data.meta)));
       })
       .catch((err) => {
         if (this._gone) return;
@@ -218,7 +245,7 @@ Page({
           saveError: `保存失败：${(err && err.message) || '未知原因'}`,
           global: back,
           globalBusy: done,
-        }, recompute(this.data.people, back)));
+        }, recompute(this.data.people, back, this.data.meta)));
         wx.showToast({ title: (err && err.message) || '没保存成功', icon: 'none' });
       });
   },
@@ -271,9 +298,9 @@ Page({
       const over = hit ? Object.assign({}, p.over, patch) : p.over;
       const busy = Object.assign({}, p.busy);
       if (hit && pk) busy[pk] = true;
-      return Object.assign({}, p, { over, overridden: isOverridden(over), busy });
+      return Object.assign({}, p, { over, overridden: isOverridden(over, keysOf(this.data.meta)), busy });
     });
-    this.setData(recompute(optimistic, this.data.global));
+    this.setData(recompute(optimistic, this.data.global, this.data.meta));
 
     perm.load(true);
 
@@ -285,9 +312,9 @@ Page({
           const over = (d && d.over) || p.over;
           const busy = Object.assign({}, p.busy);
           if (pk) busy[pk] = false;
-          return Object.assign({}, p, { over, overridden: isOverridden(over), busy });
+          return Object.assign({}, p, { over, overridden: isOverridden(over, keysOf(this.data.meta)), busy });
         });
-        this.setData(Object.assign({ saveError: '' }, recompute(people, this.data.global)));
+        this.setData(Object.assign({ saveError: '' }, recompute(people, this.data.global, this.data.meta)));
       })
       .catch((err) => {
         if (this._gone) return;

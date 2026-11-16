@@ -58,8 +58,8 @@
             <text class="p-tag" wx:if="{{p.overridden}}">单独设置</text>
           </view>
 
-          <!-- 三个胶囊一行：排班 / 审核 / 代录。胶囊文案与顺序都来自 meta（_kit 的 PERM_TEXT），
-               不在页面里再列一遍 —— 加第四个开关时只改后端，这页自动跟上。 -->
+          <!-- 每位一行胶囊（现在是四位：排班 / 审核 / 代录 / 社团密钥）。文案与顺序全来自 meta
+               （_kit 的 PERM_TEXT），页面里不列一遍 —— 后端加第五位时这页自动跟上。 -->
           <view class="p-pills">
             <view class="pill {{p.eff[m.key] ? 'on' : ''}} {{p.busy[m.key] ? 'busy' : ''}}" wx:for="{{meta}}" wx:key="key" wx:for-item="m"
                   hover-class="pressed"
