@@ -17,92 +17,125 @@
       <div>权限表还没初始化。不影响用：拨一下下面任意一个开关，会自动把这张表建好并保存。</div>
     </div>
 
-    <!-- ══════════ 统计 ══════════ -->
-    <div class="stat">
-      <b>{{ count.managers }}</b><span class="unit">位社干</span>
-      <div class="stat-s">
-        排班可用 <i>{{ count.scheduleOn }}</i> · 审核可用 <i>{{ count.reviewOn }}</i> · 代录可用 <i>{{ count.proxyOn }}</i><br />
-        单独设置 <i>{{ count.overridden }}</i> 人 · 其余跟随总开关
-      </div>
-    </div>
-
-    <!-- ══════════ ① 全局总开关 ══════════ -->
-    <div class="card" v-loading="loading">
-      <div class="card-hd">
-        <b>总开关</b><i>对全体社干生效</i>
-        <span class="r">关掉后只有单独开过的人能进</span>
-      </div>
-      <div class="grow" v-for="m in meta" :key="m.key">
-        <div class="g-main">
-          <div class="g-name">{{ m.name }}</div>
-          <div class="g-desc">{{ m.desc }}</div>
-        </div>
-        <div class="g-count">
-          生效 <b>{{ effCount(m.key) }}</b> / {{ count.managers }} 人
-        </div>
-        <button
-          class="sw"
-          :class="{ on: global[m.key], busy: isBusy('g', m.key) }"
-          :aria-label="m.name"
-          @click="toggleGlobal(m.key)"
-        ></button>
-      </div>
-      <div class="empty" v-if="!meta.length && !loading">没读到权限位，点上面「重新加载」再试。</div>
-    </div>
-
-    <!-- ══════════ ② 按人分发 ══════════ -->
-    <div class="card">
-      <div class="card-hd">
-        <b>按人分发</b><i>点一下就是单独开 / 单独关</i>
-        <span class="r">只列启用中的社干</span>
-      </div>
-
-      <div class="thead">
-        <span>成员</span>
-        <span class="c" v-for="m in meta" :key="m.key">{{ m.short || m.name }}</span>
-      </div>
-
-      <div class="prow" v-for="p in people" :key="p.personId">
-        <div class="who">
-          <b>{{ p.name }}<em class="ovr" v-if="isOvr(p.over)">单独设置</em></b>
-          <i>{{ p.username }}<template v-if="p.department"> · {{ p.department }}</template></i>
+    <div class="ppm-grid" v-loading="loading">
+      <!-- ══════════ ① 总开关（左栏：一条通道一位权限） ══════════
+           为什么做成「通道条」而不是三行普通开关：
+           这三个位对应广播站的三个岗位动作（排班 / 审核 / 代录），
+           跟调音台上三条通道一样并排、各有开关和电平。
+           开启时左侧亮一条色标，关掉就灭；下面几段电平直接读出「几个人能用」，
+           不用再去别处找一个「生效 4/4 人」的小字。 -->
+      <section class="card">
+        <div class="card-hd">
+          <b>总开关</b><span class="sub">对全体社干生效</span>
         </div>
 
-        <!-- 三位：主胶囊＝当前生效值（点了就翻），下面小字说清「跟随」还是「单独设过」 -->
-        <div class="cell" v-for="m in meta" :key="m.key">
-          <button
-            class="pill"
-            :class="[
-              effOf(p.over)[m.key] ? 'on' : 'off',
-              { busy: isBusy(p.personId, m.key) },
-            ]"
-            @click="togglePerson(p, m.key)"
-          >
-            {{ effOf(p.over)[m.key] ? '可用' : '不可用' }}
-          </button>
-          <span class="cnote" v-if="isSingle(p.over, m.key)">
-            <em class="lf">单独设置</em>
-            <button class="lk" @click="follow(p, m.key)">跟回全局</button>
-          </span>
-          <span class="cnote" v-else>跟随总开关</span>
+        <div class="chan" v-for="(m, i) in meta" :key="m.key" :data-on="global[m.key] ? '1' : '0'">
+          <div class="chan-top">
+            <span class="chan-no">{{ pad(i + 1) }}</span>
+            <span class="chan-name">{{ m.name }}</span>
+            <button
+              class="sw"
+              :class="{ on: global[m.key], busy: isBusy('g', m.key) }"
+              :aria-label="`${m.name} 总开关`"
+              :aria-pressed="!!global[m.key]"
+              @click="toggleGlobal(m.key)"
+            ></button>
+          </div>
+          <div class="chan-desc">{{ m.desc }}</div>
+          <div class="chan-foot">
+            <span class="chan-eff" v-if="count.managers">
+              生效 <b>{{ effCount(m.key) }}</b> <span class="of">/ {{ count.managers }}</span> 人
+            </span>
+            <span class="chan-eff" v-else>暂无社干</span>
+            <!-- 电平：一段一个人（过 8 人按比例），亮的＝当前可用 -->
+            <div class="lvl" v-if="count.managers" aria-hidden="true">
+              <i v-for="n in lvlBars" :key="n" :class="{ on: n <= lvlOn(m.key) }"></i>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div class="empty" v-if="!people.length && !loading">
-        还没有社干账号。去「账号管理」里从学生名册把人拉进来。
-      </div>
-    </div>
+        <div class="empty" v-if="!meta.length && !loading">没读到权限位，点上面「重新加载」再试。</div>
 
-    <div class="tip">
-      <IconInfo :size="15" />
-      <div>生效规则：单独设过用单独那格，没设过跟总开关。</div>
+        <div class="chan-note">
+          <b>关掉总开关，只留单独开过的人；</b>其余看不到入口。
+        </div>
+      </section>
+
+      <!-- ══════════ ② 按人分发（右栏：一张矩阵） ══════════
+           v2 把「跟随总开关」那行小字全删了 —— 4 人 × 3 格会重复 12 遍，
+           信息量为零还把行高撑到 100px。改成靠「外圈」表达：
+             只有一只开关        = 跟随总开关
+             开关外面套一圈浅蓝  = 这一格单独设过，旁边才冒出 ↻ 可以跟回
+           跟随态不占视觉，扫一列就知道谁被动过。 -->
+      <section class="card">
+        <div class="card-hd">
+          <b>按人分发</b><span class="sub">点开关＝单独开 / 单独关</span>
+          <span class="r">已单独设置 <b class="num">{{ count.overridden }}</b> 人</span>
+        </div>
+
+        <div class="perm" v-if="rows.length" :style="{ '--cols': gridCols }">
+          <div class="phead">
+            <span class="l">成员<span class="lg">只列启用中的社干</span></span>
+            <span v-for="m in meta" :key="m.key">{{ m.short || m.name }}</span>
+          </div>
+
+          <div class="prow" v-for="row in rows" :key="row.p.personId">
+            <div class="who">
+              <div class="av">{{ initial(row.p.name) }}</div>
+              <div class="who-t">
+                <div class="who-n">{{ row.p.name }}</div>
+                <div class="who-s">
+                  {{ row.p.username }}<template v-if="row.p.department"> · {{ row.p.department }}</template>
+                </div>
+              </div>
+            </div>
+
+            <div class="cellp" v-for="c in row.cells" :key="c.key">
+              <div class="cellset">
+                <span class="ring" :class="{ set: c.single }">
+                  <button
+                    class="mini"
+                    :class="{ on: c.on, busy: isBusy(row.p.personId, c.key) }"
+                    :aria-label="`${row.p.name} 的${c.long}`"
+                    :aria-pressed="c.on"
+                    @click="togglePerson(row.p, c.key)"
+                  ></button>
+                </span>
+                <button
+                  class="redo"
+                  :class="{ show: c.single }"
+                  :tabindex="c.single ? 0 : -1"
+                  title="跟回总开关"
+                  :aria-label="`${row.p.name} 的${c.long} 跟回总开关`"
+                  @click="follow(row.p, c.key)"
+                >
+                  <IconRefresh :size="13" :stroke-width="2" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="empty" v-else-if="!loading">
+          <b>还没有社干账号</b>
+          去「账号管理」里从学生名册把人拉进来，回来这里就能分配权限。
+        </div>
+
+        <div class="card-ft" v-if="rows.length">
+          <IconInfo :size="13" />
+          <div>
+            生效规则：单独设过用单独那格，没设过跟总开关；<b>带外圈的格子＝单独设置过</b>，点 ↻ 跟回总开关。
+            拨一下就生效，没有保存按钮。
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </template>
 
 <script setup>
 /**
- * 管理端 web · 权限管理（超管）v1
+ * 管理端 web · 权限管理（超管）v2
  *
  * 和小程序端 `pages-partner/permissions/` 是**同一张表、同一套接口**：
  *   GET  /partner/permissions                 全局开关 + 社干名单（含生效值）
@@ -110,21 +143,24 @@
  *   PUT  /partner/permissions/person/:id      按人设置         body: { … }（null = 跟回全局）
  *
  * ⚠️ 权限位（名称 / 说明 / 顺序）**只从接口的 meta 拿**（源头 `_kit.PERM_TEXT`）。
- *    页面里不另存一份文案 —— 加第四位开关时这页自动跟上，也不会出现两端叫法不一样。
+ *    页面里不另存一份文案 —— 加第四位开关时这页自动跟上（矩阵列数按 meta.length 算），
+ *    也不会出现两端叫法不一样。
  * ⚠️ 权限不做草稿态：拨一下就落库。所以没有「保存」按钮，也不该有。
  * ⚠️ 三格各自一把小锁（`busy["<id>:<key>"]`），不是全局一把锁：
  *    全局锁会在连点第二位时把第二下静默吞掉（小程序端 2026-10-31 踩过，表现成「点不亮」）。
  * ⚠️ 保存失败必须**把开关拨回原位**再报错，否则界面在骗人。
+ *
+ * ── v2 只动视觉：接口 / 权限位文案 / 落库时机一行没改 ──
+ * 对照 `preview/admin-partner-permissions-v2/`：左右两栏（318 总开关 / 剩余给矩阵）、
+ * grid 硬控列宽（表头与格子同一套模板 ⇒ 中线对齐）、单独设置用外圈表达、行高 100 → 54px。
  */
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
 import { ElMessage } from 'element-plus';
 import http from '@/utils/http';
-import { IconInfo } from '@/components/icons';
+import { IconInfo, IconRefresh } from '@/components/icons';
 import { setPageHeader, clearPageHeader } from '@/utils/pageHeader';
 
 /** 权限位的键序（与后端 `_kit.PERM_KEYS` 同序；只用来兜默认值，文案一律吃接口 meta） */
-const KEYS = ['schedule', 'review', 'proxy'];
-const BLANK_OVER = { schedule: null, review: null, proxy: null };
 
 const loading = ref(false);
 const saveError = ref('');
@@ -133,7 +169,18 @@ const global = ref({ schedule: true, review: true, proxy: true });
 const meta = ref([]);
 const people = ref([]);
 
-/** 按格 / 按全局位的「保存中」标记：key = `g:<key>` 或 `<personId>:<key>` */
+/**
+ * 权限位的键序：**只从接口 meta 派生**，别在这里写死数组。
+ *
+ * ⚠️⚠️ 原来写死 `['schedule','review','proxy']`，2026-11-07 后端加了第四位 `clubkey`（社团密钥）之后
+ *    这一页就悄悄坏了：总开关还归 `global[m.key]` 能拨，「按人」那一列却全灭 ——
+ *    因为 `effOf()` 只算三个键 ⇒ 第四位永远取到 undefined ⇒ 开关恒 off、点了也不亮，
+ *    「生效 N 人」永远算 0。界面不报错，看着像「没人有这个权限」。
+ *    `_kit.PERM_TEXT` 是唯一源头，这里跟着 meta 走，加第五位同样自动跟上。
+ */
+const KEYS = computed(() => meta.value.map((m) => m.key));
+
+/** 「保存中」标记的存储：key = `g:<key>` 或 `<personId>:<key>` */
 const busy = reactive({});
 const bkey = (a, k) => `${a}:${k}`;
 const isBusy = (a, k) => !!busy[bkey(a, k)];
@@ -144,10 +191,10 @@ function markBusy(a, k, v) {
 
 /* ---------------- 生效值计算（与后端 effectivePerm 同一口径，别自己发明第三版） ---------------- */
 function effOf(over) {
-  const o = over || BLANK_OVER;
+  const o = over || {};
   const g = global.value || {};
   const out = {};
-  KEYS.forEach((k) => {
+  KEYS.value.forEach((k) => {
     const v = o[k];
     out[k] = (v === true || v === false) ? v : !!g[k];
   });
@@ -157,22 +204,55 @@ function effOf(over) {
 const isSingle = (over, k) => !!over && (over[k] === true || over[k] === false);
 /** 这一行有没有任何一位单独设过 */
 function isOvr(over) {
-  return KEYS.some((k) => isSingle(over, k));
+  return KEYS.value.some((k) => isSingle(over, k));
 }
 
 /* ---------------- 统计（本地算，拨完立刻准） ---------------- */
-const count = computed(() => {
-  const list = people.value;
-  const on = (k) => list.filter((p) => effOf(p.over)[k]).length;
-  return {
-    managers: list.length,
-    scheduleOn: on('schedule'),
-    reviewOn: on('review'),
-    proxyOn: on('proxy'),
-    overridden: list.filter((p) => isOvr(p.over)).length,
-  };
-});
+const count = computed(() => ({
+  managers: people.value.length,
+  overridden: people.value.filter((p) => isOvr(p.over)).length,
+}));
 const effCount = (k) => people.value.filter((p) => effOf(p.over)[k]).length;
+
+/**
+ * 电平段数：一段一个人，但**最多 8 段** —— 社干一多（十个八个）一排小方块会把左栏撑爆，
+ * 而且段数多到那个量级已经读不出差别了。超过 8 人按比例压缩，数字仍看「生效 N / M 人」。
+ */
+const LVL_MAX = 8;
+const lvlBars = computed(() => Math.max(1, Math.min(count.value.managers, LVL_MAX)));
+function lvlOn(k) {
+  const total = count.value.managers;
+  if (!total) return 0;
+  return Math.round((effCount(k) / total) * lvlBars.value);
+}
+
+/* ---------------- 渲染用的行模型：模板里不调函数，一次算好 ---------------- */
+const rows = computed(() =>
+  people.value.map((p) => {
+    const eff = effOf(p.over);
+    return {
+      p,
+      cells: meta.value.map((m) => ({
+        key: m.key,
+        long: m.name,
+        on: !!eff[m.key],
+        single: isSingle(p.over, m.key),
+      })),
+    };
+  })
+);
+
+/**
+ * 矩阵列模板：成员列吃剩余宽度，权限列定宽 —— 表头与格子共用同一套，永远对得齐。
+ * 三位时 148px 最舒展；四位（现有就是四位）收成 118px，否则右栏被挤得成员名只剩两个字。
+ */
+const gridCols = computed(() => {
+  const w = meta.value.length >= 4 ? 118 : 148;
+  return `minmax(0, 1fr) ${meta.value.map(() => `${w}px`).join(' ')}`;
+});
+
+const pad = (n) => String(n).padStart(2, '0');
+const initial = (name) => String(name || '?').slice(0, 1);
 
 /* ---------------- 读取 ---------------- */
 async function load() {
@@ -187,7 +267,7 @@ async function load() {
       name: x.name,
       username: x.username || '',
       department: x.department || '',
-      over: { ...BLANK_OVER, ...(x.over || {}) },
+      over: { ...(x.over || {}) },
     }));
     buildNeeded.value = !!(d && d.buildNeeded);
   } catch (e) {
@@ -220,7 +300,7 @@ async function toggleGlobal(key) {
 /* ---------------- 按人拨一位 ---------------- */
 function togglePerson(p, key) {
   if (isBusy(p.personId, key)) return;
-  // 拨一下 = 显式设成「和当前生效值相反」；想跟回全局要点下面那行小字
+  // 拨一下 = 显式设成「和当前生效值相反」；想跟回全局要点旁边那个 ↻
   const next = !effOf(p.over)[key];
   savePerson(p.personId, { [key]: next });
 }
@@ -242,7 +322,7 @@ async function savePerson(personId, patch) {
   markBusy(personId, key, true);
   try {
     const d = await http.put(`/partner/permissions/person/${personId}`, patch);
-    if (d && d.over) row.over = { ...BLANK_OVER, ...d.over };   // 以服务端为准
+    if (d && d.over) row.over = { ...d.over };   // 以服务端为准
     saveError.value = '';
     buildNeeded.value = false;
   } catch (e) {
@@ -262,97 +342,189 @@ onBeforeUnmount(clearPageHeader);
 </script>
 
 <style scoped>
-/* 视觉口径照 v8：白卡 18px 圆角、accent #0066CC、文字 13.5/11.5，无深色块 */
-.ppm { padding: 18px 16px 26px; max-width: 900px; }
+/* ══════════════════════════════════════════════════════════
+   权限管理 v2 —— 视觉口径照 `preview/admin-partner-permissions-v2/`
+   白卡 18px、唯一强调色 --accent、全浅色（本页不出任何深色块）。
 
-/* 统计 */
-.stat { display: flex; align-items: baseline; gap: 10px; margin: 0 0 16px; }
-.stat b { font-size: 34px; font-weight: 600; letter-spacing: -1px; color: #0066cc; line-height: 1; }
-.stat .unit { font-size: 12.5px; color: #76767e; }
-.stat-s { margin-left: auto; font-size: 12px; color: #76767e; text-align: right; line-height: 1.5; }
-.stat-s i { font-style: normal; color: #1d1d1f; font-weight: 500; font-variant-numeric: tabular-nums; }
+   布局：左右两栏（318 总开关 / 剩余给矩阵），两卡等高靠 grid 的 stretch，
+         卡内用 margin-top:auto 把注脚兜到底 —— 底边齐，不留空膛。
+   矩阵：grid 而不是 table。`table-layout:fixed` 下只给部分列定宽，
+         多出来的宽度会被平均灌给所有列（招募页 2026-11-16 同一个坑），
+         表现就是开关散在每列中间、跟表头对不上。
+   ══════════════════════════════════════════════════════════ */
+.ppm { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
 
-/* 卡片 */
-.card { background: #fff; border: 1px solid #eeeef2; border-radius: 18px; margin-bottom: 18px; overflow: hidden; }
-.card-hd { display: flex; align-items: baseline; gap: 9px; padding: 15px 18px 11px; }
-.card-hd b { font-size: 14px; font-weight: 600; color: #1d1d1f; }
-.card-hd i { font-style: normal; font-size: 11.5px; color: #76767e; }
-.card-hd .r { margin-left: auto; font-size: 11.5px; color: #8a8a90; }
+/* ── 常驻条 ── */
+.tip {
+  display: flex; gap: 9px; align-items: flex-start; padding: 10px 13px;
+  background: var(--parchment); border-radius: var(--r-input);
+  font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.6;
+}
+.tip :deep(svg) { flex: none; margin-top: 1px; color: var(--muted-2); }
+.tip.err { background: var(--red-bg); color: var(--red-fg); }
+.tip.err :deep(svg) { color: var(--red-fg); }
+.tip-lk {
+  border: 0; background: none; padding: 0; margin-left: 3px; font: inherit;
+  font-size: var(--fs-sm); color: var(--red-fg); text-decoration: underline;
+  text-underline-offset: 2px; cursor: pointer;
+}
 
-/* 全局总闸 */
-.grow { display: flex; align-items: center; gap: 14px; padding: 13px 18px; border-top: 1px solid #f0f0f0; }
-.g-main { flex: 1; min-width: 0; }
-.g-name { font-size: 13.5px; font-weight: 500; color: #1d1d1f; }
-.g-desc { font-size: 11.5px; color: #76767e; margin-top: 3px; }
-.g-count { font-size: 11.5px; color: #76767e; margin-right: 12px; font-variant-numeric: tabular-nums; }
-.g-count b { color: #0066cc; font-weight: 600; }
+/* ── 两栏 ── */
+.ppm-grid { display: grid; grid-template-columns: 318px minmax(0, 1fr); gap: 14px; align-items: stretch; }
+
+/* ── 卡片 ── */
+.card {
+  display: flex; flex-direction: column;
+  background: var(--canvas); border: 1px solid var(--hairline);
+  border-radius: var(--r-card); overflow: hidden;
+}
+.card-hd { display: flex; align-items: baseline; gap: 8px; padding: 15px 18px 0; flex-wrap: wrap; }
+.card-hd b { font-size: var(--fs-lg); font-weight: 600; letter-spacing: var(--ls-tight-sm); color: var(--ink); }
+.card-hd .sub { font-size: var(--fs-xs); color: var(--muted-2); }
+.card-hd .r { margin-left: auto; font-size: var(--fs-xs); color: var(--muted-2); letter-spacing: var(--ls-wide); }
+.card-hd .r b { font-size: var(--fs-xs); font-weight: 600; color: var(--ink-2); }
+
+/* ══════════ 左栏：总开关（通道条） ══════════ */
+.chan { position: relative; padding: 13px 16px 12px 18px; border-top: 1px solid var(--divider); }
+.card > .chan:first-of-type { margin-top: 14px; }
+/* 开启态左侧色标：关掉就灭，跟开关同向 */
+.chan::before {
+  content: ''; position: absolute; left: 0; top: 15px; bottom: 15px; width: 3px;
+  border-radius: 0 3px 3px 0; background: transparent; transition: background .18s var(--ease);
+}
+.chan[data-on='1']::before { background: var(--accent); }
+
+.chan-top { display: flex; align-items: baseline; gap: 8px; }
+/* 编号与名称坐同一条基线：小字号若居中会显得"飘"半个字高 */
+.chan-no {
+  font-family: var(--mono); font-size: var(--fs-2xs); color: #adaeb5;
+  letter-spacing: .5px; font-variant-numeric: tabular-nums;
+}
+.chan-name { font-size: var(--fs-md); font-weight: 600; letter-spacing: -.1px; color: var(--ink); }
+.chan-desc { margin-top: 3px; font-size: var(--fs-xs); color: var(--muted-2); line-height: 1.45; }
+.chan-foot { display: flex; align-items: center; gap: 9px; margin-top: 9px; }
+.chan-eff { font-size: var(--fs-xs); color: var(--muted-2); font-variant-numeric: tabular-nums; }
+.chan-eff b { color: var(--ink); font-weight: 600; }
+.chan-eff .of { color: var(--soft); }
+
+/* 电平：一段一个人，亮的＝当前可用（广播机架信号表的读法） */
+.lvl { display: flex; gap: 3px; align-items: center; }
+.lvl i {
+  display: block; width: 10px; height: 4.5px; border-radius: 1.5px;
+  background: #e9e9ee; transition: background .18s var(--ease);
+}
+.lvl i.on { background: var(--accent); }
+
+.chan-note {
+  margin-top: auto; border-top: 1px solid var(--divider); padding: 11px 18px 13px;
+  font-size: var(--fs-2xs); color: var(--muted-2); line-height: 1.65;
+}
+.chan-note b { color: var(--ink-2); font-weight: 500; }
 
 /* 开关 40×24（自绘，不用 el-switch：尺寸和 v8 原型对不上） */
 .sw {
-  width: 40px; height: 24px; border-radius: 9999px; background: #e5e5ea; border: 0; padding: 0;
-  position: relative; cursor: pointer; flex: none; transition: background 0.18s;
+  width: 40px; height: 24px; margin-left: auto; align-self: center; flex: none;
+  border: 0; padding: 0; border-radius: var(--r-pill); background: #e5e5ea;
+  position: relative; cursor: pointer; transition: background .18s var(--ease);
 }
 .sw::after {
-  content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%;
-  background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); transition: transform 0.18s;
+  content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .18);
+  transition: transform .18s var(--ease);
 }
-.sw.on { background: #0066cc; }
+.sw.on { background: var(--accent); }
 .sw.on::after { transform: translateX(16px); }
-.sw.busy { opacity: 0.5; pointer-events: none; }
+.sw.busy { opacity: .45; pointer-events: none; }
+.sw:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
-/* 按人表 */
-.thead, .prow {
-  display: grid; grid-template-columns: minmax(0, 1fr) 122px 122px 122px;
-  align-items: center; gap: 10px;
+/* ══════════ 右栏：按人矩阵 ══════════ */
+.perm { margin-top: 12px; }
+.phead, .prow {
+  display: grid; grid-template-columns: var(--cols);
+  align-items: center; padding: 0 18px;
 }
-.thead { padding: 9px 18px; border-top: 1px solid #f0f0f0; border-bottom: 1px solid #f0f0f0; }
-.thead span { font-size: 10.5px; color: #76767e; letter-spacing: 0.3px; }
-.thead span.c { text-align: center; }
-.prow { padding: 11px 18px; border-bottom: 1px solid #f5f5f7; }
+.phead {
+  padding-top: 9px; padding-bottom: 9px; background: #fcfcfd;
+  border-top: 1px solid var(--divider); border-bottom: 1px solid var(--divider);
+  font-size: var(--fs-2xs); font-weight: 500; color: var(--muted-2); letter-spacing: var(--ls-wide);
+  text-align: center;
+}
+.phead .l { text-align: left; }
+.phead .lg { margin-left: 4px; font-weight: 400; letter-spacing: 0; color: var(--muted-2); }
+
+.prow { padding-top: 9px; padding-bottom: 9px; border-bottom: 1px solid #f5f5f7; transition: background .14s var(--ease); }
 .prow:last-child { border-bottom: 0; }
 .prow:hover { background: #fafafb; }
-.who { min-width: 0; }
-.who b { display: block; font-size: 13.5px; font-weight: 500; color: #1d1d1f; line-height: 1.35; }
-.who i {
-  display: block; font-style: normal; font-size: 11px; color: #76767e; margin-top: 3px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+
+.who { display: flex; align-items: center; gap: 10px; min-width: 0; padding-right: 12px; text-align: left; }
+.av {
+  flex: none; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--acc-bg); color: var(--accent);
+  font-size: 12px; font-weight: 600;
 }
-.who .ovr {
-  display: inline-block; font-style: normal; font-size: 9.5px; font-weight: 500;
-  color: #0066cc; background: #e6f0fa; border-radius: 9999px; padding: 1px 6px;
-  margin-left: 6px; vertical-align: 1px;
+.who-t { min-width: 0; }
+.who-n { font-size: var(--fs-md); font-weight: 500; letter-spacing: -.1px; line-height: 1.3; color: var(--ink); }
+.who-s {
+  margin-top: 2px; font-size: var(--fs-xs); color: var(--muted-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums;
 }
 
-/* 单格：胶囊 + 一行小字 */
-.cell { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.pill {
-  width: 100%; max-width: 96px; height: 28px; border-radius: 9999px; border: 1px solid transparent;
-  font-family: inherit; font-size: 12px; font-weight: 500; cursor: pointer; line-height: 1;
-  display: inline-flex; align-items: center; justify-content: center;
-  transition: background 0.14s, color 0.14s, border-color 0.14s;
-}
-.pill.on { background: #e6f0fa; color: #0066cc; border-color: #cfe3f8; }
-.pill.off { background: #f0f0f3; color: #8a8a90; }
-.pill:hover { border-color: #0066cc; }
-.pill.busy { opacity: 0.5; pointer-events: none; }
-.cnote { font-size: 10px; color: #76767e; line-height: 1; height: 12px; white-space: nowrap; }
-.cnote .lf { font-style: normal; color: #9a9aa2; }
-.cnote .lk {
-  background: none; border: 0; padding: 0; font-family: inherit; font-size: 10px;
-  color: #0066cc; cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
-}
+.cellp { display: flex; justify-content: center; }
+/* cellset 里只有 ring 参与布局 ⇒ 迷你开关严格落在列中心。
+   ↻ 若也参与 flex，会把开关整体推左半个钮宽，跟表头文字对不上（v2 踩过）。 */
+.cellset { display: inline-flex; align-items: center; position: relative; }
 
-/* 提示条 */
-.tip {
-  display: flex; gap: 9px; align-items: flex-start; padding: 11px 14px;
-  background: #f5f5f7; border-radius: 12px; font-size: 12px; color: #333; line-height: 1.6;
+/* 外圈＝这一格单独设过。跟随态留位不显形，列宽不跳 */
+.ring {
+  display: inline-flex; align-items: center; padding: 4px;
+  border: 1px solid transparent; border-radius: var(--r-pill);
+  transition: border-color .18s var(--ease), background .18s var(--ease);
 }
-.tip :deep(svg) { flex: none; margin-top: 1px; color: #76767e; }
-.tip.err { background: #fde8e8; color: #b42318; margin-bottom: 16px; }
-.tip.err :deep(svg) { color: #b42318; }
-.tip-lk {
-  background: none; border: 0; padding: 0; margin-left: 4px; font-family: inherit;
-  font-size: 12px; color: #b42318; text-decoration: underline; cursor: pointer;
+.ring.set { border-color: #a9d0f2; background: #f2f8ff; }
+
+/* 迷你开关 34×20 */
+.mini {
+  width: 34px; height: 20px; flex: none; border: 0; padding: 0;
+  border-radius: var(--r-pill); background: #e5e5ea; position: relative;
+  cursor: pointer; transition: background .16s var(--ease);
 }
-.empty { padding: 30px 18px; text-align: center; font-size: 12.5px; color: #8a8a90; }
+.mini::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .16);
+  transition: transform .16s var(--ease);
+}
+.mini.on { background: var(--accent); }
+.mini.on::after { transform: translateX(14px); }
+.mini.busy { opacity: .45; pointer-events: none; }
+.mini:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* ↻ 跟回总开关：只有单独设过才显形 */
+.redo {
+  position: absolute; left: calc(50% + 26px); top: 50%; transform: translateY(-50%);
+  width: 20px; height: 20px; border: 0; border-radius: 50%; padding: 0;
+  display: grid; place-items: center;
+  background: none; color: var(--accent); cursor: pointer;
+  opacity: 0; pointer-events: none; transition: opacity .14s var(--ease), background .14s var(--ease);
+}
+.redo.show { opacity: 1; pointer-events: auto; }
+.redo.show:hover { background: var(--acc-bg); }
+.redo.show:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; opacity: 1; }
+
+/* 卡脚注 / 空态 */
+.card-ft {
+  margin-top: auto; border-top: 1px solid var(--divider); padding: 11px 18px 13px;
+  display: flex; gap: 7px; align-items: flex-start;
+  font-size: var(--fs-2xs); color: var(--muted-2); line-height: 1.6;
+}
+.card-ft :deep(svg) { flex: none; margin-top: 2px; color: var(--soft); }
+.card-ft b { color: var(--ink-2); font-weight: 500; }
+
+.empty { flex: 1; padding: 34px 18px; text-align: center; font-size: var(--fs-sm); color: var(--muted-2); line-height: 1.7; }
+.empty b { display: block; margin-bottom: 3px; font-size: var(--fs-md); font-weight: 500; color: var(--ink); }
+
+/* 窄屏（1366 笔记本 / 侧栏占位时）改单栏，别让 318 的左栏把矩阵挤变形 */
+@media (max-width: 1360px) {
+  .ppm-grid { grid-template-columns: minmax(0, 1fr); }
+}
 </style>
