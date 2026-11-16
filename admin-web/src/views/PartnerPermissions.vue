@@ -109,7 +109,7 @@
                   :aria-label="`${row.p.name} 的${c.long} 跟回总开关`"
                   @click="follow(row.p, c.key)"
                 >
-                  <IconRefresh :size="13" :stroke-width="2" />
+                  <IconRefresh :size="15" :stroke-width="2" />
                 </button>
               </div>
             </div>
@@ -246,10 +246,7 @@ const rows = computed(() =>
  * 矩阵列模板：成员列吃剩余宽度，权限列定宽 —— 表头与格子共用同一套，永远对得齐。
  * 三位时 148px 最舒展；四位（现有就是四位）收成 118px，否则右栏被挤得成员名只剩两个字。
  */
-const gridCols = computed(() => {
-  const w = meta.value.length >= 4 ? 118 : 148;
-  return `minmax(0, 1fr) ${meta.value.map(() => `${w}px`).join(' ')}`;
-});
+const gridCols = computed(() => `minmax(0, 1fr) repeat(${meta.value.length}, var(--colw, 170px))`);
 
 const pad = (n) => String(n).padStart(2, '0');
 const initial = (name) => String(name || '?').slice(0, 1);
@@ -352,7 +349,7 @@ onBeforeUnmount(clearPageHeader);
          多出来的宽度会被平均灌给所有列（招募页 2026-11-16 同一个坑），
          表现就是开关散在每列中间、跟表头对不上。
    ══════════════════════════════════════════════════════════ */
-.ppm { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.ppm { max-width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; height: 100%; min-height: 0; }
 
 /* ── 常驻条 ── */
 .tip {
@@ -370,7 +367,7 @@ onBeforeUnmount(clearPageHeader);
 }
 
 /* ── 两栏 ── */
-.ppm-grid { display: grid; grid-template-columns: 318px minmax(0, 1fr); gap: 14px; align-items: stretch; }
+.ppm-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 16px; align-items: stretch; }
 
 /* ── 卡片 ── */
 .card {
@@ -379,17 +376,22 @@ onBeforeUnmount(clearPageHeader);
   border-radius: var(--r-card); overflow: hidden;
 }
 .card-hd { display: flex; align-items: baseline; gap: 8px; padding: 15px 18px 0; flex-wrap: wrap; }
-.card-hd b { font-size: var(--fs-lg); font-weight: 600; letter-spacing: var(--ls-tight-sm); color: var(--ink); }
+.card-hd b { font-size: 16px; font-weight: 600; letter-spacing: var(--ls-tight-sm); color: var(--ink); }
 .card-hd .sub { font-size: var(--fs-xs); color: var(--muted-2); }
 .card-hd .r { margin-left: auto; font-size: var(--fs-xs); color: var(--muted-2); letter-spacing: var(--ls-wide); }
 .card-hd .r b { font-size: var(--fs-xs); font-weight: 600; color: var(--ink-2); }
 
 /* ══════════ 左栏：总开关（通道条） ══════════ */
-.chan { position: relative; padding: 13px 16px 12px 18px; border-top: 1px solid var(--divider); }
-.card > .chan:first-of-type { margin-top: 14px; }
+/* 通道吃掉左栏剩余高度，但封顶 150 —— 再高内容就散成三截了 */
+.chan {
+  position: relative; flex: 1; max-height: 150px;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 15px 18px 14px 20px; border-top: 1px solid var(--divider);
+}
+.card > .chan:first-of-type { margin-top: 16px; }
 /* 开启态左侧色标：关掉就灭，跟开关同向 */
 .chan::before {
-  content: ''; position: absolute; left: 0; top: 15px; bottom: 15px; width: 3px;
+  content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 54px;
   border-radius: 0 3px 3px 0; background: transparent; transition: background .18s var(--ease);
 }
 .chan[data-on='1']::before { background: var(--accent); }
@@ -400,73 +402,74 @@ onBeforeUnmount(clearPageHeader);
   font-family: var(--mono); font-size: var(--fs-2xs); color: #adaeb5;
   letter-spacing: .5px; font-variant-numeric: tabular-nums;
 }
-.chan-name { font-size: var(--fs-md); font-weight: 600; letter-spacing: -.1px; color: var(--ink); }
-.chan-desc { margin-top: 3px; font-size: var(--fs-xs); color: var(--muted-2); line-height: 1.45; }
+.chan-name { font-size: 15px; font-weight: 600; letter-spacing: -.1px; color: var(--ink); }
+.chan-desc { margin-top: 4px; font-size: 12.5px; color: var(--muted-2); line-height: 1.45; }
 .chan-foot { display: flex; align-items: center; gap: 9px; margin-top: 9px; }
-.chan-eff { font-size: var(--fs-xs); color: var(--muted-2); font-variant-numeric: tabular-nums; }
+.chan-eff { font-size: 12.5px; color: var(--muted-2); font-variant-numeric: tabular-nums; }
 .chan-eff b { color: var(--ink); font-weight: 600; }
 .chan-eff .of { color: var(--soft); }
 
 /* 电平：一段一个人，亮的＝当前可用（广播机架信号表的读法） */
 .lvl { display: flex; gap: 3px; align-items: center; }
 .lvl i {
-  display: block; width: 10px; height: 4.5px; border-radius: 1.5px;
+  display: block; width: 12px; height: 5px; border-radius: 2px;
   background: #e9e9ee; transition: background .18s var(--ease);
 }
 .lvl i.on { background: var(--accent); }
 
 .chan-note {
-  margin-top: auto; border-top: 1px solid var(--divider); padding: 11px 18px 13px;
-  font-size: var(--fs-2xs); color: var(--muted-2); line-height: 1.65;
+  margin-top: auto; border-top: 1px solid var(--divider); padding: 12px 20px 14px;
+  font-size: var(--fs-xs); color: var(--muted-2); line-height: 1.65;
 }
 .chan-note b { color: var(--ink-2); font-weight: 500; }
 
 /* 开关 40×24（自绘，不用 el-switch：尺寸和 v8 原型对不上） */
 .sw {
-  width: 40px; height: 24px; margin-left: auto; align-self: center; flex: none;
+  width: 46px; height: 28px; margin-left: auto; align-self: center; flex: none;
   border: 0; padding: 0; border-radius: var(--r-pill); background: #e5e5ea;
   position: relative; cursor: pointer; transition: background .18s var(--ease);
 }
 .sw::after {
-  content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px;
+  content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px;
   border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .18);
   transition: transform .18s var(--ease);
 }
 .sw.on { background: var(--accent); }
-.sw.on::after { transform: translateX(16px); }
+.sw.on::after { transform: translateX(18px); }
 .sw.busy { opacity: .45; pointer-events: none; }
 .sw:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 /* ══════════ 右栏：按人矩阵 ══════════ */
-.perm { margin-top: 12px; }
+/* 矩阵吃掉卡内剩余高度，行均分 —— 否则 4 行数据后面会留一个 170px 的洞 */
+.perm { --colw: 170px; flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: 12px; }
 .phead, .prow {
   display: grid; grid-template-columns: var(--cols);
   align-items: center; padding: 0 18px;
 }
 .phead {
-  padding-top: 9px; padding-bottom: 9px; background: #fcfcfd;
+  padding-top: 11px; padding-bottom: 11px; background: #fcfcfd;
   border-top: 1px solid var(--divider); border-bottom: 1px solid var(--divider);
-  font-size: var(--fs-2xs); font-weight: 500; color: var(--muted-2); letter-spacing: var(--ls-wide);
+  font-size: var(--fs-sm); font-weight: 500; color: var(--muted-2); letter-spacing: var(--ls-wide);
   text-align: center;
 }
 .phead .l { text-align: left; }
 .phead .lg { margin-left: 4px; font-weight: 400; letter-spacing: 0; color: var(--muted-2); }
 
-.prow { padding-top: 9px; padding-bottom: 9px; border-bottom: 1px solid #f5f5f7; transition: background .14s var(--ease); }
+.prow { flex: 1; min-height: 96px; padding-top: 20px; padding-bottom: 20px; border-bottom: 1px solid #f5f5f7; transition: background .14s var(--ease); }
 .prow:last-child { border-bottom: 0; }
 .prow:hover { background: #fafafb; }
 
 .who { display: flex; align-items: center; gap: 10px; min-width: 0; padding-right: 12px; text-align: left; }
 .av {
-  flex: none; width: 30px; height: 30px; border-radius: 50%;
+  flex: none; width: 34px; height: 34px; border-radius: 50%;
   display: grid; place-items: center;
   background: var(--acc-bg); color: var(--accent);
-  font-size: 12px; font-weight: 600;
+  font-size: 13px; font-weight: 600;
 }
 .who-t { min-width: 0; }
-.who-n { font-size: var(--fs-md); font-weight: 500; letter-spacing: -.1px; line-height: 1.3; color: var(--ink); }
+.who-n { font-size: 14.5px; font-weight: 500; letter-spacing: -.1px; line-height: 1.3; color: var(--ink); }
 .who-s {
-  margin-top: 2px; font-size: var(--fs-xs); color: var(--muted-2);
+  margin-top: 2px; font-size: 12.5px; color: var(--muted-2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums;
 }
 
@@ -477,7 +480,7 @@ onBeforeUnmount(clearPageHeader);
 
 /* 外圈＝这一格单独设过。跟随态留位不显形，列宽不跳 */
 .ring {
-  display: inline-flex; align-items: center; padding: 4px;
+  display: inline-flex; align-items: center; padding: 5px;
   border: 1px solid transparent; border-radius: var(--r-pill);
   transition: border-color .18s var(--ease), background .18s var(--ease);
 }
@@ -485,24 +488,24 @@ onBeforeUnmount(clearPageHeader);
 
 /* 迷你开关 34×20 */
 .mini {
-  width: 34px; height: 20px; flex: none; border: 0; padding: 0;
+  width: 42px; height: 24px; flex: none; border: 0; padding: 0;
   border-radius: var(--r-pill); background: #e5e5ea; position: relative;
   cursor: pointer; transition: background .16s var(--ease);
 }
 .mini::after {
-  content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px;
   border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .16);
   transition: transform .16s var(--ease);
 }
 .mini.on { background: var(--accent); }
-.mini.on::after { transform: translateX(14px); }
+.mini.on::after { transform: translateX(18px); }
 .mini.busy { opacity: .45; pointer-events: none; }
 .mini:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 /* ↻ 跟回总开关：只有单独设过才显形 */
 .redo {
-  position: absolute; left: calc(50% + 26px); top: 50%; transform: translateY(-50%);
-  width: 20px; height: 20px; border: 0; border-radius: 50%; padding: 0;
+  position: absolute; left: calc(50% + 32px); top: 50%; transform: translateY(-50%);
+  width: 24px; height: 24px; border: 0; border-radius: 50%; padding: 0;
   display: grid; place-items: center;
   background: none; color: var(--accent); cursor: pointer;
   opacity: 0; pointer-events: none; transition: opacity .14s var(--ease), background .14s var(--ease);
@@ -513,9 +516,9 @@ onBeforeUnmount(clearPageHeader);
 
 /* 卡脚注 / 空态 */
 .card-ft {
-  margin-top: auto; border-top: 1px solid var(--divider); padding: 11px 18px 13px;
-  display: flex; gap: 7px; align-items: flex-start;
-  font-size: var(--fs-2xs); color: var(--muted-2); line-height: 1.6;
+  margin-top: auto; border-top: 1px solid var(--divider); padding: 12px 20px 14px;
+  display: flex; gap: 7px; align-items: flex-start; background: #fcfcfd;
+  font-size: var(--fs-xs); color: var(--muted-2); line-height: 1.6;
 }
 .card-ft :deep(svg) { flex: none; margin-top: 2px; color: var(--soft); }
 .card-ft b { color: var(--ink-2); font-weight: 500; }
@@ -523,8 +526,15 @@ onBeforeUnmount(clearPageHeader);
 .empty { flex: 1; padding: 34px 18px; text-align: center; font-size: var(--fs-sm); color: var(--muted-2); line-height: 1.7; }
 .empty b { display: block; margin-bottom: 3px; font-size: var(--fs-md); font-weight: 500; color: var(--ink); }
 
-/* 窄屏（1366 笔记本 / 侧栏占位时）改单栏，别让 318 的左栏把矩阵挤变形 */
-@media (max-width: 1360px) {
-  .ppm-grid { grid-template-columns: minmax(0, 1fr); }
+/* ── 视口收缩分三档：先缩列宽，最后才塌成单栏 ──
+   两栏要塞下 360 左栏 + 成员列 + 四列权限；1440 笔记本的内容区只有 1168，
+   硬撑两栏会挤成一条缝，所以那时才改单栏。 */
+@media (max-width: 1608px) {
+  .perm { --colw: 140px; }
+}
+@media (max-width: 1448px) {
+  .ppm { height: auto; max-width: 900px; }
+  .ppm-grid { flex: none; grid-template-columns: minmax(0, 1fr); }
+  .perm { --colw: 170px; }
 }
 </style>
