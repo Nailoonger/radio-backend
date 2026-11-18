@@ -147,7 +147,7 @@ const modKeyToFile = (key) => key.replace(/\./g, '/') + '.js';
   const systemRoutes = RAW_ROUTES.filter(([, hk]) => hk.startsWith('system.'));
   // ⚠️ 2026-10-29 起有第四种前缀：/partner/**（伙伴端小程序 + admin-web 共用）
   const partnerRoutes = RAW_ROUTES.filter(([k]) => pathOf(k).startsWith('/partner/'));
-  eq('★ admin 路由 113 条（含招新）', adminRoutes.length, 113);   // 112 → 113：+ POST /admin/admin/reset-password/batch
+  eq('★ admin 路由 115 条（含招新）', adminRoutes.length, 115);   // 112 → 113：+ POST /admin/admin/reset-password/batch；113 → 115：+ 栏目播出编排 get/put slots
   eq('user 路由 47 条（含招新、社团密钥 4 + 提报 5）', userRoutes.length, 47);
   eq('system 路由 2 条（/health + /system/init-collections）',
     systemRoutes.map(([k]) => k), ['GET /health', 'POST /system/init-collections']);

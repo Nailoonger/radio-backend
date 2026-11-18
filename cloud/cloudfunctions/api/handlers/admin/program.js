@@ -1,39 +1,60 @@
 'use strict';
 
 /**
- * 管理端 · 节目排期
+ * 管理端 · 栏目管理
  * 迁移自 src/controllers/admin/programController.js
  *
- * 路由层挂 `adminAuth + requireAdmin`（普通管理员即可）→ 全部 `asAdmin`。
+ * 路由层挂 `adminAuth + requireAdmin`（普通管理员即可）→ 除编排写入外都是 `asAdmin`；
+ * 编排写入 `PUT /admin/program/slots` 走 `asSuper`。
  *
- * ⚠️ 时间语义：`broadcastDate` 是 `DATEONLY`（`YYYY-MM-DD` 字符串）。
- *    原实现用 `Op.between: [startDate, endDate]` 落在 SQL 上比较的是日期；
- *    云端改成 `_.gte(startDate).and(_.lte(endDate))`。字符串 `YYYY-MM-DD` 定长零填充，
- *    字典序 == 日期序，所以等价。
- *    ⚠️ 但**必须两端都给**才过滤（源实现就是 `if (startDate && endDate)`）。
+ * ⚠️⚠️ 2026-11-19 起栏目不再填具体日期：
+ *   常规栏目 = 每周哪几天（weekdays）+ 哪个时段（slotLabel）+ 第几档（slotIndex）；
+ *   具体日期由 services/programSlot.expand() 在**下发前**投影出来。
+ *   只有特别节目档（isSpecial=1）才带自己的 broadcastDate。
+ *   原因：broadcast_date 是小程序节目单 / 首页唯一时间依据，只换字段会让按日期查的接口静默返回空。
  */
 
-const { C, _, findOne, findAllPaged, insertOne, updateById, updateWhere, removeWhere, nextId, parseId } = require('../../lib/db');
+const { C, findMany, findOne, insertOne, updateById, removeWhere, nextId, parseId } = require('../../lib/db');
 const { ApiError, Codes } = require('../../lib/response');
-const { asAdmin, pager, pick, applyFields, sortRows } = require('./_kit');
+const { asAdmin, asSuper, pager, pick, applyFields, sortRows } = require('./_kit');
+const programSlot = require('../../services/programSlot');
 
-/** program 的对外字段集（= 映射文档 §4，顺序与 Sequelize 属性一致） */
-const FIELDS = ['id', 'title', 'host', 'broadcastTime', 'broadcastDate', 'desc', 'cover', 'isShow', 'isLive', 'sort', 'createTime', 'updateTime'];
+/** program 的对外字段集 */
+const FIELDS = [
+  'id', 'title', 'host', 'broadcastTime', 'broadcastDate',
+  'weekdays', 'slotLabel', 'slotIndex', 'isSpecial',
+  'desc', 'cover', 'isShow', 'isLive', 'sort', 'createTime', 'updateTime',
+];
+
+/** 周几归一化 → '1,2,3' */
+function normWeekdays(v) {
+  let arr = [];
+  if (Array.isArray(v)) arr = v;
+  else if (v !== undefined && v !== null && String(v).trim() !== '') arr = String(v).split(',');
+  const nums = arr
+    .map((x) => parseInt(String(x).trim(), 10))
+    .filter((n) => n >= 1 && n <= 7)
+    .filter((n, i, a) => a.indexOf(n) === i)
+    .sort((a, b) => a - b);
+  return nums.join(',');
+}
+
+function resolveTime(body, slots) {
+  const isSpecial = Number(body.isSpecial) === 1 ? 1 : 0;
+  const manual = String(body.broadcastTime || '').trim();
+  if (isSpecial) return manual;
+  const auto = programSlot.timeTextOf(body.slotLabel, body.slotIndex, slots);
+  return auto || manual;
+}
 
 /** GET /admin/program/list */
 async function list(ctx) {
   asAdmin(ctx);
   const q = ctx.query || {};
-  const { page, pageSize } = pager(q, 20);
+  const { page, pageSize, skip } = pager(q, 200);
 
-  const where = {};
-  if (q.startDate && q.endDate) {
-    where.broadcastDate = _.gte(q.startDate).and(_.lte(q.endDate));
-  }
-
-  const rows = await findAllPaged(C.PROGRAM, where);
-  const sorted = sortRows(rows, [['broadcastDate', 'asc'], ['sort', 'asc']]);
-  const skip = (page - 1) * pageSize;
+  const rows = await findMany(C.PROGRAM, {});
+  const sorted = sortRows(rows, [['sort', 'asc'], ['id', 'asc']]);
   return {
     list: sorted.slice(skip, skip + pageSize).map((r) => pick(r, FIELDS)),
     total: sorted.length,
@@ -45,24 +66,46 @@ async function list(ctx) {
 /** POST /admin/program/create */
 async function create(ctx) {
   asAdmin(ctx);
-  const body = ctx.body || {};
-  const { title, host, broadcastTime, broadcastDate, desc, cover, isShow, sort } = body;
-  if (!title || !broadcastTime) {
-    throw new ApiError(Codes.PARAM_ERROR, '请填写节目名和开播时间');
+  const b = ctx.body || {};
+  const title = String(b.title || '').trim();
+  if (!title) throw new ApiError(Codes.PARAM_ERROR, '请填写节目名');
+
+  const isSpecial = Number(b.isSpecial) === 1 ? 1 : 0;
+  const weekdays = normWeekdays(b.weekdays);
+  const broadcastDate = isSpecial ? String(b.broadcastDate || '').trim() : '';
+
+  if (isSpecial) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(broadcastDate)) {
+      throw new ApiError(Codes.PARAM_ERROR, '特别节目档必须选择播出日期');
+    }
+  } else {
+    if (!weekdays) throw new ApiError(Codes.PARAM_ERROR, '请选择每周哪几天播出');
+    if (!b.slotLabel) throw new ApiError(Codes.PARAM_ERROR, '请选择播出时段');
+    if (!(Number(b.slotIndex) >= 1)) throw new ApiError(Codes.PARAM_ERROR, '请选择第几档');
+  }
+
+  const slots = await programSlot.getSlots();
+  const broadcastTime = resolveTime({ ...b, isSpecial }, slots);
+  if (!broadcastTime) {
+    throw new ApiError(Codes.PARAM_ERROR, '这个时段 / 档位在播出编排里不存在，请刷新后重选');
   }
 
   const now = new Date();
   const doc = {
     id: await nextId(C.PROGRAM),
     title,
-    host: host === undefined ? null : host,
+    host: b.host === undefined ? null : b.host,
     broadcastTime,
-    broadcastDate: broadcastDate || null,
-    desc: desc === undefined ? null : desc,
-    cover: cover === undefined ? null : cover,
-    isShow: isShow === undefined ? 1 : isShow,
+    broadcastDate: isSpecial ? broadcastDate : null,
+    weekdays: isSpecial ? null : weekdays,
+    slotLabel: isSpecial ? null : b.slotLabel,
+    slotIndex: isSpecial ? null : parseInt(b.slotIndex, 10),
+    isSpecial,
+    desc: b.desc === undefined ? null : b.desc,
+    cover: b.cover === undefined ? null : b.cover,
+    isShow: b.isShow === undefined ? 1 : b.isShow,
     isLive: 0,
-    sort: sort || 0,
+    sort: b.sort || 0,
     createTime: now,
     updateTime: now,
   };
@@ -77,14 +120,44 @@ async function update(ctx) {
   const row = id === null ? null : await findOne(C.PROGRAM, { id });
   if (!row) throw new ApiError(Codes.NOT_FOUND, '节目不存在');
 
-  const next = applyFields({ ...row }, ctx.body || {},
-    ['title', 'host', 'broadcastTime', 'broadcastDate', 'desc', 'cover', 'isShow', 'sort']);
+  const b = ctx.body || {};
+  const next = applyFields({ ...row }, b, ['title', 'host', 'desc', 'cover', 'isShow', 'sort']);
+  const isSpecial = b.isSpecial === undefined ? Number(row.isSpecial) === 1 : Number(b.isSpecial) === 1;
+  next.isSpecial = isSpecial ? 1 : 0;
+
+  if (isSpecial) {
+    if (b.broadcastDate !== undefined) next.broadcastDate = String(b.broadcastDate || '').trim() || null;
+    if (!next.broadcastDate) throw new ApiError(Codes.PARAM_ERROR, '特别节目档必须选择播出日期');
+    if (b.broadcastTime !== undefined) next.broadcastTime = String(b.broadcastTime).trim();
+    next.weekdays = null;
+    next.slotLabel = null;
+    next.slotIndex = null;
+  } else {
+    if (b.weekdays !== undefined) next.weekdays = normWeekdays(b.weekdays);
+    if (b.slotLabel !== undefined) next.slotLabel = b.slotLabel;
+    if (b.slotIndex !== undefined) next.slotIndex = parseInt(b.slotIndex, 10);
+    if (!next.weekdays) throw new ApiError(Codes.PARAM_ERROR, '请选择每周哪几天播出');
+    if (!next.slotLabel) throw new ApiError(Codes.PARAM_ERROR, '请选择播出时段');
+    if (!(Number(next.slotIndex) >= 1)) throw new ApiError(Codes.PARAM_ERROR, '请选择第几档');
+
+    const slots = await programSlot.getSlots();
+    next.broadcastTime = resolveTime(
+      { isSpecial: 0, slotLabel: next.slotLabel, slotIndex: next.slotIndex },
+      slots
+    );
+    next.broadcastDate = null;
+  }
+
   next.updateTime = new Date();
   await updateById(C.PROGRAM, row._id, {
     title: next.title,
     host: next.host,
     broadcastTime: next.broadcastTime,
     broadcastDate: next.broadcastDate,
+    weekdays: next.weekdays,
+    slotLabel: next.slotLabel,
+    slotIndex: next.slotIndex,
+    isSpecial: next.isSpecial,
     desc: next.desc,
     cover: next.cover,
     isShow: next.isShow,
@@ -104,27 +177,40 @@ async function remove(ctx) {
   return null;
 }
 
-/**
- * PUT /admin/program/:id/live   切换「正在直播」（保证全表仅一个 live=1）
- *
- * ⚠️ 源实现先 `Program.update({isLive:0}, {where:{}})` 全表清零，再置目标为 1。
- *    云端 `where({})` 语义不明确，改用 `_id: _.exists(true)`（= 全部文档），等价。
- */
+/** PUT /admin/program/:id/live —— 仅一个节目 live=1 */
 async function setLive(ctx) {
   asAdmin(ctx);
-  const { isLive } = ctx.body || {};
-  const id = parseId(ctx.params.id);
-
-  if (Number(isLive) === 1) {
-    await updateWhere(C.PROGRAM, { _id: _.exists(true) }, { isLive: 0 });
+  const isLive = Number((ctx.body || {}).isLive) === 1 ? 1 : 0;
+  if (isLive === 1) {
+    const live = await findMany(C.PROGRAM, { isLive: 1 });
+    await Promise.all(live.map((r) => updateById(C.PROGRAM, r._id, { isLive: 0, updateTime: new Date() })));
   }
-
+  const id = parseId(ctx.params.id);
   const row = id === null ? null : await findOne(C.PROGRAM, { id });
   if (!row) throw new ApiError(Codes.NOT_FOUND, '节目不存在');
-
-  const next = { ...row, isLive: isLive ? 1 : 0, updateTime: new Date() };
-  await updateById(C.PROGRAM, row._id, { isLive: next.isLive, updateTime: next.updateTime });
-  return pick(next, FIELDS);
+  await updateById(C.PROGRAM, row._id, { isLive, updateTime: new Date() });
+  return pick({ ...row, isLive }, FIELDS);
 }
 
-module.exports = { list, create, update, remove, setLive };
+/* ─────────── 播出编排 ─────────── */
+
+/** GET /admin/program/slots */
+async function getSlots(ctx) {
+  asAdmin(ctx);
+  const list = await programSlot.getSlotsWithTicks();
+  return { list, maxSlots: programSlot.MAX_SLOTS, maxCount: programSlot.MAX_COUNT };
+}
+
+/** PUT /admin/program/slots（仅超管） */
+async function saveSlots(ctx) {
+  asSuper(ctx);
+  const body = ctx.body || {};
+  const list = Array.isArray(body) ? body : (body.list || []);
+  const norm = await programSlot.setSlots(list);
+  // 服务层只做归一化，不抛业务码（见 services/programSlot.setSlots 注释）；
+  // 「一个合法时段都没剩」在这里报 40001，与 Express 端保持同一码同一文案。
+  if (!norm) throw new ApiError(Codes.PARAM_ERROR, '至少要有一个合法时段（名称 + 起止 HH:mm + 档数）');
+  return { list: norm };
+}
+
+module.exports = { list, create, update, remove, setLive, getSlots, saveSlots };

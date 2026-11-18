@@ -15,13 +15,10 @@
  * ⚠️ 主键口径：详情用**数字 `id`**（见 lib/db.js 的 parseId 注释），不是 `_id`。
  */
 
-const { C, findOne, findMany, parseId, _ } = require('../../lib/db');
+const { C, findOne, findMany, parseId } = require('../../lib/db');
 const { ApiError, Codes } = require('../../lib/response');
 const bj = require('../../lib/bjTime');
-
-// 原实现在 sort 相同时没有 tie-breaker（MySQL 不保证稳定序）；这里补 id 升序，
-// 让「同 sort 的节目」在每次查询里顺序一致（否则前端列表会莫名跳动）。
-const SCHEDULE_ORDER = [['broadcastDate', 'asc'], ['sort', 'asc'], ['id', 'asc']];
+const programSlot = require('../../services/programSlot');
 
 /** 'YYYY-MM-DD' + n 天（纯日历运算，不涉时区换算） */
 function datePlus(dateStr, days) {
@@ -36,7 +33,13 @@ async function current() {
   return rows[0] || null;
 }
 
-/** GET /user/program/schedule?from=YYYY-MM-DD&to=YYYY-MM-DD */
+/**
+ * GET /user/program/schedule?from=YYYY-MM-DD&to=YYYY-MM-DD
+ *
+ * ⚠️ 2026-11-19 起不再用 `broadcastDate between` 直接查：
+ *    库里存的是「每周几 + 第几档」，具体日期是**下发前投影出来的**。
+ *    直接按日期查会一条都查不到（列表静默变空，最难发现）。
+ */
 async function schedule(ctx) {
   const q = ctx.query || {};
   let from = q.from;
@@ -47,11 +50,9 @@ async function schedule(ctx) {
     to = datePlus(from, 7);
   }
 
-  const list = await findMany(
-    C.PROGRAM,
-    { isShow: 1, broadcastDate: _.gte(from).and(_.lte(to)) },
-    { orderBy: SCHEDULE_ORDER }
-  );
+  // 节目表体量小（几十条），整表取回再投影，免得为了"周几"堆一堆查询条件
+  const rows = await findMany(C.PROGRAM, { isShow: 1 });
+  const list = await programSlot.expand(rows, from, to);
   return { list };
 }
 
@@ -61,11 +62,8 @@ async function weekly() {
   const from = bj.ymd(bj.shifted(r.start.getTime()));
   const to = bj.ymd(bj.shifted(r.end.getTime() - 1)); // end 是下周一 00:00，故 -1ms 取到周日
 
-  const list = await findMany(
-    C.PROGRAM,
-    { isShow: 1, broadcastDate: _.gte(from).and(_.lte(to)) },
-    { orderBy: SCHEDULE_ORDER }
-  );
+  const rows = await findMany(C.PROGRAM, { isShow: 1 });
+  const list = await programSlot.expand(rows, from, to);
   return { weekRange: { from, to }, list };
 }
 

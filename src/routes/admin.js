@@ -651,6 +651,26 @@ router.get('/program/list', adminAuth, requireAdmin, program.list);
 
 /**
  * @swagger
+ * /api/admin/program/slots:
+ *   get:
+ *     tags: [管理端-节目排期]
+ *     summary: 读播出编排（每天几个时段、每个时段几档）
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: ok }
+ *   put:
+ *     tags: [管理端-节目排期]
+ *     summary: 写播出编排（仅超管）
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: ok }
+ */
+// ⚠️ 必须注册在 `/program/:id` **之前**，否则 PUT 会被 `:id = 'slots'` 吃掉
+router.get('/program/slots', adminAuth, requireAdmin, program.getSlots);
+router.put('/program/slots', adminAuth, requireSuperAdmin, program.saveSlots);
+
+/**
+ * @swagger
  * /api/admin/program/create:
  *   post:
  *     tags: [管理端-节目排期]

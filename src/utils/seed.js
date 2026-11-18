@@ -10,7 +10,6 @@
  */
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const dayjs = require('dayjs');
 const { sequelize, Admin, Program, SystemSetting, SystemSwitch } = require('../models');
 const config = require('../config');
 const logger = require('./logger');
@@ -76,11 +75,13 @@ async function seedSettings() {
 async function seedPrograms() {
   const count = await Program.count();
   if (count > 0) return;
-  const today = dayjs().format('YYYY-MM-DD');
+  // ⚠️ 2026-11-19 起栏目按「每周几 + 哪个时段第几档」存，不再存具体日期：
+  //    时段与档位必须与 services/programSlotService.DEFAULT_SLOTS 对得上
+  //    （午间 12:10-12:30 三档、晚间 17:40-18:10 三档），否则示例数据会显示「未排期」。
   await Program.bulkCreate([
-    { title: '午间音乐汇', host: '小李', broadcastTime: '周一至周五 12:30-13:00', broadcastDate: today, desc: '精选校园流行歌曲，伴你度过午休时光。', isShow: 1, sort: 1 },
-    { title: '校园新闻速递', host: '小红', broadcastTime: '周一 17:00-17:30', broadcastDate: today, desc: '播报本周校园大事。', isShow: 1, sort: 2 },
-    { title: '晚安故事', host: '小张', broadcastTime: '周五 21:30-22:00', broadcastDate: dayjs().add(4, 'day').format('YYYY-MM-DD'), desc: '为住校生送上一段温柔的睡前故事。', isShow: 1, sort: 3 },
+    { title: '午间音乐汇', host: '小李', weekdays: '1,2,3,4,5', slotLabel: '午间', slotIndex: 1, broadcastTime: '12:10-12:17', broadcastDate: null, isSpecial: 0, desc: '精选校园流行歌曲，伴你度过午休时光。', isShow: 1, sort: 1 },
+    { title: '校园新闻速递', host: '小红', weekdays: '1', slotLabel: '晚间', slotIndex: 1, broadcastTime: '17:40-17:50', broadcastDate: null, isSpecial: 0, desc: '播报本周校园大事。', isShow: 1, sort: 2 },
+    { title: '晚安故事', host: '小张', weekdays: '5', slotLabel: '晚间', slotIndex: 2, broadcastTime: '17:50-18:00', broadcastDate: null, isSpecial: 0, desc: '为住校生送上一段温柔的睡前故事。', isShow: 1, sort: 3 },
   ]);
   logger.info('[seed] 示例节目已创建');
 }

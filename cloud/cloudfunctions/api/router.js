@@ -135,6 +135,10 @@ const ADMIN_ROUTES = [
 
   // ---- 节目 / 公告 / 留言 / 统计 ----
   ['GET /admin/program/list', 'admin.program.list'],
+  // ⚠️ `/program/slots` 必须排在 `/program/:id` 之前 —— 段数相同，靠顺序区分，
+  //    晚了就被当成 id='slots' 吞掉（Express 时代的同一个坑）。
+  ['GET /admin/program/slots', 'admin.program.getSlots'],
+  ['PUT /admin/program/slots', 'admin.program.saveSlots'],
   ['POST /admin/program/create', 'admin.program.create'],
   ['PUT /admin/program/:id', 'admin.program.update'],
   ['DELETE /admin/program/:id', 'admin.program.remove'],

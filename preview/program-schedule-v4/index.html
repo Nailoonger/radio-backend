@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>栏目管理 · 周几排期 + 播出编排可配 v4</title>
+<style>
+:root{
+  --ink:#1d1d1f; --ink-2:#333; --muted:#7a7a7a; --muted-2:#6e6e73; --soft:#c7c7cc;
+  --hairline:#e0e0e0; --divider:#f0f0f0; --parchment:#f5f5f7; --canvas:#fff;
+  --tile:#272729; --accent:#0066cc; --accent-dark:#2997ff; --live:#ff453a;
+  --amber-bg:#fef3c7; --amber-fg:#8a6100; --green-bg:#e7f5ec; --green-fg:#1e7a46;
+  --red-bg:#fde8e8; --red-fg:#b42318; --acc-bg:#e6f0fa;
+  --r-card:18px; --r-input:12px; --r-pill:9999px;
+  --font:-apple-system,BlinkMacSystemFont,"HarmonyOS Sans SC","MiSans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--parchment);font-family:var(--font);color:var(--ink);-webkit-font-smoothing:antialiased;overflow:hidden}
+
+/* ── 预览条 ── */
+.pv{display:flex;align-items:center;gap:13px;padding:12px 26px;background:#fff;border-bottom:1px solid var(--hairline);position:relative;z-index:20}
+.pv-tag{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:var(--r-pill);background:var(--acc-bg);color:var(--accent);font-size:11.5px;font-weight:600;letter-spacing:.5px}
+.pv-title{font-size:13.5px;font-weight:600}
+.pv-note{font-size:11.5px;color:var(--muted-2)}
+.pv-tabs{margin-left:auto;display:flex;gap:8px}
+.pv-tabs button{height:30px;padding:0 14px;border:1px solid var(--hairline);background:#fff;border-radius:var(--r-pill);font-family:inherit;font-size:13px;color:var(--ink-2);cursor:pointer}
+.pv-tabs button.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:600}
+
+#stage{position:relative;height:calc(100vh - 55px);overflow:hidden}
+#page{padding:22px 26px;transition:filter .2s var(--ease),opacity .2s var(--ease);height:100%;overflow:auto}
+#stage.masked #page{filter:blur(1.4px);opacity:.45;pointer-events:none}
+#mask{position:absolute;inset:0;background:rgba(20,20,22,.30);opacity:0;pointer-events:none;transition:opacity .2s var(--ease);z-index:10}
+#stage.masked #mask{opacity:1;pointer-events:auto}
+
+.dlg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:11;background:#fff;border-radius:var(--r-card);
+  box-shadow:0 24px 60px rgba(0,0,0,.18),0 2px 8px rgba(0,0,0,.06);display:none;max-height:calc(100vh - 90px);overflow:auto}
+.dlg.on{display:block}
+.dlg-hd{display:flex;align-items:center;gap:10px;padding:18px 22px 14px}
+.dlg-hd h3{margin:0;font-size:15px;font-weight:600;letter-spacing:-.4px}
+.dlg-hd .only{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:var(--r-pill);background:var(--amber-bg);color:var(--amber-fg);font-size:11px;letter-spacing:.4px}
+.dlg-hd .x{margin-left:auto;width:26px;height:26px;border:none;background:transparent;color:var(--muted);font-size:16px;cursor:pointer;border-radius:8px}
+.dlg-hd .x:hover{background:var(--parchment);color:var(--ink)}
+.dlg-bd{padding:0 22px 6px}
+.dlg-ft{display:flex;align-items:center;gap:10px;padding:14px 22px 18px;border-top:1px solid var(--divider);margin-top:10px}
+.dlg-ft .sum{margin-right:auto;font-size:11.5px;color:var(--muted-2);letter-spacing:.3px}
+
+/* ══════════ 列表页（也是两个弹窗的背景） ══════════ */
+.listwrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.weekstrip{display:flex;gap:8px}
+.weekstrip .day{flex:1;text-align:center;padding:10px 0 9px;background:#fff;border:1px solid var(--hairline);border-radius:var(--r-card)}
+.weekstrip .day.on{background:var(--ink);border-color:var(--ink)}
+.weekstrip .w{font-size:11.5px;color:var(--muted);letter-spacing:.5px}
+.weekstrip .d{font-size:19px;font-weight:600;margin-top:2px}
+.weekstrip .n{font-size:11.5px;color:var(--muted-2);margin-top:1px}
+.weekstrip .day.on .w,.weekstrip .day.on .n{color:rgba(255,255,255,.72)}
+.weekstrip .day.on .d{color:#fff}
+
+.toolbar{display:flex;align-items:center;gap:13px}
+.filters{display:inline-flex;gap:8px}
+.filters .f{height:30px;padding:0 14px;border:1px solid var(--hairline);background:#fff;border-radius:var(--r-pill);font-family:inherit;font-size:13.5px;color:var(--ink-2)}
+.filters .f.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:600}
+.filters .f .num{opacity:.7;margin-left:3px}
+.tail{margin-left:auto;display:flex;gap:8px;align-items:center}
+.search{display:flex;align-items:center;height:36px;width:200px;padding:0 14px;background:#fff;border:1px solid var(--hairline);border-radius:var(--r-pill);font-size:12.5px;color:var(--soft)}
+.newbtn{height:36px;padding:0 18px;border:none;border-radius:var(--r-pill);background:var(--accent);color:#fff;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+
+.card{background:#fff;border:1px solid var(--hairline);border-radius:var(--r-card);overflow:hidden}
+.crow{display:flex;align-items:center;gap:14px;padding:12px 20px}
+.crow + .crow{border-top:1px solid var(--divider)}
+.crow.daystart{border-top:8px solid #e2e2e5}
+.time{width:158px;flex:none}
+.time .l1{font-size:13px;font-weight:600;color:var(--ink);letter-spacing:-.2px;display:flex;align-items:center;gap:6px}
+.time .l1 .cn{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 3px;border-radius:4px;background:var(--divider);color:var(--ink-2);font-size:10.5px;font-family:var(--mono);font-weight:600}
+.time .l2{font-family:var(--mono);font-size:11.5px;color:var(--muted-2);margin-top:3px;letter-spacing:.4px}
+.grow{flex:1;min-width:0}
+.rowc{display:flex;align-items:center;gap:8px}
+.strong{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.micro{font-size:11.5px;color:var(--muted-2);margin-top:3px;letter-spacing:.3px;line-height:1.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{display:inline-flex;align-items:center;height:22px;padding:0 10px;border-radius:var(--r-pill);font-size:11.5px;letter-spacing:.4px;flex:none}
+.tag-pass{background:var(--green-bg);color:var(--green-fg)}
+.tag-sp{background:var(--amber-bg);color:var(--amber-fg)}
+.rowact{display:flex;align-items:center;gap:4px;flex:none}
+.iconmini{width:28px;height:28px;border-radius:8px;border:none;background:transparent;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;font-size:13px}
+
+/* ══════════ 新建栏目弹窗 ══════════ */
+.dlg.prog{width:580px}
+.fi{display:flex;margin-bottom:14px}
+.fi > label{width:92px;flex:none;padding-top:7px;font-size:13.5px;color:var(--ink-2);text-align:right;padding-right:13px}
+.fi > label .req{color:var(--red-fg);margin-left:2px}
+.fi-bd{flex:1;min-width:0}
+.tin{width:100%;height:32px;padding:0 11px;border:1px solid var(--hairline);border-radius:10px;font-family:inherit;font-size:13.5px;color:var(--ink);background:#fff;outline:none}
+.tin:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--acc-bg)}
+.tin::placeholder{color:var(--soft)}
+textarea.tin{height:auto;padding:8px 11px;line-height:1.65;resize:vertical}
+
+.slotbox{padding:13px 14px 14px;background:var(--parchment);border:1px solid var(--divider);border-radius:var(--r-input)}
+.slotbox .grp + .grp{margin-top:12px}
+.slotbox .grp-cap{display:flex;align-items:baseline;gap:8px;margin-bottom:7px;flex-wrap:wrap}
+.slotbox .grp-name{font-size:11.5px;color:var(--muted-2);letter-spacing:.5px;flex:none}
+.slotbox .grp-hint{font-size:11px;color:var(--soft);letter-spacing:.3px}
+.slotbox .cfg-link{margin-left:auto;font-size:11.5px;color:var(--accent);cursor:pointer;letter-spacing:.3px}
+.slotbox .cfg-link:hover{text-decoration:underline}
+
+.days{display:flex;gap:6px}
+.days button{flex:1 1 0;min-width:0;height:32px;border:1px solid var(--hairline);background:#fff;border-radius:var(--r-pill);font-family:inherit;font-size:13px;color:var(--ink-2);cursor:pointer;padding:0}
+.days button:hover{border-color:var(--soft)}
+.days button.on{background:var(--acc-bg);border-color:var(--accent);color:var(--accent);font-weight:600}
+
+.slots{display:flex;gap:6px}
+.slots button{flex:1 1 0;min-width:0;height:44px;border:1px solid var(--hairline);background:#fff;border-radius:10px;font-family:inherit;font-size:12.5px;color:var(--ink-2);cursor:pointer;padding:0;line-height:1.3}
+.slots button .nm{display:block;font-size:12.5px}
+.slots button .mt{display:block;font-family:var(--mono);font-size:10.5px;color:var(--muted-2);margin-top:2px}
+.slots button:hover{border-color:var(--soft)}
+.slots button.on{background:var(--acc-bg);border-color:var(--accent);color:var(--accent);font-weight:600}
+.slots button.on .mt{color:var(--accent)}
+
+.ords{display:flex;gap:6px;flex-wrap:wrap}
+.ords button{flex:1 1 0;min-width:0;height:40px;border:1px solid var(--hairline);background:#fff;border-radius:10px;font-family:inherit;font-size:12.5px;color:var(--ink-2);cursor:pointer;padding:0;line-height:1.25}
+.ords button .o{display:block;font-size:12.5px}
+.ords button .tm{display:block;font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-top:2px}
+.ords button:hover{border-color:var(--soft)}
+.ords button.on{background:var(--acc-bg);border-color:var(--accent);color:var(--accent);font-weight:600}
+.ords button.on .tm{color:var(--accent)}
+.ords button.taken{background:#fff;border-style:dashed;border-color:var(--soft);color:var(--muted-2)}
+.ords button.taken .tm{color:var(--soft)}
+.ords button.taken.on{border-style:solid;border-color:var(--accent);background:var(--acc-bg);color:var(--accent)}
+.ords button.taken.on .tm{color:var(--accent)}
+
+.fi .sub{font-size:11.5px;color:var(--muted-2);margin-top:5px;letter-spacing:.3px}
+.out{margin-top:4px;padding:12px 14px;background:#fff;border:1px solid var(--hairline);border-radius:var(--r-input)}
+.out .cap{font-size:11.5px;color:var(--muted-2);letter-spacing:.5px;margin-bottom:7px}
+.out .item{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:12.5px;color:var(--ink)}
+.out .item + .item{border-top:1px dashed var(--divider)}
+.out .item .wd{font-weight:600;min-width:46px}
+.out .item .tm{font-family:var(--mono);font-size:11.5px;color:var(--muted-2)}
+.out .item .nm{color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.out .warn{font-size:12px;color:var(--red-fg)}
+.out .tip{margin-top:8px;padding-top:8px;border-top:1px solid var(--divider);font-size:11.5px;color:var(--muted-2);letter-spacing:.3px;line-height:1.7}
+.out .tip b{color:var(--ink)}
+
+.btn{height:32px;padding:0 18px;border-radius:var(--r-pill);font-family:inherit;font-size:13.5px;cursor:pointer;border:1px solid var(--hairline);background:#fff;color:var(--ink-2)}
+.btn.prim{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+
+.kind{display:flex;gap:8px;align-items:center}
+.kind button{height:32px;padding:0 16px;border:1px solid var(--hairline);background:#fff;border-radius:var(--r-pill);font-family:inherit;font-size:13px;color:var(--ink-2);cursor:pointer}
+.kind button.on{background:var(--acc-bg);border-color:var(--accent);color:var(--accent);font-weight:600}
+.kind .hint{font-size:11.5px;color:var(--muted-2);letter-spacing:.3px}
+
+/* ══════════ 播出编排弹窗 ══════════ */
+.dlg.cfg{width:672px}
+.cfg-lead{font-size:12.5px;color:var(--muted-2);letter-spacing:.3px;line-height:1.75;margin:0 0 14px}
+.cfg-head{display:flex;align-items:center;gap:0;padding:0 10px;margin-bottom:7px}
+.cfg-head span{font-size:11px;color:var(--muted-2);letter-spacing:.5px}
+.cfg-head .c1{width:92px}
+.cfg-head .c2{width:132px}
+.cfg-head .c3{width:132px}
+.cfg-head .c4{width:104px}
+
+.rows{border:1px solid var(--hairline);border-radius:var(--r-input);overflow:hidden}
+.cfgr-blk + .cfgr-blk{border-top:1px solid var(--divider)}
+.cfgr{display:flex;align-items:center;gap:13px;padding:11px 10px 8px;background:#fff}
+.cfgr .c1{width:92px;flex:none}
+.cfgr .c2{width:132px;flex:none}
+.cfgr .c3{width:132px;flex:none}
+.cfgr .c4{width:104px;flex:none}
+.cfgr .del{font-size:12px;color:var(--muted);cursor:pointer;letter-spacing:.3px;flex:none;margin-left:auto}
+.cfgr .del:hover{color:var(--red-fg)}
+
+.mini{height:30px;padding:0 9px;border:1px solid var(--hairline);border-radius:9px;font-family:var(--mono);font-size:12.5px;color:var(--ink);background:#fff;outline:none;text-align:center;width:100%}
+.mini:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--acc-bg)}
+.mini.txt{font-family:var(--font);text-align:left;padding:0 11px}
+.unit-row{display:flex;align-items:center;gap:6px}
+.unit{font-size:11.5px;color:var(--muted-2);flex:none}
+
+.tickline{display:flex;align-items:center;gap:9px;padding:0 10px 11px 10px;background:#fff}
+.tickline .times{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);letter-spacing:.4px}
+.tickline .dur{font-size:11px;color:var(--muted-2);letter-spacing:.3px}
+
+.cfg-add{margin-top:11px;display:flex;align-items:center;gap:11px}
+.addbtn{height:32px;padding:0 15px;border:1px dashed var(--hairline);background:#fff;border-radius:var(--r-pill);font-family:inherit;font-size:12.5px;color:var(--ink-2);cursor:pointer}
+.addbtn:hover{border-color:var(--accent);color:var(--accent)}
+.addbtn:disabled{color:var(--soft);cursor:not-allowed;border-color:var(--divider)}
+
+.cfg-note{margin-top:14px;padding:12px 14px;background:var(--parchment);border-radius:var(--r-input);font-size:11.5px;color:var(--muted-2);line-height:1.85;letter-spacing:.3px}
+.cfg-note b{color:var(--ink);font-weight:600}
+.cfg-note .li{display:flex;gap:7px}
+.cfg-note .li + .li{margin-top:4px}
+.cfg-note .li i{font-style:normal;color:var(--soft);flex:none}
+</style>
+</head>
+<body>
+
+<div class="pv">
+  <span class="pv-tag">v4</span>
+  <span class="pv-title">栏目管理 · 周几排期 + 播出编排可配</span>
+  <span class="pv-note">三个 tab 都是活的；编排里改起止/档数，前一个 tab 立刻跟着变</span>
+  <nav class="pv-tabs">
+    <button data-view="prog" class="on">新建栏目</button>
+    <button data-view="cfg">播出编排</button>
+    <button data-view="list">列表显示</button>
+  </nav>
+</div>
+
+<div id="stage" class="masked">
+  <div id="mask"></div>
+
+  <!-- ══════════ 背景 / 列表页 ══════════ -->
+  <div id="page">
+    <div class="listwrap">
+      <div class="weekstrip">
+        <div class="day on"><div class="w">周一 · 今天</div><div class="d">16</div><div class="n">3 档</div></div>
+        <div class="day"><div class="w">周二</div><div class="d">17</div><div class="n">1 档</div></div>
+        <div class="day"><div class="w">周三</div><div class="d">18</div><div class="n">2 档</div></div>
+        <div class="day"><div class="w">周四</div><div class="d">19</div><div class="n">暂无</div></div>
+        <div class="day"><div class="w">周五</div><div class="d">20</div><div class="n">2 档</div></div>
+        <div class="day"><div class="w">周六</div><div class="d">21</div><div class="n">暂无</div></div>
+        <div class="day"><div class="w">周日</div><div class="d">22</div><div class="n">暂无</div></div>
+      </div>
+
+      <div class="toolbar">
+        <div class="filters">
+          <button class="f on">全部 <span class="num">8</span></button>
+          <button class="f">直播中 <span class="num">0</span></button>
+          <button class="f">已展示 <span class="num">8</span></button>
+          <button class="f">已隐藏 <span class="num">0</span></button>
+        </div>
+        <div class="tail">
+          <div class="search">搜索栏目 / 主持人</div>
+          <button class="newbtn" data-open="prog">＋ 新建栏目</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="crow">
+          <div class="time"><div class="l1">周一 · 午间 <span class="cn">1</span></div><div class="l2">12:10-12:17</div></div>
+          <div class="grow">
+            <div class="rowc"><span class="strong">《新闻直通车》</span></div>
+            <div class="micro">主持人 李可 · 风声雨声读书声，声声入耳；家事国事天下事，事事关心。</div>
+          </div>
+          <span class="tag tag-pass">已展示</span>
+          <div class="rowact"><button class="iconmini">✎</button><button class="iconmini">🗑</button></div>
+        </div>
+
+        <div class="crow">
+          <div class="time"><div class="l1">周一 · 午间 <span class="cn">2</span></div><div class="l2">12:17-12:24</div></div>
+          <div class="grow">
+            <div class="rowc"><span class="strong">《读书节》</span></div>
+            <div class="micro">主持人 李佳 · 在书页与心跳之间，读出这个冬天最温柔的段落。</div>
+          </div>
+          <span class="tag tag-pass">已展示</span>
+          <div class="rowact"><button class="iconmini">✎</button><button class="iconmini">🗑</button></div>
+        </div>
+
+        <div class="crow">
+          <div class="time"><div class="l1">周一 · 晚间 <span class="cn">1</span></div><div class="l2">17:40-17:50</div></div>
+          <div class="grow">
+            <div class="rowc"><span class="strong">《精彩人生》</span></div>
+            <div class="micro">主持人 张德辉 · 聆听梦想绽放的声音，从瞬间中采撷智慧，用温暖点亮生命。</div>
+          </div>
+          <span class="tag tag-pass">已展示</span>
+          <div class="rowact"><button class="iconmini">✎</button><button class="iconmini">🗑</button></div>
+        </div>
+
+        <div class="crow daystart">
+          <div class="time"><div class="l1">周二 · 午间 <span class="cn">1</span></div><div class="l2">12:10-12:17</div></div>
+          <div class="grow">
+            <div class="rowc"><span class="strong">《走进大学》</span></div>
+            <div class="micro">主持人 小明 · 用心吐字用爱归音，点亮音乐的美好，点一首歌一份祝福。</div>
+          </div>
+          <span class="tag tag-pass">已展示</span>
+          <div class="rowact"><button class="iconmini">✎</button><button class="iconmini">🗑</button></div>
+        </div>
+
+        <div class="crow daystart">
+          <div class="time"><div class="l1">周三 · 午间 <span class="cn">1</span></div><div class="l2">12:10-12:17</div></div>
+          <div class="grow">
+            <div class="rowc"><span class="strong">《文学星空》</span></div>
+            <div class="micro">主持人 李佳 · 在书页与心跳之间，读出这个冬天最温柔的段落。</div>
+          </div>
+          <span class="tag tag-pass">已展示</span>
+          <div class="rowact"><button class="iconmini">✎</button><button class="iconmini">🗑</button></div>
+        </div>
+
+        <div class="crow">
+          <div class="time"><div class="l1">周三 · 晚间 <span class="cn">1</span></div><div class="l2">17:40-17:50</div></div>
+          <div class="grow">
+            <div class="rowc"><span class="strong">《音乐随心听》</span></div>
+            <div class="micro">主持人 待定 · 一周的歌单收尾，随便点随便听。</div>
+          </div>
+          <span class="tag tag-pass">已展示</span>
+          <div class="rowact"><button class="iconmini">✎</button><button class="iconmini">🗑</button></div>
+        </div>
+
+        <div class="crow daystart">
+          <div class="time"><div class="l1">周五 · 晚间 <span class="cn">2</span></div><div class="l2">17:50-18:00</div></div>
+          <div class="grow">
+            <div class="rowc"><span class="strong">《星空音乐会》</span></div>
+            <div class="micro">主持人 待定 · 每周五晚的压轴档，一曲收尾。</div>
+          </div>
+          <span class="tag tag-pass">已展示</span>
+          <div class="rowact"><button class="iconmini">✎</button><button class="iconmini">🗑</button></div>
+        </div>
+
+        <div class="crow daystart">
+          <div class="time"><div class="l1">11 月 20 日 周五</div><div class="l2">19:00-20:30</div></div>
+          <div class="grow">
+            <div class="rowc"><span class="strong">《校园歌手大赛决赛》</span><span class="tag tag-sp">特别档</span></div>
+            <div class="micro">主持人 待定 · 一年一度，只在 11 月 20 日这一晚。</div>
+          </div>
+          <span class="tag tag-pass">已展示</span>
+          <div class="rowact"><button class="iconmini">✎</button><button class="iconmini">🗑</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 弹窗一：新建栏目 ══════════ -->
+  <div class="dlg prog on" id="dlg-prog">
+    <div class="dlg-hd">
+      <h3>新建栏目</h3>
+      <button class="x">×</button>
+    </div>
+    <div class="dlg-bd">
+
+      <div class="fi">
+        <label>节目名<span class="req">*</span></label>
+        <div class="fi-bd"><input class="tin" id="f-title" value="读书节"></div>
+      </div>
+
+      <div class="fi">
+        <label>主持人</label>
+        <div class="fi-bd"><input class="tin" placeholder="留空则小程序显示「主持人未定」"></div>
+      </div>
+
+      <div class="fi">
+        <label>档期类型<span class="req">*</span></label>
+        <div class="fi-bd">
+          <div class="kind">
+            <button class="on" data-kind="normal">常规栏目</button>
+            <button data-kind="special">特别节目档</button>
+            <span class="hint" id="kind-hint">每周固定循环播出</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fi">
+        <label>播出安排<span class="req">*</span></label>
+        <div class="fi-bd">
+          <div class="slotbox">
+
+            <div class="grp">
+              <div class="grp-cap"><span class="grp-name">每周哪天</span><span class="grp-hint">可多选</span></div>
+              <div class="days" id="days">
+                <button data-d="1" class="on">周一</button>
+                <button data-d="2">周二</button>
+                <button data-d="3">周三</button>
+                <button data-d="4">周四</button>
+                <button data-d="5">周五</button>
+                <button data-d="6">周六</button>
+                <button data-d="7">周日</button>
+              </div>
+            </div>
+
+            <div class="grp">
+              <div class="grp-cap">
+                <span class="grp-name">哪个时段</span><span class="grp-hint">与点歌共用</span>
+                <span class="cfg-link" data-open="cfg">编排时段 / 档数 →</span>
+              </div>
+              <div class="slots" id="slots"></div>
+            </div>
+
+            <div class="grp">
+              <div class="grp-cap"><span class="grp-name">第几档</span><span class="grp-hint" id="ord-hint"></span></div>
+              <div class="ords" id="ords"></div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="fi" id="row-date" style="display:none">
+        <label>播出日期<span class="req">*</span></label>
+        <div class="fi-bd">
+          <input class="tin" type="date" id="f-date" value="2026-11-20" style="font-family:var(--mono)">
+          <div class="sub">只在这一天播一次，播完不会自动出现在下周节目单</div>
+        </div>
+      </div>
+
+      <div class="fi">
+        <label>简介</label>
+        <div class="fi-bd"><textarea class="tin" rows="2" placeholder="一句话说明这档节目播什么"></textarea></div>
+      </div>
+
+      <div class="fi">
+        <label>封面</label>
+        <div class="fi-bd">
+          <div style="height:38px;border:1px dashed var(--hairline);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:11.5px;color:var(--muted-2)">jpg/png/webp，16:9 横图最好；选填</div>
+        </div>
+      </div>
+
+      <div class="fi">
+        <label>是否展示</label>
+        <div class="fi-bd">
+          <div style="padding-top:6px"><span style="display:inline-block;width:34px;height:19px;border-radius:var(--r-pill);background:var(--accent);position:relative"><i style="position:absolute;right:2px;top:2px;width:15px;height:15px;border-radius:50%;background:#fff;display:block"></i></span></div>
+        </div>
+      </div>
+
+      <div class="out" id="out"></div>
+
+    </div>
+    <div class="dlg-ft">
+      <button class="btn">取消</button>
+      <button class="btn prim">保存</button>
+    </div>
+  </div>
+
+  <!-- ══════════ 弹窗二：播出编排 ══════════ -->
+  <div class="dlg cfg" id="dlg-cfg">
+    <div class="dlg-hd">
+      <h3>播出编排</h3>
+      <span class="only">超管可改</span>
+      <button class="x">×</button>
+    </div>
+    <div class="dlg-bd">
+      <p class="cfg-lead">每天有哪几个时段、每个时段的起止、分几档 —— 这三件事都在这里定。<br>每档多久不单独填，由「起止 ÷ 档数」自动算（除不尽时末档收在终点，总长永远对得上）。</p>
+
+      <div class="cfg-head">
+        <span class="c1">时段</span><span class="c2">起点</span><span class="c3">终点</span><span class="c4">分几档</span>
+      </div>
+
+      <div class="rows" id="cfgrows"></div>
+
+      <div class="cfg-add">
+        <button class="addbtn" id="addslot">＋ 加一个时段</button>
+        <span style="font-size:11px;color:var(--muted-2);letter-spacing:.3px">最多 6 个时段</span>
+      </div>
+
+      <div class="cfg-note">
+        <div class="li"><i>·</i><span>时段名称和起点跟「点歌设置 · 播出时段」是<b>同一份数据</b>，改这里点歌那边一起变，不会出现两套时间。</span></div>
+        <div class="li"><i>·</i><span>改了起止或档数，<b>已经排好的栏目不会被删</b>，时间自动跟着重算；超出新档数的会标红提示你重新分配。</span></div>
+      </div>
+    </div>
+    <div class="dlg-ft">
+      <span class="sum" id="cfgsum"></span>
+      <button class="btn">取消</button>
+      <button class="btn prim">保存编排</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  var FULL = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
+  /* 播出编排：与站里实况一致 —— 只有午间、晚间，各 3 档（可在这里增删改） */
+  var CFG = [
+    { label: '午间', start: '12:10', end: '12:30', count: 3 },
+    { label: '晚间', start: '17:40', end: '18:10', count: 3 }
+  ];
+  var MAX_SLOTS = 6, MAX_COUNT = 6;
+
+  /* 演示：某天某时段已排几档 */
+  var TAKEN = { '1-午间': 2, '3-午间': 1, '5-晚间': 1 };
+
+  var state = { days: [1], kind: 'normal', slotIdx: 0, ord: 3, date: '2026-11-20' };
+  var stage = document.getElementById('stage');
+
+  function toMin(hhmm) { var p = String(hhmm).split(':'); return (+p[0]) * 60 + (+p[1]); }
+  function hhmm(t) { var h = Math.floor(t / 60) % 24, m = t % 60; return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m; }
+  /* ⚠️ 这段必须跟 services/programSlot.slotTicks 一模一样：
+     每档 = round((end-start)/count)，末档强制收在 end（20 分钟分 3 档 = 7/7/6） */
+  function ticksOf(s) {
+    var a = toMin(s.start), b = toMin(s.end), n = Math.max(1, s.count | 0);
+    if (b <= a) return [];
+    var dur = Math.max(1, Math.round((b - a) / n)), out = [];
+    for (var i = 0; i < n; i++) {
+      var st = Math.min(a + i * dur, b - 1);
+      var en = (i === n - 1) ? b : Math.min(st + dur, b);
+      out.push({ index: i + 1, start: hhmm(st), end: hhmm(en), text: hhmm(st) + '-' + hhmm(en) });
+    }
+    return out;
+  }
+  function curSlot() { return CFG[state.slotIdx] || CFG[0]; }
+  function ordStart(i) { var t = ticksOf(curSlot())[i - 1]; return t ? t.start : '--:--'; }
+  function ordSpan(i) { var t = ticksOf(curSlot())[i - 1]; return t ? t.text : '--:--'; }
+  function fmtDate(str) {
+    var p = String(str).split('-');
+    if (p.length !== 3) return str;
+    var d = new Date(+p[0], +p[1] - 1, +p[2]);
+    if (isNaN(d.getTime())) return str;
+    var w = ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()];
+    return (+p[1]) + ' 月 ' + (+p[2]) + ' 日 ' + w;
+  }
+
+  /* ─────────── 播出编排 ─────────── */
+  function renderCfg() {
+    var box = document.getElementById('cfgrows');
+    var html = '';
+    CFG.forEach(function (s, i) {
+      var tk = ticksOf(s);
+      var span = Math.max(0, toMin(s.end) - toMin(s.start));
+      html +=
+        '<div class="cfgr-blk">' +
+          '<div class="cfgr" data-i="' + i + '">' +
+            '<span class="c1"><input class="mini txt" data-f="label" value="' + s.label + '" maxlength="4"></span>' +
+            '<span class="c2"><input class="mini" type="time" data-f="start" value="' + s.start + '"></span>' +
+            '<span class="c3"><input class="mini" type="time" data-f="end" value="' + s.end + '"></span>' +
+            '<span class="c4"><span class="unit-row">' +
+              '<input class="mini" type="number" min="1" max="' + MAX_COUNT + '" data-f="count" value="' + s.count + '">' +
+              '<span class="unit">档</span></span></span>' +
+            '<span class="del" data-act="del">删除</span>' +
+          '</div>' +
+          '<div class="tickline">' +
+            '<span class="times">' + (tk.length ? tk.map(function (t) { return t.text; }).join(' · ') : '终点必须晚于起点') + '</span>' +
+            '<span class="dur">' + span + ' 分钟 ÷ ' + s.count + ' 档</span>' +
+          '</div>' +
+        '</div>';
+    });
+    box.innerHTML = html;
+    var totalCount = CFG.reduce(function (a, b) { return a + (+b.count || 0); }, 0);
+    document.getElementById('cfgsum').textContent = '共 ' + CFG.length + ' 个时段、' + totalCount + ' 个档位';
+    document.getElementById('addslot').disabled = CFG.length >= MAX_SLOTS;
+    renderSlots();
+    renderOrds();
+    renderOut();
+  }
+
+  document.getElementById('cfgrows').addEventListener('click', function (e) {
+    var d = e.target.closest('[data-act="del"]');
+    if (!d) return;
+    var row = d.closest('.cfgr');
+    var i = +row.getAttribute('data-i');
+    if (CFG.length <= 1) return;
+    CFG.splice(i, 1);
+    if (state.slotIdx >= CFG.length) state.slotIdx = CFG.length - 1;
+    renderCfg();
+  });
+
+  document.getElementById('cfgrows').addEventListener('input', function (e) {
+    var f = e.target.getAttribute && e.target.getAttribute('data-f');
+    if (!f) return;
+    var row = e.target.closest('.cfgr');
+    var i = +row.getAttribute('data-i');
+    var v = e.target.value;
+    if (f === 'label') CFG[i].label = v || '未命名';
+    else if (f === 'start') CFG[i].start = v || '00:00';
+    else if (f === 'end') CFG[i].end = v || '00:00';
+    else if (f === 'count') {
+      var n = Math.max(1, Math.min(MAX_COUNT, parseInt(v, 10) || 1));
+      CFG[i].count = n;
+    }
+    renderCfg();
+  });
+
+  document.getElementById('addslot').addEventListener('click', function () {
+    if (CFG.length >= MAX_SLOTS) return;
+    CFG.push({ label: '新时段', start: '20:00', end: '20:30', count: 2 });
+    renderCfg();
+  });
+
+  /* ─────────── 新建栏目：时段 / 档位 ─────────── */
+  function renderSlots() {
+    document.getElementById('slots').innerHTML = CFG.map(function (s, i) {
+      return '<button data-i="' + i + '"' + (i === state.slotIdx ? ' class="on"' : '') + '>' +
+        '<span class="nm">' + s.label + '</span>' +
+        '<span class="mt">' + s.start + '-' + s.end + ' · ' + s.count + ' 档</span></button>';
+    }).join('');
+  }
+
+  function renderOrds() {
+    var s = curSlot();
+    if (state.ord > s.count) state.ord = s.count;
+    var html = '';
+    for (var i = 1; i <= s.count; i++) {
+      var taken = state.days.some(function (d) { return i <= (TAKEN[d + '-' + s.label] || 0); });
+      html += '<button data-o="' + i + '" class="' + ((i === state.ord ? 'on ' : '') + (taken ? 'taken' : '')).trim() + '">' +
+        '<span class="o">第 ' + i + ' 档</span><span class="tm">' + ordStart(i) + '</span></button>';
+    }
+    document.getElementById('ords').innerHTML = html;
+    var tk = ticksOf(s);
+    document.getElementById('ord-hint').textContent =
+      '虚线的是已排；' + s.start + '-' + s.end + ' 分 ' + s.count + ' 档' +
+      (tk.length ? '（一档约 ' + Math.round((toMin(s.end) - toMin(s.start)) / s.count) + ' 分钟）' : '');
+  }
+
+  function renderOut() {
+    var name = document.getElementById('f-title').value || '（节目名）';
+    var s = curSlot();
+    var span = ordSpan(state.ord);
+    var html = '<div class="cap">小程序「本周节目单」里会这样出现</div>';
+    var hint = '';
+
+    if (state.kind === 'normal') {
+      var ds = state.days.slice().sort(function (a, b) { return a - b; });
+      if (!ds.length) {
+        html += '<div class="warn">先选周几，否则这档节目不会出现在任何一天</div>';
+      } else {
+        ds.forEach(function (d) {
+          html += '<div class="item"><span class="wd">' + FULL[d] + '</span>' +
+            '<span class="tm">' + s.label + ' ' + span + '</span>' +
+            '<span class="nm">《' + name + '》</span></div>';
+        });
+        var worst = null;
+        ds.forEach(function (d) {
+          var n = TAKEN[d + '-' + s.label] || 0;
+          if (n > 0 && (!worst || n > worst.n)) worst = { d: d, n: n };
+        });
+        if (worst) {
+          hint = FULL[worst.d] + ' ' + s.label + ' 已经排了 <b>' + worst.n + ' 档</b>，这条接在第 ' + state.ord + ' 位' +
+            (state.ord <= worst.n ? ' —— <b style="color:#b42318">会和已有的撞档</b>' : '');
+        }
+        if (ds.length > 1) hint += (hint ? '<br>' : '') + '录一条，每周自动出现 <b>' + ds.length + ' 次</b>，不用重复建。';
+      }
+    } else {
+      html += '<div class="item"><span class="wd">' + fmtDate(state.date) + '</span>' +
+        '<span class="tm">' + span + '</span><span class="nm">《' + name + '》</span></div>';
+      hint = '只在这天出现一次，下周不会重复；特别档不占时段的档位。';
+    }
+    if (hint) html += '<div class="tip">' + hint + '</div>';
+    document.getElementById('out').innerHTML = html;
+  }
+
+  document.getElementById('days').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-d]');
+    if (!b) return;
+    var d = +b.getAttribute('data-d');
+    var i = state.days.indexOf(d);
+    if (i >= 0) { state.days.splice(i, 1); b.classList.remove('on'); }
+    else { state.days.push(d); b.classList.add('on'); }
+    renderOrds(); renderOut();
+  });
+
+  document.getElementById('slots').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-i]');
+    if (!b) return;
+    state.slotIdx = +b.getAttribute('data-i');
+    state.ord = 1;
+    renderSlots(); renderOrds(); renderOut();
+  });
+
+  document.getElementById('ords').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-o]');
+    if (!b) return;
+    state.ord = +b.getAttribute('data-o');
+    renderOrds(); renderOut();
+  });
+
+  document.querySelectorAll('.kind button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.kind button').forEach(function (o) { o.classList.remove('on'); });
+      b.classList.add('on');
+      state.kind = b.getAttribute('data-kind');
+      document.getElementById('row-date').style.display = state.kind === 'normal' ? 'none' : '';
+      document.getElementById('kind-hint').textContent = state.kind === 'normal' ? '每周固定循环播出' : '只在某一天播的专场';
+      renderOut();
+    });
+  });
+
+  document.getElementById('f-date').addEventListener('input', function () { state.date = this.value || '----'; renderOut(); });
+  document.getElementById('f-title').addEventListener('input', renderOut);
+
+  /* ─────────── 视图切换：弹窗叠在同一张列表页上 ─────────── */
+  function show(view) {
+    document.querySelectorAll('.pv-tabs button').forEach(function (o) {
+      o.classList.toggle('on', o.getAttribute('data-view') === view);
+    });
+    var isList = view === 'list';
+    stage.classList.toggle('masked', !isList);
+    document.getElementById('dlg-prog').classList.toggle('on', view === 'prog');
+    document.getElementById('dlg-cfg').classList.toggle('on', view === 'cfg');
+  }
+
+  document.querySelectorAll('.pv-tabs button').forEach(function (b) {
+    b.addEventListener('click', function () { show(b.getAttribute('data-view')); });
+  });
+
+  document.addEventListener('click', function (e) {
+    var o = e.target.closest && e.target.closest('[data-open]');
+    if (!o) return;
+    show(o.getAttribute('data-open'));
+  });
+
+  renderCfg();
+
+  var h = location.hash.replace('#', '');
+  if (['prog', 'cfg', 'list'].indexOf(h) >= 0) show(h); else show('prog');
+})();
+</script>
+</body>
+</html>

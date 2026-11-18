@@ -24,9 +24,27 @@ describe('节目 CRUD', () => {
     const res = await request(app)
       .post('/api/admin/program/create')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ title: '测试节目', broadcastTime: '周三 18:00-18:30', host: '小王' });
+      // 2026-11-19 起：不再填具体日期，改成 周几 + 时段 + 第几档
+      .send({ title: '测试节目', host: '小王', weekdays: '1,3', slotLabel: '午间', slotIndex: 2 });
     expect(res.body.code).toBe(0);
     expect(res.body.data.id).toBeGreaterThan(0);
+    // 默认编排：午间 12:10-12:30 分 3 档 ⇒ 第 2 档 12:17-12:24
+    expect(res.body.data.broadcastTime).toBe('12:17-12:24');
+    expect(res.body.data.isSpecial).toBe(0);
+    expect(res.body.data.broadcastDate).toBeNull();
+  });
+
+  test('常规栏目的日期由周几投影出来（本周节目单）', async () => {
+    const res = await request(app).get('/api/user/program/weekly');
+    expect(res.body.code).toBe(0);
+    const hits = res.body.data.list.filter((p) => p.title === '测试节目');
+    // weekdays='1,3' ⇒ 本周应出现两次（周一、周三），且各带一个具体日期
+    expect(hits.length).toBe(2);
+    expect(hits[0].broadcastDate).not.toBe(hits[1].broadcastDate);
+    hits.forEach((p) => {
+      const wd = new Date(p.broadcastDate + 'T00:00:00').getDay();
+      expect([1, 3]).toContain(wd === 0 ? 7 : wd);
+    });
   });
 
   test('节目列表', async () => {

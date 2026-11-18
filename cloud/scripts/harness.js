@@ -268,6 +268,16 @@ class Collection {
   skip(n) { return new Query(this.name, null).skip(n); }
   orderBy(f, d) { return new Query(this.name, null).orderBy(f, d); }
   doc(id) { return new Doc(this.name, id); }
+  /**
+   * 整表读 —— 真实云数据库 `db.collection('x').get()` 是合法的（默认取前 100 条）。
+   *
+   * ⚠️⚠️ 早期假库**没有**这个方法，于是 `lib/db.findMany(name)`（不带 where）在本地
+   *    必抛 `q.get is not a function`，而线上一切正常 —— 这是「本地红、线上好」的
+   *    镜像陷阱：很容易被人当成业务 bug，把代码改成 `.where({})` 去迁就假库，
+   *    而 `where({})` 在部分 SDK 版本上语义并不明确（见 `count()` 的注释）。
+   *    2026-11-19 栏目列表（findMany(C.PROGRAM, {})）就撞在这里，补上以对齐真实行为。
+   */
+  get() { return new Query(this.name, null).get(); }
   async add({ data }) {
     const id = data._id !== undefined ? String(data._id) : `auto_${++autoId.n}`;
     if (bucket(this.name).has(id)) { const e = new Error('duplicate _id'); e.errCode = -502002; throw e; }

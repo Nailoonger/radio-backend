@@ -43,8 +43,12 @@ async function createProgram(overrides = {}) {
   return Program.create({
     title: '午间音乐汇',
     host: '小李',
-    broadcastTime: '周一 12:30-13:00',
-    broadcastDate: '2099-12-31',
+    // 2026-11-19 起栏目不再存具体日期：常规栏目 = 每周哪几天 + 哪个时段的第几档
+    broadcastTime: '12:10-12:17',
+    weekdays: '1,2,3,4,5',
+    slotLabel: '午间',
+    slotIndex: 1,
+    isSpecial: 0,
     isShow: 1,
     sort: 1,
     ...overrides,

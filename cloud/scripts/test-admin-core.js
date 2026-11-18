@@ -85,6 +85,9 @@ const SUPER_ONLY = new Set([
   // 系统设置 / 开关
   'admin.setting.list', 'admin.setting.get', 'admin.setting.upsert',
   'admin.switch.list', 'admin.switch.update',
+  // 栏目播出编排（2026-11-19）：**读**普管放行（列表页要显示「午间 ②」），
+  // **写**只有超管 —— 改一次档数会影响全站所有栏目的播出时间，不能放给社干。
+  'admin.program.saveSlots',
   // 社干 / 部门人员 / 风采
   'admin.cadre.list', 'admin.cadre.detail', 'admin.cadre.create', 'admin.cadre.update', 'admin.cadre.remove', 'admin.cadre.toggle',
   'admin.staff.list', 'admin.staff.detail', 'admin.staff.create', 'admin.staff.update', 'admin.staff.remove', 'admin.staff.toggle',
@@ -123,6 +126,8 @@ const PLAIN_ONLY = new Set([
   'admin.submit.rules', 'admin.submit.batch', 'admin.submit.detail', 'admin.submit.approve',
   'admin.submit.statusLogs', 'admin.submit.reject', 'admin.submit.remove',
   'admin.program.list', 'admin.program.create', 'admin.program.update', 'admin.program.remove', 'admin.program.setLive',
+  // 编排**读**：普管能看（界面要渲染「周一 · 午间 ②」），写见 SUPER_ONLY
+  'admin.program.getSlots',
   'admin.notice.list', 'admin.notice.create', 'admin.notice.update', 'admin.notice.remove', 'admin.notice.toggle',
   'admin.message.list', 'admin.message.approve', 'admin.message.reject', 'admin.message.remove',
   'admin.stats.overview', 'admin.stats.submitTrend', 'admin.stats.topSongs',
@@ -146,7 +151,7 @@ const PLAIN_ONLY = new Set([
     admin: baseSeed().admin.map((a) => ({ ...a, lastLoginAt: new Date('2026-01-05T09:00:00+08:00') })),
   });
 
-  eq('管理端路由总数', ADMIN_ROUTES.length, 113);   // 112 → 113：+ POST /admin/admin/reset-password/batch
+  eq('管理端路由总数', ADMIN_ROUTES.length, 115);   // 113 → 115：+ GET/PUT /admin/program/slots（栏目播出编排）
 
   const anonBad = [];
   const plainBad = [];
@@ -183,9 +188,9 @@ const PLAIN_ONLY = new Set([
   ok('匿名调全部路由（除登录）均为 40101', anonBad.length === 0, anonBad.slice(0, 8).join(' | '));
   ok('普管对超管专属路由全部 40301、对其它路由不被误拦', plainBad.length === 0, plainBad.slice(0, 8).join(' | '));
   ok('超管调全部路由均过鉴权', anonLeak.length === 0, anonLeak.slice(0, 8).join(' | '));
-  eq('超管专属 handlerKey 条数', SUPER_ONLY.size, 67);   // 66 → 67：+ admin.adminMgr.resetPasswordBatch
+  eq('超管专属 handlerKey 条数', SUPER_ONLY.size, 68);   // 67 → 68：+ admin.program.saveSlots
   // sweepQueue 一个 key 对应两条路由（/quota/sweep 与 /queue/sweep）→ 66 > 65
-  eq('落在超管专属 handlerKey 上的**路由**条数', ADMIN_ROUTES.filter(([, hk]) => SUPER_ONLY.has(hk)).length, 68);   // 67 → 68
+  eq('落在超管专属 handlerKey 上的**路由**条数', ADMIN_ROUTES.filter(([, hk]) => SUPER_ONLY.has(hk)).length, 69);   // 68 → 69
 
   // 权限规范必须**恰好覆盖**路由表。只声明「超管」是不够的 ——
   // 另一半（普管即可）如果只靠「不在 SUPER_ONLY 里」隐式推出，那么
@@ -197,8 +202,8 @@ const PLAIN_ONLY = new Set([
   ok('每个 handlerKey 都被显式分类（超管 ∪ 普管）', uncovered.length === 0, uncovered.join(' | '));
   ok('两类互不重叠', overlap.length === 0, overlap.join(' | '));
   eq('分类总数 = 路由表去重后的 key 数', SUPER_ONLY.size + PLAIN_ONLY.size, routeKeys.length);
-  eq('普管可调 handlerKey 条数', PLAIN_ONLY.size, 44);
-  eq('普管可调**路由**条数（capacity 一 key 两路由）', ADMIN_ROUTES.filter(([, hk]) => PLAIN_ONLY.has(hk)).length, 45);
+  eq('普管可调 handlerKey 条数', PLAIN_ONLY.size, 45);   // 44 → 45：+ admin.program.getSlots
+  eq('普管可调**路由**条数（capacity 一 key 两路由）', ADMIN_ROUTES.filter(([, hk]) => PLAIN_ONLY.has(hk)).length, 46);   // 45 → 46
 
   /* ══════════════════ B. auth ══════════════════ */
   section('B. 管理端登录 / 当前账号 / 改密 / 退出');
@@ -315,31 +320,38 @@ const PLAIN_ONLY = new Set([
   eq('非法 value → 40001', [r.code, r.message], [40001, 'value 必须为 on 或 off']);
 
   /* ══════════════════ E. program ══════════════════ */
-  section('E. 节目排期');
+  section('E. 节目排期（2026-11-19 起：每周几 + 时段 + 第几档）');
   reset(baseSeed());
 
   eq('普管调 program/list → 放行', (await H.call(H.req('GET', '/admin/program/list', {}, PLAIN_TOKEN))).code, 0);
 
-  r = await H.call(H.req('POST', '/admin/program/create', { title: '晚安电台' }, SUPER_TOKEN));
-  eq('缺开播时间 → 40001', [r.code, r.message], [40001, '请填写节目名和开播时间']);
+  r = await H.call(H.req('POST', '/admin/program/create', {}, SUPER_TOKEN));
+  eq('连节目名都没有 → 40001', [r.code, r.message], [40001, '请填写节目名']);
 
-  r = await H.call(H.req('POST', '/admin/program/create', { title: '早间新闻', broadcastTime: '07:20', broadcastDate: '2026-10-05', sort: 2 }, SUPER_TOKEN));
-  eq('create → 字段集', Object.keys(r.data), ['id', 'title', 'host', 'broadcastTime', 'broadcastDate', 'desc', 'cover', 'isShow', 'isLive', 'sort', 'createTime', 'updateTime']);
-  eq('create 默认 isShow=1 / isLive=0', [r.data.isShow, r.data.isLive], [1, 0]);
+  // ⚠️ 常规栏目不再填具体日期：必须落到「每周哪几天 + 哪个时段 + 第几档」。
+  //    只给标题（老客户端的行为）现在会被挡下来 —— 这正是本轮要的：
+  //    「一天中午可能播 2-3 个」，一个自由时间排不开。
+  r = await H.call(H.req('POST', '/admin/program/create', { title: '晚安电台' }, SUPER_TOKEN));
+  eq('常规栏目没选周几 → 40001', [r.code, r.message], [40001, '请选择每周哪几天播出']);
+
+  r = await H.call(H.req('POST', '/admin/program/create', { title: '早间新闻', weekdays: [1, 3], slotLabel: '午间', slotIndex: 2, sort: 2 }, SUPER_TOKEN));
+  eq('create → 字段集', Object.keys(r.data), ['id', 'title', 'host', 'broadcastTime', 'broadcastDate', 'weekdays', 'slotLabel', 'slotIndex', 'isSpecial', 'desc', 'cover', 'isShow', 'isLive', 'sort', 'createTime', 'updateTime']);
+  eq('时间由播出编排算出来（午间第 2 档 = 12:17-12:24）', r.data.broadcastTime, '12:17-12:24');
+  eq('周几归一成 "1,3"，不存具体日期', [r.data.weekdays, r.data.broadcastDate], ['1,3', null]);
+  eq('create 默认 isShow=1 / isLive=0 / isSpecial=0', [r.data.isShow, r.data.isLive, r.data.isSpecial], [1, 0, 0]);
   const pA = r.data.id;
 
-  await H.call(H.req('POST', '/admin/program/create', { title: '午间点播', broadcastTime: '12:20', broadcastDate: '2026-10-05', sort: 1 }, SUPER_TOKEN));
-  await H.call(H.req('POST', '/admin/program/create', { title: '更早的节目', broadcastTime: '09:00', broadcastDate: '2026-10-01', sort: 9 }, SUPER_TOKEN));
+  await H.call(H.req('POST', '/admin/program/create', { title: '午间点播', weekdays: '1,2,3,4,5', slotLabel: '午间', slotIndex: 1, sort: 1 }, SUPER_TOKEN));
+  await H.call(H.req('POST', '/admin/program/create', { title: '周末音乐', weekdays: [6, 7], slotLabel: '晚间', slotIndex: 1, sort: 9 }, SUPER_TOKEN));
 
   r = await H.call(H.req('GET', '/admin/program/list', {}, SUPER_TOKEN));
-  eq('列表排序 broadcastDate ASC, sort ASC', r.data.list.map((x) => x.title), ['更早的节目', '午间点播', '早间新闻']);
+  eq('列表排序 sort ASC, id ASC', r.data.list.map((x) => x.title), ['午间点播', '早间新闻', '周末音乐']);
   eq('列表 total', r.data.total, 3);
 
-  r = await H.call(H.req('GET', '/admin/program/list', { startDate: '2026-10-05', endDate: '2026-10-05' }, SUPER_TOKEN));
-  eq('日期过滤：两端都给才生效', r.data.list.map((x) => x.title), ['午间点播', '早间新闻']);
-
-  r = await H.call(H.req('GET', '/admin/program/list', { startDate: '2026-10-05' }, SUPER_TOKEN));
-  eq('只给一端 → 不过滤', r.data.total, 3);
+  // ⚠️ 原来这里还有两条「startDate/endDate 过滤」的断言 —— 已随本轮改造删除：
+  //    常规栏目没有具体日期，管理端列表按日期过滤已无意义（要按日期看用小程序节目单）。
+  eq('列表不再按日期过滤（传了也无效果，不报错）',
+    (await H.call(H.req('GET', '/admin/program/list?startDate=2026-10-05&endDate=2026-10-05', {}, SUPER_TOKEN))).data.total, 3);
 
   r = await H.call(H.req('PUT', `/admin/program/${pA}/live`, { isLive: 1 }, SUPER_TOKEN));
   eq('标记直播', r.data.isLive, 1);
@@ -347,11 +359,19 @@ const PLAIN_ONLY = new Set([
   const pB = (await H.call(H.req('GET', '/admin/program/list', {}, SUPER_TOKEN))).data.list.find((x) => x.title === '午间点播').id;
   await H.call(H.req('PUT', `/admin/program/${pB}/live`, { isLive: 1 }, SUPER_TOKEN));
   const afterLive = (await H.call(H.req('GET', '/admin/program/list', {}, SUPER_TOKEN))).data.list;
-  eq('全表仅一个 live=1（旧的自动归 0）', afterLive.map((x) => [x.title, x.isLive]).sort(), [['更早的节目', 0], ['午间点播', 1], ['早间新闻', 0]].sort());
+  eq('全表仅一个 live=1（旧的自动归 0）', afterLive.map((x) => [x.title, x.isLive]).sort(), [['周末音乐', 0], ['午间点播', 1], ['早间新闻', 0]].sort());
 
   r = await H.call(H.req('PUT', `/admin/program/${pA}`, { title: '早间新闻（改）' }, SUPER_TOKEN));
   eq('部分更新：标题已改', r.data.title, '早间新闻（改）');
-  eq('部分更新：未传字段保留', [r.data.broadcastTime, r.data.isLive], ['07:20', 0]);
+  eq('部分更新：周几 / 时段 / 档位都保留，时间按编排重算',
+    [r.data.weekdays, r.data.slotLabel, r.data.slotIndex, r.data.broadcastTime], ['1,3', '午间', 2, '12:17-12:24']);
+
+  // 常规 ↔ 特别节目档：两套模型不许混（特别档只认自己的日期，必须清掉周几/时段/档位）
+  r = await H.call(H.req('PUT', `/admin/program/${pA}`, { isSpecial: 1, broadcastDate: '2026-12-25', broadcastTime: '09:00-10:00' }, SUPER_TOKEN));
+  eq('改成特别节目档：只留日期，周几 / 时段 / 档位清空',
+    [r.data.isSpecial, r.data.broadcastDate, r.data.weekdays, r.data.slotLabel, r.data.slotIndex],
+    [1, '2026-12-25', null, null, null]);
+  eq('特别档的时间是手填的（不按编排算）', r.data.broadcastTime, '09:00-10:00');
 
   eq('删不存在 → 40401', (await H.call(H.req('DELETE', '/admin/program/999999', {}, SUPER_TOKEN))).code, 40401);
   r = await H.call(H.req('DELETE', `/admin/program/${pA}`, {}, SUPER_TOKEN));

@@ -91,6 +91,11 @@ const SUITE = [
   // 一次操作（通过 + 分配时段）靠 opId 并成一条。标 true：describeHistory 在 services/songStatus 里，
   // 但 opId 要 admin/submit.js 与 scheduling.js 一起串，sync 漏一个就退化成"两行"。
   ['test-song-history.js', true],
+  // 栏目播出编排 + 日期投影（2026-11-19）：栏目不再填具体日期，只存「每周几 + 哪个时段第几档」，
+  // 下发前由 services/programSlot.expand() 投影成本周具体日期 —— 否则小程序节目单与首页
+  // 「今天 12:10 见」按日期查会**静默返回空**（不报错，最难发现）。
+  // 标 true：投影层是新服务，sync 漏一个就是整页空列表，必须两遍都对上。
+  ['test-program-slot.js', true],
   // 管理端「切角色实时同步」（2026-11-02 陛下报的权限错乱）：角色以库为准 —— 降权/升权/停用
   // 都立刻生效，不再等 token 过期；update 三档都能写、非法值报错、最后一位超管不许降级。
   // 标 true：入口查 admin 表（index.js）+ requireAdmin 取覆盖值（lib/auth）+ handler 校验，三处都要串。
