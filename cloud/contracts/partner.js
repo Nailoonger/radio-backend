@@ -107,6 +107,7 @@ const ABILITIES = {
   canManageSchedule: 'boolean',
   // 2026-10-31：超管分发的三个开关 ⇒ 这三位不再只看角色
   canReview: 'boolean',
+  canManageRecruit: 'boolean',
   canManagePermissions: 'boolean',
   isPartner: 'boolean',
 };
@@ -119,9 +120,10 @@ const ABILITIES = {
  * ⚠️ 这两个别合成一个：合起来的那一刻，前端就分不清「没设」和「设成了关」，
  *    「跟回全局」这个动作也就没法做了。
  */
-const PERM_SET = { schedule: 'boolean', review: 'boolean', proxy: 'boolean', clubkey: 'boolean' };
+const PERM_SET = { schedule: 'boolean', review: 'boolean', proxy: 'boolean', clubkey: 'boolean', recruit: 'boolean' };
 const PERM_TRI = {
   schedule: 'boolean|null', review: 'boolean|null', proxy: 'boolean|null', clubkey: 'boolean|null',
+  recruit: 'boolean|null',
 };
 
 const contract = {
@@ -345,8 +347,8 @@ const contract = {
         dutyRoles: 'string[]', over: PERM_TRI, eff: PERM_SET, overridden: 'boolean',
       }],
       count: {
-        managers: 'number', scheduleOn: 'number', reviewOn: 'number',
-        proxyOn: 'number', clubkeyOn: 'number', overridden: 'number',
+        managers: 'number', scheduleOn: 'number', reviewOn: 'number', proxyOn: 'number',
+        clubkeyOn: 'number', recruitOn: 'number', overridden: 'number',
       },
       meta: [{ key: 'string', name: 'string', short: 'string', desc: 'string', deny: 'string' }],
     },

@@ -53,7 +53,7 @@ function abilities(p, perms) {
   //    为 true 的接口必须只要求 asPartner；为 false 的必须要求 asManager / asSuperPartner。
   const mgr = p.isSuper || p.isManager;
   // ⚠️ 缺省兜底也要把**每一个** PERM_KEYS 列出来，否则新加的位取到 undefined ⇒ 恒 false
-  const pm = perms || { schedule: mgr, review: mgr, proxy: mgr, clubkey: mgr };
+  const pm = perms || { schedule: mgr, review: mgr, proxy: mgr, clubkey: mgr, recruit: mgr };
   // 超管恒放行（他自己就是总闸）；社干看开关；站员一律 false
   const schedOk = p.isSuper || (p.isManager && pm.schedule === true);
   const revOk = p.isSuper || (p.isManager && pm.review === true);
@@ -61,6 +61,8 @@ function abilities(p, perms) {
   const proxyOk = p.isSuper || (p.isManager && pm.proxy === true);
   // 社团密钥（2026-11-07）：第四个开关。与代录同理，不跟审核/排班混在一起
   const keyOk = p.isSuper || (p.isManager && pm.clubkey === true);
+  // 招新（2026-11-19）：第五个开关。与 `asRecruiter` 严格对应
+  const recruitOk = p.isSuper || (p.isManager && pm.recruit === true);
   return {
     // 超管：时段配置、排班规则、账号管理
     canEditSlots: p.isSuper,
@@ -76,6 +78,8 @@ function abilities(p, perms) {
     canReview: revOk,
     // 社团密钥（查看 / 重置 / 作废）—— 与 `asClubKeyer` 严格对应
     canManageClubKeys: keyOk,
+    // 招新（批次读 / 报名审核 / 面试）—— 与 `asRecruiter` 严格对应
+    canManageRecruit: recruitOk,
     canApproveLeave: mgr,
     canMarkAttendance: mgr,
     canViewOverview: mgr,

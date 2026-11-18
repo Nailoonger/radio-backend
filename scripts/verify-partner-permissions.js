@@ -71,8 +71,8 @@ const PERM_ALL_KEYS = (() => {
   const m = kitJs.match(/const PERM_ALL = \{([^}]*)\}/);
   return m ? m[1].split(',').map((s) => s.split(':')[0].trim().replace(/['"]/g, '')).filter(Boolean) : [];
 })();
-const PERM_EXPECT = ['schedule', 'review', 'proxy', 'clubkey'];
-ok('权限位齐全（schedule / review / proxy / clubkey）',
+const PERM_EXPECT = ['schedule', 'review', 'proxy', 'clubkey', 'recruit'];
+ok('权限位齐全（schedule / review / proxy / clubkey / recruit）',
   PERM_EXPECT.every((k) => PERM_KEYS.indexOf(k) >= 0) && PERM_KEYS.length === PERM_EXPECT.length,
   `PERM_KEYS = [${PERM_KEYS.join(', ')}] —— 少一位就是那个功能没有开关，多一位要同步 PERM_ALL`);
 ok('PERM_ALL 与 PERM_KEYS 每一位都对得上',
@@ -89,6 +89,21 @@ const denyLines = kitJs.split('\n').filter((l) => /deny:/.test(l) && !/^\s*\*/.t
 ok('拒绝文案：每一档都是「暂无权限」四个字',
   denyLines.length === PERM_KEYS.length && denyLines.every((l) => l.indexOf("deny: '暂无权限'") >= 0),
   `有 ${denyLines.length} 条 deny、PERM_KEYS 有 ${PERM_KEYS.length} 位；或有一档又写了别的字 —— 被关掉的人只该看到这四个字`);
+
+/* ── 2026-11-19 第五位 recruit：开关必须真的管住接口，否则就是「界面在骗人」 ── */
+const recruitJs = read('cloud/cloudfunctions/api/handlers/admin/recruitment.js');
+ok('招新：读 / 审 / 面走 asRecruiter（社干看 recruit 位）',
+  /const \{ asRecruiter \} = require\('\.\.\/partner\/_kit'\)/.test(recruitJs)
+  && /async function applications\(ctx\) \{ await asRecruiter\(ctx\)/.test(recruitJs)
+  && /async function review\(ctx\) \{ await asRecruiter\(ctx\)/.test(recruitJs)
+  && /async function interview\(ctx\) \{ await asRecruiter\(ctx\)/.test(recruitJs),
+  '退回 asAdmin ⇒ 凡是能登录后台的社干都能翻报名表、改面试结论（报名表里有学生姓名班级联系方式）');
+ok('招新：建批次 / 发布 / 发榜仍然只有超管',
+  /async function createBatch\(ctx\) \{ asSuper\(ctx\)/.test(recruitJs)
+  && /async function publishResults\(ctx\) \{ asSuper\(ctx\)/.test(recruitJs),
+  '这几步会改全局（对外发报名表、出榜），不该按人分发');
+ok('招新：_kit 里 asRecruiter 按 PERM_TEXT.recruit 拒',
+  /async function asRecruiter\(ctx\)/.test(kitJs) && /if \(!perms\.recruit\) throw new ApiError\(Codes\.FORBIDDEN, PERM_TEXT\.recruit\.deny\)/.test(kitJs));
 ok('拒绝文案不再出现「暂无审核权限 / 暂无代录权限」',
   kitJs.indexOf('暂无审核权限') < 0 && kitJs.indexOf('暂无代录权限') < 0);
 ok('全局缺行视为全开（升级当天不改现状）',
@@ -356,5 +371,5 @@ ROLE_FILES.forEach((rel) => {
 
 /* 输出 */
 console.log(out.join('\n'));
-console.log(failed ? `\n✗ 失败 ${failed} 项` : '\n✓ 权限分发 + 填写窗口口径一致（4 个开关 · 4 个接口 · 前端 4 处拦截 · 1 个新页）');
+console.log(failed ? `\n✗ 失败 ${failed} 项` : `\n✓ 权限分发 + 填写窗口口径一致（${PERM_KEYS.length} 个开关 · 4 个接口 · 前端 4 处拦截 · 1 个新页）`);
 process.exit(failed ? 1 : 0);

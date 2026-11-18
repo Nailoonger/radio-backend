@@ -152,7 +152,7 @@ async function asManager(ctx) {
  *    这两件事的语义本来就不同 —— 排班是「排谁上班」，代录是「替别人说自己能不能来」。
  *    一个人可以只会收时间、不会排班（宣传口的人常常这样）。
  */
-const PERM_KEYS = ['schedule', 'review', 'proxy', 'clubkey'];
+const PERM_KEYS = ['schedule', 'review', 'proxy', 'clubkey', 'recruit'];
 const PERM_TEXT = {
   // ⚠️ `short` 给人少的胶囊用（一行要塞三个，写全名会挤成两三行）
   // ⚠️⚠️ `deny` 三档一律「暂无权限」四个字（2026-11-01 陛下定）：
@@ -163,6 +163,8 @@ const PERM_TEXT = {
   proxy: { key: 'proxy', name: '代录权限', short: '代录', desc: '替别人填可排时间', deny: '暂无权限' },
   // 2026-11-07：社团密钥（查看、生成、重置、作废）。缺这一位时社干打不开密钥管理页。
   clubkey: { key: 'clubkey', name: '社团密钥权限', short: '密钥', desc: '查看、生成、重置各社团密钥', deny: '暂无权限' },
+  // 2026-11-19：招新（批次管理 / 报名审核 / 面试安排）。缺这一位时只有超管能碰招新。
+  recruit: { key: 'recruit', name: '招新权限', short: '招新', desc: '管理招新批次、面试安排与报名审核', deny: '暂无权限' },
 };
 /**
  * 全开快照 —— 超管恒全开，以及「缺行」时的默认值都取这个
@@ -171,7 +173,7 @@ const PERM_TEXT = {
  *    `{schedule,review,proxy}` 让后加的位永远 undefined ⇒ !!undefined === false）。
  *    现在统一走这个常量，别再在别处手写对象字面量。
  */
-const PERM_ALL = { schedule: true, review: true, proxy: true, clubkey: true };
+const PERM_ALL = { schedule: true, review: true, proxy: true, clubkey: true, recruit: true };
 
 /** 三态归一：true / false / null（null = 跟随全局；脏值一律当跟随，不当作 true） */
 function triPerm(v) {
@@ -341,8 +343,30 @@ async function asClubKeyer(ctx) {
   return p;
 }
 
-// ─────────────────────────── 可排时间填写窗口 ───────────────────────────
+/**
+ * 招新管理权限（批次 / 报名审核 / 面试安排）—— 2026-11-19 第五位
+ *
+ * ⚠️ 为什么要有这一位：招新原来只有一道**角色**闸（`asAdmin`，社干都能进），
+ *    等于「全体社干都能看报名表、能改面试结论」。招新名单是学生隐私，
+ *    该按人分发，而不是发给所有有后台账号的人。
+ * ⚠️ 默认仍然是全开（`PERM_ALL` + 缺行=全开），所以发版当天没有人被挡在门外，
+ *    要收紧是超管在「权限管理」里逐人关。
+ * ⚠️ 站员按角色拒（两句话别混成一句：角色上没有 vs 权限没开）。
+ */
+async function asRecruiter(ctx) {
+  const p = ctx.partner || (await asPartner(ctx));
+  if (p.isSuper) {
+    p.perms = { ...PERM_ALL };
+    return p;
+  }
+  if (p.role !== ROLE_MANAGER) throw new ApiError(Codes.FORBIDDEN, '站员不能管理招新');
+  const perms = await permsOf(p.admin);
+  p.perms = perms;
+  if (!perms.recruit) throw new ApiError(Codes.FORBIDDEN, PERM_TEXT.recruit.deny);
+  return p;
+}
 
+// ─────────────────────────── 可排时间填写窗口 ───────────────────────────
 /**
  * 填写窗口：**周一 00:00 ~ 周六 23:59:59.999 可填，周日整日只读**（2026-10-31 陛下定）
  *
@@ -658,7 +682,7 @@ function notYet(name) {
 module.exports = {
   ROLE_SUPER, ROLE_MANAGER, ROLE_MEMBER,
   DUTY_ROLES, DEPARTMENTS, WEEK_DAYS, DEPT_BY_ROLE, deptOfRoles,
-  asPartner, asSuperPartner, asManager, asScheduler, asReviewer, asProxyer, asClubKeyer,
+  asPartner, asSuperPartner, asManager, asScheduler, asReviewer, asProxyer, asClubKeyer, asRecruiter,
   PERM_KEYS, PERM_TEXT, PERM_ALL, triPerm, readGlobalPerm, readPersonPerm, effectivePerm, permsOf,
   isMissingCollection, readOr,
   availabilityWindow, assertWindowWritable,

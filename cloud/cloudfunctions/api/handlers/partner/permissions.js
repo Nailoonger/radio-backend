@@ -238,20 +238,25 @@ async function savePerson(ctx) {
  */
 async function mine(ctx) {
   const p = await asPartner(ctx);
-  const text = {
-    schedule: PERM_TEXT.schedule.deny,
-    review: PERM_TEXT.review.deny,
-    proxy: PERM_TEXT.proxy.deny,
-    clubkey: PERM_TEXT.clubkey.deny,
-  };
+  /**
+   * ⚠️ 这三处原来都手写了 `{schedule, review, proxy, clubkey}` —— 加第五位（招新）时
+   *    这里就是「漏一处 ⇒ 前端永远读到 undefined ⇒ !!undefined === false ⇒ 超管自己
+   *    打开招新页也被挡」。全部改成按 PERM_KEYS 生成，加位不用动这里。
+   */
+  const text = {};
+  const allTrue = {};
+  const allFalse = {};
+  PERM_KEYS.forEach((k) => {
+    text[k] = PERM_TEXT[k].deny;
+    allTrue[k] = true;
+    allFalse[k] = false;
+  });
 
   // 超管恒 true：他自己就是总闸，不该被自己关的开关锁在门外
-  if (p.isSuper) return { isSuper: true, schedule: true, review: true, proxy: true, clubkey: true, text };
+  if (p.isSuper) return { isSuper: true, ...allTrue, text };
 
   // 站员：这几处本来就不属于他，权限位一律 false（这是角色，不是开关）
-  if (Number(p.role) !== ROLE_MANAGER) {
-    return { isSuper: false, schedule: false, review: false, proxy: false, clubkey: false, text };
-  }
+  if (Number(p.role) !== ROLE_MANAGER) return { isSuper: false, ...allFalse, text };
 
   const [global, over] = await Promise.all([readGlobalPerm(), readPersonPerm(p.id)]);
   return { isSuper: false, ...effectivePerm(global, over), over, text };
