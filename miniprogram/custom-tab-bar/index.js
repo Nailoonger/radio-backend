@@ -11,6 +11,8 @@
 //    中间那段"没反应 + 突然出现 + 再滑"就是抽搐的主体。
 //    而且每个 tab 页各有一个 tabBar 实例，只有点按时那个实例的格位是可信的
 //    （用户眼睛看到的就是它）—— 在别的实例里演，起点只能靠猜。
+//    切页本身压后 ~170ms（见 MOTION_MS / SWITCH_DELAY），让拖尾先在旧页上把
+//    "拉长"演完；不压后的话页面一换，拖尾就只剩一帧。
 // ③ 起点写死在 keyframe 里（ind-<from><to>，见 index.wxss 末尾 12 组），
 //    与元素当时的样式无关 ⇒ 起点永远不会错，也不用靠 setData 时序去抢。
 // ④ 一次切页只允许一次 setData（点按那一次）。目标页 onShow 只做"静态落位"，
@@ -21,6 +23,12 @@
 // 状态只有一份来源：app.globalData.tabIndex（当前页格位）。
 // 点按写 tabFrom，目标页 onShow 消费后清空；取不到 tabFrom 就静态落位、不演动画
 // （从详情页返回、冷启动、切页失败重试都属于这一类 —— 那种时候硬滑反而像抽筋）。
+
+// 拖尾 240ms（见 index.wxss 的 12 组 ind-*）。切页要等它把"拉长"这段演完再走，
+// 否则 wx.switchTab 一换页，拖尾就被砍在拉伸中途 —— 看着像"刚拉长就瞬间归位"。
+// 0.71×240 ≈ 170ms：拖尾进入收缩段的位置，黑条已经在收，页面正好换过来，两边接得上。
+const MOTION_MS = 240;
+const SWITCH_DELAY = Math.round(MOTION_MS * 0.71);
 
 Component({
   options: {
@@ -80,17 +88,20 @@ Component({
       this.setData({ selected: index, indicatorClass: `ind-${from}${index}` });
 
       const request = global.tabRequest = (global.tabRequest || 0) + 1;
-      wx.switchTab({
-        url: item.pagePath,
-        fail: () => {
-          // 切页失败：视觉与来源格一起回滚，别留下"点了但没走"的黑胶囊
-          if (global.tabRequest !== request) return;
-          global.tabIndex = from;
-          global.tabFrom = undefined;
-          this._own = from;
-          this.setData({ selected: from, indicatorClass: `ind-rest-${from}` });
-        },
-      });
+      clearTimeout(this._switchTimer);
+      this._switchTimer = setTimeout(() => {
+        wx.switchTab({
+          url: item.pagePath,
+          fail: () => {
+            // 切页失败：视觉与来源格一起回滚，别留下"点了但没走"的黑胶囊
+            if (global.tabRequest !== request) return;
+            global.tabIndex = from;
+            global.tabFrom = undefined;
+            this._own = from;
+            this.setData({ selected: from, indicatorClass: `ind-rest-${from}` });
+          },
+        });
+      }, SWITCH_DELAY);
     },
 
     /**

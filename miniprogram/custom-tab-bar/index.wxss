@@ -81,36 +81,108 @@
 .ind-rest-2 { opacity: 1; transform: translateX(200%); }
 .ind-rest-3 { opacity: 1; transform: translateX(300%); }
 
-/* ── 滑动：12 组 from→to 全部写死 ────────────────────────────────
+/* ── 滑动 + 拖尾：12 组 from→to 全部写死 ──────────────────────────
  * 为什么不用 CSS 变量 / transition 从当前样式出发：
  *   起点必须是「用户刚才看到的那一格」，而元素的当前样式在实例复用时是脏的。
  *   把 from 写进关键帧，浏览器无条件从这一格开始，跟历史状态无关。
- * 只有 4 格 ⇒ 4×3 = 12 组，穷举比任何时序技巧都可靠。 */
-.ind-01 { opacity: 1; animation: ind01 260ms cubic-bezier(.22,.61,.36,1) both; }
-.ind-02 { opacity: 1; animation: ind02 260ms cubic-bezier(.22,.61,.36,1) both; }
-.ind-03 { opacity: 1; animation: ind03 260ms cubic-bezier(.22,.61,.36,1) both; }
-.ind-10 { opacity: 1; animation: ind10 260ms cubic-bezier(.22,.61,.36,1) both; }
-.ind-12 { opacity: 1; animation: ind12 260ms cubic-bezier(.22,.61,.36,1) both; }
-.ind-13 { opacity: 1; animation: ind13 260ms cubic-bezier(.22,.61,.36,1) both; }
-.ind-20 { opacity: 1; animation: ind20 260ms cubic-bezier(.22,.61,.36,1) both; }
-.ind-21 { opacity: 1; animation: ind21 260ms cubic-bezier(.22,.61,.36,1) both; }
-.ind-23 { opacity: 1; animation: ind23 260ms cubic-bezier(.22,.61,.36,1) both; }
-.ind-30 { opacity: 1; animation: ind30 260ms cubic-bezier(.22,.61,.36,1) both; }
-.ind-31 { opacity: 1; animation: ind31 260ms cubic-bezier(.22,.61,.36,1) both; }
-.ind-32 { opacity: 1; animation: ind32 260ms cubic-bezier(.22,.61,.36,1) both; }
+ * 只有 4 格 ⇒ 4×3 = 12 组，穷举比任何时序技巧都可靠。
+ *
+ * 拖尾（2026-11-19 补回）：前沿先冲出去、后沿滞后跟上，中途拉长再收回。
+ *   旧版是靠动 left + width 拉长 —— 布局属性，每帧重排，正是抽搐的主因；
+ *   这里改用 translateX + scaleX，纯合成层，一个像素都不重排。
+ *   ⚠️ scaleX 的支点必须跟着方向切：向右时支点放在左边缘（transform-origin: 0 50%，
+ *   后沿在左），向左时放在右边缘（100% 50%）。支点放错，被拉长的那一头就成了后沿，
+ *   拖尾会整个反向 —— 看着像"先缩后伸"。
+ *   四段 ease-out 是旧版的手感（每段收一次速），别改成一条连续缓动。
+ *   竖向挤压（旧版的 scaleY 0.90→1.02）没有搬回来：它只在纵向上抖一下，
+ *   跟横向拖尾不在一个节奏上，是"抽搐"的来源之一。 */
+.ind-01 { opacity: 1; transform-origin: 0 50%;   animation: ind01 240ms ease-out both; }
+.ind-02 { opacity: 1; transform-origin: 0 50%;   animation: ind02 240ms ease-out both; }
+.ind-03 { opacity: 1; transform-origin: 0 50%;   animation: ind03 240ms ease-out both; }
+.ind-12 { opacity: 1; transform-origin: 0 50%;   animation: ind12 240ms ease-out both; }
+.ind-13 { opacity: 1; transform-origin: 0 50%;   animation: ind13 240ms ease-out both; }
+.ind-23 { opacity: 1; transform-origin: 0 50%;   animation: ind23 240ms ease-out both; }
+.ind-10 { opacity: 1; transform-origin: 100% 50%; animation: ind10 240ms ease-out both; }
+.ind-20 { opacity: 1; transform-origin: 100% 50%; animation: ind20 240ms ease-out both; }
+.ind-30 { opacity: 1; transform-origin: 100% 50%; animation: ind30 240ms ease-out both; }
+.ind-21 { opacity: 1; transform-origin: 100% 50%; animation: ind21 240ms ease-out both; }
+.ind-31 { opacity: 1; transform-origin: 100% 50%; animation: ind31 240ms ease-out both; }
+.ind-32 { opacity: 1; transform-origin: 100% 50%; animation: ind32 240ms ease-out both; }
 
-@keyframes ind01 { from { transform: translateX(0%); }   to { transform: translateX(100%); } }
-@keyframes ind02 { from { transform: translateX(0%); }   to { transform: translateX(200%); } }
-@keyframes ind03 { from { transform: translateX(0%); }   to { transform: translateX(300%); } }
-@keyframes ind10 { from { transform: translateX(100%); } to { transform: translateX(0%); } }
-@keyframes ind12 { from { transform: translateX(100%); } to { transform: translateX(200%); } }
-@keyframes ind13 { from { transform: translateX(100%); } to { transform: translateX(300%); } }
-@keyframes ind20 { from { transform: translateX(200%); } to { transform: translateX(0%); } }
-@keyframes ind21 { from { transform: translateX(200%); } to { transform: translateX(100%); } }
-@keyframes ind23 { from { transform: translateX(200%); } to { transform: translateX(300%); } }
-@keyframes ind30 { from { transform: translateX(300%); } to { transform: translateX(0%); } }
-@keyframes ind31 { from { transform: translateX(300%); } to { transform: translateX(100%); } }
-@keyframes ind32 { from { transform: translateX(300%); } to { transform: translateX(200%); } }
+/* 每组的四拍：0% 原位 → 35% 前沿冲出去（宽度拉到 1+0.62d 格）→
+ * 74% 后沿追上来、略微撞过终点 → 100% 归位。d = 跨了几格。 */
+@keyframes ind01 {
+  0%   { transform: translateX(0%)    scaleX(1); }
+  35%  { transform: translateX(6%)    scaleX(1.62); }
+  74%  { transform: translateX(95%)   scaleX(1.06); }
+  100% { transform: translateX(100%)  scaleX(1); }
+}
+@keyframes ind02 {
+  0%   { transform: translateX(0%)    scaleX(1); }
+  35%  { transform: translateX(12%)   scaleX(2.24); }
+  74%  { transform: translateX(190%)  scaleX(1.12); }
+  100% { transform: translateX(200%)  scaleX(1); }
+}
+@keyframes ind03 {
+  0%   { transform: translateX(0%)    scaleX(1); }
+  35%  { transform: translateX(18%)   scaleX(2.86); }
+  74%  { transform: translateX(285%)  scaleX(1.18); }
+  100% { transform: translateX(300%)  scaleX(1); }
+}
+@keyframes ind12 {
+  0%   { transform: translateX(100%)  scaleX(1); }
+  35%  { transform: translateX(106%)  scaleX(1.62); }
+  74%  { transform: translateX(195%)  scaleX(1.06); }
+  100% { transform: translateX(200%)  scaleX(1); }
+}
+@keyframes ind13 {
+  0%   { transform: translateX(100%)  scaleX(1); }
+  35%  { transform: translateX(112%)  scaleX(2.24); }
+  74%  { transform: translateX(290%)  scaleX(1.12); }
+  100% { transform: translateX(300%)  scaleX(1); }
+}
+@keyframes ind23 {
+  0%   { transform: translateX(200%)  scaleX(1); }
+  35%  { transform: translateX(206%)  scaleX(1.62); }
+  74%  { transform: translateX(295%)  scaleX(1.06); }
+  100% { transform: translateX(300%)  scaleX(1); }
+}
+@keyframes ind10 {
+  0%   { transform: translateX(100%)  scaleX(1); }
+  35%  { transform: translateX(94%)   scaleX(1.62); }
+  74%  { transform: translateX(5%)    scaleX(1.06); }
+  100% { transform: translateX(0%)    scaleX(1); }
+}
+@keyframes ind20 {
+  0%   { transform: translateX(200%)  scaleX(1); }
+  35%  { transform: translateX(188%)  scaleX(2.24); }
+  74%  { transform: translateX(10%)   scaleX(1.12); }
+  100% { transform: translateX(0%)    scaleX(1); }
+}
+@keyframes ind30 {
+  0%   { transform: translateX(300%)  scaleX(1); }
+  35%  { transform: translateX(282%)  scaleX(2.86); }
+  74%  { transform: translateX(15%)   scaleX(1.18); }
+  100% { transform: translateX(0%)    scaleX(1); }
+}
+@keyframes ind21 {
+  0%   { transform: translateX(200%)  scaleX(1); }
+  35%  { transform: translateX(194%)  scaleX(1.62); }
+  74%  { transform: translateX(105%)  scaleX(1.06); }
+  100% { transform: translateX(100%)  scaleX(1); }
+}
+@keyframes ind31 {
+  0%   { transform: translateX(300%)  scaleX(1); }
+  35%  { transform: translateX(288%)  scaleX(2.24); }
+  74%  { transform: translateX(110%)  scaleX(1.12); }
+  100% { transform: translateX(100%)  scaleX(1); }
+}
+@keyframes ind32 {
+  0%   { transform: translateX(300%)  scaleX(1); }
+  35%  { transform: translateX(294%)  scaleX(1.62); }
+  74%  { transform: translateX(205%)  scaleX(1.06); }
+  100% { transform: translateX(200%)  scaleX(1); }
+}
 
 .tab {
   position: relative;          /* 图标/文字要压在指示器上面 */
