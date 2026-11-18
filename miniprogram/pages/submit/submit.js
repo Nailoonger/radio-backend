@@ -607,6 +607,9 @@ Page({
   },
 
   goMySubmit() {
+    // 走底栏的 go()，跟点「我的」是同一套拖尾；拿不到实例再退回直连
+    const bar = typeof this.getTabBar === 'function' ? this.getTabBar() : null;
+    if (bar && typeof bar.go === 'function') { bar.go(3); return; }
     wx.switchTab({ url: '/pages/mySubmit/mySubmit' });
   },
 });

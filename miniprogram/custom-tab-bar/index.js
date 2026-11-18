@@ -60,7 +60,9 @@ Component({
       // 页面已经不可见了，这时把实例拨回"本页自己的格位"，用户看不到这一下。
       // 作用是让下次本页出现的第一帧就是对的（见契约 ⑤）：
       // 不复位的话，复用的实例会带着"上次离开时滑到的那格"重新出现，先闪一帧再归位。
-      const i = this._own;
+      // ⚠️ 这里的格位必须取 _pageIndex（本页在 list 里的固定格位），
+      //    不能用点按时的目标格 —— 点按会把它带到别的格去，复位就复位错了。
+      const i = this._pageIndex;
       if (!Number.isInteger(i)) return;
       const cls = `ind-rest-${i}`;
       if (this.data.selected !== i || this.data.indicatorClass !== cls) {
@@ -71,11 +73,20 @@ Component({
 
   methods: {
     /**
-     * 点按 tab：只记来源格、立刻在当前实例上演完这段滑动，然后发起切页。
-     * ⚠️ 这里必须"先动再切"，不能只记状态等目标页去演（契约 ②）。
+     * 点按 tab（wxml 绑的就是它）。
      */
     switchTab(e) {
-      const index = Number(e.currentTarget.dataset.index);
+      this.go(Number(e.currentTarget.dataset.index));
+    },
+
+    /**
+     * 按格位切页：拖尾 + 选中态 + 来源格，全部跟点按走同一条路。
+     * 页面内的「立即投稿」「去我的投稿」这类按钮请调它，别直接 wx.switchTab ——
+     * 直接调的话底栏不会演拖尾（tabFrom 得手写，还容易写错格），
+     * 观感上就是"点卡片和点底栏不是一套东西"。
+     * ⚠️ 这里必须"先动再切"，不能只记状态等目标页去演（契约 ②）。
+     */
+    go(index) {
       const item = this.data.list[index];
       if (!item) return;
 
@@ -85,7 +96,7 @@ Component({
 
       global.tabIndex = index;
       global.tabFrom = from;
-      this._own = index;
+      // 注意：不碰 _pageIndex —— 它记的是「本页在 list 里的固定格位」，点按只改视觉。
 
       // 唯一一次 setData：选中态 + 位移一起给，一次渲染、一段动画、没有第二段。
       this.setData({ selected: index, indicatorClass: `ind-${from}${index}` });
@@ -100,7 +111,6 @@ Component({
             if (global.tabRequest !== request) return;
             global.tabIndex = from;
             global.tabFrom = undefined;
-            this._own = from;
             this.setData({ selected: from, indicatorClass: `ind-rest-${from}` });
           },
         });
@@ -116,7 +126,7 @@ Component({
       const raw = global.tabFrom;
       global.tabFrom = undefined;
       global.tabIndex = index;
-      this._own = index;
+      this._pageIndex = index;   // 本页固定格位，只有这里写；hide() 靠它复位
 
       const direction = Number.isInteger(raw) && raw >= 0 && raw < this.data.list.length && raw !== index
         ? Math.sign(index - raw) : 0;

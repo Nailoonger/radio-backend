@@ -28,11 +28,17 @@ Page({
   },
 
   /** 自定义 tabBar 渲染在页面内容之上，遮罩盖不住它，所以启动期间
-   *  让胶囊退到屏幕外（容器无底色，不会有任何"多出来一块"的感觉）。 */
+   *  让胶囊退到屏幕外（容器无底色，不会有任何"多出来一块"的感觉）。
+   *  ⚠️ 只在值真的变了才发 setData：onShow 每次都会走这里，
+   *     无条件 setData 等于每次切页都白跑一次逻辑层→视图层通信。 */
   setTabBar(state) {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData(state);
-    }
+    const bar = typeof this.getTabBar === 'function' ? this.getTabBar() : null;
+    if (!bar) return;
+    const patch = {};
+    Object.keys(state).forEach((k) => {
+      if (bar.data[k] !== state[k]) patch[k] = state[k];
+    });
+    if (Object.keys(patch).length) bar.setData(patch);
   },
 
   onLoad() {
@@ -223,7 +229,11 @@ Page({
   },
 
   goSubmit() {
-    // 记录来源格：投稿页的指示器从「首页」滑过去
+    // 走底栏自己的 go()：拖尾、选中态、来源格跟点 tab 完全一套；
+    // 直接 wx.switchTab 的话底栏不会演拖尾（tabFrom 还得手写，容易写错格）。
+    const bar = typeof this.getTabBar === 'function' ? this.getTabBar() : null;
+    if (bar && typeof bar.go === 'function') { bar.go(1); return; }
+    // 兜底：拿不到实例（极端时序）也别让按钮失效
     getApp().globalData.tabFrom = 0;
     wx.switchTab({ url: '/pages/submit/submit' });
   },
