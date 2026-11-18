@@ -1,7 +1,10 @@
 /* pages-partner/permissions/permissions.wxss · v1（2026-10-31）
    全部浅色：羊皮纸底 + 白卡 + accent 强调。没有任何深色块。
-   ⚠️ 胶囊与卡片圆角分开：单行元素 9999rpx，内容卡片 35rpx（≈18px@390）。
-      卡片上用 9999rpx 会变橄榄球（实测过）。 */
+   ⚠️ 圆角分三档：权限胶囊 20rpx（方角胶囊）／卡片 35rpx（≈18px@390）／
+      小标 9999rpx。卡片上用 9999rpx 会变橄榄球（实测过）。
+   ⚠️ 权限胶囊 2026-11-19 从 9999rpx 改成 20rpx：这类胶囊是**一格一个**的方形块
+      （5 个并排，每个≈58×42px，见 `preview/partner-pill-radius-v1/`），
+      套 9999rpx 出来是椭圆，不是胶囊 —— 陛下点名要「方角胶囊」。 */
 .page { min-height: 100vh; display: flex; flex-direction: column; background: #F5F5F7; }
 .chev {
   width: 18rpx; height: 18rpx;
@@ -68,7 +71,8 @@
 .pill {
   flex: 1;
   min-width: 0;
-  border-radius: 9999rpx;
+  /* 方角胶囊：20rpx（≈10px@390）。这格差不多是正方形，9999rpx 会渲染成椭圆 */
+  border-radius: 20rpx;
   background: #F5F5F7;
   padding: 13rpx 0;
   display: flex;
