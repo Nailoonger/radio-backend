@@ -21,7 +21,7 @@ const H = require('./harness');
 const API = path.join(__dirname, '..', 'cloudfunctions', 'api');
 const { sign } = require(path.join(API, 'lib/auth'));
 const {
-  currentWeekStart, availabilityWindow, assertWindowWritable,
+  currentWeekStart, availabilityWindow, assertWindowWritable, PERM_KEYS,
 } = require(path.join(API, 'handlers/partner/_kit'));
 
 const WEEK = currentWeekStart(Date.now() + 7 * 24 * 3600 * 1000);
@@ -81,7 +81,9 @@ const setPerson = (pid, patch, id = 1) => call('PUT', `/partner/permissions/pers
   equal('看板只列社干', r.data.people.map((p) => p.personId), [2, 3]);
   equal('看板计数', r.data.count, { managers: 2, scheduleOn: 2, reviewOn: 2, proxyOn: 2, clubkeyOn: 2, overridden: 0 });
   // 2026-11-07：权限位从三个变四个（加 clubkey · 社团密钥）
-  equal('看板文案位齐全（四个开关）', r.data.meta.map((m) => m.key), ['schedule', 'review', 'proxy', 'clubkey']);
+  /* ⚠️ 2026-11-19 加了第五位 recruit（招新）。这里以前写死四位，加位就红 ——
+     改成断言「meta 与 PERM_KEYS 完全一致」，加第六位时只要 _kit 改了这里自动跟上。 */
+  equal('看板文案位齐全（与 PERM_KEYS 同序）', r.data.meta.map((m) => m.key), PERM_KEYS);
 
   /* ───────── ③ 全局关掉 ⇒ 社干被拦，超管不受影响 ───────── */
   r = await setGlobal({ schedule: false });
