@@ -59,7 +59,13 @@
   pointer-events: none;
 }
 
-/* 指示器底盘。宽度恒为 25%，位移靠 translateX(100%) 一格一格走。
+/* 指示器底盘：一格宽，两端是标准的半圆（border-radius 999rpx 会被浏览器 clamp 到
+ * 高度的一半 —— 所以宽度怎么变，两端弧度都恒等于半圆）。
+ * ⚠️⚠️ 这里**必须**用 left + width 做拖尾，不能用 translateX + scaleX。
+ *   scaleX 会连 border-radius 一起横向缩放 ⇒ 两端变成被拉扁的椭圆尖（2026-11-19 陛下退回）。
+ *   代价是 left/width 会触发重排 —— 但这是绝对定位、无后代、无文字的单个纯色块，
+ *   重排范围就这一小块；旧版抽搐的真因不是它（是两段 setData 导致起点错位 + 纵向挤压
+ *   + 在错误的位置补演），那些已经修掉了。形状正确优先。
  * opacity 默认 0：实例刚建出来还不知道自己该在哪格，先不画，
  * 避免第一帧闪在默认位置 —— 页面 onShow 会立刻给它 ind-rest-<n> 或 ind-<from><to>。 */
 .indicator {
@@ -70,16 +76,14 @@
   width: 25%;
   border-radius: 999rpx;
   background: #1D1D1F;
-  transform: translateX(0);
   opacity: 0;
-  will-change: transform;
 }
 
 /* ── 静态落位（无动画）：页面 onShow 拿不到来源格时用 ────────────── */
-.ind-rest-0 { opacity: 1; transform: translateX(0%); }
-.ind-rest-1 { opacity: 1; transform: translateX(100%); }
-.ind-rest-2 { opacity: 1; transform: translateX(200%); }
-.ind-rest-3 { opacity: 1; transform: translateX(300%); }
+.ind-rest-0 { opacity: 1; left: 0%; }
+.ind-rest-1 { opacity: 1; left: 25%; }
+.ind-rest-2 { opacity: 1; left: 50%; }
+.ind-rest-3 { opacity: 1; left: 75%; }
 
 /* ── 滑动 + 拖尾：12 组 from→to 全部写死 ──────────────────────────
  * 为什么不用 CSS 变量 / transition 从当前样式出发：
@@ -87,101 +91,97 @@
  *   把 from 写进关键帧，浏览器无条件从这一格开始，跟历史状态无关。
  * 只有 4 格 ⇒ 4×3 = 12 组，穷举比任何时序技巧都可靠。
  *
- * 拖尾（2026-11-19 补回）：前沿先冲出去、后沿滞后跟上，中途拉长再收回。
- *   旧版是靠动 left + width 拉长 —— 布局属性，每帧重排，正是抽搐的主因；
- *   这里改用 translateX + scaleX，纯合成层，一个像素都不重排。
- *   ⚠️ scaleX 的支点必须跟着方向切：向右时支点放在左边缘（transform-origin: 0 50%，
- *   后沿在左），向左时放在右边缘（100% 50%）。支点放错，被拉长的那一头就成了后沿，
- *   拖尾会整个反向 —— 看着像"先缩后伸"。
- *   四段 ease-out 是旧版的手感（每段收一次速），别改成一条连续缓动。
- *   竖向挤压（旧版的 scaleY 0.90→1.02）没有搬回来：它只在纵向上抖一下，
- *   跟横向拖尾不在一个节奏上，是"抽搐"的来源之一。 */
-.ind-01 { opacity: 1; transform-origin: 0 50%;   animation: ind01 240ms ease-out both; }
-.ind-02 { opacity: 1; transform-origin: 0 50%;   animation: ind02 240ms ease-out both; }
-.ind-03 { opacity: 1; transform-origin: 0 50%;   animation: ind03 240ms ease-out both; }
-.ind-12 { opacity: 1; transform-origin: 0 50%;   animation: ind12 240ms ease-out both; }
-.ind-13 { opacity: 1; transform-origin: 0 50%;   animation: ind13 240ms ease-out both; }
-.ind-23 { opacity: 1; transform-origin: 0 50%;   animation: ind23 240ms ease-out both; }
-.ind-10 { opacity: 1; transform-origin: 100% 50%; animation: ind10 240ms ease-out both; }
-.ind-20 { opacity: 1; transform-origin: 100% 50%; animation: ind20 240ms ease-out both; }
-.ind-30 { opacity: 1; transform-origin: 100% 50%; animation: ind30 240ms ease-out both; }
-.ind-21 { opacity: 1; transform-origin: 100% 50%; animation: ind21 240ms ease-out both; }
-.ind-31 { opacity: 1; transform-origin: 100% 50%; animation: ind31 240ms ease-out both; }
-.ind-32 { opacity: 1; transform-origin: 100% 50%; animation: ind32 240ms ease-out both; }
+ * 四拍（d = 跨了几格）：
+ *   0%   后沿在 from 格、宽 1 格
+ *   35%  前沿先冲出去（右移冲 68%，左移同理），后沿只挪了 6% ⇒ 中间被拉长到 1+0.62d 格
+ *   74%  后沿追上来，前沿略微撞过终点 1%
+ *   100% 收成一格，落在 to 格
+ * 每拍 ease-out，保留旧版那种分段收力的手感（别合成一条连续缓动）。
+ * 两端弧度由 999rpx 保证，与宽度无关。 */
+.ind-01 { opacity: 1; animation: ind01 240ms ease-out both; }
+.ind-02 { opacity: 1; animation: ind02 240ms ease-out both; }
+.ind-03 { opacity: 1; animation: ind03 240ms ease-out both; }
+.ind-10 { opacity: 1; animation: ind10 240ms ease-out both; }
+.ind-12 { opacity: 1; animation: ind12 240ms ease-out both; }
+.ind-13 { opacity: 1; animation: ind13 240ms ease-out both; }
+.ind-20 { opacity: 1; animation: ind20 240ms ease-out both; }
+.ind-21 { opacity: 1; animation: ind21 240ms ease-out both; }
+.ind-23 { opacity: 1; animation: ind23 240ms ease-out both; }
+.ind-30 { opacity: 1; animation: ind30 240ms ease-out both; }
+.ind-31 { opacity: 1; animation: ind31 240ms ease-out both; }
+.ind-32 { opacity: 1; animation: ind32 240ms ease-out both; }
 
-/* 每组的四拍：0% 原位 → 35% 前沿冲出去（宽度拉到 1+0.62d 格）→
- * 74% 后沿追上来、略微撞过终点 → 100% 归位。d = 跨了几格。 */
 @keyframes ind01 {
-  0%   { transform: translateX(0%)    scaleX(1); }
-  35%  { transform: translateX(6%)    scaleX(1.62); }
-  74%  { transform: translateX(95%)   scaleX(1.06); }
-  100% { transform: translateX(100%)  scaleX(1); }
+  0%   { left: 0%; width: 25%; }
+  35%  { left: 1.5%; width: 40.5%; }
+  74%  { left: 23.75%; width: 26.5%; }
+  100% { left: 25%; width: 25%; }
 }
 @keyframes ind02 {
-  0%   { transform: translateX(0%)    scaleX(1); }
-  35%  { transform: translateX(12%)   scaleX(2.24); }
-  74%  { transform: translateX(190%)  scaleX(1.12); }
-  100% { transform: translateX(200%)  scaleX(1); }
+  0%   { left: 0%; width: 25%; }
+  35%  { left: 3%; width: 56%; }
+  74%  { left: 47.5%; width: 28%; }
+  100% { left: 50%; width: 25%; }
 }
 @keyframes ind03 {
-  0%   { transform: translateX(0%)    scaleX(1); }
-  35%  { transform: translateX(18%)   scaleX(2.86); }
-  74%  { transform: translateX(285%)  scaleX(1.18); }
-  100% { transform: translateX(300%)  scaleX(1); }
-}
-@keyframes ind12 {
-  0%   { transform: translateX(100%)  scaleX(1); }
-  35%  { transform: translateX(106%)  scaleX(1.62); }
-  74%  { transform: translateX(195%)  scaleX(1.06); }
-  100% { transform: translateX(200%)  scaleX(1); }
-}
-@keyframes ind13 {
-  0%   { transform: translateX(100%)  scaleX(1); }
-  35%  { transform: translateX(112%)  scaleX(2.24); }
-  74%  { transform: translateX(290%)  scaleX(1.12); }
-  100% { transform: translateX(300%)  scaleX(1); }
-}
-@keyframes ind23 {
-  0%   { transform: translateX(200%)  scaleX(1); }
-  35%  { transform: translateX(206%)  scaleX(1.62); }
-  74%  { transform: translateX(295%)  scaleX(1.06); }
-  100% { transform: translateX(300%)  scaleX(1); }
+  0%   { left: 0%; width: 25%; }
+  35%  { left: 4.5%; width: 71.5%; }
+  74%  { left: 71.25%; width: 29.5%; }
+  100% { left: 75%; width: 25%; }
 }
 @keyframes ind10 {
-  0%   { transform: translateX(100%)  scaleX(1); }
-  35%  { transform: translateX(94%)   scaleX(1.62); }
-  74%  { transform: translateX(5%)    scaleX(1.06); }
-  100% { transform: translateX(0%)    scaleX(1); }
+  0%   { left: 25%; width: 25%; }
+  35%  { left: 8%; width: 40.5%; }
+  74%  { left: -0.25%; width: 26.5%; }
+  100% { left: 0%; width: 25%; }
+}
+@keyframes ind12 {
+  0%   { left: 25%; width: 25%; }
+  35%  { left: 26.5%; width: 40.5%; }
+  74%  { left: 48.75%; width: 26.5%; }
+  100% { left: 50%; width: 25%; }
+}
+@keyframes ind13 {
+  0%   { left: 25%; width: 25%; }
+  35%  { left: 28%; width: 56%; }
+  74%  { left: 72.5%; width: 28%; }
+  100% { left: 75%; width: 25%; }
 }
 @keyframes ind20 {
-  0%   { transform: translateX(200%)  scaleX(1); }
-  35%  { transform: translateX(188%)  scaleX(2.24); }
-  74%  { transform: translateX(10%)   scaleX(1.12); }
-  100% { transform: translateX(0%)    scaleX(1); }
-}
-@keyframes ind30 {
-  0%   { transform: translateX(300%)  scaleX(1); }
-  35%  { transform: translateX(282%)  scaleX(2.86); }
-  74%  { transform: translateX(15%)   scaleX(1.18); }
-  100% { transform: translateX(0%)    scaleX(1); }
+  0%   { left: 50%; width: 25%; }
+  35%  { left: 16%; width: 56%; }
+  74%  { left: -0.5%; width: 28%; }
+  100% { left: 0%; width: 25%; }
 }
 @keyframes ind21 {
-  0%   { transform: translateX(200%)  scaleX(1); }
-  35%  { transform: translateX(194%)  scaleX(1.62); }
-  74%  { transform: translateX(105%)  scaleX(1.06); }
-  100% { transform: translateX(100%)  scaleX(1); }
+  0%   { left: 50%; width: 25%; }
+  35%  { left: 33%; width: 40.5%; }
+  74%  { left: 24.75%; width: 26.5%; }
+  100% { left: 25%; width: 25%; }
+}
+@keyframes ind23 {
+  0%   { left: 50%; width: 25%; }
+  35%  { left: 51.5%; width: 40.5%; }
+  74%  { left: 73.75%; width: 26.5%; }
+  100% { left: 75%; width: 25%; }
+}
+@keyframes ind30 {
+  0%   { left: 75%; width: 25%; }
+  35%  { left: 24%; width: 71.5%; }
+  74%  { left: -0.75%; width: 29.5%; }
+  100% { left: 0%; width: 25%; }
 }
 @keyframes ind31 {
-  0%   { transform: translateX(300%)  scaleX(1); }
-  35%  { transform: translateX(288%)  scaleX(2.24); }
-  74%  { transform: translateX(110%)  scaleX(1.12); }
-  100% { transform: translateX(100%)  scaleX(1); }
+  0%   { left: 75%; width: 25%; }
+  35%  { left: 41%; width: 56%; }
+  74%  { left: 24.5%; width: 28%; }
+  100% { left: 25%; width: 25%; }
 }
 @keyframes ind32 {
-  0%   { transform: translateX(300%)  scaleX(1); }
-  35%  { transform: translateX(294%)  scaleX(1.62); }
-  74%  { transform: translateX(205%)  scaleX(1.06); }
-  100% { transform: translateX(200%)  scaleX(1); }
+  0%   { left: 75%; width: 25%; }
+  35%  { left: 58%; width: 40.5%; }
+  74%  { left: 49.75%; width: 26.5%; }
+  100% { left: 50%; width: 25%; }
 }
 
 .tab {
