@@ -3,6 +3,10 @@
  * 设计稿：容器高 94px，胶囊 62px / 圆角 36px / 内边距 4px，选中项实心墨黑 + 白图标。
  * rpx = 设计px × 1.923
  * 左右内边距 40rpx 与页面 .body / .bottom-cta 对齐 → 胶囊和页面里的块级按钮等宽。
+ *
+ * 动效口径见 index.js 顶部「动画契约 v11」。一句话：
+ *   指示器只动 transform（合成层，零重排），起点由 keyframe 写死，一次 setData 完成一次滑动。
+ *   ⚠️ 不要再给 .indicator 加 left / width / scaleY 的动画 —— 那是抽搐的唯一来源。
  */
 .tabbar {
   position: fixed;
@@ -54,6 +58,10 @@
   right: 8rpx;
   pointer-events: none;
 }
+
+/* 指示器底盘。宽度恒为 25%，位移靠 translateX(100%) 一格一格走。
+ * opacity 默认 0：实例刚建出来还不知道自己该在哪格，先不画，
+ * 避免第一帧闪在默认位置 —— 页面 onShow 会立刻给它 ind-rest-<n> 或 ind-<from><to>。 */
 .indicator {
   position: absolute;
   top: 0;
@@ -62,14 +70,47 @@
   width: 25%;
   border-radius: 999rpx;
   background: #1D1D1F;
-  transform-origin: center;
+  transform: translateX(0);
+  opacity: 0;
+  will-change: transform;
 }
 
-/* 首次落位前隐藏：实例初渲染时 selected 恒为 0（初始值不可信），
- * 若直接画出来，用户会看到指示器"闪回第一格再滑向目标"——跨格时像方向错了 */
-.indicator-off {
-  opacity: 0;
-}
+/* ── 静态落位（无动画）：页面 onShow 拿不到来源格时用 ────────────── */
+.ind-rest-0 { opacity: 1; transform: translateX(0%); }
+.ind-rest-1 { opacity: 1; transform: translateX(100%); }
+.ind-rest-2 { opacity: 1; transform: translateX(200%); }
+.ind-rest-3 { opacity: 1; transform: translateX(300%); }
+
+/* ── 滑动：12 组 from→to 全部写死 ────────────────────────────────
+ * 为什么不用 CSS 变量 / transition 从当前样式出发：
+ *   起点必须是「用户刚才看到的那一格」，而元素的当前样式在实例复用时是脏的。
+ *   把 from 写进关键帧，浏览器无条件从这一格开始，跟历史状态无关。
+ * 只有 4 格 ⇒ 4×3 = 12 组，穷举比任何时序技巧都可靠。 */
+.ind-01 { opacity: 1; animation: ind01 260ms cubic-bezier(.22,.61,.36,1) both; }
+.ind-02 { opacity: 1; animation: ind02 260ms cubic-bezier(.22,.61,.36,1) both; }
+.ind-03 { opacity: 1; animation: ind03 260ms cubic-bezier(.22,.61,.36,1) both; }
+.ind-10 { opacity: 1; animation: ind10 260ms cubic-bezier(.22,.61,.36,1) both; }
+.ind-12 { opacity: 1; animation: ind12 260ms cubic-bezier(.22,.61,.36,1) both; }
+.ind-13 { opacity: 1; animation: ind13 260ms cubic-bezier(.22,.61,.36,1) both; }
+.ind-20 { opacity: 1; animation: ind20 260ms cubic-bezier(.22,.61,.36,1) both; }
+.ind-21 { opacity: 1; animation: ind21 260ms cubic-bezier(.22,.61,.36,1) both; }
+.ind-23 { opacity: 1; animation: ind23 260ms cubic-bezier(.22,.61,.36,1) both; }
+.ind-30 { opacity: 1; animation: ind30 260ms cubic-bezier(.22,.61,.36,1) both; }
+.ind-31 { opacity: 1; animation: ind31 260ms cubic-bezier(.22,.61,.36,1) both; }
+.ind-32 { opacity: 1; animation: ind32 260ms cubic-bezier(.22,.61,.36,1) both; }
+
+@keyframes ind01 { from { transform: translateX(0%); }   to { transform: translateX(100%); } }
+@keyframes ind02 { from { transform: translateX(0%); }   to { transform: translateX(200%); } }
+@keyframes ind03 { from { transform: translateX(0%); }   to { transform: translateX(300%); } }
+@keyframes ind10 { from { transform: translateX(100%); } to { transform: translateX(0%); } }
+@keyframes ind12 { from { transform: translateX(100%); } to { transform: translateX(200%); } }
+@keyframes ind13 { from { transform: translateX(100%); } to { transform: translateX(300%); } }
+@keyframes ind20 { from { transform: translateX(200%); } to { transform: translateX(0%); } }
+@keyframes ind21 { from { transform: translateX(200%); } to { transform: translateX(100%); } }
+@keyframes ind23 { from { transform: translateX(200%); } to { transform: translateX(300%); } }
+@keyframes ind30 { from { transform: translateX(300%); } to { transform: translateX(0%); } }
+@keyframes ind31 { from { transform: translateX(300%); } to { transform: translateX(100%); } }
+@keyframes ind32 { from { transform: translateX(300%); } to { transform: translateX(200%); } }
 
 .tab {
   position: relative;          /* 图标/文字要压在指示器上面 */
@@ -92,7 +133,8 @@
 }
 
 /* 常态图标与选中图标叠放，用透明度交叉淡入——
- * 替代原来的 src 切换：瞬时不翻面，也消除 iconOn 首次点击才加载的闪白 */
+ * 替代原来的 src 切换：瞬时不翻面，也消除 iconOn 首次点击才加载的闪白。
+ * 400ms 与指示器 260ms 同一段落点，视觉上像"胶囊把图标点亮"。 */
 .tab-icon {
   position: absolute;
   left: 0;
@@ -128,15 +170,14 @@
   color: #FFFFFF;
 }
 
-/* 起点落位不做颜色过渡，渲染完成后再切到新选中项。 */
-.tabbar.noanim .tab-label,
-.tabbar.noanim .tab-icon-on { transition: none; }
-.tab-icon-bounce {
-  animation: tabIconBounce 400ms cubic-bezier(.22,.61,.36,1) both;
+/* 选中落地的微弹：挂在 .on 上，由 class 变化自然触发，
+ * 不靠 JS 打 motionClass（旧写法「先 false 再 true」两次 setData 会被合并，弹不出来）。 */
+.tab.on .tab-icon-wrap {
+  animation: tabIconBounce 360ms cubic-bezier(.22,.61,.36,1);
 }
 @keyframes tabIconBounce {
   0% { transform: scale(1); }
-  22% { transform: scale(.82); }
-  65% { transform: scale(1.08); }
+  22% { transform: scale(.84); }
+  62% { transform: scale(1.06); }
   100% { transform: scale(1); }
 }

@@ -1,53 +1,39 @@
 // custom-tab-bar/index.js
 // 胶囊浮动底部导航（设计稿「01/02/03/04」底部）
 //
-// 动画契约 v10：沿用 v9 的「立即切页、目标页起点落位、渲染回调后播放」。
-// 每页有独立实例；来源页不预播。selected 始终是真实页，visualSelected 只控制外观。
-// 胶囊四段形变共 400ms；hide 与版本号阻止旧回调覆盖后续切换。
-
-function pose(animation, left, width, height, duration) {
-  return animation.left(`${left * 25}%`).width(`${width * 25}%`)
-    .scaleY(height).step({ duration, timingFunction: 'ease-out' });
-}
-
-function resting(index) {
-  const animation = wx.createAnimation();
-  pose(animation, index, 1, 1, 0);
-  return animation.export();
-}
-
-function flowing(from, to) {
-  const animation = wx.createAnimation();
-  const distance = Math.abs(to - from);
-  const direction = Math.sign(to - from);
-  // 前沿先行、后沿滞后；向左时镜像两端位置。
-  pose(animation, direction > 0 ? from + distance * 0.12 : from - distance * 0.72,
-    1 + distance * 0.60, 0.90, 120);
-  pose(animation, direction > 0 ? from + distance * 0.80 : to,
-    1 + distance * 0.20, 0.94, 120);
-  pose(animation, to + direction * 0.035, 1, 1.02, 100);
-  pose(animation, to, 1, 1, 60);
-  return animation.export();
-}
+// ── 动画契约 v11（2026-11-19 重写：修「抽搐 / 不从原位滑 / 位置错乱」）──────
+// 改之前先读完这段，下面几条任何一条改回去，毛病都会原样复发：
+//
+// ① 指示器只动 transform。v10 用 wx.createAnimation 同时动 left% / width% / scaleY，
+//    三个都是布局属性 ⇒ 每帧重排，真机必掉帧；那个四段 width 变形本身就是"抽搐"。
+// ② 滑动发生在**用户正在看的那一格上**（点按那一刻就开演），不在目标页 onShow 里补演。
+//    v10 是"点了什么都不动 → 等 switchTab 完成 → 新页 onShow 才开始滑"，
+//    中间那段"没反应 + 突然出现 + 再滑"就是抽搐的主体。
+//    而且每个 tab 页各有一个 tabBar 实例，只有点按时那个实例的格位是可信的
+//    （用户眼睛看到的就是它）—— 在别的实例里演，起点只能靠猜。
+// ③ 起点写死在 keyframe 里（ind-<from><to>，见 index.wxss 末尾 12 组），
+//    与元素当时的样式无关 ⇒ 起点永远不会错，也不用靠 setData 时序去抢。
+// ④ 一次切页只允许一次 setData（点按那一次）。目标页 onShow 只做"静态落位"，
+//    正常路径下连 setData 都不发 —— 实例的格位在页面隐藏时就已经拨正了。
+// ⑤ 页面隐藏时把实例拨回「本页自己的格位」（selected + indicatorClass 一起）。
+//    这一步用户看不见，但它是"再次出现时第一帧不闪在上一格"的唯一保证。
+//
+// 状态只有一份来源：app.globalData.tabIndex（当前页格位）。
+// 点按写 tabFrom，目标页 onShow 消费后清空；取不到 tabFrom 就静态落位、不演动画
+// （从详情页返回、冷启动、切页失败重试都属于这一类 —— 那种时候硬滑反而像抽筋）。
 
 Component({
   options: {
-    // 让 app.wxss 里的 :host 之外的全局变量可用
+    // 让 app.wxss 里的全局类可用
     addGlobalClass: true,
   },
 
   data: {
-    selected: 0,
-    visualSelected: 0,
-    indicatorAnimation: {},
-    motionClass: false,
-    // 第一次 setSelected 落位前隐藏指示器。
-    revealed: false,
-    // 起点落位时禁用文字和图标颜色过渡；胶囊用 0ms 动画落位。
-    noanim: false,
+    selected: 0,          // 真实选中格（决定 icon/文字配色）
+    indicatorClass: '',   // '' | ind-rest-<n>（静态落位）| ind-<from><to>（滑动）
     // 启动动画期间由首页通过 getTabBar() 驱动：
     //   hidden —— 胶囊退到屏幕外（容器无底色，不会有白板出现）
-    //   enter  —— 胶囊自下而上滑入（animation 加类即播，不受 setData 合并影响）
+    //   enter  —— 胶囊自下而上滑入（加类即播，不受 setData 合并影响）
     hidden: false,
     enter: false,
     list: [
@@ -59,54 +45,73 @@ Component({
   },
 
   pageLifetimes: {
-    hide() { this._motionVersion = (this._motionVersion || 0) + 1; },
+    hide() {
+      // 页面已经不可见了，这时把实例拨回"本页自己的格位"，用户看不到这一下。
+      // 作用是让下次本页出现的第一帧就是对的（见契约 ⑤）：
+      // 不复位的话，复用的实例会带着"上次离开时滑到的那格"重新出现，先闪一帧再归位。
+      const i = this._own;
+      if (!Number.isInteger(i)) return;
+      const cls = `ind-rest-${i}`;
+      if (this.data.selected !== i || this.data.indicatorClass !== cls) {
+        this.setData({ selected: i, indicatorClass: cls });
+      }
+    },
   },
 
   methods: {
     /**
-     * 【契约 1】用户点按 tab：只记录来源格 + 立刻切页，不演动画、不延迟。
+     * 点按 tab：只记来源格、立刻在当前实例上演完这段滑动，然后发起切页。
+     * ⚠️ 这里必须"先动再切"，不能只记状态等目标页去演（契约 ②）。
      */
     switchTab(e) {
       const index = Number(e.currentTarget.dataset.index);
       const item = this.data.list[index];
-      if (!item || index === this.data.selected) return;
+      if (!item) return;
 
-      const app = getApp();
-      const global = app.globalData;
+      const global = getApp().globalData;
+      const from = Number.isInteger(global.tabIndex) ? global.tabIndex : 0;
+      if (index === from) return;
+
+      global.tabIndex = index;
+      global.tabFrom = from;
+      this._own = index;
+
+      // 唯一一次 setData：选中态 + 位移一起给，一次渲染、一段动画、没有第二段。
+      this.setData({ selected: index, indicatorClass: `ind-${from}${index}` });
+
       const request = global.tabRequest = (global.tabRequest || 0) + 1;
-      global.tabFrom = this.data.selected;
       wx.switchTab({
         url: item.pagePath,
         fail: () => {
-          if (global.tabRequest === request) global.tabFrom = undefined;
+          // 切页失败：视觉与来源格一起回滚，别留下"点了但没走"的黑胶囊
+          if (global.tabRequest !== request) return;
+          global.tabIndex = from;
+          global.tabFrom = undefined;
+          this._own = from;
+          this.setData({ selected: from, indicatorClass: `ind-rest-${from}` });
         },
       });
     },
 
     /**
-     * 【契约 2】页面 onShow 调用：指示器从来源格滑到本格格位（只此一次滑动）。
-     * 首次渲染即按起点就位（冷启动生效），渲染完成回调里再滑向终点。
+     * 页面 onShow 调用，参数是本页在 list 里的格位。
+     * 只做"静态落位"（滑动已经在点按那一刻演完了），并返回方向给内容入场用。
      */
     setSelected(index) {
-      const app = getApp();
-      const global = app && app.globalData;
-      const source = global && global.tabFrom;
-      const from = Number.isInteger(source) && source >= 0 && source < 4 ? source : index;
-      if (global) global.tabFrom = undefined;
-      const version = this._motionVersion = (this._motionVersion || 0) + 1;
-      const direction = Math.sign(index - from);
+      const global = getApp().globalData;
+      const raw = global.tabFrom;
+      global.tabFrom = undefined;
+      global.tabIndex = index;
+      this._own = index;
 
-      // 真实选中态立即更新，避免起点渲染期间快速点按误判。
-      this.setData({
-        selected: index, visualSelected: from, revealed: true,
-        noanim: true, motionClass: false, indicatorAnimation: resting(from),
-      }, () => {
-        if (version !== this._motionVersion) return;
-        this.setData({
-          noanim: false, visualSelected: index, motionClass: direction !== 0,
-          indicatorAnimation: direction ? flowing(from, index) : resting(index),
-        });
-      });
+      const direction = Number.isInteger(raw) && raw >= 0 && raw < this.data.list.length && raw !== index
+        ? Math.sign(index - raw) : 0;
+
+      const cls = `ind-rest-${index}`;
+      // 正常路径：隐藏时已复位（契约 ⑤）⇒ 这里一次 setData 都不发
+      if (this.data.selected === index && this.data.indicatorClass === cls) return direction;
+
+      this.setData({ selected: index, indicatorClass: cls });
       return direction;
     },
   },

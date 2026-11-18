@@ -1,22 +1,24 @@
 <!-- custom-tab-bar/index.wxml -->
-<view class="tabbar {{noanim ? 'noanim' : ''}} {{hidden ? 'tabbar-hidden' : ''}} {{enter ? 'tabbar-enter' : ''}}">
+<view class="tabbar {{hidden ? 'tabbar-hidden' : ''}} {{enter ? 'tabbar-enter' : ''}}">
   <view class="pill">
     <view class="indicator-track">
-      <view class="indicator {{revealed ? '' : 'indicator-off'}}" animation="{{indicatorAnimation}}"></view>
+      <!-- 位置完全由 indicatorClass 里的 keyframe / 静态 transform 决定，
+           不再绑 animation 属性（wx.createAnimation 那条路见 index.js 契约 ②） -->
+      <view class="indicator {{indicatorClass}}"></view>
     </view>
     <view
       wx:for="{{list}}"
       wx:key="pagePath"
-      class="tab {{visualSelected === index ? 'on' : ''}}"
+      class="tab {{selected === index ? 'on' : ''}}"
       data-index="{{index}}"
       bindtap="switchTab"
       hover-class="tab-press"
       hover-start-time="0"
       hover-stay-time="120"
     >
-      <view class="tab-icon-wrap {{motionClass && visualSelected === index ? 'tab-icon-bounce' : ''}}">
+      <view class="tab-icon-wrap">
         <image class="tab-icon" src="{{item.icon}}" mode="aspectFit" />
-        <image class="tab-icon tab-icon-on {{visualSelected === index ? 'show' : ''}}" src="{{item.iconOn}}" mode="aspectFit" />
+        <image class="tab-icon tab-icon-on {{selected === index ? 'show' : ''}}" src="{{item.iconOn}}" mode="aspectFit" />
       </view>
       <text class="tab-label">{{item.text}}</text>
     </view>

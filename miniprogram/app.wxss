@@ -389,17 +389,17 @@ button.btn-block,
   overflow: hidden;
 }
 
-/* Tab 内容轻推淡入；只挂 body，避免移动固定导航、弹层和启动遮罩。 */
-.tab-content-prepare { opacity: .6; }
-.tab-content-right { animation: tabContentRight 400ms cubic-bezier(.22,.61,.36,1) both; }
-.tab-content-left { animation: tabContentLeft 400ms cubic-bezier(.22,.61,.36,1) both; }
-@keyframes tabContentRight {
-  from { opacity: .6; transform: translateX(20rpx); }
-  to { opacity: 1; transform: translateX(0); }
-}
-@keyframes tabContentLeft {
-  from { opacity: .6; transform: translateX(-20rpx); }
-  to { opacity: 1; transform: translateX(0); }
+/* 切 tab 的内容入场（utils/tabMotion.js 驱动，自定义 tabBar 侧见「动画契约 v11」）
+   ⚠️⚠️ 这里只准动 opacity，禁止再加 transform。
+   给 .body 加 transform 会让它成为 position:fixed 后代的包含块 —— 底栏、弹层、
+   骨架层（.sklayer 就是 fixed）会跟着一起位移，整页抽搐，2026-11-19 修过一次。
+   ⚠️ 也不要再拆成「prepare + 动画类」两段 setData：两段常落在同一批原生渲染里，
+   第一段画不出来就剩一次闪，画出来就是先暗一帧再亮回来。 */
+.tab-content-right,
+.tab-content-left { animation: tabContentIn 200ms cubic-bezier(.22,.61,.36,1) both; }
+@keyframes tabContentIn {
+  from { opacity: .78; }
+  to   { opacity: 1; }
 }
 
 /* ============================================================
