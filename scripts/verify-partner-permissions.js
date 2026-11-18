@@ -104,6 +104,20 @@ ok('招新：建批次 / 发布 / 发榜仍然只有超管',
   '这几步会改全局（对外发报名表、出榜），不该按人分发');
 ok('招新：_kit 里 asRecruiter 按 PERM_TEXT.recruit 拒',
   /async function asRecruiter\(ctx\)/.test(kitJs) && /if \(!perms\.recruit\) throw new ApiError\(Codes\.FORBIDDEN, PERM_TEXT\.recruit\.deny\)/.test(kitJs));
+
+/* ── 入口侧：被关掉的人不该看见、也不该站点进去（2026-11-19） ── */
+const recruitIndexJs = read('miniprogram/pages-partner/recruit/index.js');
+const partnerRoleJs = read('miniprogram/utils/partnerRole.js');
+ok('招新入口按能力位收口（工作台卡片 + 招新首页）',
+  /x\.go !== 'recruit' \|\| src\.canRecruit !== false/.test(read('miniprogram/pages-partner/desk/desk.js'))
+  && /partnerRole\.allow\('canManageRecruit'\)/.test(recruitIndexJs)
+  && /partnerRole\.allow\('canManageRecruit'\)/.test(read('miniprogram/pages-partner/recruit/detail/detail.js')),
+  '退回「只看角色」⇒ 关了招新权限的人还能看到卡片、进得去，而报名表里是学生姓名班级联系方式');
+ok('能力位读法在 partnerRole 里唯一一处（can / allow），拿不到不当 false',
+  /function can\(name\)/.test(partnerRoleJs)
+  && /function allow\(name\)/.test(partnerRoleJs)
+  && /if \(!a\) return true;/.test(partnerRoleJs),
+  '「拉不到就 false」会在断网时把有权限的人挡在自己的功能外面');
 ok('拒绝文案不再出现「暂无审核权限 / 暂无代录权限」',
   kitJs.indexOf('暂无审核权限') < 0 && kitJs.indexOf('暂无代录权限') < 0);
 ok('全局缺行视为全开（升级当天不改现状）',

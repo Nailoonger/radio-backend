@@ -65,8 +65,30 @@ Page({
         else if (partnerRole.known(n)) this.setData({ roleKey: partnerRole.roleKeyOf(n) });
       });
     }
+    /**
+     * 招新第五位权限（2026-11-19）
+     *
+     * ⚠️ 以前这页只有角色闸：凡是社干都能进来翻报名表（姓名/班级/联系方式）。
+     *    工作台的「招新」卡已经按 `canManageRecruit` 收口，这里是第二道：
+     *    从消息、历史记录、分享链接直接落到这页的人也要被挡。
+     * ⚠️ 拿不到能力位（断网/401）时 allow() 返回 true —— 不因为一次网络抖动把人挡在门外，
+     *    真没权限的话下面的接口会 403。
+     * ⚠️ 拒绝文案「暂无权限」与 `_kit.PERM_TEXT.recruit.deny` 同四个字（全站统一，不另写一句）。
+     */
+    partnerRole.allow('canManageRecruit').then((ok) => {
+      if (ok || this._gone) return;
+      wx.showToast({ title: '暂无权限', icon: 'none' });
+      setTimeout(() => {
+        if (this._gone) return;
+        const pages = getCurrentPages();
+        if (pages.length > 1) wx.navigateBack({ delta: 1 });
+        else wx.reLaunch({ url: '/pages-partner/desk/desk' });
+      }, 800);
+    });
     this.load();
   },
+
+  onUnload() { this._gone = true; },
 
   onShow() { if (this._ready) this.load(); },
   onPullDownRefresh() { this.load().then(() => wx.stopPullDownRefresh()); },

@@ -85,12 +85,33 @@ Page({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
       id: (q && q.id) || '',
       batchId: (q && q.batchId) || '',
-      /* 社干与超管都能审（服务端 asAdmin）；站员不该进来 */
+      /* 社干与超管都能审（服务端 asRecruiter）；站员不该进来 */
       canReview: r === 0 || r === 1,
     });
     partnerRole.ensure();
+    /**
+     * 招新第五位权限（2026-11-19）
+     *
+     * ⚠️ `canReview` 上面的角色判断是**出界面用**的（不能等接口回来才画按钮）。
+     *    真正的闸门是服务端的 `asRecruiter`；这里再补一道入口收口：
+     *    被超管关掉 recruit 位的人，从历史记录/分享链接落到这页也要退回去，
+     *    而不是站在这页上点按钮才吃 403。
+     * ⚠️ 文案「暂无权限」与 `_kit.PERM_TEXT.recruit.deny` 同四个字。
+     */
+    partnerRole.allow('canManageRecruit').then((ok) => {
+      if (ok || this._gone) return;
+      wx.showToast({ title: '暂无权限', icon: 'none' });
+      setTimeout(() => {
+        if (this._gone) return;
+        const pages = getCurrentPages();
+        if (pages.length > 1) wx.navigateBack({ delta: 1 });
+        else wx.reLaunch({ url: '/pages-partner/desk/desk' });
+      }, 800);
+    });
     this.load();
   },
+
+  onUnload() { this._gone = true; },
 
   goBack() {
     const pages = getCurrentPages();

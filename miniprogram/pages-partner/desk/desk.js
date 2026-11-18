@@ -117,6 +117,8 @@ Page({
 
     // 身份（先用本地 adminInfo 出界面避免闪错，再以 /partner/me 为准）
     roleKey: 'manager',          // member | manager | super
+    /* 招新第五位权限（2026-11-19）：没拉到能力位前按「显示」——见 buildSections 里那张卡的注释 */
+    canRecruit: true,
     roleTag: '社干',
     name: '',
     greet: greetWord(),
@@ -460,13 +462,16 @@ Page({
       .then((me) => {
         const m = me || {};
         const roleKey = roleKeyOf(m.role);
+        // 招新（第五位）：超管恒有；社干看 recruit 位。能力位缺失时按「有」处理（见 buildSections）
+        const canRecruit = !!(m.abilities && m.abilities.canManageRecruit);
         this.setData({
           ready: true,
           roleKey,
+          canRecruit,
           roleTag: m.isSuper ? '超管' : (m.roleText || '社干'),
           name: m.name || this.data.name,
           // ⚠️ 身份刚变，大白卡副句按新身份重出一遍；班表状态另有 fetchSchedule 负责
-          slides: this.buildSlides(Object.assign({}, this.data, { roleKey })),
+          slides: this.buildSlides(Object.assign({}, this.data, { roleKey, canRecruit })),
         }, () => { this.measureSlide(); this.skGate && this.skGate.check(); });
         this.fetchSchedule();
         this.fetchSongs();
@@ -596,9 +601,12 @@ Page({
             让工作台多一个请求不划算（这条线一天也就几条）。 */
       { go: 'club-notice', t: '广播通知', d: '社团提报 · 审核 · 播出', n: null, u: '' },
       /* 招新（2026-11-14）：跟着「站内协作」走，不给角标 —— 待审数是批次级的，
-         要单拉一次 /admin/recruitment/batches 才有；为一个红点让工作台多一个请求不划算。 */
+         要单拉一次 /admin/recruitment/batches 才有；为一个红点让工作台多一个请求不划算。
+         ⚠️ 2026-11-19：招新成了**第五位权限**（recruit）。这里按 `canManageRecruit` 收口 ——
+            以前只有角色闸，凡社干都看得到、进得去，而报名表里是学生姓名/班级/联系方式。
+            能力位还没拉到时按「显示」处理（宁可点进去被后端 403，也别把有权限的人挡在门外）。 */
       { go: 'recruit', t: '招新', d: '批次 · 报名审核 · 面试', n: null, u: '' },
-    ];
+    ].filter((x) => x.go !== 'recruit' || src.canRecruit !== false);
     /* ⚠️ 2026-10-28 陛下拍板：第三块「排班协作」（可排时间 / 值班时段）去掉 ——
        v151 社干工作台就只有"听众投稿 / 站内协作"两块，这两项原型挂在「班表」tab。
        班表 tab 落地后在那里给入口；ROUTES 里的 availability / slots 保留着复用。 */

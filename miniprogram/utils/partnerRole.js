@@ -76,6 +76,8 @@ function ensure() {
       if (!me) return NaN;
       // ⚠️ 字段名照后端：role / nickname / username / createTime（见 me.js applyAdmin 头注）
       remember({ id: me.id, username: me.username, nickname: me.nickname, role: me.role, createTime: me.createTime });
+      // 顺手把这份 me 记进 syncCache，abilities() 立刻可用（否则同一页还要再打一次 /partner/me）
+      syncCache = { at: Date.now(), me, pending: null };
       const next = Number(me.role);
       return known(next) ? next : NaN;
     })
@@ -145,4 +147,45 @@ function toastChanged() {
   if (wx.showToast) wx.showToast({ title: '权限已更新', icon: 'none' });
 }
 
-module.exports = { info, role, known, ensure, remember, roleKeyOf, sync, toastChanged, STORAGE_KEY };
+/**
+ * 最近一次 `/partner/me` 的能力位（没拉过就是 null）
+ *
+ * ⚠️ 2026-11-19：招新加了第五位权限（recruit）。原来「谁能审招新」只看角色
+ * （`role === 0 || role === 1`），等于凡是社干都能翻报名表 —— 报名表里有学生
+ * 姓名 / 班级 / 联系方式。入口侧必须跟着 `canManageRecruit` 走，否则就是
+ * 「按钮在、点进去报 403」。
+ */
+function abilities() {
+  return (syncCache.me && syncCache.me.abilities) || null;
+}
+
+/**
+ * 同步读某一位能力：**拿不到返回 null（不知道），不是 false**
+ * 调用方要区分「明确关掉」和「还没拉到」—— 后者不该把有权限的人挡在门外。
+ */
+function can(name) {
+  const a = abilities();
+  if (!a) return null;
+  return a[name] === true;
+}
+
+/**
+ * 异步判定某一位能力：缓存没有就现拉一次（走 sync 的 15 秒 TTL + 并发去重）
+ *
+ * ⚠️ 拉不到（断网 / 401）时返回 **true** —— 宁可让人进去被后端 403 拦住，
+ *    也不要因为一次网络抖动把有权限的人挡在自己的功能外面。
+ */
+function allow(name) {
+  const cached = can(name);
+  if (cached !== null) return Promise.resolve(cached);
+  return sync().then((r) => {
+    const a = r && r.me && r.me.abilities;
+    if (!a) return true;
+    return a[name] === true;
+  });
+}
+
+module.exports = {
+  info, role, known, ensure, remember, roleKeyOf, sync, toastChanged,
+  abilities, can, allow, STORAGE_KEY,
+};
